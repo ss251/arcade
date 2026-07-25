@@ -1,0 +1,294 @@
+<title>ARCADE — paid agent skills on Arc</title>
+
+<style>
+  /* ── tokens ───────────────────────────────────────────────────────────────
+     Subject is settlement: hashes, receipts, ledgers. Neutrals carry a slight
+     blue bias toward the accent so they read as chosen, not inherited. */
+  :root {
+    --paper:      #FBFBF8;
+    --paper-2:    #F1F2EF;
+    --ink:        #0B1014;
+    --ink-2:      #39424B;
+    --ink-3:      #6B757F;
+    --rule:       #DDDFDA;
+    --accent:     #1F5FD0;
+    --settled:    #1A7F4B;
+    --halt:       #B4413C;
+    --shadow:     0 1px 2px rgba(11,16,20,.05), 0 8px 24px -12px rgba(11,16,20,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:   #0B1014;
+      --paper-2: #121A21;
+      --ink:     #ECEFF1;
+      --ink-2:   #A7B2BC;
+      --ink-3:   #6F7C87;
+      --rule:    #1E2830;
+      --accent:  #5B9BFF;
+      --settled: #3FBE77;
+      --halt:    #E2706A;
+      --shadow:  0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#0B1014; --paper-2:#121A21; --ink:#ECEFF1; --ink-2:#A7B2BC;
+    --ink-3:#6F7C87; --rule:#1E2830; --accent:#5B9BFF; --settled:#3FBE77; --halt:#E2706A;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+  :root[data-theme="light"] {
+    --paper:#FBFBF8; --paper-2:#F1F2EF; --ink:#0B1014; --ink-2:#39424B;
+    --ink-3:#6B757F; --rule:#DDDFDA; --accent:#1F5FD0; --settled:#1A7F4B; --halt:#B4413C;
+    --shadow: 0 1px 2px rgba(11,16,20,.05), 0 8px 24px -12px rgba(11,16,20,.12);
+  }
+
+  /* Display face is monospace on purpose: this project's native typography is
+     transaction hashes and terminal output. */
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 0 24px 120px; }
+
+  /* ── ledger entry: every section is a row with a labelled gutter ────────── */
+  section { border-top: 1px solid var(--rule); padding: 44px 0 8px; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 18px;
+  }
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+  h1 {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: clamp(30px, 5.2vw, 46px); line-height: 1.1; letter-spacing: -.02em;
+    font-weight: 600; margin: 0 0 18px;
+  }
+  h2 { font-size: clamp(21px, 3vw, 26px); line-height: 1.25; letter-spacing: -.01em; margin: 0 0 14px; }
+  h3 { font-size: 15px; letter-spacing: .01em; margin: 0 0 6px; }
+  p { margin: 0 0 16px; max-width: 65ch; color: var(--ink-2); }
+  p.lead { font-size: 18px; color: var(--ink); }
+  strong { color: var(--ink); font-weight: 600; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+  code, .mono {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .88em; font-variant-numeric: tabular-nums;
+  }
+
+  /* ── masthead ──────────────────────────────────────────────────────────── */
+  header { padding: 72px 0 40px; }
+  .tag {
+    display: inline-block; font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); border: 1px solid var(--accent); border-radius: 2px;
+    padding: 4px 9px; margin-bottom: 22px;
+  }
+
+  /* ── the receipt: the subject's most characteristic object ─────────────── */
+  .receipt {
+    background: var(--paper-2); border: 1px solid var(--rule); border-radius: 3px;
+    padding: 20px 22px; box-shadow: var(--shadow); margin: 28px 0 8px;
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; font-variant-numeric: tabular-nums;
+  }
+  .receipt .row { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; }
+  .receipt .row span:first-child { color: var(--ink-3); }
+  .receipt .sep { border-top: 1px dashed var(--rule); margin: 10px 0; }
+  .receipt .total { font-weight: 600; }
+  .ok { color: var(--settled); }
+  .no { color: var(--halt); }
+
+  /* ── figures ───────────────────────────────────────────────────────────── */
+  .figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px; margin: 22px 0 6px; }
+  .fig { background: var(--paper-2); padding: 16px 18px; }
+  .fig .n {
+    font-family: ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums;
+    font-size: 24px; font-weight: 600; letter-spacing: -.02em; display: block; margin-bottom: 3px;
+  }
+  .fig .l { font-size: 12px; color: var(--ink-3); line-height: 1.4; }
+
+  /* ── flow + tables ─────────────────────────────────────────────────────── */
+  pre {
+    background: var(--paper-2); border: 1px solid var(--rule); border-radius: 3px;
+    padding: 18px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 6px 0 18px;
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--ink-2);
+  }
+  .tbl { overflow-x: auto; margin: 6px 0 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 12px;
+       letter-spacing: .06em; text-transform: uppercase; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); }
+  td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: top;
+       font-variant-numeric: tabular-nums; }
+  td:first-child { color: var(--ink-3); white-space: nowrap; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin: 8px 0 18px; }
+  .split > div { background: var(--paper-2); padding: 16px 18px; }
+  .split h3 { font-family: ui-monospace, Menlo, monospace; font-size: 11px; letter-spacing: .12em;
+              text-transform: uppercase; color: var(--ink-3); margin-bottom: 10px; }
+  .split ul { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; }
+  .split li { margin-bottom: 5px; }
+  @media (max-width: 620px) { .split { grid-template-columns: 1fr; } }
+
+  footer { border-top: 1px solid var(--rule); padding-top: 24px; margin-top: 44px;
+           color: var(--ink-3); font-size: 13px; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <span class="tag">Encode × Circle · Programmable Money · Agentic Economy</span>
+    <h1>ARCADE</h1>
+    <p class="lead">Publish a skill or an agent as a paid endpoint on Arc. Get paid per call in USDC — without ever handing over your code, your prompts, or your keys.</p>
+    <p>Buyers are agents too. So a seller's agent can hire another seller mid-run, and each hop settles on-chain. That's the economy part.</p>
+
+    <div class="receipt" aria-label="Example settled receipt">
+      <div class="row"><span>skill</span><span>counterparty-brief</span></div>
+      <div class="row"><span>buyer</span><span>0xAeB742…6f5b</span></div>
+      <div class="row"><span>seller</span><span>0xb70ffd…2cd2</span></div>
+      <div class="sep"></div>
+      <div class="row"><span>price</span><span>$0.0100</span></div>
+      <div class="row"><span>seller share</span><span>$0.0095</span></div>
+      <div class="row"><span>platform fee</span><span>$0.0005</span></div>
+      <div class="sep"></div>
+      <div class="row total"><span>settled</span><span class="ok">✓ on Arc · 2.17s</span></div>
+      <div class="row"><span>tx</span><span><a href="https://testnet.arcscan.app/tx/0x793b3b58bd7b2c436bfc4011505cdf2036b19facad04ad7810cf049a1a1f70dc">0x793b3b58…</a></span></div>
+    </div>
+  </header>
+
+  <section>
+    <p class="eyebrow">The problem</p>
+    <h2>Everyone has agent capacity they can't sell.</h2>
+    <p>You have a skill that produces genuinely good output — a research routine, a due-diligence brief, a data check. It's worth nothing to anyone but you, because the only way to share it is to hand over the prompt and the API key.</p>
+    <p>Meanwhile the buyer's problem is the mirror image: an agent is capped by whatever tools its operator already paid for. Subscriptions can't fix that — a card transaction costs ~30¢, so nobody can bill you $0.0004 for one call. They have to sell you a $20/month bucket you underuse.</p>
+    <p><strong>An agent doesn't need a card. It needs an endpoint and a balance.</strong></p>
+  </section>
+
+  <section>
+    <p class="eyebrow">How it works</p>
+    <h2>One command turns a skill into revenue.</h2>
+<pre> SELLER (own machine)              ARCADE                    BUYER (any agent)
+┌──────────────────────┐  ┌────────────────────────┐  ┌────────────────────┐
+│ skill/ or agent/     │  │ REGISTRY               │  │ Circle agent wallet│
+│  prompts, code, keys │  │  listings · price      │◀─│  or EOA            │
+│  NEVER LEAVE ────────│──│  ratings · SLA         │  │                    │
+│                      │  ├────────────────────────┤  │ probe → 402 → sign │
+│ RUNNER (daemon)      │◀─│ /x/:seller/:skill      │◀─│ → retry → poll     │
+│  outbound wss only   │──│ paywall→broker→settle  │──│                    │
+│  sandbox per job     │  └────────────────────────┘  └────────────────────┘
+└──────────────────────┘        settles on Arc testnet</pre>
+    <p>The runner dials <em>out</em> and pulls work, so a seller runs from a laptop behind NAT with no open ports — and the hub structurally cannot receive their credentials, because nothing of theirs is ever transmitted.</p>
+    <p><strong>Settlement happens only on success.</strong> Payment is verified before the seller does any work, and the authorization is cashed only after the output validates against the listing's schema. A refusal, timeout, bounds breach or malformed result leaves it unbroadcast. That <em>is</em> the refund — the buyer pays nothing.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Evidence</p>
+    <h2>Proven on Arc testnet, not described.</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>What</th><th>Measured</th></tr></thead>
+        <tbody>
+          <tr><td>EIP-3009 settlement</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0xc9b77c1e6c62fec6d10298af0f6cdcfc7f05b3ad6e7ef4ccdbb5a1e6b4ebc2f8">0xc9b77c1e…</a> · block 53480033</td></tr>
+          <tr><td>Buyer-side signing</td><td><strong>5 ms, zero gas, no chain interaction</strong></td></tr>
+          <tr><td>Submit → confirmed</td><td>2,173 ms · 87,153 gas · 0.002179 USDC</td></tr>
+          <tr><td>Full paid call</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x5eb961c09f7acd8960be76e6034c9f7d6a80050e4e7e0f26a61eed1845eb8142">0x5eb961c0…</a></td></tr>
+          <tr><td>Across two machines</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0xf45de149c07385a52b6d3c9aa9d4c4a92fd26736ccbb1434cfc80b4d688f8368">0xf45de149…</a> · runner on a separate host</td></tr>
+          <tr><td>Gateway Nanopayments</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x5ede9428611e7f1fb0eeadfc1cda4843fc3d6c9afcbbb9fe19ee6c5b34174388">0x5ede9428…</a> · gas-free, $0.000001 floor</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The two-machine run matters more than the rest. On one host, "seller code never leaves the seller's machine" is unfalsifiable. So it was run with the hub on one box and the runner on another over Tailscale — the runner working from a fresh clone — asserting afterwards that the hub held no engine config, entry path, or egress rule.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">The guarantee</p>
+    <h2>The hub cannot see your skill. Structurally.</h2>
+    <div class="split">
+      <div>
+        <h3>Published</h3>
+        <ul>
+          <li>name, description, tags</li>
+          <li>price and work bounds</li>
+          <li>input / output schemas</li>
+          <li>ratings and measured SLA</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Never transmitted</h3>
+        <ul>
+          <li>engine and entry point</li>
+          <li>system prompt</li>
+          <li>secret names, egress rules</li>
+          <li>the code itself</li>
+        </ul>
+      </div>
+    </div>
+    <p>This isn't a filter someone could forget to call. The public projection is a <em>type with nowhere to put</em> a prompt or a key, so leaking one is a compile error — and a property test asserts it over arbitrary generated manifests, checking that no canary value survives to the wire.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Circle integration</p>
+    <h2>Built from the Agent Stack, on Circle's own example chain.</h2>
+    <div class="tbl">
+      <table>
+        <tbody>
+          <tr><td>Agent Wallet</td><td>Seller's earnings account — earned <strong>19.99 → 20.00 USDC</strong> live through the marketplace. Funded via CLI faucet.</td></tr>
+          <tr><td>Nanopayments</td><td>Verified working on Arc: gas-free both sides, $0.000001 minimum. Ships as a conformance-tested rail.</td></tr>
+          <tr><td>Circle CLI</td><td><code>circle services pay --chain ARC-TESTNET</code> discovers our listing and parses our 402 — its rejections found two real interop bugs in our wire format.</td></tr>
+          <tr><td>USDC on Arc</td><td>Native gas <em>and</em> the 6-decimal ERC-20 at one address. Every price, payment and receipt is atomic units; gas math kept strictly separate.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Rigor</p>
+    <h2>Where the bodies were found.</h2>
+    <div class="figs">
+      <div class="fig"><span class="n">157</span><span class="l">TypeScript tests</span></div>
+      <div class="fig"><span class="n">13</span><span class="l">Foundry tests</span></div>
+      <div class="fig"><span class="n">12</span><span class="l">audit agents</span></div>
+      <div class="fig"><span class="n">6</span><span class="l">convergent defects</span></div>
+    </div>
+    <p>The fee-splitter contract was audited before deploy. Twelve independent agents converged on one root defect — a <code>seller</code> parameter unbound to anything the buyer signed — and the contract's own docstring claimed a bound that was measurably false. It was rewritten so the whole class is unrepresentable rather than merely guarded.</p>
+    <p>The best catch would have cost a day: <code>TransferWithAuthorization</code> and <code>ReceiveWithAuthorization</code> carry <strong>different EIP-712 typehashes</strong>. Every settlement would have reverted on an invalid signature — and the probe script that "confirmed" it worked had only ever tested a garbage signature.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Status</p>
+    <h2>Shipped, and what's next.</h2>
+    <div class="split">
+      <div>
+        <h3>Working today</h3>
+        <ul>
+          <li>both payment rails, conformance-tested</li>
+          <li>hub: paywall, broker, settle pipeline</li>
+          <li>runner with sandboxed execution</li>
+          <li>buyer SDK + CLI</li>
+          <li>schema-derived OpenAPI discovery</li>
+        </ul>
+      </div>
+      <div>
+        <h3>By final submission</h3>
+        <ul>
+          <li>fee splitter deployed and wired</li>
+          <li>Claude Agent SDK engine adapter</li>
+          <li>web marketplace + MCP server</li>
+          <li>agent-hires-agent chain</li>
+          <li>receipt-gated ratings</li>
+        </ul>
+      </div>
+    </div>
+    <p>Poncho — the closest comparable — is closed, buyer-side, and settles on Base. Circle's own marketplace intake is a Google Form. ARCADE is the open two-sided version, on Arc, where anyone turns an agent into revenue in one command.</p>
+  </section>
+
+  <footer>
+    <p><a href="https://github.com/ss251/arcade">github.com/ss251/arcade</a> · Checkpoint 2 · Agentic Economy track<br>
+    All transaction links resolve on Arc testnet via ArcScan.</p>
+  </footer>
+
+</div>
