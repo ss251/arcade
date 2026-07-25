@@ -6,15 +6,20 @@ The first half is not uniform. Providers differ in ways that matter, and this pa
 
 ## The comparison
 
-| Provider | API / business terms | Consumer subscription | ARCADE |
+Ten providers checked. The API/consumer split holds everywhere it was checked — but the *reasons* differ, and three providers have a wrinkle that a summary would flatten.
+
+| Provider | API / business terms | Consumer subscription | Wrinkle |
 |---|---|---|---|
-| **Anthropic** | ✅ explicit: may power products for end users | ❌ three separate prohibitions | publishable on `api-key` |
-| **OpenAI** | ✅ explicit: may make Customer Applications available to End Users; customer **owns Output** | ❌ no selling the Services; no programmatic extraction of Output | publishable on `api-key` |
-| **DeepSeek** | ✅ explicit: may provide services to **external end users**; assigns Output rights to you | — | publishable on `api-key` |
-| **Google Gemini** | ✅ for the API generally — ⚠️ **but Search-grounded results carry their own resale ban** | ❌ | see the grounding caveat below |
-| **xAI** | ⚠️ AUP binds API users too and forbids "reselling any Input or Output" | ❌ | publishable with an **advisory** |
-| **OpenRouter** | ⚠️ no reselling API access; you inherit every upstream provider's terms | — | see the pass-through note |
-| **Mistral** | not verified — their terms are behind a legal-centre index we could not retrieve cleanly | — | treat as unknown until checked |
+| **Anthropic** | ✅ explicit: may power products for end users | ❌ three separate prohibitions | — |
+| **OpenAI** | ✅ explicit; customer **owns Output** | ❌ no selling Services; no programmatic extraction of Output | no blanket automated-access clause in the API terms |
+| **DeepSeek** | ✅ explicit: services to **external end users**; assigns Output rights | — | most permissive checked |
+| **Moonshot (Kimi)** | ✅ explicit: Customer Applications offered to End Users | — | ⚠️ **trains on your content by default** |
+| **Z.ai (Zhipu/GLM)** | ✅ explicit: downstream systems for your end users; **no training on End User Content** | ❌ | cleanest consumer/API separation of the set |
+| **Qwen (Alibaba)** | ✅ Model Studio API; Alibaba states no training on customer data | ❌ most explicit prohibition of any | Qwen Code's OAuth tier is the consumer tier |
+| **Google Gemini** | ✅ for the API — ⚠️ **Search grounding bans resale separately** | ❌ | a *feature* stricter than the provider |
+| **xAI** | ⚠️ AUP binds API users and forbids "reselling any Input or Output" | ❌ | the outlier |
+| **OpenRouter** | ⚠️ no reselling API access; you inherit every upstream provider's terms | — | pass-through liability |
+| **Mistral** | not verified — the legal centre would not yield the document cleanly | — | treat as unknown |
 
 ## The clauses
 
@@ -71,6 +76,46 @@ The API itself permits making API Clients available to users. The catch is narro
 > "You will not allow end users to…access or collect Grounded Results **by automated means**."
 
 A skill that declares `web-search` on a Gemini engine and returns grounded results to a paying buyer is doing something those two sentences describe fairly directly. A Gemini-backed skill with **no** search capability has no such problem. If the Gemini engine lands, that distinction has to be enforced in the capability mapping rather than left to the seller.
+
+### Moonshot (Kimi)
+
+Permission is explicit. §1, Services:
+
+> "This license allows you to use Moonshot AI's application programming interfaces ("APIs") to integrate the Services into your own applications, products, or Services (each referred to as a "Customer Application") and **to offer those Customer Applications to End Users**."
+
+§3.2 prohibits "Copying, transferring, renting, lending, selling, or providing sub-licensing or re-licensing of **the Services**" — the Service, not the Output, which is the same shape as Anthropic and OpenAI. §4 confirms "we do not claim ownership of it".
+
+**The wrinkle is privacy, not resale.** §4, Content:
+
+> "We may use Content to provide, maintain, develop, support, and improve the Services… **Unless otherwise expressly agreed in writing, Customer Content may be used for the foregoing purposes.**"
+
+Training on customer content is the **default**, opt-out only via an enterprise arrangement. For a marketplace that matters more than it would for a personal tool: the content flowing through a skill is the *buyer's* data, and the buyer never agreed to it improving Moonshot's models. A Moonshot engine should therefore require an enterprise agreement before it can be published, or the listing has to disclose the data flow — this is a commitment ARCADE makes to buyers, not a seller preference.
+
+### Z.ai (Zhipu / GLM)
+
+The cleanest consumer/API separation of the set. Additional Terms for API Services §1(a):
+
+> "We grant you a non-exclusive right to access and use the API Services during the valid term, which includes the right to use Z.ai's API to integrate the Services into your applications or **to develop downstream systems, applications or functions to your end users**."
+
+§IV.4: "you retain all rights, title, and interest in the Prompts you submit and the **Outputs**". And the API tier gets a protection the consumer tier does not — Additional Terms §3(b):
+
+> "We will not use End User Content to develop or improve Services, unless you explicitly agree to such use."
+
+against §IV.3(a) for general User Content, where "we reserve the right to process any User Content to improve our existing Services". The consumer-side automated-access ban (§III.4(b): "deep linking, page scraping, social bots, spiders, or other automated means") sits in the consumer section, with the API governed by its own Additional Terms — a distinction other providers blur.
+
+The export clause (§XIII.2, "may not resell, export, or transfer Z.ai products… to specific individuals or countries subject to regulatory restrictions") is export control, not a general resale ban.
+
+### Qwen (Alibaba)
+
+Two tiers, and Qwen Code exposes both — its own docs say so plainly: Qwen OAuth is governed by the **consumer** Terms of Service, while an Alibaba Cloud Model Studio API key is governed by Alibaba Cloud's. Qwen Code itself "does not use your prompts, code, or responses for model training"; what happens upstream depends on which you authenticated with.
+
+The consumer terms are the most explicit prohibition encountered anywhere:
+
+> "(b) interact with, extract, or download any information, data or content from the Services (**including without limitation the Outputs**) **in an automated manner**; (c) scrape, mine, or distil any information, data or content from the Services (including without limitation the Outputs) whether using scripts, engines, software, tools, agents, devices…"
+
+> "Your account is personal to you and is meant only for your usage. You must not share your account credentials or allow anyone else to access or use your account, or borrow, rent, transfer, or **sell any account**."
+
+Note that this one names Outputs directly and names *agents* as a prohibited means. A Qwen-Code-on-OAuth endpoint is squarely out; Model Studio with an API key is the commercial path, and Alibaba states customer data is not used for training.
 
 ### xAI
 
@@ -145,7 +190,8 @@ Four questions, in this order. Two of them are the ones we got wrong by assuming
 1. **Do the API terms explicitly permit powering a product for your end users?** Anthropic §A.1, OpenAI §2.2 and DeepSeek all say so in as many words. If a provider is silent, that is not the same as permission.
 2. **Who does the acceptable-use policy bind?** xAI's binds developers and businesses, not just consumers — which is why its resale clause reaches the API. Check scope before assuming an AUP is a consumer document.
 3. **Do any *features* carry their own terms?** Google's Search grounding does, and it is stricter than the API terms around it. A capability map has to respect per-feature terms, not just per-provider ones.
-4. **Does the consumer tier prohibit resale, programmatic access, or account sharing?** All four checked so far do, by varied wording. Assume it does and verify.
+4. **Does the consumer tier prohibit resale, programmatic access, or account sharing?** Every one checked does, by varied wording — Qwen's is the most explicit, naming Outputs and agents directly. Assume it does and verify.
+5. **Is training on customer content the default?** Moonshot's is, opt-out only at enterprise scale; Z.ai's API tier and Alibaba explicitly are not. This is the question a seller is least likely to ask and the one buyers care about most, because the content flowing through a skill is the *buyer's* data and they never agreed to it improving anyone's model. Treat it as a disclosure obligation, not a preference.
 
 ## Not legal advice
 
