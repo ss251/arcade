@@ -3,9 +3,12 @@ import { resolve } from "node:path"
 import {
   BoundsExceeded,
   EngineRefused,
+  isRefusal,
   JobOutcome,
   type SkillManifest
 } from "@arcade/core"
+import { ENGINES } from "./engines/harness.ts"
+import type { SkillAgent } from "./engines/types.ts"
 
 /**
  * Sandboxed skill execution.
@@ -39,32 +42,36 @@ const BASE_ENV = (skillDir: string): Record<string, string> => ({
 })
 
 /**
- * Adapters that authenticate against a subscription seat rather than an API key.
+ * The environment a job actually gets.
  *
- * These need a widened environment and it is worth being explicit about why. The seat
- * credential lives in the OS login keychain, whose service name is derived from the config
- * directory, and it is only reachable with the seller's real `HOME`. So for these lanes
- * the environment is narrowed rather than built from nothing, and the isolation guarantee
- * moves from the environment to the tool surface: the engine denies every tool the seller
- * did not name, so a job with a readable filesystem has nothing to read it with.
+ * Two sources of widening, both explicit and both narrow:
  *
- * `ARCADE_SEAT_DIR` points at the marketplace seat, which is deliberately NOT the seller's
- * everyday config directory — that one would run their personal hooks and load their MCP
- * servers inside a buyer's job.
+ *  - the `secrets` the manifest names, which is the seller declaring what their own code
+ *    needs, and
+ *  - the engine's `envGrants`, which is the engine declaring what it cannot run without.
+ *
+ * The second exists because engines differ in what they need and pretending otherwise
+ * would mean granting the union to everyone. An API-key engine needs one variable. A
+ * subscription engine needs the real `HOME`, because its credential lives in the OS login
+ * keychain and is unreachable without it — so that lane genuinely does widen the
+ * environment, and its safety rests on the tool surface being closed instead: a job with a
+ * readable filesystem has no instrument to read it with.
+ *
+ * Grants are names, never values, and a name that is not set in the parent is simply
+ * absent rather than passed as empty.
  */
-const SEAT_ADAPTERS = new Set<string>(["claude-seat"])
-
-const SEAT_PASSTHROUGH = ["ARCADE_SEAT_DIR", "ARCADE_CLAUDE_BIN"] as const
-
 export const buildEnv = (manifest: SkillManifest, skillDir: string): Record<string, string> => {
   const env = BASE_ENV(skillDir)
 
-  if (SEAT_ADAPTERS.has(manifest.engine.adapter)) {
-    const home = process.env["HOME"]
-    if (home !== undefined) env["HOME"] = home
-    const user = process.env["USER"]
-    if (user !== undefined) env["USER"] = user
-    for (const name of SEAT_PASSTHROUGH) {
+  const engine = ENGINES[manifest.engine.adapter]
+  if (engine !== undefined) {
+    const agent: SkillAgent = {
+      systemPrompt: "",
+      ...(manifest.engine.credential === undefined
+        ? {}
+        : { credential: manifest.engine.credential })
+    }
+    for (const name of engine.envGrants(agent)) {
       const value = process.env[name]
       if (value !== undefined) env[name] = value
     }
@@ -103,35 +110,27 @@ const spawnScoped = (
       })
   )
 
-/** Engine harnesses, resolved relative to this module so they survive any cwd. */
-const CLAUDE_API_HARNESS = new URL("./engines/claude-api.ts", import.meta.url).pathname
-const CLAUDE_SEAT_HARNESS = new URL("./engines/claude-seat.ts", import.meta.url).pathname
+/** The one engine harness, resolved relative to this module so it survives any cwd. */
+const HARNESS = new URL("./engines/harness.ts", import.meta.url).pathname
 
+/**
+ * `script` runs the seller's executable directly; every model engine runs through the one
+ * harness, which fences the buyer's input and dispatches by adapter. That split is the
+ * whole reason a third or fourth provider is a `run` function rather than another copy of
+ * the plumbing.
+ */
 const commandFor = (manifest: SkillManifest, skillDir: string): ReadonlyArray<string> => {
   // Absolute, because the child is spawned with `cwd: skillDir`. A relative skills
   // directory would otherwise be applied twice — once as the cwd and again inside the
   // path — and the entry would resolve to a directory that does not exist.
   const entry = resolve(skillDir, manifest.engine.entry)
   const extra = manifest.engine.args ?? []
-  switch (manifest.engine.adapter) {
-    case "script":
-      return entry.endsWith(".ts") || entry.endsWith(".js")
-        ? ["bun", "run", entry, ...extra]
-        : [entry, ...extra]
-    case "claude-api":
-      // Lane A: the harness runs the Claude API tool runner and enforces the token and
-      // tool-call ceilings mid-loop. It is spawned rather than imported so the seller's
-      // agent module inherits the scrubbed environment, not the daemon's.
-      return ["bun", "run", CLAUDE_API_HARNESS, entry, ...extra]
-    case "claude-seat":
-      // Lane B: the seller's own Claude Code seat, through the Agent SDK harness, which
-      // maps the manifest's ceilings onto the SDK's native maxTurns / maxBudgetUsd.
-      return ["bun", "run", CLAUDE_SEAT_HARNESS, entry, ...extra]
-    case "codex-cli":
-      return ["codex", "exec", ...extra]
-    case "grok-cli":
-      return ["grok", "-p", ...extra]
+  if (manifest.engine.adapter === "script") {
+    return entry.endsWith(".ts") || entry.endsWith(".js")
+      ? ["bun", "run", entry, ...extra]
+      : [entry, ...extra]
   }
+  return ["bun", "run", HARNESS, entry, ...extra]
 }
 
 export const execSkill = (args: ExecArgs) =>
@@ -151,6 +150,7 @@ export const execSkill = (args: ExecArgs) =>
         jobId: args.jobId,
         input: args.input,
         skillDir: resolve(skillDir),
+        adapter: manifest.engine.adapter,
         bounds: manifest.bounds,
         outputSchema: manifest.outputSchema
       })
@@ -189,17 +189,20 @@ export const execSkill = (args: ExecArgs) =>
       usage?: { turns?: number; tokens?: number; toolCalls?: number }
       costUsd?: number
       error?: string
+      suspectedInjection?: boolean
+    }
+
+    /** Everything an engine reports about what a call cost and how it behaved. */
+    const telemetry = {
+      ...(envelope.costUsd === undefined ? {} : { costUsd: envelope.costUsd }),
+      ...(envelope.suspectedInjection === true ? { suspectedInjection: true } : {})
     }
 
     // D2: refusal is read from stop_reason, NEVER the exit code. A refusing agent
     // frequently exits 0 — treating that as success would charge for a non-answer.
-    //
-    // Matched by prefix: the Claude API reports a refusal category alongside the reason
-    // (`refusal:cyber`), and an exact-match list would silently let a categorised refusal
-    // through as a successful answer.
+    // `isRefusal` matches categorised reasons (`refusal:cyber`) by prefix.
     if (envelope.stopReason !== undefined && envelope.stopReason !== "end_turn") {
-      const refusalish = ["refusal", "reasoning_extraction", "content_filter"]
-      if (refusalish.some((r) => envelope.stopReason === r || envelope.stopReason!.startsWith(`${r}:`))) {
+      if (isRefusal(envelope.stopReason)) {
         yield* Effect.fail(
           new EngineRefused({ skillId: manifest.id, stopReason: envelope.stopReason })
         ).pipe(Effect.catchAll(() => Effect.void))
@@ -207,7 +210,8 @@ export const execSkill = (args: ExecArgs) =>
           status: "refused",
           stopReason: envelope.stopReason,
           startedAtMs,
-          finishedAtMs
+          finishedAtMs,
+          ...telemetry
         })
       }
 
@@ -226,7 +230,21 @@ export const execSkill = (args: ExecArgs) =>
           status: "bounds_exceeded",
           startedAtMs,
           finishedAtMs,
-          error: envelope.error ?? "engine reported a bounds breach"
+          error: envelope.error ?? "engine reported a bounds breach",
+          ...telemetry
+        })
+      }
+
+      // A protocol limit — oversized input or output — refused before or instead of
+      // producing an answer. Distinct from a failure so ratings can tell "this seller is
+      // unreliable" from "that caller sent a megabyte".
+      if (envelope.stopReason === "rejected") {
+        return JobOutcome.make({
+          status: "rejected",
+          startedAtMs,
+          finishedAtMs,
+          error: envelope.error ?? "rejected by a protocol limit",
+          ...telemetry
         })
       }
     }
@@ -252,7 +270,8 @@ export const execSkill = (args: ExecArgs) =>
         status: "bounds_exceeded",
         startedAtMs,
         finishedAtMs,
-        error: `${breach.bound} > ${breach.limit}`
+        error: `${breach.bound} > ${breach.limit}`,
+        ...telemetry
       })
     }
 
@@ -261,7 +280,8 @@ export const execSkill = (args: ExecArgs) =>
         status: "failed",
         startedAtMs,
         finishedAtMs,
-        error: `exit ${exitCode}`
+        error: `exit ${exitCode}`,
+        ...telemetry
       })
     }
 
@@ -273,7 +293,8 @@ export const execSkill = (args: ExecArgs) =>
         status: "failed",
         startedAtMs,
         finishedAtMs,
-        error: envelope.error ?? `engine reported ${envelope.stopReason}`
+        error: envelope.error ?? `engine reported ${envelope.stopReason}`,
+        ...telemetry
       })
     }
     if (envelope.stopReason === "timeout") {
@@ -281,7 +302,8 @@ export const execSkill = (args: ExecArgs) =>
         status: "timeout",
         startedAtMs,
         finishedAtMs,
-        error: envelope.error ?? "engine reported a timeout"
+        error: envelope.error ?? "engine reported a timeout",
+        ...telemetry
       })
     }
 
@@ -299,7 +321,8 @@ export const execSkill = (args: ExecArgs) =>
         status: "failed",
         startedAtMs,
         finishedAtMs,
-        error: envelope.error ?? "engine returned no output"
+        error: envelope.error ?? "engine returned no output",
+        ...telemetry
       })
     }
 
@@ -308,7 +331,8 @@ export const execSkill = (args: ExecArgs) =>
       ...(envelope.stopReason === undefined ? {} : { stopReason: envelope.stopReason }),
       output: envelope.output ?? parsed,
       startedAtMs,
-      finishedAtMs
+      finishedAtMs,
+      ...telemetry
     })
   }).pipe(
     Effect.scoped,

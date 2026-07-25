@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 import { Effect } from "effect"
-import { toPublicListing } from "@arcade/core"
+import { assertManifestPublishable, credentialOf, NotPublishable, toPublicListing } from "@arcade/core"
 import { defaultConfig, configPath, readConfig, writeConfig } from "./config.ts"
 import { loadSkills } from "./skills.ts"
 import { startDaemon } from "./daemon.ts"
 import { buildEnv } from "./exec.ts"
-import { seatDir, seatIsLoggedIn } from "./engines/claude-seat.ts"
+import { seatDir, seatIsLoggedIn } from "./engines/claude-agent.ts"
 import { mkdir } from "node:fs/promises"
 
 /**
@@ -74,7 +74,11 @@ const main = Effect.gen(function* () {
     console.log(`status          ${loggedIn ? "logged in" : "NOT logged in"}`)
 
     if (loggedIn) {
-      console.log(`\nLane B is ready. Skills using "adapter": "claude-seat" will run on this seat.`)
+      console.log(
+        `\nThe seat is ready. Skills with "credential": "subscription" run on it — locally\n` +
+          `only. Consumer terms forbid selling a seat's output, so those skills cannot be\n` +
+          `published; switch the manifest to "api-key" to list one.`
+      )
       return
     }
 
@@ -118,7 +122,28 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
       console.error(`no arcade.json found under ${dir}`)
       process.exit(1)
     }
+    // The gate, before anything is presented as publishable. Consumer terms for every
+    // provider forbid reselling a subscription seat, so a seat-backed listing must never
+    // be shown as something this marketplace can carry.
+    try {
+      assertManifestPublishable(found.manifest)
+    } catch (e) {
+      if (e instanceof NotPublishable) {
+        console.error(`CANNOT PUBLISH ${e.skillId}\n`)
+        console.error(`  engine      ${e.adapter}`)
+        console.error(`  credential  ${e.credential}\n`)
+        console.error(e.reason)
+        process.exit(2)
+      }
+      throw e
+    }
+
     const pub = toPublicListing(found.manifest)
+    const caps = found.manifest.engine.capabilities
+    console.log(`engine  ${found.manifest.engine.adapter} (${credentialOf(found.manifest)})`)
+    console.log(
+      `grants  ${caps.length === 0 ? "no tools — this job reaches neither the network nor the filesystem" : caps.join(", ")}\n`
+    )
     console.log("PUBLISHED to the hub:\n")
     console.log(JSON.stringify(pub, null, 2))
     console.log("\nSTAYS ON THIS MACHINE (never transmitted):\n")

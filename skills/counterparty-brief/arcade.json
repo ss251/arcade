@@ -2,8 +2,13 @@
   "id": "counterparty-brief",
   "version": "0.1.0",
   "serviceName": "Counterparty Brief",
-  "description": "Due-diligence brief on a company: legal identity, business model, funding and regulatory posture, plus red flags — each claim carried back to a cited source. Pay per brief, no seat, no contract.",
-  "tags": ["research", "diligence", "kyb", "compliance"],
+  "description": "Due-diligence brief on a company: legal identity, business model, funding and regulatory posture, plus red flags \u2014 each claim carried back to a cited source. Pay per brief, no seat, no contract.",
+  "tags": [
+    "research",
+    "diligence",
+    "kyb",
+    "compliance"
+  ],
   "price": "$0.25",
   "replaces": "$500/mo market-intelligence seat",
   "bounds": {
@@ -14,7 +19,9 @@
   },
   "inputSchema": {
     "type": "object",
-    "required": ["company"],
+    "required": [
+      "company"
+    ],
     "properties": {
       "company": {
         "type": "string",
@@ -22,7 +29,12 @@
       },
       "focus": {
         "type": "string",
-        "enum": ["general", "funding", "regulatory", "leadership"],
+        "enum": [
+          "general",
+          "funding",
+          "regulatory",
+          "leadership"
+        ],
         "description": "Optional emphasis for the brief. Defaults to general."
       }
     }
@@ -56,44 +68,80 @@
         "description": "Individually sourced claims",
         "items": {
           "type": "object",
-          "required": ["claim", "category", "sourceUrl"],
+          "required": [
+            "claim",
+            "category",
+            "sourceUrl"
+          ],
           "properties": {
-            "claim": { "type": "string" },
+            "claim": {
+              "type": "string"
+            },
             "category": {
               "type": "string",
-              "enum": ["identity", "business", "funding", "regulatory", "leadership", "risk"]
+              "enum": [
+                "identity",
+                "business",
+                "funding",
+                "regulatory",
+                "leadership",
+                "risk"
+              ]
             },
-            "sourceUrl": { "type": "string" }
+            "sourceUrl": {
+              "type": "string"
+            }
           }
         }
       },
       "redFlags": {
         "type": "array",
         "description": "Concerns a counterparty should weigh. Empty when none were found.",
-        "items": { "type": "string" }
+        "items": {
+          "type": "string"
+        }
       },
       "sources": {
         "type": "array",
         "items": {
           "type": "object",
-          "required": ["url", "title"],
+          "required": [
+            "url",
+            "title"
+          ],
           "properties": {
-            "url": { "type": "string" },
-            "title": { "type": "string" }
+            "url": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
           }
         }
       },
       "confidence": {
         "type": "string",
-        "enum": ["high", "medium", "low"],
+        "enum": [
+          "high",
+          "medium",
+          "low"
+        ],
         "description": "How well the sources actually support the brief"
       }
     }
   },
   "engine": {
     "adapter": "claude-api",
-    "entry": "agent.ts"
+    "credential": "api-key",
+    "entry": "agent.ts",
+    "capabilities": [
+      "web-search"
+    ]
   },
-  "secrets": ["ANTHROPIC_API_KEY"],
-  "egress": ["api.anthropic.com"]
+  "secrets": [
+    "ANTHROPIC_API_KEY"
+  ],
+  "egress": [
+    "api.anthropic.com"
+  ]
 }

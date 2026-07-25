@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest"
-import {
-  runAgent,
-  strictify,
-  type AgentDefinition,
-  type HarnessInput
-} from "../src/engines/claude-api.js"
+import { runClaudeApi, strictify } from "../src/engines/claude-api.js"
+import type { HarnessJob, SkillAgent } from "../src/engines/types.js"
 
 /**
  * These cover the paths where lane A costs the seller real money: a run that blows past
@@ -30,6 +26,9 @@ const msg = (over: Partial<FakeMessage> = {}): FakeMessage => ({
 })
 
 const toolUse = (name: string, input: unknown) => ({ type: "tool_use", name, input })
+
+/** The harness fences the buyer input; engines receive the finished prompt. */
+const PROMPT = "fenced prompt"
 
 /** Records what the harness did to the runner so the tests can assert on control flow. */
 interface FakeRunner {
@@ -68,13 +67,13 @@ const fakeClient = (script: ReadonlyArray<FakeMessage>, spy: FakeRunner) =>
     }
   }) as never
 
-const agent = (over: Partial<AgentDefinition> = {}): AgentDefinition => ({
+const agent = (over: Partial<SkillAgent> = {}): SkillAgent => ({
   systemPrompt: "test",
   model: "claude-opus-5",
   ...over
 })
 
-const job = (bounds: Partial<HarnessInput["bounds"]> = {}): HarnessInput => ({
+const job = (bounds: Partial<HarnessJob["bounds"]> = {}): HarnessJob => ({
   jobId: "job-1",
   skillDir: "/tmp/skill",
   input: { company: "Acme" },
@@ -87,10 +86,10 @@ const job = (bounds: Partial<HarnessInput["bounds"]> = {}): HarnessInput => ({
 describe("completion", () => {
   it("returns the submit arguments as the job output", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    const out = await runAgent(
+    const out = await runClaudeApi(
       agent(),
       job(),
-      fakeClient([msg({ content: [toolUse("submit", { ok: true })] })], spy)
+      PROMPT, fakeClient([msg({ content: [toolUse("submit", { ok: true })] })], spy)
     )
 
     expect(out.output).toEqual({ ok: true })
@@ -100,10 +99,10 @@ describe("completion", () => {
 
   it("stops as soon as submit is seen, without spending another turn", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    await runAgent(
+    await runClaudeApi(
       agent(),
       job(),
-      fakeClient(
+      PROMPT, fakeClient(
         [
           msg({ content: [toolUse("web_search", {})] }),
           msg({ content: [toolUse("submit", { ok: true })] }),
@@ -120,10 +119,10 @@ describe("completion", () => {
     // D2 refuses to settle this. The distinction matters: the agent produced text, it just
     // never produced the answer the buyer paid for.
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    const out = await runAgent(
+    const out = await runClaudeApi(
       agent(),
       job({ maxTurns: 2 }),
-      fakeClient([msg({ content: [{ type: "text", text: "still looking" }], stop_reason: "end_turn" })], spy)
+      PROMPT, fakeClient([msg({ content: [{ type: "text", text: "still looking" }], stop_reason: "end_turn" })], spy)
     )
 
     expect(out.output).toBeUndefined()
@@ -136,10 +135,10 @@ describe("completion", () => {
 describe("refusal", () => {
   it("carries the refusal category through, and returns no output", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    const out = await runAgent(
+    const out = await runClaudeApi(
       agent(),
       job(),
-      fakeClient(
+      PROMPT, fakeClient(
         [msg({ content: [], stop_reason: "refusal", stop_details: { category: "cyber" } })],
         spy
       )
@@ -153,10 +152,10 @@ describe("refusal", () => {
     // A declined request is a 200 whose body may be empty or partial. Treating a partial
     // as an answer is exactly how a buyer gets billed for a non-answer.
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    const out = await runAgent(
+    const out = await runClaudeApi(
       agent(),
       job(),
-      fakeClient(
+      PROMPT, fakeClient(
         [msg({ content: [toolUse("submit", { ok: true })], stop_reason: "refusal" })],
         spy
       )
@@ -178,7 +177,7 @@ describe("bounds enforcement", () => {
       msg({ usage: { input_tokens: 0, output_tokens: 20_000 } })
     )
 
-    const out = await runAgent(agent(), job({ maxCostUsd: 0.12 }), fakeClient(expensive, spy))
+    const out = await runClaudeApi(agent(), job({ maxCostUsd: 0.12 }), PROMPT, fakeClient(expensive, spy))
 
     expect(out.stopReason).toBe("bounds_exceeded")
     expect(spy.consumed).toBe(1)
@@ -192,7 +191,7 @@ describe("bounds enforcement", () => {
       msg({ content: [toolUse("web_search", {}), toolUse("web_search", {})] })
     )
 
-    const out = await runAgent(agent(), job({ maxToolCalls: 3 }), fakeClient(searches, spy))
+    const out = await runClaudeApi(agent(), job({ maxToolCalls: 3 }), PROMPT, fakeClient(searches, spy))
 
     expect(out.stopReason).toBe("bounds_exceeded")
     expect(out.error).toMatch(/maxToolCalls/)
@@ -201,17 +200,17 @@ describe("bounds enforcement", () => {
 
   it("passes the turn ceiling to the runner rather than counting it locally", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    await runAgent(agent(), job({ maxTurns: 5 }), fakeClient([msg()], spy))
+    await runClaudeApi(agent(), job({ maxTurns: 5 }), PROMPT, fakeClient([msg()], spy))
 
     expect(spy.params?.["max_iterations"]).toBe(5)
   })
 
   it("lets an unbounded-cost run proceed", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    const out = await runAgent(
+    const out = await runClaudeApi(
       agent(),
       job(),
-      fakeClient(
+      PROMPT, fakeClient(
         [msg({ usage: { output_tokens: 90_000 } }), msg({ content: [toolUse("submit", { ok: true })] })],
         spy
       )
@@ -228,10 +227,10 @@ describe("pause_turn", () => {
     // The SDK's runner does not resume `pause_turn` on its own: the loop just ends. A
     // half-finished brief that looks complete is the failure mode this prevents.
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    const out = await runAgent(
+    const out = await runClaudeApi(
       agent(),
       job(),
-      fakeClient(
+      PROMPT, fakeClient(
         [
           msg({ content: [{ type: "text", text: "searching" }], stop_reason: "pause_turn" }),
           msg({ content: [toolUse("submit", { ok: true })] })
@@ -252,14 +251,14 @@ describe("request construction", () => {
     // On Opus 5, disabling thinking above `high` effort is a 400, and below it the model
     // can emit tool calls as plain text — a call that silently never runs.
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    await runAgent(agent({ effort: "xhigh" }), job(), fakeClient([msg()], spy))
+    await runClaudeApi(agent({ effort: "xhigh" }), job(), PROMPT, fakeClient([msg()], spy))
 
     expect(spy.params?.["thinking"]).toBeUndefined()
   })
 
   it("defaults to Opus 5 at medium effort", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    await runAgent({ systemPrompt: "x" }, job(), fakeClient([msg()], spy))
+    await runClaudeApi({ systemPrompt: "x" }, job(), PROMPT, fakeClient([msg()], spy))
 
     expect(spy.params?.["model"]).toBe("claude-opus-5")
     expect(spy.params?.["output_config"]).toEqual({ effort: "medium" })
@@ -267,7 +266,7 @@ describe("request construction", () => {
 
   it("declares submit with the manifest's output schema, made strict", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    await runAgent(agent(), job(), fakeClient([msg()], spy))
+    await runClaudeApi(agent(), job(), PROMPT, fakeClient([msg()], spy))
 
     const tools = spy.params?.["tools"] as Array<Record<string, unknown>>
     const submit = tools.find((t) => t["name"] === "submit")!
@@ -277,20 +276,29 @@ describe("request construction", () => {
 
   it("omits web search unless the seller asked for it", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    await runAgent(agent(), job(), fakeClient([msg()], spy))
+    await runClaudeApi(agent(), job(), PROMPT, fakeClient([msg()], spy))
 
     const tools = spy.params?.["tools"] as Array<Record<string, unknown>>
     expect(tools.some((t) => t["name"] === "web_search")).toBe(false)
   })
 
-  it("does not pair web search with a second code-execution sandbox", async () => {
+  it("maps the web-search capability to one server tool, not a second sandbox", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    await runAgent(agent({ webSearch: { maxUses: 4 } }), job(), fakeClient([msg()], spy))
+    await runClaudeApi(
+      agent({ capabilities: ["web-search"] }),
+      job({ maxToolCalls: 4 }),
+      PROMPT,
+      fakeClient([msg()], spy)
+    )
 
     const tools = spy.params?.["tools"] as Array<Record<string, unknown>>
     const search = tools.find((t) => t["name"] === "web_search")!
     expect(search["type"]).toBe("web_search_20260209")
+    // The tool budget derives from the manifest's declared bound, so a seller cannot grant
+    // themselves more searches than the listing says the job may make.
     expect(search["max_uses"]).toBe(4)
+    // Dynamic filtering runs code execution internally; declaring a second sandbox
+    // alongside it gives the model two and confuses it.
     expect(tools.some((t) => t["name"] === "code_execution")).toBe(false)
   })
 })
@@ -327,20 +335,20 @@ describe("strictify", () => {
 describe("cost estimate", () => {
   it("prices cache reads well below fresh input", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    const cached = await runAgent(
+    const cached = await runClaudeApi(
       agent(),
       job(),
-      fakeClient(
+      PROMPT, fakeClient(
         [msg({ content: [toolUse("submit", {})], usage: { cache_read_input_tokens: 100_000 } })],
         spy
       )
     )
 
     const spy2: FakeRunner = { consumed: 0, pushed: [] }
-    const fresh = await runAgent(
+    const fresh = await runClaudeApi(
       agent(),
       job(),
-      fakeClient(
+      PROMPT, fakeClient(
         [msg({ content: [toolUse("submit", {})], usage: { input_tokens: 100_000 } })],
         spy2
       )
@@ -353,10 +361,10 @@ describe("cost estimate", () => {
     // Cheap is not free: a run can sit under every cost ceiling and still balloon the
     // context it has to re-read each turn.
     const spy: FakeRunner = { consumed: 0, pushed: [] }
-    const out = await runAgent(
+    const out = await runClaudeApi(
       agent(),
       job({ maxTokens: 50_000 }),
-      fakeClient(
+      PROMPT, fakeClient(
         Array.from({ length: 5 }, () => msg({ usage: { cache_read_input_tokens: 40_000 } })),
         spy
       )

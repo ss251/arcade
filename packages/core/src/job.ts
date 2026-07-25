@@ -17,6 +17,7 @@ export const JobStatus = Schema.Literal(
   "invalid", // output failed the listing's outputSchema
   "timeout", // exceeded bounds.timeoutSec
   "bounds_exceeded", // exceeded maxTurns/maxTokens/maxToolCalls
+  "rejected", // input or output violated a protocol limit — refused, not attempted
   "runner_lost", // runner disconnected mid-job
   "failed" // any other execution failure
 )
@@ -28,6 +29,7 @@ export const NON_SETTLING: ReadonlySet<JobStatus> = new Set<JobStatus>([
   "invalid",
   "timeout",
   "bounds_exceeded",
+  "rejected",
   "runner_lost",
   "failed"
 ])
@@ -38,6 +40,17 @@ export class JobOutcome extends Schema.Class<JobOutcome>("JobOutcome")({
   stopReason: Schema.optional(Schema.String),
   output: Schema.optional(Schema.Unknown),
   error: Schema.optional(Schema.String),
+  /**
+   * What the seller spent on inference to produce this, in USD.
+   *
+   * Carried through to the receipt so the take-rate is not the only number with evidence
+   * behind it. A marketplace that shows a seller their revenue and not their cost is
+   * showing them half a business — and on a per-call product where a single run can cost
+   * more than it earns, it is the half that decides whether to keep the listing up.
+   */
+  costUsd: Schema.optional(Schema.Number),
+  /** The buyer's payload contained forged fence markers. Recorded, never fatal. */
+  suspectedInjection: Schema.optional(Schema.Boolean),
   startedAtMs: Schema.Number,
   finishedAtMs: Schema.Number
 }) {}
@@ -61,8 +74,18 @@ const REFUSAL_STOP_REASONS: ReadonlySet<string> = new Set([
   "content_filter"
 ])
 
-export const isRefusal = (stopReason: string | undefined): boolean =>
-  stopReason !== undefined && REFUSAL_STOP_REASONS.has(stopReason)
+/**
+ * Matched by prefix as well as exactly: providers report a refusal category alongside the
+ * reason (`refusal:cyber`), and an exact-match set would let a categorised refusal through
+ * as a successful answer — charging the buyer for a decline.
+ */
+export const isRefusal = (stopReason: string | undefined): boolean => {
+  if (stopReason === undefined) return false
+  for (const r of REFUSAL_STOP_REASONS) {
+    if (stopReason === r || stopReason.startsWith(`${r}:`)) return true
+  }
+  return false
+}
 
 export interface SettleDecision {
   readonly settle: boolean

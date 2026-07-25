@@ -1,4 +1,11 @@
 import { Schema } from "effect"
+import {
+  assertPublishable,
+  Capability,
+  CredentialSource,
+  defaultCredential,
+  EngineAdapter
+} from "./engine.ts"
 
 /**
  * THE SECRECY BOUNDARY.
@@ -109,17 +116,16 @@ export class PublicListing extends Schema.Class<PublicListing>("PublicListing")(
 
 // ── PRIVATE half ────────────────────────────────────────────────────────────
 
-export const EngineAdapter = Schema.Literal(
-  "script", // lane E — bare executable, no LLM
-  "claude-api", // lane A — seller's own Anthropic API key, via the Claude API tool runner
-  "claude-seat", // lane B — seller's own Claude Code seat, via the Claude Agent SDK
-  "codex-cli", // lane C
-  "grok-cli" // lane D
-)
-export type EngineAdapter = typeof EngineAdapter.Type
-
 export class Engine extends Schema.Class<Engine>("Engine")({
   adapter: EngineAdapter,
+  /**
+   * Where model access comes from. Defaults to `"api-key"`.
+   *
+   * `"subscription"` runs on a personal seat, which consumer terms limit to the holder's
+   * own interactive use. Such a skill still runs locally but `assertPublishable` refuses
+   * to list it — see `engine.ts` for the clauses and the reasoning.
+   */
+  credential: Schema.optional(CredentialSource),
   /**
    * Path to the executable/entry module, relative to the skill directory.
    *
@@ -128,6 +134,15 @@ export class Engine extends Schema.Class<Engine>("Engine")({
    * loaded by the harness inside the sandbox and never transmitted.
    */
   entry: Schema.String,
+  /**
+   * What the skill may do, in portable terms. Empty means the job reaches neither the
+   * network nor the filesystem.
+   *
+   * Declared here as well as in the agent module so the runner can reason about the
+   * sandbox without importing the seller's code — and so `arcade publish` can show a
+   * seller the blast radius of their own skill in one line.
+   */
+  capabilities: Schema.optionalWith(Schema.Array(Capability), { default: () => [] }),
   /** Optional system prompt for LLM adapters. Never transmitted. */
   systemPrompt: Schema.optional(Schema.String),
   /** Extra argv passed to the entry. */
@@ -183,8 +198,32 @@ export const toPublicListing = (m: SkillManifest): PublicListing =>
     outputSchema: m.outputSchema
   })
 
+/** The credential a manifest's engine will actually use. */
+export const credentialOf = (m: SkillManifest) =>
+  m.engine.credential ?? defaultCredential(m.engine.adapter)
+
+/**
+ * The publish gate, in manifest terms.
+ *
+ * Called by `arcade publish` and again by the runner before it announces a skill, so a
+ * seat-backed listing cannot reach the hub by either route. It throws rather than
+ * returning a boolean because the only correct response is to stop: a marketplace that
+ * lists a skill it may not legally sell has a problem no retry fixes.
+ */
+export const assertManifestPublishable = (m: SkillManifest): void =>
+  assertPublishable(m.id, m.engine.adapter, credentialOf(m))
+
 /** Field names that must never appear in a published payload. Asserted by the property test. */
-export const PRIVATE_FIELDS = ["engine", "secrets", "egress", "workdir", "systemPrompt", "entry"] as const
+export const PRIVATE_FIELDS = [
+  "engine",
+  "secrets",
+  "egress",
+  "workdir",
+  "systemPrompt",
+  "entry",
+  "capabilities",
+  "credential"
+] as const
 
 export const decodeManifest = Schema.decodeUnknown(SkillManifest)
 export const encodePublicListing = Schema.encode(PublicListing)

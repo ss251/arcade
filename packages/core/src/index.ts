@@ -1,4 +1,6 @@
 export * from "./chain.ts"
+export * from "./engine.ts"
+export * from "./untrusted.ts"
 export * from "./errors.ts"
 export * from "./money.ts"
 export * from "./manifest.ts"

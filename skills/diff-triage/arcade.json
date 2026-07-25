@@ -2,8 +2,12 @@
   "id": "diff-triage",
   "version": "0.1.0",
   "serviceName": "Diff Triage",
-  "description": "Structured triage of a code diff: what it changes, what could break, which tests are missing, and whether it is safe to merge. Pay per diff — no seat, no per-user licence.",
-  "tags": ["code-review", "ci", "quality"],
+  "description": "Structured triage of a code diff: what it changes, what could break, which tests are missing, and whether it is safe to merge. Pay per diff \u2014 no seat, no per-user licence.",
+  "tags": [
+    "code-review",
+    "ci",
+    "quality"
+  ],
   "price": "$0.05",
   "replaces": "$30/user/mo code-review seat",
   "bounds": {
@@ -13,7 +17,9 @@
   },
   "inputSchema": {
     "type": "object",
-    "required": ["diff"],
+    "required": [
+      "diff"
+    ],
     "properties": {
       "diff": {
         "type": "string",
@@ -27,7 +33,13 @@
   },
   "outputSchema": {
     "type": "object",
-    "required": ["summary", "risk", "findings", "testGaps", "verdict"],
+    "required": [
+      "summary",
+      "risk",
+      "findings",
+      "testGaps",
+      "verdict"
+    ],
     "properties": {
       "summary": {
         "type": "string",
@@ -35,34 +47,64 @@
       },
       "risk": {
         "type": "string",
-        "enum": ["low", "medium", "high"]
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
       },
       "findings": {
         "type": "array",
         "items": {
           "type": "object",
-          "required": ["severity", "claim", "where"],
+          "required": [
+            "severity",
+            "claim",
+            "where"
+          ],
           "properties": {
-            "severity": { "type": "string", "enum": ["blocker", "major", "minor", "nit"] },
-            "claim": { "type": "string" },
-            "where": { "type": "string", "description": "file:line or hunk header" }
+            "severity": {
+              "type": "string",
+              "enum": [
+                "blocker",
+                "major",
+                "minor",
+                "nit"
+              ]
+            },
+            "claim": {
+              "type": "string"
+            },
+            "where": {
+              "type": "string",
+              "description": "file:line or hunk header"
+            }
           }
         }
       },
       "testGaps": {
         "type": "array",
-        "items": { "type": "string" },
+        "items": {
+          "type": "string"
+        },
         "description": "Behaviour this diff changes that nothing appears to cover"
       },
       "verdict": {
         "type": "string",
-        "enum": ["ship", "ship-with-nits", "needs-work", "do-not-merge"]
+        "enum": [
+          "ship",
+          "ship-with-nits",
+          "needs-work",
+          "do-not-merge"
+        ]
       }
     }
   },
   "engine": {
-    "adapter": "claude-seat",
-    "entry": "agent.ts"
+    "adapter": "claude-agent",
+    "credential": "api-key",
+    "entry": "agent.ts",
+    "capabilities": []
   },
   "secrets": [],
   "egress": []

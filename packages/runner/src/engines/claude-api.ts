@@ -1,82 +1,23 @@
-#!/usr/bin/env bun
-/**
- * Lane A engine harness — the Claude API, running on the seller's own machine.
- *
- * This file is SPAWNED AS A CHILD PROCESS by `exec.ts`, never imported into the daemon.
- * That is deliberate and load-bearing: the child's environment is built from scratch and
- * contains only the variables the manifest declares in `secrets`, so the seller's other
- * credentials are absent rather than merely unused. Running the SDK in-process would hand
- * every job the daemon's full environment and quietly void that guarantee.
- *
- * ## Why the Claude API and not the Claude Agent SDK
- *
- * The Agent SDK is Claude Code packaged as a library: it ships Bash, Read, Write and Edit.
- * A paid marketplace endpoint needs the opposite of that — a bounded run that returns one
- * schema-valid object — and handing filesystem and shell access to a sandboxed job is a
- * liability, not a feature. The API's tool runner gives us what the product actually
- * requires: `max_iterations`, per-turn usage accounting, strict tool schemas, and a
- * `stop_reason` that distinguishes a refusal from an answer.
- *
- * ## Why bounds are enforced here rather than in the caller
- *
- * D1 exists so a variable-cost agent run cannot go margin-negative. Checking usage after
- * the process exits detects the breach only once the seller has already paid for every
- * token — full API bill, and (per D2) no settlement to offset it. So the ceiling is applied
- * mid-loop: token and tool-call budgets abort the run through an `AbortSignal`, and turns
- * are capped by the runner itself.
- *
- * ## Completion contract
- *
- * The agent finishes by calling `submit`, whose input schema IS the manifest's
- * `outputSchema`. `strict: true` makes the API guarantee those arguments validate, so
- * "the agent decided it was done" and "the output has the shape the buyer paid for" are
- * the same event. Running out of turns without calling `submit` is an incomplete job, not
- * a cheap answer — and D2 declines to settle it.
- *
- * protocol — stdin:  {jobId, input, bounds, outputSchema}
- *            stdout: {output, stopReason, usage:{turns,tokens,toolCalls}, costUsd}
- *            stderr: logs (relayed to the hub; never contains secrets)
- */
-
 import Anthropic from "@anthropic-ai/sdk"
-import { resolve } from "node:path"
-
-// ── the seller's half ───────────────────────────────────────────────────────
+import type { Capability } from "@arcade/core"
+import type { Engine, HarnessJob, JobEnvelope, SkillAgent } from "./types.js"
 
 /**
- * What a lane-A skill's entry module must default-export. Every field here stays on the
- * seller's machine: `PublicListing` has nowhere to put a system prompt or a tool.
+ * Claude API engine — the seller's own API key, via the Messages tool runner.
+ *
+ * Commercial terms §A.1 permit using the API "to power products and services Customer
+ * makes available to its own customers and end users", which is exactly what a paid skill
+ * is: the buyer receives a work product, never model access.
+ *
+ * The completion contract is a `submit` tool whose input schema IS the manifest's
+ * `outputSchema`, marked strict. "The agent decided it was done" and "the output has the
+ * shape the buyer paid for" become the same event, and a run that ends without calling it
+ * is an incomplete job rather than a cheap answer.
  */
-export interface AgentDefinition {
-  /** Defaults to Claude Opus 5 — the most capable model, and the seller pays for it. */
-  readonly model?: string
-  /**
-   * Thinking depth. Defaults to "medium": on Opus 5 the low and medium levels are
-   * unusually strong, and a per-call endpoint priced in cents is exactly the case where
-   * that matters. Sellers running harder skills can raise it.
-   */
-  readonly effort?: "low" | "medium" | "high" | "xhigh" | "max"
-  readonly systemPrompt: string
-  /** Per-response output ceiling. Note this caps thinking + text together on Opus 5. */
-  readonly maxTokensPerTurn?: number
-  /** Server-side web search. Omit for skills that must not reach the network. */
-  readonly webSearch?: {
-    readonly maxUses?: number
-    readonly allowedDomains?: ReadonlyArray<string>
-  }
-  /** Client-side tools, built with `betaTool`. These run in this sandbox, on this machine. */
-  readonly tools?: ReadonlyArray<unknown>
-  /**
-   * Set false when the output schema uses keywords strict mode rejects (`minLength`,
-   * numeric bounds). The hub still validates the output against the full schema, so this
-   * trades an API-level guarantee for schema expressiveness — it never weakens D2.
-   */
-  readonly strictOutput?: boolean
-}
 
-// ── pricing (for the receipt, not for the bound) ────────────────────────────
+// ── pricing, for the receipt ────────────────────────────────────────────────
 
-/** USD per million tokens. Cache reads bill at 0.1x input, cache writes at 1.25x. */
+/** USD per million tokens. Cache reads bill at 0.1x input, writes at 1.25x. */
 const PRICING: Record<string, { input: number; output: number }> = {
   "claude-opus-5": { input: 5, output: 25 },
   "claude-opus-4-8": { input: 5, output: 25 },
@@ -94,17 +35,19 @@ interface Usage {
 const estimateCostUsd = (model: string, u: Usage): number => {
   const p = PRICING[model]
   if (p === undefined) return 0
-  const input = u.input_tokens ?? 0
-  const write = u.cache_creation_input_tokens ?? 0
-  const read = u.cache_read_input_tokens ?? 0
-  const output = u.output_tokens ?? 0
-  return (input * p.input + write * p.input * 1.25 + read * p.input * 0.1 + output * p.output) / 1e6
+  return (
+    ((u.input_tokens ?? 0) * p.input +
+      (u.cache_creation_input_tokens ?? 0) * p.input * 1.25 +
+      (u.cache_read_input_tokens ?? 0) * p.input * 0.1 +
+      (u.output_tokens ?? 0) * p.output) /
+    1e6
+  )
 }
 
 /**
- * Every token the request was billed for. Summing raw counts over-states cost slightly
- * (cache reads bill at a tenth), which is the correct direction for a margin guard: the
- * bound trips early rather than late.
+ * Every token the request was billed for. Summing raw counts slightly over-states cost —
+ * cache reads bill at a tenth — which is the right direction for a margin guard: the bound
+ * trips early rather than late.
  */
 const billableTokens = (u: Usage): number =>
   (u.input_tokens ?? 0) +
@@ -121,7 +64,6 @@ const billableTokens = (u: Usage): number =>
 export const strictify = (schema: unknown): unknown => {
   if (schema === null || typeof schema !== "object") return schema
   if (Array.isArray(schema)) return schema.map(strictify)
-
   const node = schema as Record<string, unknown>
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(node)) out[k] = strictify(v)
@@ -131,46 +73,62 @@ export const strictify = (schema: unknown): unknown => {
   return out
 }
 
+// ── capability mapping ──────────────────────────────────────────────────────
+
+/**
+ * Portable capabilities to Claude API server tools.
+ *
+ * A closed mapping is a security property, not a convenience: a seller can only obtain a
+ * tool by naming a capability, and capabilities this engine cannot satisfy safely are
+ * simply absent rather than silently approximated.
+ */
+const toolsForCapabilities = (
+  capabilities: ReadonlyArray<Capability>,
+  allowedDomains: ReadonlyArray<string>,
+  maxToolCalls: number | undefined
+): Array<unknown> => {
+  const tools: Array<unknown> = []
+  const domains = allowedDomains.length > 0 ? { allowed_domains: [...allowedDomains] } : {}
+
+  if (capabilities.includes("web-search")) {
+    // The _20260209 variant filters results with code execution internally; declaring a
+    // separate code_execution tool alongside it hands the model two sandboxes.
+    tools.push({
+      type: "web_search_20260209",
+      name: "web_search",
+      ...(maxToolCalls === undefined ? {} : { max_uses: maxToolCalls }),
+      ...domains
+    })
+  }
+  if (capabilities.includes("web-fetch")) {
+    tools.push({
+      type: "web_fetch_20260209",
+      name: "web_fetch",
+      ...(maxToolCalls === undefined ? {} : { max_uses: maxToolCalls }),
+      ...domains
+    })
+  }
+  if (capabilities.includes("run-code")) {
+    tools.push({ type: "code_execution_20260521", name: "code_execution" })
+  }
+  // read-workdir / write-workdir have no server-side equivalent on this engine. They are
+  // deliberately unmapped rather than approximated with code execution, which would grant
+  // far more than the capability names.
+  return tools
+}
+
 // ── the run ─────────────────────────────────────────────────────────────────
 
-export interface HarnessInput {
-  readonly jobId: string
-  readonly input: unknown
-  /**
-   * Absolute path to the skill directory. Local-only — it never leaves this machine, and
-   * exists so an engine can pin the job's working directory to the skill rather than
-   * inheriting wherever the daemon was started.
-   */
-  readonly skillDir: string
-  readonly bounds: {
-    readonly maxTurns?: number
-    readonly maxTokens?: number
-    readonly maxToolCalls?: number
-    readonly maxCostUsd?: number
-    readonly timeoutSec: number
-  }
-  readonly outputSchema: unknown
-}
-
-export interface HarnessEnvelope {
-  readonly output?: unknown
-  readonly stopReason?: string
-  readonly usage: { turns: number; tokens: number; toolCalls: number }
-  readonly costUsd: number
-  readonly error?: string
-}
-
-/** Refusal categories that mean "the model declined", as distinct from "the model failed". */
 const REFUSAL_STOP_REASONS = new Set(["refusal"])
 
-export const runAgent = async (
-  agent: AgentDefinition,
-  job: HarnessInput,
-  client: Anthropic
-): Promise<HarnessEnvelope> => {
+export const runClaudeApi = async (
+  agent: SkillAgent,
+  job: HarnessJob,
+  prompt: string,
+  client: Anthropic = new Anthropic()
+): Promise<JobEnvelope> => {
   const model = agent.model ?? "claude-opus-5"
   const { bounds } = job
-
   const totals = { turns: 0, tokens: 0, toolCalls: 0 }
   let costUsd = 0
   let submitted: unknown
@@ -190,35 +148,25 @@ export const runAgent = async (
     ...(agent.strictOutput === false ? {} : { strict: true })
   }
 
-  const tools: Array<unknown> = [submitTool, ...(agent.tools ?? [])]
-  if (agent.webSearch !== undefined) {
-    // The _20260209 variant filters results with code execution internally — declaring a
-    // separate code_execution tool alongside it gives the model two sandboxes and confuses it.
-    tools.push({
-      type: "web_search_20260209",
-      name: "web_search",
-      ...(agent.webSearch.maxUses === undefined ? {} : { max_uses: agent.webSearch.maxUses }),
-      ...(agent.webSearch.allowedDomains === undefined
-        ? {}
-        : { allowed_domains: [...agent.webSearch.allowedDomains] })
-    })
-  }
+  const tools = [
+    submitTool,
+    ...toolsForCapabilities(
+      agent.capabilities ?? [],
+      agent.allowedDomains ?? [],
+      bounds.maxToolCalls
+    )
+  ]
 
   const runner = client.beta.messages.toolRunner({
     model,
-    // Per-response ceiling. On Opus 5 thinking is on by default and shares this budget with
-    // the response text, so a tight value truncates mid-answer rather than saving money.
+    // Per-response ceiling. Thinking shares this budget with the response text, so a tight
+    // value truncates mid-answer rather than saving money.
     max_tokens: agent.maxTokensPerTurn ?? 16000,
     output_config: { effort: agent.effort ?? "medium" },
     system: agent.systemPrompt,
     tools: tools as never,
     ...(bounds.maxTurns === undefined ? {} : { max_iterations: bounds.maxTurns }),
-    messages: [
-      {
-        role: "user",
-        content: [{ type: "text", text: JSON.stringify(job.input) }]
-      }
-    ]
+    messages: [{ role: "user", content: [{ type: "text", text: prompt }] }]
   })
   runner.setRequestOptions({ signal: abort.signal })
 
@@ -232,7 +180,7 @@ export const runAgent = async (
       costUsd += estimateCostUsd(model, u)
       lastStopReason = message.stop_reason ?? undefined
 
-      // A declined request is a 200 with an empty or partial body — checking stop_reason
+      // A declined request is a 200 with an empty or partial body. Checking stop_reason
       // before reading content is the difference between reporting a refusal and charging
       // for one.
       if (message.stop_reason !== null && REFUSAL_STOP_REASONS.has(message.stop_reason)) {
@@ -247,35 +195,28 @@ export const runAgent = async (
       for (const block of message.content) {
         if (block.type !== "tool_use") continue
         totals.toolCalls += 1
-        if (block.name === "submit") {
-          submitted = block.input
-        }
+        if (block.name === "submit") submitted = block.input
       }
 
       if (submitted !== undefined) break
 
-      // Checked before the cheaper ceilings because it is the one that actually protects
-      // the seller: a run can sit comfortably under every token bound and still cost more
-      // than the call earns.
+      // Cost first: a run can sit under every token bound and still cost more than the
+      // call earns.
       if (bounds.maxCostUsd !== undefined && costUsd > bounds.maxCostUsd) {
         breach = `maxCostUsd > $${bounds.maxCostUsd} (spent $${costUsd.toFixed(4)})`
-        abort.abort()
-        break
-      }
-      if (bounds.maxTokens !== undefined && totals.tokens > bounds.maxTokens) {
+      } else if (bounds.maxTokens !== undefined && totals.tokens > bounds.maxTokens) {
         breach = `maxTokens > ${bounds.maxTokens}`
-        abort.abort()
-        break
-      }
-      if (bounds.maxToolCalls !== undefined && totals.toolCalls > bounds.maxToolCalls) {
+      } else if (bounds.maxToolCalls !== undefined && totals.toolCalls > bounds.maxToolCalls) {
         breach = `maxToolCalls > ${bounds.maxToolCalls}`
+      }
+      if (breach !== undefined) {
         abort.abort()
         break
       }
 
-      // A server-side tool that exhausts its internal iteration budget stops the turn with
-      // `pause_turn`. The runner does not resume it on its own: without this the loop ends
-      // quietly and a half-finished answer looks like a complete one.
+      // A server tool that exhausts its internal iteration budget stops the turn with
+      // `pause_turn`. The runner does not resume it: without this the loop ends quietly
+      // and a half-finished answer looks like a complete one.
       if (message.stop_reason === "pause_turn") {
         runner.pushMessages({ role: "assistant", content: message.content })
       }
@@ -296,7 +237,7 @@ export const runAgent = async (
   }
   if (submitted === undefined) {
     return {
-      stopReason: lastStopReason ?? "incomplete",
+      stopReason: lastStopReason === "end_turn" ? "incomplete" : (lastStopReason ?? "incomplete"),
       usage: totals,
       costUsd,
       error: "agent ended without calling submit"
@@ -305,48 +246,29 @@ export const runAgent = async (
   return { output: submitted, stopReason: "end_turn", usage: totals, costUsd }
 }
 
-// ── entry point ─────────────────────────────────────────────────────────────
-
-const main = async () => {
-  const arg = process.argv[2]
-  if (arg === undefined) throw new Error("usage: claude-api.ts <entry-module>")
-  // `import()` resolves a bare relative path against THIS module, not the working
-  // directory, which would look for the seller's agent inside the runner package.
-  const entry = resolve(process.cwd(), arg)
-
-  const raw = await new Response(Bun.stdin.stream()).text()
-  const job = JSON.parse(raw) as HarnessInput
-
-  const mod = (await import(entry)) as { default?: AgentDefinition }
-  const agent = mod.default
-  if (agent === undefined || typeof agent.systemPrompt !== "string") {
-    throw new Error(`${entry} must default-export an AgentDefinition with a systemPrompt`)
+export const claudeApiEngine: Engine = {
+  adapter: "claude-api",
+  run: (agent, job, prompt) => runClaudeApi(agent, job, prompt),
+  // Nothing. Calling an HTTP API needs no part of the seller's machine, and the key
+  // itself arrives through the manifest's `secrets` like every other credential — one
+  // rule, visible in `arcade publish`, rather than an engine quietly widening the
+  // environment on the seller's behalf.
+  envGrants: () => [],
+  doctor: async (agent) => {
+    if (agent.credential === "subscription") {
+      return {
+        ok: false,
+        detail: "claude-api authenticates with an API key; it has no subscription mode"
+      }
+    }
+    const has =
+      process.env["ANTHROPIC_API_KEY"] !== undefined ||
+      process.env["ANTHROPIC_AUTH_TOKEN"] !== undefined
+    return {
+      ok: has,
+      detail: has
+        ? "ANTHROPIC_API_KEY present"
+        : "no ANTHROPIC_API_KEY — declare it in the manifest's `secrets` and export it"
+    }
   }
-
-  if (!process.env["ANTHROPIC_API_KEY"] && !process.env["ANTHROPIC_AUTH_TOKEN"]) {
-    throw new Error(
-      "no Anthropic credential in the sandbox environment — declare ANTHROPIC_API_KEY in " +
-        "the manifest's `secrets` so the runner passes it through"
-    )
-  }
-
-  const envelope = await runAgent(agent, job, new Anthropic())
-  process.stdout.write(JSON.stringify(envelope))
-}
-
-if (import.meta.main) {
-  main().catch((e: unknown) => {
-    // stdout stays pure JSON so the parent can always parse an outcome; diagnostics go to
-    // stderr, which the hub relays as job logs.
-    process.stderr.write(`${String((e as Error)?.stack ?? e)}\n`)
-    process.stdout.write(
-      JSON.stringify({
-        stopReason: "error",
-        usage: { turns: 0, tokens: 0, toolCalls: 0 },
-        costUsd: 0,
-        error: String((e as Error)?.message ?? e)
-      } satisfies HarnessEnvelope)
-    )
-    process.exit(1)
-  })
 }

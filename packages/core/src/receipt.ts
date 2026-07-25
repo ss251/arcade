@@ -28,6 +28,16 @@ export class Receipt extends Schema.Class<Receipt>("Receipt")({
   feeAtomic: Schema.BigIntFromSelf,
   feeBps: Schema.Int,
 
+  /**
+   * What the seller spent on inference to produce this, in USD, as reported by the engine.
+   *
+   * A marketplace that shows a seller their revenue and not their cost is showing them
+   * half a business, and on a per-call product where one run can cost more than it earns
+   * it is the half that decides whether the listing stays up. Absent for engines with no
+   * inference cost (a script) and for jobs that never reached one.
+   */
+  sellerCostUsd: Schema.optional(Schema.Number),
+
   /** On-chain settlement of the seller's share. Absent when the job did not settle. */
   settleTx: Schema.optional(Schema.String),
   /** Accrual bucket this receipt's fee belongs to. */

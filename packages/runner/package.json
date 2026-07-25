@@ -4,10 +4,15 @@
   "private": true,
   "type": "module",
   "main": "./src/cli.ts",
-  "bin": { "arcade": "./src/cli.ts" },
+  "bin": {
+    "arcade": "./src/cli.ts"
+  },
   "exports": {
     ".": "./src/cli.ts",
-    "./engines/claude-api": "./src/engines/claude-api.ts"
+    "./engines/types": "./src/engines/types.ts",
+    "./engines/harness": "./src/engines/harness.ts",
+    "./engines/claude-api": "./src/engines/claude-api.ts",
+    "./engines/claude-agent": "./src/engines/claude-agent.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

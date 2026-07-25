@@ -77,6 +77,7 @@ export const runJob = (args: RunJobArgs) =>
           seller: args.seller,
           priceAtomic,
           sellerAtomic,
+          ...(outcome.costUsd === undefined ? {} : { sellerCostUsd: outcome.costUsd }),
           feeAtomic,
           feeBps,
           ...(settleTx === undefined ? {} : { settleTx }),

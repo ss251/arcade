@@ -5,6 +5,8 @@ import {
   PublicListing,
   SkillManifest,
   decodeHubMessage,
+  assertManifestPublishable,
+  NotPublishable,
   toPublicListing
 } from "@arcade/core"
 import { execSkill } from "./exec.ts"
@@ -33,7 +35,23 @@ export const startDaemon = (args: DaemonArgs) =>
     }
 
     const byId = new Map<string, LoadedSkill>(skills.map((s) => [s.manifest.id, s]))
-    const listings: Array<PublicListing> = skills.map((s) => toPublicListing(s.manifest))
+    // The second of the two routes to the hub. `arcade publish` gates the interactive
+    // path; this gates the automatic one, so a seat-backed skill sitting in the skills
+    // directory cannot be announced just because the daemon started.
+    const sellable = skills.filter((s) => {
+      try {
+        assertManifestPublishable(s.manifest)
+        return true
+      } catch (e) {
+        if (e instanceof NotPublishable) {
+          console.error(`skipping ${e.skillId}: ${e.credential} credential is not sellable`)
+          console.error(`  ${e.reason.split("\n")[0]}`)
+          return false
+        }
+        throw e
+      }
+    })
+    const listings: Array<PublicListing> = sellable.map((s) => toPublicListing(s.manifest))
 
     console.log(`[runner] ${args.config.runnerId}`)
     for (const s of skills) {

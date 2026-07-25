@@ -113,7 +113,7 @@ describe("runner env scrub", () => {
 
   it("scrubs identically across every adapter that does not need a seat", () => {
     withPollutedEnv(() => {
-      for (const adapter of ["script", "claude-api", "codex-cli", "grok-cli"] as const) {
+      for (const adapter of ["script", "claude-api", "codex", "grok"] as const) {
         const env = buildEnv(
           manifest({ engine: { adapter, entry: "run.ts" }, secrets: [] }),
           "/tmp/skill"
@@ -124,12 +124,18 @@ describe("runner env scrub", () => {
     })
   })
 
-  describe("seat adapters", () => {
-    // `claude-seat` authenticates against a subscription seat whose credential lives in
-    // the OS login keychain, reachable only with the seller's real HOME. So this lane
-    // genuinely does widen the environment — and the point of these tests is to pin
-    // exactly how far, so the widening can never quietly grow.
-    const seat = () => manifest({ engine: { adapter: "claude-seat", entry: "agent.ts" }, secrets: [] })
+  describe("subscription-backed engines", () => {
+    // A seat credential lives in the OS login keychain and is reachable only with the
+    // seller's real HOME, so this configuration genuinely does widen the environment. The
+    // point of these tests is to pin exactly how far, so the widening cannot quietly grow.
+    //
+    // Note the widening follows the CREDENTIAL, not the engine: the same adapter on an API
+    // key gets the ordinary scrub, which the last test here asserts.
+    const seat = () =>
+      manifest({
+        engine: { adapter: "claude-agent", entry: "agent.ts", credential: "subscription" },
+        secrets: []
+      })
 
     it("widens by exactly HOME and USER, and nothing else", () => {
       withPollutedEnv(() => {
@@ -175,6 +181,18 @@ describe("runner env scrub", () => {
         if (prev === undefined) delete process.env["CLAUDE_CODE_OAUTH_TOKEN"]
         else process.env["CLAUDE_CODE_OAUTH_TOKEN"] = prev
       }
+    })
+
+    it("gives the same engine on an API key the ordinary scrub", () => {
+      // The one that matters for the marketplace: publishable skills get no widening.
+      withPollutedEnv(() => {
+        const env = buildEnv(
+          manifest({ engine: { adapter: "claude-agent", entry: "agent.ts" }, secrets: [] }),
+          "/tmp/skill"
+        )
+        expect(Object.keys(env).sort()).toEqual(["ARCADE_SANDBOX", "HOME", "LANG", "PATH"])
+        expect(env["HOME"]).toBe("/tmp/skill")
+      })
     })
 
     it("forwards the seat directory override so the runner and harness agree", () => {
