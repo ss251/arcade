@@ -121,6 +121,39 @@ Two defaults worth understanding, because both cost you money if you fight them:
 
 If your output schema uses keywords strict mode rejects (`minLength`, numeric ranges), set `strictOutput: false`. The hub still validates every output against your full schema, so this trades an API-level guarantee for schema expressiveness — it never weakens the settle-on-success rule.
 
+### Writing a `claude-seat` skill
+
+Lane B sells spare capacity on a Claude Code subscription you already pay for. Set the seat up once:
+
+```bash
+bun run arcade runner seat        # prints the seat dir and whether it's logged in
+CLAUDE_CONFIG_DIR=~/.arcade/seat claude    # then /login, once
+```
+
+It is deliberately a **separate** seat from the one you work in. Credentials are keyed per config directory, so this is its own login — and more importantly, your everyday config directory also carries your hooks, your MCP servers and your `CLAUDE.md`, none of which belong in a stranger's paid job.
+
+```ts
+import type { SeatAgentDefinition } from "@arcade/runner/engines/claude-seat"
+
+export default {
+  systemPrompt: "…",
+  allowedTools: []        // default: none
+} satisfies SeatAgentDefinition
+```
+
+**`allowedTools: []` is not "no tools" on its own.** Measured, the default toolset still loads — Bash, Read, Write, Edit included — leaving safety to depend on the permission mode refusing each call. The runner therefore also sends an explicit deny list, so those tools are absent from the request rather than merely refused. Name a tool in `allowedTools` and it stops being denied; name nothing and the job genuinely cannot touch your disk.
+
+That absence is what pays for lane B's one weakness. Unlike lane A, the sandbox environment is **widened**: your seat credential lives in the OS keychain and is only reachable with your real `HOME`. The widening is safe because it is inert — a job with a readable filesystem has no instrument to read it with.
+
+**Two settings do most of the work on cost.** The runner pins the job's working directory to the skill and loads no filesystem settings at all. Without that, jobs inherit whatever directory the runner was started in — including its `.mcp.json`, which grants every buyer's job network egress nobody agreed to. Measured on one diff:
+
+| runner started in | tools loaded | cache write | cost |
+|---|---|---|---|
+| a repo with `.mcp.json` | 29 + MCP | 17,338 tok | $0.220 |
+| isolated (what the runner now does) | 1 | 843 tok | **$0.043** |
+
+**Your ceilings are quota, not cash.** The subscription is already paid, so marginal spend is ~zero and `maxCostUsd` guards against one runaway job eating the quota you meant to sell across hundreds. Set it well above the price — `diff-triage` prices at $0.05 with a $0.40 ceiling — and treat it as a circuit breaker rather than a margin calculation.
+
 ## What the sandbox does
 
 Each job runs in a fresh child process whose environment is **built from scratch** — `PATH`, `HOME`, `LANG` and only the variables you named in `secrets`. Your other credentials aren't merely unused, they're absent. The process is held in a `Scope`, so it is killed on success, failure, timeout *and* interrupt; a leaked agent process would keep spending your money after the job stopped earning.

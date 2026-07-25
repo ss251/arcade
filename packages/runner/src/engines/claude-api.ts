@@ -136,6 +136,12 @@ export const strictify = (schema: unknown): unknown => {
 export interface HarnessInput {
   readonly jobId: string
   readonly input: unknown
+  /**
+   * Absolute path to the skill directory. Local-only — it never leaves this machine, and
+   * exists so an engine can pin the job's working directory to the skill rather than
+   * inheriting wherever the daemon was started.
+   */
+  readonly skillDir: string
   readonly bounds: {
     readonly maxTurns?: number
     readonly maxTokens?: number

@@ -150,6 +150,7 @@ export const execSkill = (args: ExecArgs) =>
       JSON.stringify({
         jobId: args.jobId,
         input: args.input,
+        skillDir: resolve(skillDir),
         bounds: manifest.bounds,
         outputSchema: manifest.outputSchema
       })
@@ -261,6 +262,44 @@ export const execSkill = (args: ExecArgs) =>
         startedAtMs,
         finishedAtMs,
         error: `exit ${exitCode}`
+      })
+    }
+
+    // An engine that reports its own failure exits 0 — it ran correctly and is telling us
+    // the job did not. Without this the fallback below would hand the error envelope back
+    // as the job's output, and a settled receipt would be issued for a failure.
+    if (envelope.stopReason === "error" || envelope.stopReason === "incomplete") {
+      return JobOutcome.make({
+        status: "failed",
+        startedAtMs,
+        finishedAtMs,
+        error: envelope.error ?? `engine reported ${envelope.stopReason}`
+      })
+    }
+    if (envelope.stopReason === "timeout") {
+      return JobOutcome.make({
+        status: "timeout",
+        startedAtMs,
+        finishedAtMs,
+        error: envelope.error ?? "engine reported a timeout"
+      })
+    }
+
+    // Bare scripts may write their result directly instead of wrapping it, so an
+    // unwrapped body is still valid. But only treat it as one when it is genuinely not an
+    // envelope — otherwise an engine whose `output` is legitimately absent gets its own
+    // bookkeeping returned to the buyer as the answer.
+    const looksLikeEnvelope =
+      typeof parsed === "object" &&
+      parsed !== null &&
+      ("stopReason" in parsed || "usage" in parsed || "costUsd" in parsed)
+
+    if (envelope.output === undefined && looksLikeEnvelope) {
+      return JobOutcome.make({
+        status: "failed",
+        startedAtMs,
+        finishedAtMs,
+        error: envelope.error ?? "engine returned no output"
       })
     }
 

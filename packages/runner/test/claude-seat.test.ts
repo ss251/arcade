@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { runSeatAgent, type SeatAgentDefinition } from "../src/engines/claude-seat.js"
+import {
+  denyList,
+  runSeatAgent,
+  unexpectedTools,
+  type SeatAgentDefinition
+} from "../src/engines/claude-seat.js"
 import type { HarnessInput } from "../src/engines/claude-api.js"
 
 /**
@@ -42,6 +47,7 @@ const agent = (over: Partial<SeatAgentDefinition> = {}): SeatAgentDefinition => 
 
 const job = (bounds: Partial<HarnessInput["bounds"]> = {}): HarnessInput => ({
   jobId: "job-1",
+  skillDir: "/tmp/skill",
   input: { company: "Acme" },
   bounds: { timeoutSec: 60, ...bounds },
   outputSchema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } }
@@ -166,6 +172,75 @@ describe("sandbox posture", () => {
 
     const env = spy.options?.["env"] as Record<string, string>
     expect(env["CLAUDE_CONFIG_DIR"]).toMatch(/\.arcade\/seat$/)
+  })
+
+  it("strips the built-in tools from the request rather than refusing them later", async () => {
+    // Measured: `allowedTools: []` alone still loads Bash, Read, Write and Edit. Absence
+    // is the guarantee; the permission mode is only the second line.
+    const spy: FakeQuery = {}
+    await runSeatAgent(agent(), job(), fakeQuery([result()], spy))
+
+    const denied = spy.options?.["disallowedTools"] as Array<string>
+    for (const dangerous of ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch"]) {
+      expect(denied).toContain(dangerous)
+    }
+  })
+
+  it("never denies the tool that delivers the output contract", async () => {
+    const spy: FakeQuery = {}
+    await runSeatAgent(agent(), job(), fakeQuery([result()], spy))
+
+    expect(spy.options?.["disallowedTools"]).not.toContain("StructuredOutput")
+  })
+
+  it("stops denying a tool the seller opted into", async () => {
+    const spy: FakeQuery = {}
+    await runSeatAgent(agent({ allowedTools: ["WebSearch"] }), job(), fakeQuery([result()], spy))
+
+    const denied = spy.options?.["disallowedTools"] as Array<string>
+    expect(denied).not.toContain("WebSearch")
+    expect(denied).toContain("Bash")
+  })
+
+  it("loads no filesystem settings at all", async () => {
+    // Omitting this loads the seller's settings, the project's, and any CLAUDE.md into a
+    // stranger's job — and, measured, the MCP servers of whatever directory the runner
+    // started in: an egress path nobody granted, at five times the cost.
+    const spy: FakeQuery = {}
+    await runSeatAgent(agent(), job(), fakeQuery([result()], spy))
+
+    expect(spy.options?.["settingSources"]).toEqual([])
+  })
+
+  it("pins the working directory to the skill, not the daemon's", async () => {
+    const spy: FakeQuery = {}
+    await runSeatAgent(agent(), job(), fakeQuery([result()], spy))
+
+    expect(spy.options?.["cwd"]).toBe("/tmp/skill")
+  })
+
+  it("resolves a seller's workdir relative to the skill", async () => {
+    const spy: FakeQuery = {}
+    await runSeatAgent(agent({ workdir: "sub" }), job(), fakeQuery([result()], spy))
+
+    expect(spy.options?.["cwd"]).toBe("/tmp/skill/sub")
+  })
+})
+
+describe("deny-list drift", () => {
+  it("flags a tool that loaded without being asked for", async () => {
+    // The deny list is a snapshot. A future release can add a tool it does not name, and
+    // that should be a line in the seller's log rather than a silent widening.
+    expect(unexpectedTools(["StructuredOutput", "NewShinyTool"], [])).toEqual(["NewShinyTool"])
+  })
+
+  it("stays quiet when only expected tools load", async () => {
+    expect(unexpectedTools(["StructuredOutput", "WebSearch"], ["WebSearch"])).toEqual([])
+  })
+
+  it("keeps the output tool out of the deny list at any allow-list size", async () => {
+    expect(denyList([])).not.toContain("StructuredOutput")
+    expect(denyList(["Bash"])).not.toContain("StructuredOutput")
   })
 })
 

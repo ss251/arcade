@@ -76,6 +76,7 @@ const agent = (over: Partial<AgentDefinition> = {}): AgentDefinition => ({
 
 const job = (bounds: Partial<HarnessInput["bounds"]> = {}): HarnessInput => ({
   jobId: "job-1",
+  skillDir: "/tmp/skill",
   input: { company: "Acme" },
   bounds: { timeoutSec: 60, ...bounds },
   outputSchema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } }

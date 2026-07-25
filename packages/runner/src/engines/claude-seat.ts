@@ -130,6 +130,7 @@ export const seatIsLoggedIn = async (): Promise<boolean> => {
 interface SeatResult {
   type?: string
   subtype?: string
+  tools?: Array<string>
   structured_output?: unknown
   result?: string
   stop_reason?: string | null
@@ -143,6 +144,57 @@ interface SeatResult {
 const BOUNDS_SUBTYPES: Record<string, string> = {
   error_max_turns: "maxTurns",
   error_max_budget_usd: "maxCostUsd"
+}
+
+/**
+ * Claude Code's built-in tools, denied unless the seller names them.
+ *
+ * `allowedTools: []` does NOT produce a tool-free run — measured, it still loads the full
+ * default toolset including Bash, Read, Write and Edit, leaving safety to depend on the
+ * permission mode refusing them at call time. `disallowedTools` removes them from the
+ * request instead, which is a stronger guarantee and a much cheaper one: on a trivial job
+ * this cut the per-call cache write from 34,481 tokens to 619 and the cost from $0.356 to
+ * $0.016. Loading a marketplace endpoint with an IDE's worth of tool schemas is pure waste
+ * — the buyer pays for none of it and the seller pays for all of it.
+ *
+ * Glob and Grep are listed explicitly because they are NOT covered by the SDK's own
+ * default-deny handling, and both read the filesystem.
+ *
+ * Denying a tool that does not exist is a no-op, so this list is safe to over-specify. It
+ * can still go stale in the other direction, which is why `warnOnUnexpectedTools` reports
+ * anything that loads despite not being asked for.
+ */
+export const BUILT_IN_TOOLS = [
+  "Agent", "Bash", "BashOutput", "CronCreate", "CronDelete", "CronList", "DesignSync",
+  "Edit", "EnterPlanMode", "EnterWorktree", "ExitPlanMode", "ExitWorktree", "Glob",
+  "Grep", "KillShell", "LSP", "ListMcpResourcesTool", "Monitor", "MultiEdit",
+  "NotebookEdit", "NotebookRead", "PushNotification", "Read", "ReadMcpResourceTool",
+  "RemoteTrigger", "ReportFindings", "ScheduleWakeup", "SendMessage", "SendUserFile",
+  "Skill", "SlashCommand", "Task", "TaskCreate", "TaskGet", "TaskList", "TaskOutput",
+  "TaskStop", "TaskUpdate", "TodoWrite", "ToolSearch", "WebFetch", "WebSearch",
+  "Workflow", "Write"
+] as const
+
+/** The tool that delivers `outputFormat`. Denying it would break the output contract. */
+const OUTPUT_TOOL = "StructuredOutput"
+
+export const denyList = (allowed: ReadonlyArray<string>): Array<string> => {
+  const keep = new Set<string>([...allowed, OUTPUT_TOOL])
+  return BUILT_IN_TOOLS.filter((t) => !keep.has(t))
+}
+
+/**
+ * Report any tool that loaded without being asked for.
+ *
+ * The deny list is a snapshot, and a future release can add a tool it does not name. This
+ * turns that from a silent widening of the sandbox into a line in the seller's job log.
+ */
+export const unexpectedTools = (
+  loaded: ReadonlyArray<string>,
+  allowed: ReadonlyArray<string>
+): Array<string> => {
+  const expected = new Set<string>([...allowed, OUTPUT_TOOL])
+  return loaded.filter((t) => !expected.has(t))
 }
 
 export const runSeatAgent = async (
@@ -172,10 +224,23 @@ export const runSeatAgent = async (
         ...(bounds.maxTurns === undefined ? {} : { maxTurns: bounds.maxTurns }),
         ...(bounds.maxCostUsd === undefined ? {} : { maxBudgetUsd: bounds.maxCostUsd }),
 
-        // Default-deny. Nothing in `allowedTools` means no tools at all — the correct
-        // posture for a job whose input came from a stranger.
+        // Default-deny, by absence rather than refusal. `allowedTools` alone still loads
+        // the whole built-in toolset, so the deny list is what actually keeps Bash, Read
+        // and Write out of a job whose input came from a stranger.
         permissionMode: "dontAsk",
         allowedTools: [...(agent.allowedTools ?? [])],
+        disallowedTools: denyList(agent.allowedTools ?? []),
+
+        // Isolation mode. Omitting this loads every filesystem settings source — the
+        // seller's settings, the project's, and any CLAUDE.md — into a stranger's paid
+        // job. Measured, that also loaded the MCP servers declared by whatever directory
+        // the runner happened to start in, which is both an egress path nobody granted
+        // and a five-fold cost increase: 17,338 cache-write tokens against 843.
+        settingSources: [],
+
+        // Pin the working directory to the skill. Inheriting the daemon's would make a
+        // job's tool surface and settings depend on where the seller launched the runner.
+        cwd: agent.workdir === undefined ? job.skillDir : resolve(job.skillDir, agent.workdir),
 
         // The marketplace seat, never the seller's everyday config directory.
         env: { ...process.env, CLAUDE_CONFIG_DIR: seatDir() },
@@ -187,6 +252,14 @@ export const runSeatAgent = async (
 
     let result: SeatResult | undefined
     for await (const message of stream as AsyncIterable<SeatResult>) {
+      if (message.type === "system" && message.subtype === "init") {
+        const extra = unexpectedTools(message.tools ?? [], agent.allowedTools ?? [])
+        if (extra.length > 0) {
+          // Not fatal — the permission mode still refuses them — but the seller should
+          // know their sandbox got wider than the deny list expected.
+          process.stderr.write(`sandbox: unexpected tools loaded: ${extra.join(", ")}\n`)
+        }
+      }
       if (message.type === "result") result = message
     }
 
@@ -246,15 +319,28 @@ export const runSeatAgent = async (
       costUsd
     }
   } catch (e) {
-    const aborted = abort.signal.aborted
-    return {
-      stopReason: aborted ? "timeout" : "error",
-      usage: totals,
-      costUsd: 0,
-      error: aborted
-        ? `exceeded ${bounds.timeoutSec}s`
-        : String((e as Error)?.message ?? e)
+    if (abort.signal.aborted) {
+      return {
+        stopReason: "timeout",
+        usage: totals,
+        costUsd: 0,
+        error: `exceeded ${bounds.timeoutSec}s`
+      }
     }
+
+    // A ceiling can arrive as a thrown error rather than a terminal result subtype — the
+    // SDK surfaces it whichever way the run happened to end. Reporting that as a generic
+    // failure would hide the one outcome the seller most needs to see, so both shapes map
+    // to the same place.
+    const message = String((e as Error)?.message ?? e)
+    if (/maximum budget|max budget/i.test(message)) {
+      return { stopReason: "bounds_exceeded", usage: totals, costUsd: bounds.maxCostUsd ?? 0, error: message }
+    }
+    if (/maximum number of turns|max turns/i.test(message)) {
+      return { stopReason: "bounds_exceeded", usage: totals, costUsd: 0, error: message }
+    }
+
+    return { stopReason: "error", usage: totals, costUsd: 0, error: message }
   } finally {
     clearTimeout(timer)
   }
