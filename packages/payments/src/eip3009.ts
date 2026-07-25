@@ -113,7 +113,36 @@ export interface Eip3009Config {
   /** Account that broadcasts settlements and pays gas (the facilitator role). */
   readonly facilitator: Account
   readonly rpcUrl?: string
+  /**
+   * Deployed FeeSplitter for this seller. When set, it becomes `payTo` in the 402 challenge
+   * and settlement goes through it, so the platform fee is split ON-CHAIN and atomically.
+   *
+   * Without it the seller is paid the full price directly and the fee is only a number on a
+   * receipt — a claim against a wallet we do not control and can never sweep. That was the
+   * uncollectable-take-rate bug; this field is the fix.
+   */
+  readonly feeSplitter?: string
 }
+
+/** `settle(address,uint256,uint256,uint256,bytes32,uint8,bytes32,bytes32)` */
+export const FEE_SPLITTER_ABI = [
+  {
+    type: "function",
+    name: "settle",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "from", type: "address" },
+      { name: "value", type: "uint256" },
+      { name: "validAfter", type: "uint256" },
+      { name: "validBefore", type: "uint256" },
+      { name: "nonce", type: "bytes32" },
+      { name: "v", type: "uint8" },
+      { name: "r", type: "bytes32" },
+      { name: "s", type: "bytes32" }
+    ],
+    outputs: []
+  }
+] as const
 
 export const makeEip3009Rail = (config: Eip3009Config): Rail => {
   const transport = http(config.rpcUrl ?? ARC_RPC_URL, { retryCount: 3, retryDelay: 1000 })
@@ -138,7 +167,10 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
         network: ARC_CAIP2,
         amount: input.priceAtomic.toString(),
         asset: USDC_ADDRESS,
-        payTo: input.payTo,
+        // When a splitter is deployed, the buyer pays IT, not the seller — that is what makes
+        // the fee collectable on-chain. The buyer signs one ordinary authorization either way,
+        // so this is invisible to any standards-compliant x402 client.
+        payTo: config.feeSplitter ?? input.payTo,
         resource: input.resource,
         ...(input.description === undefined ? {} : { description: input.description }),
         mimeType: "application/json",
@@ -243,24 +275,46 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
       const s = `0x${sig.slice(66, 130)}` as Hex
       const v = Number.parseInt(sig.slice(130, 132), 16)
 
-      const data = encodeFunctionData({
-        abi: TRANSFER_WITH_AUTHORIZATION_ABI,
-        functionName: "transferWithAuthorization",
-        args: [
-          p.from as Hex,
-          p.to as Hex,
-          BigInt(p.value),
-          BigInt(p.validAfter),
-          BigInt(p.validBefore),
-          p.nonce as Hex,
-          v,
-          r,
-          s
-        ]
-      })
+      // Two settlement shapes. With a splitter, we call IT and it pulls the payment in and
+      // splits atomically; without one, we submit the authorization straight to the token and
+      // the seller receives the full amount (fee uncollected — see Eip3009Config.feeSplitter).
+      const useSplitter = config.feeSplitter !== undefined
+      const data = useSplitter
+        ? encodeFunctionData({
+            abi: FEE_SPLITTER_ABI,
+            functionName: "settle",
+            args: [
+              p.from as Hex,
+              BigInt(p.value),
+              BigInt(p.validAfter),
+              BigInt(p.validBefore),
+              p.nonce as Hex,
+              v,
+              r,
+              s
+            ]
+          })
+        : encodeFunctionData({
+            abi: TRANSFER_WITH_AUTHORIZATION_ABI,
+            functionName: "transferWithAuthorization",
+            args: [
+              p.from as Hex,
+              p.to as Hex,
+              BigInt(p.value),
+              BigInt(p.validAfter),
+              BigInt(p.validBefore),
+              p.nonce as Hex,
+              v,
+              r,
+              s
+            ]
+          })
 
       const hash = yield* call("sendTransaction", () =>
-        wallet.sendTransaction({ to: USDC_ADDRESS as Hex, data })
+        wallet.sendTransaction({
+          to: (useSplitter ? config.feeSplitter! : USDC_ADDRESS) as Hex,
+          data
+        })
       )
 
       // One receipt read per tick — the -32011 fix.

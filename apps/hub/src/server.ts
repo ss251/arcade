@@ -54,8 +54,17 @@ const railLayer = () => {
             "      Settlement will fail without gas. Set it to a funded Arc testnet key."
         )
       }
+      const splitter = process.env["ARCADE_FEE_SPLITTER"]
+      if (splitter === undefined) {
+        console.warn(
+          "[hub] ARCADE_FEE_SPLITTER not set — sellers will receive the FULL price and the\n" +
+            "      platform fee on receipts will be uncollectable. Deploy one with\n" +
+            "      scripts/deploy-splitter.ts and set this to route payments through it."
+        )
+      }
       return Eip3009Live({
-        facilitator: privateKeyToAccount((pk ?? generatePrivateKey()) as `0x${string}`)
+        facilitator: privateKeyToAccount((pk ?? generatePrivateKey()) as `0x${string}`),
+        ...(splitter === undefined ? {} : { feeSplitter: splitter })
       })
     }
   }
