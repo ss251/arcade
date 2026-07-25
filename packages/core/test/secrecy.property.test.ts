@@ -31,7 +31,7 @@ const arbManifest = fc.record({
 
   // The private half — deliberately filled with recognisable canary values.
   engine: fc.record({
-    adapter: fc.constantFrom("script", "claude-agent-sdk", "claude-cli"),
+    adapter: fc.constantFrom("script", "claude-api", "claude-cli"),
     entry: fc.constant("CANARY_ENTRY_run.ts"),
     systemPrompt: fc.constant("CANARY_PROMPT you are a secret specialist agent")
   }),

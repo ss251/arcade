@@ -125,7 +125,7 @@ describe("manifest validation", () => {
       expect(decode({ engine: { adapter: "wat", entry: "run.ts" } }).ok).toBe(false)
     })
 
-    it.each(["script", "claude-agent-sdk", "claude-cli", "codex-cli", "grok-cli"])(
+    it.each(["script", "claude-api", "claude-cli", "codex-cli", "grok-cli"])(
       "accepts adapter %s",
       (adapter) => {
         expect(decode({ engine: { adapter, entry: "run.ts" } }).ok).toBe(true)

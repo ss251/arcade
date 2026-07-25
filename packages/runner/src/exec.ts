@@ -1,4 +1,5 @@
 import { Effect, Scope } from "effect"
+import { resolve } from "node:path"
 import {
   BoundsExceeded,
   EngineRefused,
@@ -72,17 +73,25 @@ const spawnScoped = (
       })
   )
 
+/** The lane-A harness, resolved relative to this module so it survives any cwd. */
+const CLAUDE_API_HARNESS = new URL("./engines/claude-api.ts", import.meta.url).pathname
+
 const commandFor = (manifest: SkillManifest, skillDir: string): ReadonlyArray<string> => {
-  const entry = `${skillDir}/${manifest.engine.entry}`
+  // Absolute, because the child is spawned with `cwd: skillDir`. A relative skills
+  // directory would otherwise be applied twice — once as the cwd and again inside the
+  // path — and the entry would resolve to a directory that does not exist.
+  const entry = resolve(skillDir, manifest.engine.entry)
   const extra = manifest.engine.args ?? []
   switch (manifest.engine.adapter) {
     case "script":
       return entry.endsWith(".ts") || entry.endsWith(".js")
         ? ["bun", "run", entry, ...extra]
         : [entry, ...extra]
-    case "claude-agent-sdk":
-      // Lane A: the seller's own API key, named in `secrets`, injected by buildEnv.
-      return ["bun", "run", entry, ...extra]
+    case "claude-api":
+      // Lane A: the harness runs the Claude API tool runner and enforces the token and
+      // tool-call ceilings mid-loop. It is spawned rather than imported so the seller's
+      // agent module inherits the scrubbed environment, not the daemon's.
+      return ["bun", "run", CLAUDE_API_HARNESS, entry, ...extra]
     case "claude-cli":
       return ["claude", "-p", ...extra]
     case "codex-cli":
@@ -101,7 +110,17 @@ export const execSkill = (args: ExecArgs) =>
 
     const proc = yield* spawnScoped(cmd, env, skillDir)
 
-    proc.stdin.write(JSON.stringify({ jobId: args.jobId, input: args.input }))
+    // The envelope carries only the PUBLIC half of the manifest. Bounds and outputSchema
+    // are already published in the listing, so an engine harness can enforce and satisfy
+    // them without the sandbox ever being handed anything a buyer couldn't already read.
+    proc.stdin.write(
+      JSON.stringify({
+        jobId: args.jobId,
+        input: args.input,
+        bounds: manifest.bounds,
+        outputSchema: manifest.outputSchema
+      })
+    )
     proc.stdin.end()
 
     const [stdout, stderr, exitCode] = yield* Effect.promise(() =>
@@ -134,13 +153,19 @@ export const execSkill = (args: ExecArgs) =>
       output?: unknown
       stopReason?: string
       usage?: { turns?: number; tokens?: number; toolCalls?: number }
+      costUsd?: number
+      error?: string
     }
 
     // D2: refusal is read from stop_reason, NEVER the exit code. A refusing agent
     // frequently exits 0 — treating that as success would charge for a non-answer.
+    //
+    // Matched by prefix: the Claude API reports a refusal category alongside the reason
+    // (`refusal:cyber`), and an exact-match list would silently let a categorised refusal
+    // through as a successful answer.
     if (envelope.stopReason !== undefined && envelope.stopReason !== "end_turn") {
       const refusalish = ["refusal", "reasoning_extraction", "content_filter"]
-      if (refusalish.includes(envelope.stopReason)) {
+      if (refusalish.some((r) => envelope.stopReason === r || envelope.stopReason!.startsWith(`${r}:`))) {
         yield* Effect.fail(
           new EngineRefused({ skillId: manifest.id, stopReason: envelope.stopReason })
         ).pipe(Effect.catchAll(() => Effect.void))
@@ -149,6 +174,25 @@ export const execSkill = (args: ExecArgs) =>
           stopReason: envelope.stopReason,
           startedAtMs,
           finishedAtMs
+        })
+      }
+
+      // An engine that enforces its own ceilings mid-run reports the breach directly.
+      // Trusting it is what makes in-loop enforcement possible at all: by the time the
+      // caller could measure usage, the seller has already paid for the overage.
+      if (envelope.stopReason === "bounds_exceeded") {
+        yield* Effect.fail(
+          new BoundsExceeded({
+            skillId: manifest.id,
+            bound: "maxTokens",
+            limit: manifest.bounds.maxTokens ?? 0
+          })
+        ).pipe(Effect.catchAll(() => Effect.void))
+        return JobOutcome.make({
+          status: "bounds_exceeded",
+          startedAtMs,
+          finishedAtMs,
+          error: envelope.error ?? "engine reported a bounds breach"
         })
       }
     }

@@ -8,7 +8,8 @@
       "@arcade/payments": ["./packages/payments/src/index.ts"],
       "@arcade/payments/*": ["./packages/payments/src/*"],
       "@arcade/buyer": ["./packages/buyer/src/index.ts"],
-      "@arcade/buyer/*": ["./packages/buyer/src/*"]
+      "@arcade/buyer/*": ["./packages/buyer/src/*"],
+      "@arcade/runner/*": ["./packages/runner/src/*"]
     }
   }
 }

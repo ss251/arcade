@@ -1,0 +1,99 @@
+{
+  "id": "counterparty-brief",
+  "version": "0.1.0",
+  "serviceName": "Counterparty Brief",
+  "description": "Due-diligence brief on a company: legal identity, business model, funding and regulatory posture, plus red flags — each claim carried back to a cited source. Pay per brief, no seat, no contract.",
+  "tags": ["research", "diligence", "kyb", "compliance"],
+  "price": "$0.25",
+  "replaces": "$500/mo market-intelligence seat",
+  "bounds": {
+    "maxTurns": 8,
+    "maxToolCalls": 12,
+    "maxCostUsd": 0.12,
+    "timeoutSec": 90
+  },
+  "inputSchema": {
+    "type": "object",
+    "required": ["company"],
+    "properties": {
+      "company": {
+        "type": "string",
+        "description": "Company name, domain, or legal entity to research"
+      },
+      "focus": {
+        "type": "string",
+        "enum": ["general", "funding", "regulatory", "leadership"],
+        "description": "Optional emphasis for the brief. Defaults to general."
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "entity",
+      "legalName",
+      "summary",
+      "findings",
+      "redFlags",
+      "sources",
+      "confidence"
+    ],
+    "properties": {
+      "entity": {
+        "type": "string",
+        "description": "The company as identified, echoed back"
+      },
+      "legalName": {
+        "type": "string",
+        "description": "Registered legal name, or empty string if not established"
+      },
+      "summary": {
+        "type": "string",
+        "description": "Two to four sentences on what this company is and does"
+      },
+      "findings": {
+        "type": "array",
+        "description": "Individually sourced claims",
+        "items": {
+          "type": "object",
+          "required": ["claim", "category", "sourceUrl"],
+          "properties": {
+            "claim": { "type": "string" },
+            "category": {
+              "type": "string",
+              "enum": ["identity", "business", "funding", "regulatory", "leadership", "risk"]
+            },
+            "sourceUrl": { "type": "string" }
+          }
+        }
+      },
+      "redFlags": {
+        "type": "array",
+        "description": "Concerns a counterparty should weigh. Empty when none were found.",
+        "items": { "type": "string" }
+      },
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["url", "title"],
+          "properties": {
+            "url": { "type": "string" },
+            "title": { "type": "string" }
+          }
+        }
+      },
+      "confidence": {
+        "type": "string",
+        "enum": ["high", "medium", "low"],
+        "description": "How well the sources actually support the brief"
+      }
+    }
+  },
+  "engine": {
+    "adapter": "claude-api",
+    "entry": "agent.ts"
+  },
+  "secrets": ["ANTHROPIC_API_KEY"],
+  "egress": ["api.anthropic.com"]
+}

@@ -69,6 +69,17 @@ export class Bounds extends Schema.Class<Bounds>("Bounds")({
   maxTokens: Schema.optional(Schema.Int.pipe(Schema.positive())),
   /** Max tool invocations. */
   maxToolCalls: Schema.optional(Schema.Int.pipe(Schema.positive())),
+  /**
+   * Max inference spend for one call, in USD.
+   *
+   * This is the bound that actually expresses D1. A token ceiling is a weak margin guard
+   * because output bills at roughly five times input: the same 50k tokens can cost a
+   * quarter or well over a dollar depending on the mix. Denominating the ceiling in money
+   * makes "this call cannot go margin-negative" a property the engine can enforce instead
+   * of a hope. Published deliberately — a buyer can read it against the price and see the
+   * seller's margin is real.
+   */
+  maxCostUsd: Schema.optional(Schema.Number.pipe(Schema.positive())),
   /** Hard wall-clock ceiling. Always required — every job must be able to die. */
   timeoutSec: Schema.Int.pipe(Schema.positive(), Schema.lessThanOrEqualTo(900))
 }) {}
@@ -100,7 +111,7 @@ export class PublicListing extends Schema.Class<PublicListing>("PublicListing")(
 
 export const EngineAdapter = Schema.Literal(
   "script", // lane E — bare executable, no LLM
-  "claude-agent-sdk", // lane A — seller's own Anthropic API key
+  "claude-api", // lane A — seller's own Anthropic API key, via the Claude API tool runner
   "claude-cli", // lane B — seller's own seat, self-hosted, seller's risk
   "codex-cli", // lane C
   "grok-cli" // lane D
@@ -109,7 +120,13 @@ export type EngineAdapter = typeof EngineAdapter.Type
 
 export class Engine extends Schema.Class<Engine>("Engine")({
   adapter: EngineAdapter,
-  /** Path to the executable/entry module, relative to the skill directory. */
+  /**
+   * Path to the executable/entry module, relative to the skill directory.
+   *
+   * For `claude-api` this is the seller's agent module — a default-exported
+   * `AgentDefinition` carrying the system prompt, model, and any client-side tools. It is
+   * loaded by the harness inside the sandbox and never transmitted.
+   */
   entry: Schema.String,
   /** Optional system prompt for LLM adapters. Never transmitted. */
   systemPrompt: Schema.optional(Schema.String),

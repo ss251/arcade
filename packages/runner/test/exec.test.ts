@@ -113,7 +113,7 @@ describe("runner env scrub", () => {
 
   it("scrubs identically regardless of engine adapter", () => {
     withPollutedEnv(() => {
-      for (const adapter of ["script", "claude-agent-sdk", "claude-cli", "codex-cli", "grok-cli"] as const) {
+      for (const adapter of ["script", "claude-api", "claude-cli", "codex-cli", "grok-cli"] as const) {
         const env = buildEnv(
           manifest({ engine: { adapter, entry: "run.ts" }, secrets: [] }),
           "/tmp/skill"

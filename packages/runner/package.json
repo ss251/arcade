@@ -5,7 +5,12 @@
   "type": "module",
   "main": "./src/cli.ts",
   "bin": { "arcade": "./src/cli.ts" },
+  "exports": {
+    ".": "./src/cli.ts",
+    "./engines/claude-api": "./src/engines/claude-api.ts"
+  },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@arcade/core": "workspace:*",
     "effect": "^3.22.0"
   }
