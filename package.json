@@ -12,10 +12,12 @@
     "arcade-buy": "bun run packages/buyer/src/cli.ts"
   },
   "devDependencies": {
+    "@circle-fin/x402-batching": "^3.2.0",
     "@effect/vitest": "^0.30.0",
     "@types/bun": "latest",
     "fast-check": "^4.3.0",
     "typescript": "^5.9.0",
+    "viem": "^2.55.8",
     "vitest": "^3.2.0"
   },
   "engines": {

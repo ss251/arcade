@@ -44,7 +44,7 @@ async function waitReceipt(hash: `0x${string}`, label: string) {
 }
 
 function report(tag: string, r: any, ms: number) {
-  const cost = r.gasUsed * r.effectiveGasPrice;
+  const cost: bigint = BigInt(r.gasUsed) * BigInt(r.effectiveGasPrice);
   console.log(`${tag} status=${r.status} block=${r.blockNumber} confirmMs=${ms}`);
   console.log(`${tag} gasUsed=${r.gasUsed} gasCostUSDC=${formatEther(cost)}`);
   console.log(`${tag} explorer=https://testnet.arcscan.app/tx/${r.transactionHash}`);
