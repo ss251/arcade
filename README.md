@@ -41,7 +41,17 @@ And the full product loop, end to end — 402 → offline signature → job disp
 | price / seller / fee | $0.01 → $0.0095 seller + $0.0005 platform |
 | buyer balance | 19.998375 → 19.988375 USDC (exactly the price) |
 
-Re-runnable evidence: `bun run scripts/g1-live-settle.ts`.
+### On two machines
+
+The claim that seller code never leaves the seller's machine is unfalsifiable on one host, so it was run across two — hub on a Linux box, runner on a MacBook, connected over Tailscale, with the MacBook working from a **fresh `git clone` of this repo**:
+
+| | |
+|---|---|
+| paid call | [`0xf45de149…`](https://testnet.arcscan.app/tx/0xf45de149c07385a52b6d3c9aa9d4c4a92fd26736ccbb1434cfc80b4d688f8368) |
+| execution | on the MacBook — `[runner] job job_57bed392… succeeded` |
+| secrecy assertions | hub log carries no engine/entry/egress · hub API exposes no private field |
+
+Re-runnable evidence: `bun run scripts/g1-live-settle.ts` and `scripts/e2e-two-machine.sh`.
 
 ---
 
