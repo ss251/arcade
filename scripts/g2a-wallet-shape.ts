@@ -57,30 +57,60 @@ if (chainId !== ARC_CHAIN_ID) {
 console.log(`chain ${chainId} (Arc testnet)\n`)
 
 let anySca = false
+let anyIndeterminate = false
 
 for (const address of addresses) {
   const code = await rpc("eth_getCode", [address, "latest"])
   const balance = await rpc("eth_getBalance", [address, "latest"])
   const nonce = await rpc("eth_getTransactionCount", [address, "latest"])
 
-  const isSca = code !== "0x" && code.length > 2
-  if (isSca) anySca = true
+  const hasCode = code !== "0x" && code.length > 2
+  const n = Number(BigInt(nonce))
+  const bal = BigInt(balance)
+
+  /**
+   * ⚠️ `eth_getCode` alone CANNOT distinguish an EOA from an undeployed SCA.
+   *
+   * Circle uses lazy deployment: "you don't have to pay the gas fee at the time of wallet
+   * creation. Instead, the fee is charged when you initiate your first outbound transaction."
+   * An ERC-4337 account has a deterministic counterfactual address that returns `0x` until
+   * that first outbound op lands. A brand-new wallet that has never transacted is therefore
+   * INDETERMINATE, and reporting it as "EOA" would be a confident wrong answer.
+   */
+  // The discriminator is NONCE, not balance: receiving a faucet drip does not deploy an
+  // SCA either. Only an OUTBOUND operation (nonce > 0) forces lazy deployment, so until
+  // then a codeless address is genuinely ambiguous no matter how much USDC it holds.
+  const indeterminate = !hasCode && n === 0
+  const verdict = hasCode ? "SCA" : indeterminate ? "INDETERMINATE" : "EOA"
+  if (hasCode) anySca = true
+  if (indeterminate) anyIndeterminate = true
 
   console.log(`${address}`)
-  console.log(`  verdict        ${isSca ? "SCA (smart contract account)" : "EOA"}`)
-  console.log(`  bytecode       ${isSca ? `${code.length - 2} hex chars` : "none"}`)
-  console.log(`  native balance ${(Number(BigInt(balance)) / 1e18).toFixed(6)} USDC (18-dec gas view)`)
-  console.log(`  nonce          ${Number(BigInt(nonce))}`)
+  console.log(`  verdict        ${verdict}${indeterminate ? " — never transacted, cannot tell yet" : ""}`)
+  console.log(`  bytecode       ${hasCode ? `${code.length - 2} hex chars` : "none"}`)
+  console.log(`  native balance ${(Number(bal) / 1e18).toFixed(6)} USDC (18-dec gas view)`)
+  console.log(`  nonce          ${n}`)
   console.log(
     `  nanopayments   ${
-      isSca
+      hasCode
         ? "INCOMPATIBLE — Gateway uses ecrecover, not EIP-1271"
-        : "compatible — can sign EIP-3009 authorizations directly"
+        : indeterminate
+          ? "UNKNOWN — fund the wallet and send one outbound tx, then re-run"
+          : "compatible — can sign EIP-3009 authorizations directly"
     }\n`
   )
 }
 
 console.log("---")
+if (anyIndeterminate) {
+  console.log(
+    "INDETERMINATE: at least one wallet has never transacted, so eth_getCode cannot\n" +
+      "distinguish an EOA from a lazily-deployed SCA. Fund it and send one outbound\n" +
+      "transaction to force deployment, then re-run:\n" +
+      "  circle wallet fund --address <addr> --chain ARC-TESTNET\n" +
+      "  circle wallet transfer …   (any outbound op)\n"
+  )
+}
 if (anySca) {
   console.log(
     "At least one address is an SCA. If that is the Circle agent wallet, the buyer must pay\n" +
