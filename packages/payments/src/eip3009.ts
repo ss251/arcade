@@ -144,13 +144,23 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
         mimeType: "application/json",
         // Match Gateway's window so a buyer can pay either rail with one signature shape.
         maxTimeoutSeconds: GATEWAY_MIN_VALIDITY_SECONDS,
-        extra: {}
+        /**
+         * The token's EIP-712 domain. REQUIRED by the x402 `exact` EVM scheme: without it a
+         * client cannot construct the TransferWithAuthorization signature and has to guess.
+         *
+         * Circle's own CLI rejects a challenge that omits these — "EIP-712 domain parameters
+         * (name, version) are required in payment requirements for asset 0x3600…". Our own
+         * buyer happened to work because it hardcodes USDC/2, which masked the bug until a
+         * third-party client tried to pay.
+         */
+        extra: { name: USDC_EIP712_NAME, version: USDC_EIP712_VERSION }
       })
     )
 
   const verify = (payload: PaymentPayload, requirements: PaymentRequirements) =>
     Effect.gen(function* () {
-      const p = payload.payload
+      const p = payload.payload.authorization
+      const sig = payload.payload.signature
       const value = BigInt(p.value)
       const required = BigInt(requirements.amount)
 
@@ -190,7 +200,7 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
               validBefore,
               nonce: p.nonce as Hex
             },
-            signature: p.signature as Hex
+            signature: sig as Hex
           }),
         catch: (e) => new InvalidSignature({ reason: String((e as Error)?.message ?? e), payer: p.from })
       })
@@ -219,7 +229,7 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
         payer: p.from,
         payTo: p.to,
         amountAtomic: value,
-        network: payload.network,
+        network: payload.accepted.network,
         payload,
         requirements
       } satisfies VerifiedPayment
@@ -227,8 +237,8 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
 
   const settle = (verified: VerifiedPayment) =>
     Effect.gen(function* () {
-      const p = verified.payload.payload
-      const sig = p.signature as Hex
+      const p = verified.payload.payload.authorization
+      const sig = verified.payload.payload.signature as Hex
       const r = sig.slice(0, 66) as Hex
       const s = `0x${sig.slice(66, 130)}` as Hex
       const v = Number.parseInt(sig.slice(130, 132), 16)

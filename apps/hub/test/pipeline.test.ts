@@ -61,15 +61,15 @@ const setup = async (outcome: JobOutcome) => {
   const signed = await Effect.runPromise(
     signAuthorization({ account: buyer, to: SELLER, valueAtomic: PRICE })
   )
-  const payload = PaymentPayload.make({
-    x402Version: 2,
-    scheme: "exact",
-    network: ARC_CAIP2,
-    payload: signed
-  })
   const requirements = await Effect.runPromise(
     rail.challenge({ priceAtomic: PRICE, resource: "/x/s/demo-skill", payTo: SELLER })
   )
+  const { signature, ...authorization } = signed
+  const payload = PaymentPayload.make({
+    x402Version: 2,
+    payload: { authorization, signature },
+    accepted: requirements
+  })
   const verified: VerifiedPayment = await Effect.runPromise(rail.verify(payload, requirements))
 
   const layer = Layer.mergeAll(

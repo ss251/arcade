@@ -9,6 +9,7 @@ import {
 } from "@arcade/core"
 import {
   PaymentPayload,
+  PaymentRequirements,
   makeTestRail,
   makeTestState,
   makeEip3009Rail,
@@ -52,15 +53,31 @@ const candidates: Array<Candidate> = [
   { label: "RailTest", rail: makeTestRail(testState), state: testState }
 ]
 
-const makePayload = async (over: Partial<PaymentPayload["payload"]> = {}) => {
+/** Builds a canonical v2 payload; `over` tweaks the authorization fields. */
+const makePayload = async (
+  over: Partial<PaymentPayload["payload"]["authorization"]> = {},
+  requirements?: PaymentRequirements
+) => {
   const signed = await Effect.runPromise(
     signAuthorization({ account: buyer, to: SELLER, valueAtomic: PRICE })
   )
+  const { signature, ...authorization } = signed
   return PaymentPayload.make({
     x402Version: 2,
-    scheme: "exact",
-    network: ARC_CAIP2,
-    payload: { ...signed, ...over }
+    payload: { authorization: { ...authorization, ...over }, signature },
+    accepted:
+      requirements ??
+      PaymentRequirements.make({
+        scheme: "exact",
+        network: ARC_CAIP2,
+        amount: PRICE.toString(),
+        asset: USDC_ADDRESS,
+        payTo: SELLER,
+        resource: "/x/ss251/demo",
+        mimeType: "application/json",
+        maxTimeoutSeconds: GATEWAY_MIN_VALIDITY_SECONDS,
+        extra: {}
+      })
   })
 }
 
@@ -84,11 +101,26 @@ describe.each(candidates)("rail conformance: $label", ({ rail }) => {
       rail.challenge({ priceAtomic: PRICE, resource: "/x/ss251/demo", payTo: SELLER })
     )
     if (rail.name === "gateway") {
+      // Gateway signs against its own domain, not the token's.
       expect(req.extra["name"]).toBe("GatewayWalletBatched")
       expect(req.extra["version"]).toBe("1")
-    } else {
-      expect(req.extra["name"]).toBeUndefined()
+      expect(req.extra["verifyingContract"]).toBeDefined()
     }
+  })
+
+  it("always carries an EIP-712 domain a third-party client can sign against", async () => {
+    /**
+     * REGRESSION GUARD. Circle's own CLI refused to pay us with:
+     *   "EIP-712 domain parameters (name, version) are required in payment requirements
+     *    for asset 0x3600…"
+     * Our buyer masked it by hardcoding USDC/2. Every rail must publish a domain so ANY
+     * x402 client can construct the signature.
+     */
+    const req = await Effect.runPromise(
+      rail.challenge({ priceAtomic: PRICE, resource: "/x/ss251/demo", payTo: SELLER })
+    )
+    expect(req.extra["name"], `${rail.name} rail must publish extra.name`).toBeDefined()
+    expect(req.extra["version"], `${rail.name} rail must publish extra.version`).toBeDefined()
   })
 
   it("rejects an underpaying authorization", async () => {

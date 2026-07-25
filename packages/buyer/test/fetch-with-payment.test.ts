@@ -77,14 +77,20 @@ describe("fetchWithPayment", () => {
     // The retry must carry a well-formed authorization for the right payee and amount.
     const header = calls[1]?.headers.get(HEADER_PAYMENT_SIGNATURE)
     expect(header).toBeTruthy()
+    // Canonical x402 v2 shape, as verified against Circle's CLI.
     const decoded = decodeHeaderJson(header!) as {
-      network: string
-      payload: { from: string; to: string; value: string; signature: string }
+      x402Version: number
+      accepted: { network: string; amount: string }
+      payload: {
+        authorization: { from: string; to: string; value: string }
+        signature: string
+      }
     }
-    expect(decoded.network).toBe(ARC_CAIP2)
-    expect(decoded.payload.from.toLowerCase()).toBe(account.address.toLowerCase())
-    expect(decoded.payload.to).toBe(SELLER)
-    expect(decoded.payload.value).toBe("10000")
+    expect(decoded.x402Version).toBe(2)
+    expect(decoded.accepted.network).toBe(ARC_CAIP2)
+    expect(decoded.payload.authorization.from.toLowerCase()).toBe(account.address.toLowerCase())
+    expect(decoded.payload.authorization.to).toBe(SELLER)
+    expect(decoded.payload.authorization.value).toBe("10000")
     expect(decoded.payload.signature).toMatch(/^0x[0-9a-f]{130}$/i)
   })
 

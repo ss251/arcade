@@ -7,7 +7,9 @@ import {
   InvalidSignature,
   NonceAlreadyUsed,
   SettlementFailed,
-  USDC_ADDRESS
+  USDC_ADDRESS,
+  USDC_EIP712_NAME,
+  USDC_EIP712_VERSION
 } from "@arcade/core"
 import { PaymentRequirements, type PaymentPayload, type SettledPayment, type VerifiedPayment } from "./types.ts"
 import type { ChallengeInput, Rail } from "./rail.ts"
@@ -47,18 +49,21 @@ export const makeTestRail = (
         ...(input.description === undefined ? {} : { description: input.description }),
         mimeType: "application/json",
         maxTimeoutSeconds: GATEWAY_MIN_VALIDITY_SECONDS,
-        extra: {}
+        // Mirrors EIP3009Live: every rail must publish a signable EIP-712 domain, or the
+        // test layer would quietly diverge from the thing it stands in for.
+        extra: { name: USDC_EIP712_NAME, version: USDC_EIP712_VERSION }
       })
     )
 
   const verify = (payload: PaymentPayload, requirements: PaymentRequirements) =>
     Effect.gen(function* () {
-      const p = payload.payload
+      const p = payload.payload.authorization
+      const sig = payload.payload.signature
       const value = BigInt(p.value)
       const required = BigInt(requirements.amount)
       const state = yield* Ref.get(stateRef)
 
-      if (p.signature === "0xbad" || p.signature.length < 4) {
+      if (sig === "0xbad" || sig.length < 4) {
         return yield* new InvalidSignature({ reason: "test: bad signature", payer: p.from })
       }
       if (p.to.toLowerCase() !== requirements.payTo.toLowerCase()) {
@@ -96,7 +101,7 @@ export const makeTestRail = (
         payer: p.from,
         payTo: p.to,
         amountAtomic: value,
-        network: payload.network,
+        network: payload.accepted.network,
         payload,
         requirements
       } satisfies VerifiedPayment
@@ -109,7 +114,7 @@ export const makeTestRail = (
         return yield* new SettlementFailed({ reason: "test: forced settlement failure" })
       }
 
-      const nonce = verified.payload.payload.nonce
+      const nonce = verified.payload.payload.authorization.nonce
       const payer = verified.payer.toLowerCase()
       const txHash = `0xtest${nonce.slice(2, 12)}${state.settlements.length.toString(16).padStart(4, "0")}`
 

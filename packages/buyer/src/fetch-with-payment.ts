@@ -95,11 +95,13 @@ export const fetchWithPayment = (
       validForSeconds: requirements.maxTimeoutSeconds
     })
 
+    // Canonical x402 v2 shape — authorization and signature nested, requirements echoed
+    // back as `accepted`. Verified against Circle's CLI, which is the interop bar.
+    const { signature, ...authorization } = signed
     const payload = PaymentPayload.make({
       x402Version: 2,
-      scheme: "exact",
-      network: requirements.network,
-      payload: signed
+      payload: { authorization, signature },
+      accepted: requirements
     })
 
     const retryHeaders = new Headers(init.headers ?? {})

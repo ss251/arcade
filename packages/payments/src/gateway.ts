@@ -98,24 +98,24 @@ export const makeGatewayRail = (config: GatewayConfig = {}): Rail => {
 
   const verify = (payload: PaymentPayload, requirements: PaymentRequirements) =>
     Effect.gen(function* () {
-      const value = BigInt(payload.payload.value)
+      const value = BigInt(payload.payload.authorization.value)
       const required = BigInt(requirements.amount)
 
       // Local pre-checks before spending a network round-trip. These also keep the rail
       // conformance suite deterministic and offline for the rejection cases.
       if (value < required) {
         return yield* new InsufficientFunds({
-          payer: payload.payload.from,
+          payer: payload.payload.authorization.from,
           requiredAtomic: required,
           availableAtomic: value
         })
       }
-      if (payload.payload.to.toLowerCase() !== requirements.payTo.toLowerCase()) {
-        return yield* new InvalidSignature({ reason: "payTo mismatch", payer: payload.payload.from })
+      if (payload.payload.authorization.to.toLowerCase() !== requirements.payTo.toLowerCase()) {
+        return yield* new InvalidSignature({ reason: "payTo mismatch", payer: payload.payload.authorization.from })
       }
       const nowSeconds = Math.floor(Date.now() / 1000)
-      const validAfter = BigInt(payload.payload.validAfter)
-      const validBefore = BigInt(payload.payload.validBefore)
+      const validAfter = BigInt(payload.payload.authorization.validAfter)
+      const validBefore = BigInt(payload.payload.authorization.validBefore)
       if (BigInt(nowSeconds) < validAfter || BigInt(nowSeconds) >= validBefore) {
         return yield* new AuthorizationExpired({ validAfter, validBefore, nowSeconds })
       }
@@ -129,16 +129,16 @@ export const makeGatewayRail = (config: GatewayConfig = {}): Rail => {
       if (!res.isValid) {
         const reason = res.invalidReason ?? "facilitator rejected the authorization"
         if (/insufficient|balance/i.test(reason)) {
-          return yield* new InsufficientFunds({ payer: payload.payload.from, requiredAtomic: required })
+          return yield* new InsufficientFunds({ payer: payload.payload.authorization.from, requiredAtomic: required })
         }
-        return yield* new InvalidSignature({ reason, payer: payload.payload.from })
+        return yield* new InvalidSignature({ reason, payer: payload.payload.authorization.from })
       }
 
       return {
-        payer: res.payer ?? payload.payload.from,
+        payer: res.payer ?? payload.payload.authorization.from,
         payTo: requirements.payTo,
         amountAtomic: value,
-        network: payload.network,
+        network: payload.accepted.network,
         payload,
         requirements
       } satisfies VerifiedPayment

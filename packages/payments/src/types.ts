@@ -39,26 +39,52 @@ export class PaymentRequired402 extends Schema.Class<PaymentRequired402>("Paymen
  *
  * A Struct rather than a Class: this is a pure wire shape with no behaviour, and keeping it
  * structural means callers can build one from a plain object (which is what signing returns).
+ *
+ * Note the signature is NOT part of the authorization — it sits beside it in the canonical
+ * v2 payload, because the signature is over exactly these six fields.
  */
-export const ExactEvmPayload = Schema.Struct({
+export const ExactEvmAuthorization = Schema.Struct({
   from: Schema.String,
   to: Schema.String,
   value: Schema.String,
   validAfter: Schema.String,
   validBefore: Schema.String,
   /** 32-byte hex. */
-  nonce: Schema.String,
-  /** 65-byte hex signature. */
-  signature: Schema.String
+  nonce: Schema.String
 })
-export type ExactEvmPayload = typeof ExactEvmPayload.Type
+export type ExactEvmAuthorization = typeof ExactEvmAuthorization.Type
 
+/**
+ * Canonical x402 v2 payment payload.
+ *
+ * Shape confirmed against a REAL third-party client (Circle CLI 0.0.6) rather than inferred:
+ * the authorization and signature are nested under `payload`, and the requirements the buyer
+ * agreed to travel back as `accepted`. We originally had a flat payload with top-level
+ * scheme/network — which worked only because our own buyer spoke the same private dialect.
+ * Interop is the entire point of a marketplace, so canonical wins.
+ */
 export class PaymentPayload extends Schema.Class<PaymentPayload>("PaymentPayload")({
   x402Version: Schema.Literal(2),
-  scheme: Schema.Literal("exact"),
-  network: Schema.String,
-  payload: ExactEvmPayload
+  payload: Schema.Struct({
+    authorization: ExactEvmAuthorization,
+    signature: Schema.String
+  }),
+  /** The requirements the buyer signed against — echoed back for verification. */
+  accepted: PaymentRequirements,
+  /** Optional resource descriptor some clients attach. */
+  resource: Schema.optional(
+    Schema.Struct({
+      url: Schema.String,
+      description: Schema.optional(Schema.String),
+      mimeType: Schema.optional(Schema.String)
+    })
+  )
 }) {}
+
+/** Convenience accessors so call sites don't reach through the nesting. */
+export const authorizationOf = (p: PaymentPayload) => p.payload.authorization
+export const signatureOf = (p: PaymentPayload) => p.payload.signature
+export const networkOf = (p: PaymentPayload) => p.accepted.network
 
 /** Result of verifying a payment, before any work is done. */
 export interface VerifiedPayment {
