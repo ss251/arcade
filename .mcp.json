@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "arc-docs": {
+      "type": "http",
+      "url": "https://docs.arc.io/mcp"
+    },
+    "circle": {
+      "type": "http",
+      "url": "https://api.circle.com/v1/codegen/mcp"
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "tanstack": {
+      "type": "stdio",
+      "command": "bunx",
+      "args": ["--bun", "@tanstack/cli", "mcp"]
+    }
+  }
+}

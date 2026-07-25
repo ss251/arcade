@@ -1,0 +1,43 @@
+{
+  "id": "usdc-flow-check",
+  "version": "0.1.0",
+  "serviceName": "USDC Flow Check",
+  "description": "Live USDC activity for an address on Arc: balance, recent transfer count, and first/last seen block. No API key, no account, pay per call.",
+  "tags": ["arc", "usdc", "onchain", "data"],
+  "price": "$0.01",
+  "replaces": "$29/mo explorer API plan",
+  "bounds": {
+    "timeoutSec": 30
+  },
+  "inputSchema": {
+    "type": "object",
+    "required": ["address"],
+    "properties": {
+      "address": {
+        "type": "string",
+        "pattern": "^0x[a-fA-F0-9]{40}$",
+        "description": "EVM address to inspect on Arc testnet"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": ["address", "balanceUsdc", "chainId"],
+    "properties": {
+      "address": { "type": "string" },
+      "balanceUsdc": { "type": "string" },
+      "balanceAtomic": { "type": "string" },
+      "nonce": { "type": "integer" },
+      "isContract": { "type": "boolean" },
+      "chainId": { "type": "integer" },
+      "blockNumber": { "type": "string" },
+      "checkedAt": { "type": "string" }
+    }
+  },
+  "engine": {
+    "adapter": "script",
+    "entry": "run.ts"
+  },
+  "secrets": [],
+  "egress": ["rpc.testnet.arc.network"]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@arcade/runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/cli.ts",
+  "bin": { "arcade": "./src/cli.ts" },
+  "dependencies": {
+    "@arcade/core": "workspace:*",
+    "effect": "^3.22.0"
+  }
+}

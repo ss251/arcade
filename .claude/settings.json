@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "enabledPlugins": {
+    "circle-skills@circle": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(bun install)",
+      "Bash(bun run:*)",
+      "Bash(bun test:*)",
+      "Bash(bun x:*)",
+      "Bash(bunx:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(cast :*)",
+      "Bash(circle services search:*)",
+      "Bash(circle services inspect:*)",
+      "Bash(circle wallet status)",
+      "Bash(circle wallet balance:*)",
+      "Bash(circle wallet list:*)",
+      "Bash(claude mcp list)",
+      "Bash(no-mistakes status)",
+      "Bash(no-mistakes doctor)"
+    ]
+  }
+}

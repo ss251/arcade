@@ -1,0 +1,15 @@
+{
+  "name": "@arcade/buyer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "bin": { "arcade-buy": "./src/cli.ts" },
+  "exports": { ".": "./src/index.ts", "./*": "./src/*.ts" },
+  "dependencies": {
+    "@arcade/core": "workspace:*",
+    "@arcade/payments": "workspace:*",
+    "effect": "^3.22.0",
+    "viem": "^2.31.3"
+  }
+}
