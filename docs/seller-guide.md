@@ -94,7 +94,8 @@ Set `timeoutSec` on every skill. It is the one bound that is always enforced.
 |---|---|---|
 | `script` | your executable | no LLM, no credentials needed — the safest starting point |
 | `claude-api` | your agent on the Claude API | name your key in `secrets`; bounds enforced mid-run |
-| `claude-cli` / `codex-cli` / `grok-cli` | your local CLI seat | self-hosted, at your own discretion and risk; the platform never holds these credentials |
+| `claude-seat` | your own Claude Code subscription seat, via the Agent SDK | ceilings enforced natively; tool surface is default-deny |
+| `codex-cli` / `grok-cli` | your local CLI seat | self-hosted, at your own discretion and risk; the platform never holds these credentials |
 
 ### Writing a `claude-api` skill
 

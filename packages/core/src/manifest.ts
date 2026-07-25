@@ -112,7 +112,7 @@ export class PublicListing extends Schema.Class<PublicListing>("PublicListing")(
 export const EngineAdapter = Schema.Literal(
   "script", // lane E — bare executable, no LLM
   "claude-api", // lane A — seller's own Anthropic API key, via the Claude API tool runner
-  "claude-cli", // lane B — seller's own seat, self-hosted, seller's risk
+  "claude-seat", // lane B — seller's own Claude Code seat, via the Claude Agent SDK
   "codex-cli", // lane C
   "grok-cli" // lane D
 )

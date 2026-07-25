@@ -38,8 +38,38 @@ const BASE_ENV = (skillDir: string): Record<string, string> => ({
   ARCADE_SANDBOX: "1"
 })
 
+/**
+ * Adapters that authenticate against a subscription seat rather than an API key.
+ *
+ * These need a widened environment and it is worth being explicit about why. The seat
+ * credential lives in the OS login keychain, whose service name is derived from the config
+ * directory, and it is only reachable with the seller's real `HOME`. So for these lanes
+ * the environment is narrowed rather than built from nothing, and the isolation guarantee
+ * moves from the environment to the tool surface: the engine denies every tool the seller
+ * did not name, so a job with a readable filesystem has nothing to read it with.
+ *
+ * `ARCADE_SEAT_DIR` points at the marketplace seat, which is deliberately NOT the seller's
+ * everyday config directory — that one would run their personal hooks and load their MCP
+ * servers inside a buyer's job.
+ */
+const SEAT_ADAPTERS = new Set<string>(["claude-seat"])
+
+const SEAT_PASSTHROUGH = ["ARCADE_SEAT_DIR", "ARCADE_CLAUDE_BIN"] as const
+
 export const buildEnv = (manifest: SkillManifest, skillDir: string): Record<string, string> => {
   const env = BASE_ENV(skillDir)
+
+  if (SEAT_ADAPTERS.has(manifest.engine.adapter)) {
+    const home = process.env["HOME"]
+    if (home !== undefined) env["HOME"] = home
+    const user = process.env["USER"]
+    if (user !== undefined) env["USER"] = user
+    for (const name of SEAT_PASSTHROUGH) {
+      const value = process.env[name]
+      if (value !== undefined) env[name] = value
+    }
+  }
+
   for (const name of manifest.secrets) {
     const value = process.env[name]
     if (value !== undefined) env[name] = value
@@ -73,8 +103,9 @@ const spawnScoped = (
       })
   )
 
-/** The lane-A harness, resolved relative to this module so it survives any cwd. */
+/** Engine harnesses, resolved relative to this module so they survive any cwd. */
 const CLAUDE_API_HARNESS = new URL("./engines/claude-api.ts", import.meta.url).pathname
+const CLAUDE_SEAT_HARNESS = new URL("./engines/claude-seat.ts", import.meta.url).pathname
 
 const commandFor = (manifest: SkillManifest, skillDir: string): ReadonlyArray<string> => {
   // Absolute, because the child is spawned with `cwd: skillDir`. A relative skills
@@ -92,8 +123,10 @@ const commandFor = (manifest: SkillManifest, skillDir: string): ReadonlyArray<st
       // tool-call ceilings mid-loop. It is spawned rather than imported so the seller's
       // agent module inherits the scrubbed environment, not the daemon's.
       return ["bun", "run", CLAUDE_API_HARNESS, entry, ...extra]
-    case "claude-cli":
-      return ["claude", "-p", ...extra]
+    case "claude-seat":
+      // Lane B: the seller's own Claude Code seat, through the Agent SDK harness, which
+      // maps the manifest's ceilings onto the SDK's native maxTurns / maxBudgetUsd.
+      return ["bun", "run", CLAUDE_SEAT_HARNESS, entry, ...extra]
     case "codex-cli":
       return ["codex", "exec", ...extra]
     case "grok-cli":
