@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
 import * as fc from "fast-check"
 import {
+  advisoryFor,
   assertPublishable,
   credentialOf,
   assertManifestPublishable,
@@ -15,11 +16,15 @@ import {
 /**
  * The publish gate.
  *
- * Anthropic's Consumer Terms forbid reselling the Services (§3), accessing them "through
- * automated or non-human means" outside an API key (§3), and making an account available
- * to anyone else (§2). The Commercial Terms that govern API keys explicitly permit the
- * opposite: powering "products and services Customer makes available to its own customers
- * and end users" (§A.1). OpenAI and xAI draw the same line.
+ * All three providers forbid selling what a personal subscription produces, though by
+ * different wording — Anthropic's Consumer Terms §3 ("resell the Services", and no access
+ * "through automated or non-human means" outside an API key) and §2 ("may not make your
+ * Account available to anyone else"); OpenAI's consumer Terms of Use ("Modify, copy, lease,
+ * sell or distribute any of our Services", "Automatically or programmatically extract data
+ * or Output"); xAI's AUP ("reselling any Input or Output").
+ *
+ * Their API terms are NOT symmetrical, which is why `advisoryFor` exists — see
+ * `engine.ts` and `docs/terms.md`.
  *
  * So this is not a policy preference to be documented and hoped for. These tests exist to
  * make sure a seat-backed skill cannot reach the hub by any route.
@@ -73,8 +78,8 @@ describe("publish gate", () => {
   })
 
   it("refuses a seat on every engine that can take one", () => {
-    // The restriction follows the credential, not the vendor: Claude, Codex and Grok all
-    // prohibit resale of a consumer subscription.
+    // The restriction follows the credential, not the vendor: every provider prohibits
+    // selling what a consumer subscription produces, whatever wording they use.
     for (const a of ["claude-agent", "codex", "grok"] as const) {
       expect(() => assertPublishable("s", a, "subscription")).toThrow(NotPublishable)
     }
@@ -88,6 +93,10 @@ describe("publish gate", () => {
       const err = e as NotPublishable
       expect(err.reason).toMatch(/api-key/)
       expect(err.reason).toMatch(/still run locally/i)
+      // Each provider named, because the seller needs to know which rule binds them.
+      expect(err.reason).toMatch(/Anthropic/)
+      expect(err.reason).toMatch(/OpenAI/)
+      expect(err.reason).toMatch(/xAI/)
     }
   })
 
@@ -102,6 +111,33 @@ describe("publish gate", () => {
     // seat is always a deliberate act.
     expect(() => assertManifestPublishable(manifest())).not.toThrow()
     expect(credentialOf(manifest())).toBe("api-key")
+  })
+})
+
+describe("advisories", () => {
+  it("flags Grok on an API key without refusing it", async () => {
+    // xAI's AUP binds API users and prohibits "reselling any Input or Output". That is
+    // probably not aimed at products built on their API, but it is unresolved — and an
+    // unresolved licensing question belongs in front of the seller, not buried.
+    const terms = termsFor("grok", "api-key")
+    expect(terms.sellable).toBe(true)
+    expect(terms.advisory).toMatch(/reselling any Input or Output/)
+    expect(advisoryFor("grok", "api-key")).toBeDefined()
+  })
+
+  it("attaches no advisory to providers whose API terms are explicit", async () => {
+    // Anthropic §A.1 and OpenAI §2.2 both permit powering products for end users in so
+    // many words, so there is nothing to caveat.
+    expect(advisoryFor("claude-api", "api-key")).toBeUndefined()
+    expect(advisoryFor("claude-agent", "api-key")).toBeUndefined()
+    expect(advisoryFor("codex", "api-key")).toBeUndefined()
+    expect(advisoryFor("script", "none")).toBeUndefined()
+  })
+
+  it("does not let an advisory soften a refusal", async () => {
+    const seat = termsFor("grok", "subscription")
+    expect(seat.sellable).toBe(false)
+    expect(seat.advisory).toBeUndefined()
   })
 })
 

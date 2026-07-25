@@ -1,6 +1,12 @@
 #!/usr/bin/env bun
 import { Effect } from "effect"
-import { assertManifestPublishable, credentialOf, NotPublishable, toPublicListing } from "@arcade/core"
+import {
+  advisoryFor,
+  assertManifestPublishable,
+  credentialOf,
+  NotPublishable,
+  toPublicListing
+} from "@arcade/core"
 import { defaultConfig, configPath, readConfig, writeConfig } from "./config.ts"
 import { loadSkills } from "./skills.ts"
 import { startDaemon } from "./daemon.ts"
@@ -136,6 +142,14 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
         process.exit(2)
       }
       throw e
+    }
+
+    const advisory = advisoryFor(found.manifest.engine.adapter, credentialOf(found.manifest))
+    if (advisory !== undefined) {
+      // Publishable, but the provider's terms are not unambiguous. Saying so is not the
+      // same as refusing: this repository does not get to settle a licensing question on a
+      // seller's behalf, and it should not stay quiet about one either.
+      console.error(`ADVISORY\n\n${advisory}\n`)
     }
 
     const pub = toPublicListing(found.manifest)

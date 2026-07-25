@@ -55,21 +55,57 @@ export interface EngineTerms {
   readonly sellable: boolean
   /** Shown to the seller when publishing is refused. */
   readonly reason?: string
+  /**
+   * Shown to the seller when publishing is allowed but the provider's terms are not
+   * unambiguous. A caveat is not a refusal — this marketplace does not get to decide a
+   * licensing question on a seller's behalf — but neither should it stay quiet about one.
+   */
+  readonly advisory?: string
 }
 
-const SUBSCRIPTION_REFUSAL =
-  "This engine runs on a personal subscription seat. Consumer terms for Claude, ChatGPT " +
-  "and Grok all prohibit reselling the service, making your account available to others, " +
-  "and non-interactive access outside an API key — so a paid endpoint backed by a seat is " +
-  "not something this marketplace can list. Switch the skill to an API key " +
-  '(`credential: "api-key"`) and it publishes as-is; the engine and your agent code do not ' +
-  "change. Seat-backed skills still run locally, for your own agents."
-
 /**
- * Terms per engine. `claude-agent` appears once because the Agent SDK authenticates
- * against either source — which is precisely why the credential, not the engine, is what
- * decides sellability.
+ * Provider terms differ, and the differences are load-bearing rather than cosmetic.
+ * Quoted here because a summary of a licence is how a summary becomes the licence.
+ *
+ * ANTHROPIC — Commercial Terms §A.1 permit use "including to power products and services
+ * Customer makes available to its own customers and end users". Consumer Terms forbid it
+ * three ways: §3 "resell the Services"; §3 access "through automated or non-human means,
+ * whether through a bot, script, or otherwise" except via an API key; §2 "You also may not
+ * make your Account available to anyone else."
+ *
+ * OPENAI — Services Agreement §2.2 grants "the right to use OpenAI's API to integrate the
+ * Services into Customer Applications and to make Customer Applications available to End
+ * Users", and §4.1 gives the customer ownership of Output. Note §3.3's restriction list
+ * contains NO blanket automated-access clause; that one is Anthropic-specific. The consumer
+ * Terms of Use reach the same destination by a different route: "Modify, copy, lease, sell
+ * or distribute any of our Services" and "Automatically or programmatically extract data or
+ * Output".
+ *
+ * XAI — the one that is genuinely different. The Acceptable Use Policy states it "applies
+ * to anyone using our Service, including consumers, developers and businesses", so it binds
+ * API users too, and it prohibits "Scraping, harvesting or reselling any Input or Output".
+ * A per-call marketplace is closer to that language than an ordinary SaaS product is. It is
+ * unlikely to be the intended reading — it would foreclose most paid products built on the
+ * xAI API — but it is not a question this repository can settle, so a Grok skill publishes
+ * with the caveat attached rather than silently.
  */
+const SUBSCRIPTION_REFUSAL =
+  "This engine runs on a personal subscription seat, and every provider forbids selling " +
+  "what one produces. Anthropic: no reselling the Services, no automated access outside " +
+  "an API key, no making your account available to others. OpenAI: no selling or " +
+  "distributing the Services, and no programmatic extraction of Output. xAI: no reselling " +
+  "any Output. Switch the skill to an API key (`credential: \"api-key\"`) and it publishes " +
+  "as-is — the engine and your agent code do not change. Seat-backed skills still run " +
+  "locally, for your own agents."
+
+const XAI_OUTPUT_ADVISORY =
+  "xAI's Acceptable Use Policy binds API users as well as consumers and prohibits " +
+  '"reselling any Input or Output". Selling a per-call result sits closer to that wording ' +
+  "than a typical product built on their API does. This is very likely not the intended " +
+  "reading, but it is unresolved — see docs/terms.md before listing a Grok-backed skill " +
+  "commercially."
+
+/** Credential sources each engine can authenticate against. */
 export const ENGINE_TERMS: Record<EngineAdapter, ReadonlyArray<CredentialSource>> = {
   script: ["none"],
   "claude-api": ["api-key"],
@@ -81,10 +117,21 @@ export const ENGINE_TERMS: Record<EngineAdapter, ReadonlyArray<CredentialSource>
 export const termsFor = (
   adapter: EngineAdapter,
   credential: CredentialSource
-): EngineTerms =>
-  credential === "subscription"
-    ? { credential, sellable: false, reason: SUBSCRIPTION_REFUSAL }
-    : { credential, sellable: true }
+): EngineTerms => {
+  if (credential === "subscription") {
+    return { credential, sellable: false, reason: SUBSCRIPTION_REFUSAL }
+  }
+  if (adapter === "grok" && credential === "api-key") {
+    return { credential, sellable: true, advisory: XAI_OUTPUT_ADVISORY }
+  }
+  return { credential, sellable: true }
+}
+
+/** The caveat, if any, a seller should see when publishing this engine. */
+export const advisoryFor = (
+  adapter: EngineAdapter,
+  credential: CredentialSource
+): string | undefined => termsFor(adapter, credential).advisory
 
 /** The credential an engine uses when the seller does not say. Never `subscription`. */
 export const defaultCredential = (adapter: EngineAdapter): CredentialSource =>
