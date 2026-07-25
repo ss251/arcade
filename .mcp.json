@@ -11,11 +11,6 @@
     "context7": {
       "type": "http",
       "url": "https://mcp.context7.com/mcp"
-    },
-    "tanstack": {
-      "type": "stdio",
-      "command": "bunx",
-      "args": ["--bun", "@tanstack/cli", "mcp"]
     }
   }
 }
