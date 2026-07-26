@@ -10,8 +10,8 @@ Ten providers checked. The API/consumer split holds everywhere it was checked �
 
 | Provider | API / business terms | Consumer subscription | Wrinkle |
 |---|---|---|---|
-| **Anthropic** | ✅ explicit: may power products for end users | ⚠️ third-party apps on your own sub are **permitted and metered**; resale and credential-routing are not | policy moved 4× in 2026 |
-| **OpenAI** | ✅ explicit; customer **owns Output** | ❌ no selling Services; no programmatic extraction of Output | no blanket automated-access clause in the API terms |
+| **Anthropic** | ✅ explicit: may power products for end users | ❌ OAuth is for "native Anthropic applications"; third-party devs may not offer Claude login or route plan credentials "on behalf of their users" | metering ≠ permission — see below |
+| **OpenAI** | ✅ explicit; customer **owns Output** | ❌ for resale — but a **documented** app-server BYO-subscription path exists for embedding | ToS silent on commercial use of that path |
 | **DeepSeek** | ✅ explicit: services to **external end users**; assigns Output rights | ❌ | most permissive API terms checked |
 | **Moonshot (Kimi)** | ✅ explicit: Customer Applications offered to End Users | ❌ **strictest of all — no commercial use at all** | ⚠️ API tier **trains on your content by default** |
 | **Z.ai (Zhipu/GLM)** | ✅ explicit: downstream systems for your end users; **no training on End User Content** | ❌ | cleanest consumer/API separation of the set |
@@ -53,6 +53,34 @@ The policy has moved repeatedly and the record is worth keeping, because the dir
 | Apr 2026 | Included subscription quota stopped covering third-party tools; usable via extra usage or an API key. |
 | May 2026 | A separate metered monthly credit for third-party Agent SDK apps was announced. |
 | **Jun 2026** | **That credit was paused. Third-party app usage draws from subscription limits again — the current state.** |
+
+### The operative document, and the one I mistook for it
+
+There are two Anthropic pages about subscriptions and third-party tools, they say different things, and confusing them is the error this section exists to prevent.
+
+The **Help Center** page quoted above is about **metering** — what your plan is charged for. It is not a grant of permission. The **[Claude Code legal page](https://code.claude.com/docs/en/legal-and-compliance)** is the permission document, and it is unambiguous:
+
+> "**OAuth authentication** is intended exclusively for purchasers of Claude Free, Pro, Max, Team, and Enterprise subscription plans and is designed to support ordinary use of Claude Code and **other native Anthropic applications**."
+
+> "**Developers** building products or services that interact with Claude's capabilities, **including those using the Agent SDK**, should use API key authentication through Claude Console or a supported cloud provider. **Anthropic does not permit third-party developers to offer Claude.ai login or to route requests through Free, Pro, or Max plan credentials on behalf of their users.**"
+
+> "Advertised usage limits for Pro and Max plans assume **ordinary, individual usage** of Claude Code and the Agent SDK."
+
+> "Anthropic reserves the right to take measures to enforce these restrictions and may do so **without prior notice**."
+
+Three consequences, and the second is the one that closes a door people keep trying:
+
+1. The Agent SDK is named on the **API-key** side. It is not a subscription carve-out, whatever the X discourse says.
+2. **"On behalf of their users" forecloses the buyer-brings-their-own-subscription design.** A marketplace that let a buyer connect their Claude plan — even with the credential staying on the buyer's machine — is a third-party developer offering Claude login. That architecture is viable on Codex (below) and not here.
+3. "Native Anthropic applications" is narrower than "any client you run yourself", so third-party harnesses sit outside the intended scope even for personal use.
+
+Enforcement is real and **billing-shaped rather than punitive**: third-party OAuth traffic is repriced at the account level — reported server copy, "Third-party apps now draw from your extra usage, not your plan limits" — rather than accounts being closed. That is a reason to expect the *cost* of evasion to rise silently, not a reason to read the restriction as unenforced.
+
+### The Codex contrast
+
+OpenAI documents the **Codex app-server** as being for "deep integration inside your own product", and ships **"Sign in with ChatGPT"** as a first-party feature of that embedding path (`learn.chatgpt.com/docs/app-server`, `/docs/auth`). That is a vendor-documented BYO-subscription architecture with no Anthropic equivalent, and several products ship on it.
+
+The caveat is worth carrying: OpenAI has never affirmatively blessed subscription auth in a third-party **commercial** product. Asked directly (openai/codex discussion #8338), a maintainer addressed only the Apache licence and declined the terms question across three follow-ups. So the permission is architectural and implied, never written — which is a materially better position than Anthropic's explicit prohibition, and materially worse than §A.1's explicit grant.
 
 **What this changes, and what it does not.** It settles that *programmatic* and *third-party* are not themselves the problem. Two things remain prohibited, and they are the two ARCADE actually touches:
 
