@@ -13,7 +13,7 @@
   "replaces": "$500/mo market-intelligence seat",
   "bounds": {
     "maxTurns": 8,
-    "maxToolCalls": 12,
+    "maxToolCalls": 6,
     "maxCostUsd": 0.12,
     "timeoutSec": 90
   },

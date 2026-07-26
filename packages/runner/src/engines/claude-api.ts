@@ -21,8 +21,23 @@ import type { Engine, HarnessJob, JobEnvelope, SkillAgent } from "./types.js"
 const PRICING: Record<string, { input: number; output: number }> = {
   "claude-opus-5": { input: 5, output: 25 },
   "claude-opus-4-8": { input: 5, output: 25 },
+  "claude-opus-4-7": { input: 5, output: 25 },
   "claude-sonnet-5": { input: 3, output: 15 },
+  "claude-sonnet-4-6": { input: 3, output: 15 },
   "claude-haiku-4-5": { input: 1, output: 5 }
+}
+
+/**
+ * Server-side tool pricing, per call.
+ *
+ * These were unaccounted entirely, and they are not a rounding error: a skill permitting
+ * 12 searches carries about $0.12 of invisible cost, which on `counterparty-brief` equalled
+ * its ENTIRE cost ceiling and half its revenue. The seller's ceiling could not trip because
+ * the spend it was meant to bound was not being measured.
+ */
+const SERVER_TOOL_USD: Record<string, number> = {
+  web_search_requests: 0.01,
+  web_fetch_requests: 0.01
 }
 
 interface Usage {
@@ -30,18 +45,43 @@ interface Usage {
   output_tokens?: number
   cache_creation_input_tokens?: number
   cache_read_input_tokens?: number
+  server_tool_use?: Record<string, number> | null
 }
 
-const estimateCostUsd = (model: string, u: Usage): number => {
+/** Raised when a model's price is unknown, so the ceiling fails closed rather than open. */
+export class UnpricedModel extends Error {
+  readonly _tag = "UnpricedModel"
+  constructor(readonly model: string) {
+    super(
+      `no price known for "${model}", so maxCostUsd cannot be enforced. Add it to PRICING ` +
+        `or remove the model override. Refusing to run a job whose cost ceiling would be ` +
+        `silently inert.`
+    )
+  }
+}
+
+export const estimateCostUsd = (model: string, u: Usage): number => {
   const p = PRICING[model]
-  if (p === undefined) return 0
-  return (
+  // Fail closed. Returning 0 for an unknown model disabled `maxCostUsd` entirely — the
+  // seller guide calls it "the bound that actually protects your margin", and a typo in a
+  // model name silently removed it.
+  if (p === undefined) throw new UnpricedModel(model)
+
+  const tokens =
     ((u.input_tokens ?? 0) * p.input +
       (u.cache_creation_input_tokens ?? 0) * p.input * 1.25 +
       (u.cache_read_input_tokens ?? 0) * p.input * 0.1 +
       (u.output_tokens ?? 0) * p.output) /
     1e6
-  )
+
+  let tools = 0
+  for (const [k, n] of Object.entries(u.server_tool_use ?? {})) {
+    // An unknown server tool is priced at the highest known rate rather than zero: the
+    // ceiling should over-estimate an unfamiliar cost, never ignore it.
+    tools += (n ?? 0) * (SERVER_TOOL_USD[k] ?? Math.max(...Object.values(SERVER_TOOL_USD)))
+  }
+
+  return tokens + tools
 }
 
 /**
@@ -129,6 +169,18 @@ export const runClaudeApi = async (
 ): Promise<JobEnvelope> => {
   const model = agent.model ?? "claude-opus-5"
   const { bounds } = job
+
+  // Checked before a token is spent: if the ceiling cannot be enforced, the job must not
+  // start. A bound that silently does nothing is worse than no bound, because the seller
+  // priced their listing believing it was there.
+  if (bounds.maxCostUsd !== undefined && PRICING[model] === undefined) {
+    return {
+      stopReason: "rejected",
+      usage: { turns: 0, tokens: 0, toolCalls: 0 },
+      costUsd: 0,
+      error: new UnpricedModel(model).message
+    }
+  }
   const totals = { turns: 0, tokens: 0, toolCalls: 0 }
   let costUsd = 0
   let submitted: unknown
@@ -175,7 +227,7 @@ export const runClaudeApi = async (
   try {
     for await (const message of runner as AsyncIterable<Anthropic.Beta.BetaMessage>) {
       totals.turns += 1
-      const u = (message.usage ?? {}) as Usage
+      const u = (message.usage ?? {}) as unknown as Usage
       totals.tokens += billableTokens(u)
       costUsd += estimateCostUsd(model, u)
       lastStopReason = message.stop_reason ?? undefined

@@ -137,14 +137,15 @@ You do not have to do anything for this — it happens in the harness. But write
 Two files. `arcade.json` is the public half; `agent.ts` is the half that never leaves your machine:
 
 ```ts
-import type { AgentDefinition } from "@arcade/runner/engines/claude-api"
+import { defineAgent } from "@arcade/runner/engines/types"
 
-export default {
+export default defineAgent({
+  credential: "api-key",
   model: "claude-opus-5",
   effort: "medium",
-  webSearch: { maxUses: 8 },
+  capabilities: ["web-search"],
   systemPrompt: "…"
-} satisfies AgentDefinition
+})
 ```
 
 Your agent finishes by calling the `submit` tool, whose input schema **is** your manifest's `outputSchema`. You don't declare `submit` — the harness builds it from your listing and marks it strict, so the API guarantees the arguments validate. This makes "the agent decided it was done" and "the output has the shape the buyer paid for" the same event; running out of turns without calling `submit` is an incomplete job and doesn't settle.
@@ -156,38 +157,39 @@ Two defaults worth understanding, because both cost you money if you fight them:
 
 If your output schema uses keywords strict mode rejects (`minLength`, numeric ranges), set `strictOutput: false`. The hub still validates every output against your full schema, so this trades an API-level guarantee for schema expressiveness — it never weakens the settle-on-success rule.
 
-### Writing a `claude-seat` skill
+### Developing against your own seat
 
-Lane B sells spare capacity on a Claude Code subscription you already pay for. Set the seat up once:
+You can iterate on a skill using a Claude Code subscription you already pay for — locally, for your own benefit, never for a paying stranger. Set up a seat kept separate from your everyday one:
 
 ```bash
 bun run arcade runner seat        # prints the seat dir and whether it's logged in
 CLAUDE_CONFIG_DIR=~/.arcade/seat claude    # then /login, once
 ```
 
-It is deliberately a **separate** seat from the one you work in. Credentials are keyed per config directory, so this is its own login — and more importantly, your everyday config directory also carries your hooks, your MCP servers and your `CLAUDE.md`, none of which belong in a stranger's paid job.
+It is deliberately separate because credentials are keyed per config directory, and — more importantly — your everyday directory carries your hooks, MCP servers and `CLAUDE.md`, none of which belong inside a job.
 
-```ts
-import type { SeatAgentDefinition } from "@arcade/runner/engines/claude-seat"
+**A seat-backed skill cannot be published, and cannot be run for a buyer.** `arcade publish` refuses it, and the runner will not add it to its dispatch map, so no message from the hub can cause it to execute. When you are ready to list, change one field:
 
-export default {
-  systemPrompt: "…",
-  allowedTools: []        // default: none
-} satisfies SeatAgentDefinition
+```jsonc
+"engine": { "adapter": "claude-agent", "credential": "api-key", "entry": "agent.ts" }
 ```
 
-**`allowedTools: []` is not "no tools" on its own.** Measured, the default toolset still loads — Bash, Read, Write, Edit included — leaving safety to depend on the permission mode refusing each call. The runner therefore also sends an explicit deny list, so those tools are absent from the request rather than merely refused. Name a tool in `allowedTools` and it stops being denied; name nothing and the job genuinely cannot touch your disk.
+Your prompt, capabilities, bounds and schemas are untouched. One thing that is *not* identical: the sandbox environment differs between the two. A seat-backed run gets your real `HOME` because the credential lives in the OS keychain; an API-key run gets `HOME` redirected into the skill directory. So "flip one field" is true of the manifest and not quite true of the runtime — test once on the key before you list.
 
-That absence is what pays for lane B's one weakness. Unlike lane A, the sandbox environment is **widened**: your seat credential lives in the OS keychain and is only reachable with your real `HOME`. The widening is safe because it is inert — a job with a readable filesystem has no instrument to read it with.
+Why it cannot be sold: [`terms.md`](./terms.md). Anthropic's Claude Code legal page is explicit that developers building products should use API keys, and that Anthropic "does not permit third-party developers to offer Claude.ai login or to route requests through Free, Pro, or Max plan credentials on behalf of their users." Every other provider's consumer terms say something equivalent. This is enforced rather than documented because a marketplace that made the violation easy would be exposed on its own account, under Anthropic's Commercial Terms §D.4(c).
 
-**Two settings do most of the work on cost.** The runner pins the job's working directory to the skill and loads no filesystem settings at all. Without that, jobs inherit whatever directory the runner was started in — including its `.mcp.json`, which grants every buyer's job network egress nobody agreed to. Measured on one diff:
+### Two findings worth keeping from that lane
+
+Both apply to any `claude-agent` skill, on either credential.
+
+**`allowedTools: []` does not mean "no tools".** Measured, the default toolset still loads — Bash, Read, Write, Edit included — leaving safety to rest on the permission mode refusing each call. The runner sends an explicit deny list instead, so those tools are absent from the request rather than merely refused. On one job that also cut the per-call cache write from 34,481 tokens to 619, and the cost from $0.356 to $0.016.
+
+**Your working directory decides what loads.** The runner pins the job's cwd to the skill and loads no filesystem settings at all. Without that, jobs inherit whatever directory the runner started in — including its `.mcp.json`, which grants every buyer's job network egress nobody agreed to:
 
 | runner started in | tools loaded | cache write | cost |
 |---|---|---|---|
 | a repo with `.mcp.json` | 29 + MCP | 17,338 tok | $0.220 |
-| isolated (what the runner now does) | 1 | 843 tok | **$0.043** |
-
-**Your ceilings are quota, not cash.** The subscription is already paid, so marginal spend is ~zero and `maxCostUsd` guards against one runaway job eating the quota you meant to sell across hundreds. Set it well above the price — `diff-triage` prices at $0.05 with a $0.40 ceiling — and treat it as a circuit breaker rather than a margin calculation.
+| isolated (what the runner does) | 1 | 843 tok | **$0.043** |
 
 ## What the sandbox does
 

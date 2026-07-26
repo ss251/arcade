@@ -8,11 +8,11 @@
     "ci",
     "quality"
   ],
-  "price": "$0.05",
+  "price": "$0.12",
   "replaces": "$30/user/mo code-review seat",
   "bounds": {
     "maxTurns": 4,
-    "maxCostUsd": 0.4,
+    "maxCostUsd": 0.07,
     "timeoutSec": 120
   },
   "inputSchema": {
@@ -106,6 +106,10 @@
     "entry": "agent.ts",
     "capabilities": []
   },
-  "secrets": [],
-  "egress": []
+  "secrets": [
+    "ANTHROPIC_API_KEY"
+  ],
+  "egress": [
+    "api.anthropic.com"
+  ]
 }

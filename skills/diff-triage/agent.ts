@@ -12,6 +12,10 @@ import { defineAgent } from "@arcade/runner/engines/types"
 
 export default defineAgent({
   credential: "api-key",
+  // Measured on this task: Sonnet $0.047, Opus $0.13–0.22. The listing earns $0.114 after
+  // fee, so the model choice is the difference between a margin and a loss — and triage of
+  // a diff that is already in the prompt does not need the harder model.
+  model: "claude-sonnet-5",
   capabilities: [],
 
   systemPrompt: `You triage code diffs for a reviewer deciding whether to merge.

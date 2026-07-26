@@ -33,7 +33,7 @@ const usage = () => {
   console.log(`arcade — publish agent skills as paid endpoints on Arc
 
   arcade runner init [--seller 0x..] [--hub URL]   create ~/.arcade/config.json
-  arcade runner seat                               set up the Claude Code seat (lane B)
+  arcade runner seat                               set up a local development seat
   arcade runner start [--skills DIR]               connect to the hub and serve jobs
   arcade publish <skillDir>                        preview the PUBLIC projection
   arcade doctor [--skills DIR]                     validate config + skills
@@ -63,11 +63,10 @@ const main = Effect.gen(function* () {
   }
 
   if (cmd === "runner" && sub === "seat") {
-    // Lane B runs on a Claude Code seat. This deliberately provisions a SEPARATE one
-    // rather than reusing the seller's everyday config directory: credentials are keyed
-    // per config directory in the OS keychain, and — more importantly — that directory
-    // also carries hooks, MCP servers and skills, all of which would otherwise execute
-    // inside a stranger's paid job.
+    // A LOCAL DEVELOPMENT seat — skills on it run for the seller alone and cannot be
+    // published. Provisioned separately from the everyday config directory because
+    // credentials are keyed per directory in the OS keychain, and because that directory
+    // also carries hooks, MCP servers and skills that have no business inside a job.
     const dir = seatDir()
     yield* Effect.tryPromise({
       try: () => mkdir(dir, { recursive: true }),
@@ -93,13 +92,13 @@ This seat has no credential yet. Log in once, interactively:
 
   CLAUDE_CONFIG_DIR=${dir} claude
 
-then run /login inside it and pick the account whose spare capacity you want to sell.
+then run /login inside it and pick the account you want to develop against.
 
 Why a separate seat, and not the one you use every day:
 
   - credentials are keyed per config directory, so this is its own login
   - your personal hooks, MCP servers and skills stay out of buyers' jobs
-  - the quota you sell is visibly separate from the quota you work on
+  - the quota you develop against is visibly separate from the quota you work on
 
 Nothing about this seat ever reaches the hub. The runner is on your machine and the
 credential stays in your keychain — ARCADE only ever sees a job result.`)

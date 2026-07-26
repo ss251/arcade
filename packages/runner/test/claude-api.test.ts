@@ -373,3 +373,81 @@ describe("cost estimate", () => {
     expect(out.stopReason).toBe("bounds_exceeded")
   })
 })
+
+describe("cost accounting", () => {
+  /**
+   * `maxCostUsd` is what the seller guide calls "the bound that actually protects your
+   * margin". Two ways it silently did nothing: server-side tool calls were not counted at
+   * all, and an unknown model priced at zero disabled the ceiling entirely.
+   */
+
+  it("counts server-side tool calls, which dominate a search-heavy skill", async () => {
+    // counterparty-brief permits 12 searches: ~$0.12, against a $0.12 ceiling and a
+    // $0.2375 seller share. Unmeasured, the flagship listing could run margin-negative
+    // while reporting that it stayed inside its bound.
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(
+      agent(),
+      job(),
+      PROMPT,
+      fakeClient(
+        [
+          msg({
+            content: [toolUse("submit", { ok: true })],
+            usage: { input_tokens: 0, output_tokens: 0, server_tool_use: { web_search_requests: 12 } } as never
+          })
+        ],
+        spy
+      )
+    )
+    expect(out.costUsd).toBeCloseTo(0.12, 6)
+  })
+
+  it("prices an unknown server tool at the highest known rate rather than zero", async () => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(
+      agent(),
+      job(),
+      PROMPT,
+      fakeClient(
+        [
+          msg({
+            content: [toolUse("submit", {})],
+            usage: { server_tool_use: { some_future_tool_requests: 5 } } as never
+          })
+        ],
+        spy
+      )
+    )
+    // Over-estimating an unfamiliar cost is the safe direction for a ceiling.
+    expect(out.costUsd).toBeGreaterThan(0)
+  })
+
+  it("refuses to start when a cost ceiling cannot be enforced", async () => {
+    // Previously an unpriced model returned 0 from the estimator, so maxCostUsd was inert
+    // and the seller never learned. A typo in a model name removed their margin guard.
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(
+      agent({ model: "claude-does-not-exist" }),
+      job({ maxCostUsd: 0.1 }),
+      PROMPT,
+      fakeClient([msg({ content: [toolUse("submit", { ok: true })] })], spy)
+    )
+
+    expect(out.stopReason).toBe("rejected")
+    expect(out.error).toMatch(/no price known/)
+    expect(spy.consumed).toBe(0)
+  })
+
+  it("still runs an unpriced model when no cost ceiling was declared", async () => {
+    // Nothing to enforce, so nothing to fail closed on — the seller opted out of the bound.
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(
+      agent({ model: "claude-does-not-exist" }),
+      job(),
+      PROMPT,
+      fakeClient([msg({ content: [toolUse("submit", { ok: true })] })], spy)
+    )
+    expect(out.stopReason).not.toBe("rejected")
+  })
+})
