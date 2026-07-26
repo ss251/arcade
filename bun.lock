@@ -68,6 +68,7 @@
         "@anthropic-ai/sdk": "^0.115.0",
         "@arcade/core": "workspace:*",
         "effect": "^3.22.0",
+        "viem": "^2.31.3",
       },
     },
   },

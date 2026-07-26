@@ -5,12 +5,13 @@ import {
   PublicListing,
   SkillManifest,
   decodeHubMessage,
-  assertManifestPublishable,
-  NotPublishable,
+  helloDigest,
   toPublicListing
 } from "@arcade/core"
 import { execSkill } from "./exec.ts"
-import { loadSkills, type LoadedSkill } from "./skills.ts"
+import { loadSkills } from "./skills.ts"
+import { dispatchMap, gate } from "./publishable.ts"
+import { privateKeyToAccount } from "viem/accounts"
 import type { RunnerConfig } from "./config.ts"
 
 /**
@@ -34,27 +35,48 @@ export const startDaemon = (args: DaemonArgs) =>
       return yield* Effect.fail(new Error(`no skills found in ${args.skillsDir}`))
     }
 
-    const byId = new Map<string, LoadedSkill>(skills.map((s) => [s.manifest.id, s]))
-    // The second of the two routes to the hub. `arcade publish` gates the interactive
-    // path; this gates the automatic one, so a seat-backed skill sitting in the skills
-    // directory cannot be announced just because the daemon started.
-    const sellable = skills.filter((s) => {
-      try {
-        assertManifestPublishable(s.manifest)
-        return true
-      } catch (e) {
-        if (e instanceof NotPublishable) {
-          console.error(`skipping ${e.skillId}: ${e.credential} credential is not sellable`)
-          console.error(`  ${e.reason.split("\n")[0]}`)
-          return false
-        }
-        throw e
-      }
-    })
-    const listings: Array<PublicListing> = sellable.map((s) => toPublicListing(s.manifest))
+    // The gate, applied ONCE and used for everything downstream. `arcade publish` gates the
+    // interactive route to the hub; this gates the automatic one. Critically, the dispatch
+    // map is built from the same filtered set — a refused skill is unreachable, not merely
+    // unadvertised, so no message from the hub can cause it to run.
+    const gated = gate(skills)
+    const byId = dispatchMap(gated)
+    const listings: Array<PublicListing> = gated.sellable.map((s) => toPublicListing(s.manifest))
+
+    for (const r of gated.refused) {
+      console.error(`not serving ${r.skillId}: ${r.reason.split("\n")[0]}`)
+    }
+
+    if (gated.sellable.length === 0) {
+      return yield* Effect.fail(
+        new Error(`no sellable skills in ${args.skillsDir} (${gated.refused.length} refused)`)
+      )
+    }
+
+    // Read from the environment, never the config file — a payout key on disk beside a
+    // seller's address is the one secret this project must not encourage storing.
+    const sellerKey = process.env["ARCADE_SELLER_KEY"]
+    if (sellerKey === undefined) {
+      return yield* Effect.fail(
+        new Error(
+          "ARCADE_SELLER_KEY is required: the runner signs its handshake with the key " +
+            "controlling your payout address, which is what stops anyone else claiming " +
+            "your listings. Export it; do not put it in ~/.arcade/config.json."
+        )
+      )
+    }
+    const sellerAccount = privateKeyToAccount(sellerKey as `0x${string}`)
+    if (sellerAccount.address.toLowerCase() !== args.config.sellerAddress.toLowerCase()) {
+      return yield* Effect.fail(
+        new Error(
+          `ARCADE_SELLER_KEY controls ${sellerAccount.address} but config says ` +
+            `${args.config.sellerAddress} — the hub would reject this handshake.`
+        )
+      )
+    }
 
     console.log(`[runner] ${args.config.runnerId}`)
-    for (const s of skills) {
+    for (const s of gated.sellable) {
       console.log(`  ${s.manifest.id}@${s.manifest.version}  ${s.manifest.price}  (${s.manifest.engine.adapter})`)
     }
 
@@ -68,17 +90,33 @@ export const startDaemon = (args: DaemonArgs) =>
 
         ws.addEventListener("open", () => {
           console.log(`[runner] connected to ${args.config.hubWsUrl}`)
-          ws.send(
-            JSON.stringify({
-              _tag: "Hello",
+          void (async () => {
+            // Prove control of the payout address. The hub cannot take `seller` on trust:
+            // a self-asserted address let anyone re-announce an existing skill id and
+            // redirect every subsequent buyer's payment to themselves.
+            const nonce = `${Date.now()}-${crypto.randomUUID()}`
+            const digest = helloDigest({
               runnerId: args.config.runnerId,
               seller: args.config.sellerAddress,
-              // ONLY the public projection crosses this wire. See packages/core/manifest.ts.
-              listings: listings.map((l) => Schema.encodeSync(PublicListing)(l)),
-              maxConcurrency: args.config.maxConcurrency,
-              agentVersion: "0.1.0"
+              nonce,
+              skillIds: listings.map((l) => l.id)
             })
-          )
+            const signature = await sellerAccount.signMessage({ message: digest })
+
+            ws.send(
+              JSON.stringify({
+                _tag: "Hello",
+                runnerId: args.config.runnerId,
+                seller: args.config.sellerAddress,
+                // ONLY the public projection crosses this wire. See packages/core/manifest.ts.
+                listings: listings.map((l) => Schema.encodeSync(PublicListing)(l)),
+                maxConcurrency: args.config.maxConcurrency,
+                agentVersion: "0.1.0",
+                nonce,
+                signature
+              })
+            )
+          })()
           heartbeat = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(

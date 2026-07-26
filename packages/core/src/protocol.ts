@@ -18,8 +18,42 @@ export class Hello extends Schema.TaggedClass<Hello>()("Hello", {
   /** Only public projections — the runner never sends a full manifest. */
   listings: Schema.Array(PublicListing),
   maxConcurrency: Schema.Int.pipe(Schema.positive()),
-  agentVersion: Schema.String
+  agentVersion: Schema.String,
+  /** Freshness, so a captured Hello cannot be replayed indefinitely. */
+  nonce: Schema.String,
+  /**
+   * EIP-191 signature over `helloDigest(...)`, by the key controlling `seller`.
+   *
+   * Without this the connection was anonymous and `seller` was self-asserted, which made
+   * listings claimable by anyone: re-announce an existing skill id with your own address
+   * and every subsequent buyer signs a payment authorization to you. Proving control of
+   * the PAYOUT address is exactly the right property, because payout redirection is the
+   * attack.
+   */
+  signature: Schema.String
 }) {}
+
+/**
+ * The canonical string a runner signs. Lives in core so both sides derive it identically —
+ * a hub and runner that disagree about the bytes would fail open or fail closed silently.
+ */
+export const helloDigest = (args: {
+  readonly runnerId: string
+  readonly seller: string
+  readonly nonce: string
+  readonly skillIds: ReadonlyArray<string>
+}): string =>
+  [
+    "arcade-runner-hello",
+    "v1",
+    args.runnerId,
+    args.seller.toLowerCase(),
+    args.nonce,
+    [...args.skillIds].sort().join(",")
+  ].join("\n")
+
+/** How stale a Hello nonce may be. Bounds replay of a captured handshake. */
+export const HELLO_MAX_AGE_MS = 5 * 60_000
 
 export class JobLog extends Schema.TaggedClass<JobLog>()("JobLog", {
   jobId: Schema.String,

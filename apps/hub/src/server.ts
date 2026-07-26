@@ -4,6 +4,8 @@ import {
   JobOutcome,
   PublicListing,
   Rating,
+  helloDigest,
+  HELLO_MAX_AGE_MS,
   decodeRunnerMessage,
   explorerTxUrl,
   formatPrice,
@@ -20,6 +22,7 @@ import {
   GatewayLive,
   RailTest
 } from "@arcade/payments"
+import { recoverMessageAddress } from "viem"
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
 import { StoreLive, StoreTag } from "./store.ts"
@@ -89,7 +92,7 @@ const main = Effect.gen(function* () {
 
   const sockets = new Map<object, { runnerId?: string }>()
 
-  const server = Bun.serve<{ runnerId?: string }, never>({
+  const server = Bun.serve<{ runnerId?: string; seller?: string }, never>({
     port: PORT,
     idleTimeout: 120,
 
@@ -107,7 +110,65 @@ const main = Effect.gen(function* () {
 
         switch (msg._tag) {
           case "Hello": {
+            // The connection is anonymous until proven otherwise. `seller` decides where
+            // every buyer's money goes, so it cannot be self-asserted: without this, anyone
+            // could re-announce an existing skill id with their own address and collect.
+            const age = Date.now() - Number(msg.nonce.split("-")[0] ?? 0)
+            if (!Number.isFinite(age) || age < -HELLO_MAX_AGE_MS || age > HELLO_MAX_AGE_MS) {
+              ws.send(JSON.stringify({ _tag: "Ack", ok: false, detail: "stale handshake" }))
+              ws.close()
+              return
+            }
+
+            const digest = helloDigest({
+              runnerId: msg.runnerId,
+              seller: msg.seller,
+              nonce: msg.nonce,
+              skillIds: msg.listings.map((l) => l.id)
+            })
+            let recovered: string
+            try {
+              recovered = await recoverMessageAddress({
+                message: digest,
+                signature: msg.signature as `0x${string}`
+              })
+            } catch {
+              ws.send(JSON.stringify({ _tag: "Ack", ok: false, detail: "bad signature" }))
+              ws.close()
+              return
+            }
+            if (recovered.toLowerCase() !== msg.seller.toLowerCase()) {
+              console.error(`[hub] rejected ${msg.runnerId}: signer ${recovered} != seller ${msg.seller}`)
+              ws.send(JSON.stringify({ _tag: "Ack", ok: false, detail: "signature does not match seller" }))
+              ws.close()
+              return
+            }
+
+            // Listing ids are first-claimed. A different seller re-announcing an existing
+            // id is the payout-redirection attack, so it is refused rather than merged.
+            const existing = await run(store.allListings)
+            const owners = new Map(existing.map((r) => [r.listing.id, r.seller.toLowerCase()]))
+            const stolen = msg.listings
+              .map((l) => l.id)
+              .filter((id) => {
+                const owner = owners.get(id)
+                return owner !== undefined && owner !== msg.seller.toLowerCase()
+              })
+            if (stolen.length > 0) {
+              console.error(`[hub] rejected ${msg.runnerId}: ${stolen.join(", ")} owned by another seller`)
+              ws.send(
+                JSON.stringify({
+                  _tag: "Ack",
+                  ok: false,
+                  detail: `skill id already claimed: ${stolen.join(", ")}`
+                })
+              )
+              ws.close()
+              return
+            }
+
             ws.data.runnerId = msg.runnerId
+            ws.data.seller = msg.seller
             const conn: RunnerConn = {
               runnerId: msg.runnerId,
               seller: msg.seller,
@@ -145,10 +206,22 @@ const main = Effect.gen(function* () {
             break
           }
           case "JobResult": {
+            // Only the runner the job was assigned to may complete it. Without this any
+            // connected socket could forge an outcome for someone else's job — settling a
+            // fabricated success, or failing a competitor's work.
+            const owner = await run(broker.runnerFor(msg.jobId))
+            if (owner === undefined || owner !== ws.data.runnerId) {
+              console.error(
+                `[hub] dropped JobResult for ${msg.jobId} from ${ws.data.runnerId ?? "anonymous"} (assigned to ${owner ?? "nobody"})`
+              )
+              break
+            }
             await run(broker.complete(msg.jobId, msg.outcome))
             break
           }
           case "Heartbeat": {
+            // Same principle: a socket may only speak for the runner it authenticated as.
+            if (ws.data.runnerId !== msg.runnerId) break
             await run(store.touchRunner(msg.runnerId, msg.activeJobs))
             break
           }
