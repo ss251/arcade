@@ -17,6 +17,7 @@ import {
   GATEWAY_MIN_VALIDITY_SECONDS,
   InsufficientFunds,
   InvalidSignature,
+  NonceAlreadyUsed,
   RECEIPT_POLL_INTERVAL_MS,
   RpcFailure,
   RpcRateLimited,
@@ -122,6 +123,13 @@ export interface Eip3009Config {
    * uncollectable-take-rate bug; this field is the fix.
    */
   readonly feeSplitter?: string
+  /**
+   * Override the read client. Exists so the verify path — replay, balance — can be tested
+   * without a chain: the replay check was asserted in three documents and implemented in
+   * none, and the reason it went unnoticed is that only the in-memory fake was ever
+   * exercised against it.
+   */
+  readonly publicClient?: { readContract: (args: never) => Promise<unknown> }
 }
 
 /** `settle(address,uint256,uint256,uint256,bytes32,uint8,bytes32,bytes32)` */
@@ -146,7 +154,8 @@ export const FEE_SPLITTER_ABI = [
 
 export const makeEip3009Rail = (config: Eip3009Config): Rail => {
   const transport = http(config.rpcUrl ?? ARC_RPC_URL, { retryCount: 3, retryDelay: 1000 })
-  const pub = createPublicClient({ chain: arcTestnet, transport })
+  const pub = (config.publicClient ??
+    createPublicClient({ chain: arcTestnet, transport })) as ReturnType<typeof createPublicClient>
   const wallet = createWalletClient({ account: config.facilitator, chain: arcTestnet, transport })
 
   const call = <A>(method: string, f: () => Promise<A>) =>
@@ -238,6 +247,23 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
       })
       if (!ok) {
         return yield* new InvalidSignature({ reason: "signature does not recover to `from`", payer: p.from })
+      }
+
+      // Replay. `transferWithAuthorization` is permissionless and USDC records each
+      // (authorizer, nonce) pair once — but nothing stopped a caller replaying the same
+      // PAYMENT-SIGNATURE header at the HUB, which dispatched a fresh job every time. The
+      // seller burned N× inference and exactly one settle landed on chain. Three documents
+      // claimed this check existed; the ABI entry sat unused directly above.
+      const used = yield* call("authorizationState", () =>
+        pub.readContract({
+          address: USDC_ADDRESS as Hex,
+          abi: TRANSFER_WITH_AUTHORIZATION_ABI,
+          functionName: "authorizationState",
+          args: [p.from as Hex, p.nonce as Hex]
+        })
+      )
+      if (used === true) {
+        return yield* new NonceAlreadyUsed({ nonce: p.nonce, payer: p.from })
       }
 
       // Balance check — a valid signature over funds that aren't there still can't settle.

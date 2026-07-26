@@ -202,3 +202,76 @@ describe("RailTest semantics (used by the hub pipeline tests)", () => {
     expect(exit._tag).toBe("Failure")
   })
 })
+
+describe("EIP3009Live verify — the on-chain checks", () => {
+  /**
+   * Replay was claimed in README.md, docs/architecture.md and by the conformance suite's
+   * own "all three rails agree" framing, and implemented only in the in-memory fake. The
+   * attack it left open: replay one `PAYMENT-SIGNATURE` header N times, the hub dispatches
+   * N jobs, the seller burns N× inference, and exactly one settle lands on chain — which
+   * inverts the promise that a seller never works unpaid.
+   *
+   * These drive the real rail with a stubbed read client, so the actual code path runs.
+   */
+
+  /** Error payloads carry atomic bigints, which plain JSON.stringify refuses. */
+  const tags = (exit: unknown) => JSON.stringify(exit, (_k, v) => (typeof v === "bigint" ? v.toString() : v))
+
+  const stubClient = (over: Partial<Record<string, unknown>> = {}) => ({
+    readContract: async (args: { functionName: string }) => {
+      if (args.functionName === "authorizationState") return over["authorizationState"] ?? false
+      if (args.functionName === "balanceOf") return over["balanceOf"] ?? 10_000_000n
+      throw new Error(`unexpected read: ${args.functionName}`)
+    }
+  })
+
+  const liveRail = (over?: Partial<Record<string, unknown>>) =>
+    makeEip3009Rail({
+      facilitator: privateKeyToAccount(generatePrivateKey()),
+      publicClient: stubClient(over) as never
+    })
+
+  it("rejects an authorization whose nonce is already spent on chain", async () => {
+    const rail = liveRail({ authorizationState: true })
+    const req = await Effect.runPromise(
+      rail.challenge({ priceAtomic: PRICE, resource: "/x/ss251/demo", payTo: SELLER })
+    )
+    const exit = await Effect.runPromiseExit(rail.verify(await makePayload(undefined, req), req))
+
+    expect(exit._tag).toBe("Failure")
+    expect(tags(exit)).toContain("NonceAlreadyUsed")
+  })
+
+  it("accepts the same authorization while the nonce is unspent", async () => {
+    const rail = liveRail({ authorizationState: false })
+    const req = await Effect.runPromise(
+      rail.challenge({ priceAtomic: PRICE, resource: "/x/ss251/demo", payTo: SELLER })
+    )
+    const exit = await Effect.runPromiseExit(rail.verify(await makePayload(undefined, req), req))
+
+    expect(exit._tag).toBe("Success")
+  })
+
+  it("checks replay before balance, so a spent nonce reports the real reason", async () => {
+    // Ordering matters for diagnosis: a replayed authorization from an emptied account
+    // should say "already used", not "insufficient funds".
+    const rail = liveRail({ authorizationState: true, balanceOf: 0n })
+    const req = await Effect.runPromise(
+      rail.challenge({ priceAtomic: PRICE, resource: "/x/ss251/demo", payTo: SELLER })
+    )
+    const exit = await Effect.runPromiseExit(rail.verify(await makePayload(undefined, req), req))
+
+    expect(tags(exit)).toContain("NonceAlreadyUsed")
+    expect(tags(exit)).not.toContain("InsufficientFunds")
+  })
+
+  it("still rejects an unfunded payer whose nonce is fresh", async () => {
+    const rail = liveRail({ authorizationState: false, balanceOf: 0n })
+    const req = await Effect.runPromise(
+      rail.challenge({ priceAtomic: PRICE, resource: "/x/ss251/demo", payTo: SELLER })
+    )
+    const exit = await Effect.runPromiseExit(rail.verify(await makePayload(undefined, req), req))
+
+    expect(tags(exit)).toContain("InsufficientFunds")
+  })
+})

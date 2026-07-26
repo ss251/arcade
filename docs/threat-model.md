@@ -78,6 +78,16 @@ What it does not eliminate — and what this document is mostly about — is tha
 | **Mitigations** | **Not applicable by construction.** Buyers receive JSON, never code. There is no install step, no auto-update, and no execution surface on the buyer's side. |
 | **Residual** | **None.** This is the class the pull-model architecture exists to delete, and it is the strongest security property in the design. |
 
+### T-PAYMENT-001 — Authorization replay
+
+| | |
+|---|---|
+| **ATLAS** | — (payment layer, outside the ATLAS matrix) |
+| **Vector** | A buyer replays one accepted `PAYMENT-SIGNATURE` header N times. Each replay is a fresh job; the seller burns N× inference, and exactly one `transferWithAuthorization` lands on chain because USDC records each `(authorizer, nonce)` pair once. |
+| **Mitigations** | `verify` calls `authorizationState(from, nonce)` before dispatch and fails `NonceAlreadyUsed`. Checked **before** the balance read, so a replay from an emptied account reports the real reason rather than "insufficient funds". |
+| **Residual** | **Low**, with a stated window: the check is a chain read at verify time, so two requests racing inside one block can both pass. Only one settles, so the loss is bounded at one duplicate job rather than N. |
+| **History** | Asserted in three documents and implemented in none — the ABI entry sat unused, and only the in-memory fake enforced it, so the conformance suite's "all three rails agree" was false. Found by the compliance fan-out. |
+
 ### T-IMPACT-001 — Cost exhaustion of the seller
 
 | | |
