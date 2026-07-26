@@ -52,6 +52,16 @@ export const helloDigest = (args: {
     [...args.skillIds].sort().join(",")
   ].join("\n")
 
+/**
+ * What a buyer signs to leave a rating.
+ *
+ * The receipt gate alone never authenticated anyone: job ids were public, so possession of
+ * one proved nothing about who paid. Binding the stars into the signature also stops a
+ * captured signature being replayed with a different score.
+ */
+export const ratingDigest = (args: { readonly jobId: string; readonly stars: number }): string =>
+  ["arcade-rating", "v1", args.jobId, String(args.stars)].join("\n")
+
 /** How stale a Hello nonce may be. Bounds replay of a captured handshake. */
 export const HELLO_MAX_AGE_MS = 5 * 60_000
 

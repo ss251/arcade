@@ -4,6 +4,7 @@ import {
   JobOutcome,
   PublicListing,
   Rating,
+  ratingDigest,
   helloDigest,
   HELLO_MAX_AGE_MS,
   decodeRunnerMessage,
@@ -22,6 +23,7 @@ import {
   GatewayLive,
   RailTest
 } from "@arcade/payments"
+import { createHmac, timingSafeEqual } from "node:crypto"
 import { recoverMessageAddress } from "viem"
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
@@ -89,6 +91,34 @@ const main = Effect.gen(function* () {
   const store = yield* StoreTag
   const broker = yield* BrokerTag
   const rail = yield* RailTag
+
+  /**
+   * Job access tokens, derived rather than stored.
+   *
+   * `/jobs/:id` and `/jobs/:id/result` were unauthenticated, and `/receipts` published
+   * every job id — so anyone could enumerate receipts and read every buyer's input and
+   * every paid result for free. That is both a privacy breach the docs never disclosed and
+   * a way to obtain the product without paying for it.
+   *
+   * HMAC over a per-hub secret keeps this stateless: the token is a function of the job id,
+   * so nothing has to be persisted or expired, and a buyer who has the 202 can always
+   * re-derive access to their own job and nobody else's.
+   */
+  const hubSecret =
+    process.env["ARCADE_HUB_SECRET"] ?? crypto.randomUUID() + crypto.randomUUID()
+  const jobToken = (jobId: string): string =>
+    createHmac("sha256", hubSecret).update(`arcade-job:${jobId}`).digest("hex").slice(0, 32)
+  const jobTokenOk = (jobId: string, presented: string | null): boolean => {
+    if (presented === null) return false
+    const expected = jobToken(jobId)
+    // Constant-time: token comparison is a guessing oracle otherwise.
+    return (
+      presented.length === expected.length &&
+      timingSafeEqual(Buffer.from(presented), Buffer.from(expected))
+    )
+  }
+  const tokenFrom = (req: Request, url: URL): string | null =>
+    req.headers.get("x-job-token") ?? url.searchParams.get("token")
 
   const sockets = new Map<object, { runnerId?: string }>()
 
@@ -308,8 +338,12 @@ const main = Effect.gen(function* () {
 
       if (path === "/receipts" && req.method === "GET") {
         const receipts = await run(store.allReceipts)
+        // The public feed is evidence that settlement happens, not a directory of who
+        // bought what. `jobId` is omitted because it was the capability to read a
+        // stranger's input and output; `buyer` because a wallet address plus a skill id is
+        // a purchase history.
         return json(
-          receipts.map((r) => ({
+          receipts.map(({ jobId: _jobId, buyer: _buyer, ...r }) => ({
             ...r,
             priceAtomic: r.priceAtomic.toString(),
             sellerAtomic: r.sellerAtomic.toString(),
@@ -324,19 +358,46 @@ const main = Effect.gen(function* () {
 
       const jobMatch = /^\/jobs\/([A-Za-z0-9_]+)$/.exec(path)
       if (jobMatch !== null && req.method === "GET") {
-        const job = await run(store.getJob(jobMatch[1]!))
+        const jobId = jobMatch[1]!
+        if (!jobTokenOk(jobId, tokenFrom(req, url))) return json({ error: "not_found" }, 404)
+        const job = await run(store.getJob(jobId))
         if (job === undefined) return json({ error: "not_found" }, 404)
-        return json({ ...job, priceAtomic: job.priceAtomic.toString() })
+        // `input` is deliberately absent: the buyer already has it, and nobody else should.
+        const { input: _input, ...rest } = job
+        return json({ ...rest, priceAtomic: rest.priceAtomic.toString() })
       }
 
-      // ---- ratings: receipt-gated -------------------------------------------
       if (path === "/ratings" && req.method === "POST") {
-        const body = (await req.json()) as { jobId?: string; stars?: number; comment?: string }
+        const body = (await req.json()) as {
+          jobId?: string
+          stars?: number
+          comment?: string
+          signature?: string
+        }
         const receipts = await run(store.allReceipts)
         const receipt = receipts.find((r) => r.jobId === body.jobId)
         // A rating requires a SETTLED receipt: a fake review costs real USDC.
         if (receipt === undefined || !receipt.settled) {
           return json({ error: "rating requires a settled receipt for this job" }, 403)
+        }
+
+        // …and proof you are the buyer on it. The receipt gate alone was not a gate: job
+        // ids were published on /receipts, so anyone could enumerate them and post a rating
+        // attributed to someone else's wallet. "Reputation is bought, not asserted" needs
+        // the buyer's signature, or it is asserted after all.
+        const stars = Math.max(1, Math.min(5, Math.trunc(body.stars ?? 0)))
+        const digest = ratingDigest({ jobId: receipt.jobId, stars })
+        let rater: string
+        try {
+          rater = await recoverMessageAddress({
+            message: digest,
+            signature: (body.signature ?? "0x") as `0x${string}`
+          })
+        } catch {
+          return json({ error: "rating must be signed by the buyer", digest }, 401)
+        }
+        if (rater.toLowerCase() !== receipt.buyer.toLowerCase()) {
+          return json({ error: "signature does not match the buyer on this receipt" }, 403)
         }
         const already = (await run(store.ratingsFor(receipt.skillId))).some(
           (r) => r.receiptJobId === receipt.jobId
@@ -348,7 +409,7 @@ const main = Effect.gen(function* () {
           skillId: receipt.skillId,
           skillVersion: receipt.skillVersion,
           buyer: receipt.buyer,
-          stars: Math.max(1, Math.min(5, Math.trunc(body.stars ?? 0))),
+          stars,
           ...(body.comment === undefined ? {} : { comment: body.comment }),
           createdAtMs: Date.now()
         })
@@ -418,7 +479,9 @@ const main = Effect.gen(function* () {
           {
             job_id: jobId,
             status: "queued",
-            poll_url: `${url.origin}/jobs/${jobId}/result`,
+            poll_url: `${url.origin}/jobs/${jobId}/result?token=${jobToken(jobId)}`,
+            // The capability to read this job's result. Held only by whoever paid for it.
+            job_token: jobToken(jobId),
             price: formatPrice(priceAtomic)
           },
           202
@@ -429,16 +492,31 @@ const main = Effect.gen(function* () {
       const resultMatch = /^\/jobs\/([A-Za-z0-9_]+)\/result$/.exec(path)
       if (resultMatch !== null && req.method === "GET") {
         const jobId = resultMatch[1]!
+        if (!jobTokenOk(jobId, tokenFrom(req, url))) return json({ error: "not_found" }, 404)
         const deadline = Date.now() + 120_000
         while (Date.now() < deadline) {
           const receipts = await run(store.allReceipts)
           const receipt = receipts.find((r) => r.jobId === jobId)
           if (receipt !== undefined) {
             const job = await run(store.getJob(jobId))
+            // The payload is released only against a SETTLED receipt. Previously a receipt
+            // merely EXISTING was enough — and the pipeline writes one on every terminal
+            // outcome, settled or not. So a job whose settlement failed still handed over
+            // the work: the seller produced it, the buyer received it, nobody paid. D2 says
+            // a failed job leaves the buyer's balance untouched; it has to also leave the
+            // buyer without the goods, or "non-settlement is the refund" is a transfer.
+            const delivered = receipt.settled === true
             return json({
               job_id: jobId,
               status: job?.outcome?.status ?? (receipt.settled ? "succeeded" : "failed"),
-              result: job?.outcome?.output ?? null,
+              result: delivered ? (job?.outcome?.output ?? null) : null,
+              ...(delivered
+                ? {}
+                : {
+                    detail:
+                      job?.outcome?.error ??
+                      "not settled — you were not charged, and no result is released"
+                  }),
               receipt: {
                 ...receipt,
                 priceAtomic: receipt.priceAtomic.toString(),

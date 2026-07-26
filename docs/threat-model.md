@@ -78,6 +78,31 @@ What it does not eliminate — and what this document is mostly about — is tha
 | **Mitigations** | **Not applicable by construction.** Buyers receive JSON, never code. There is no install step, no auto-update, and no execution surface on the buyer's side. |
 | **Residual** | **None.** This is the class the pull-model architecture exists to delete, and it is the strongest security property in the design. |
 
+### T-PRIV-001 — Disclosure of buyer inputs and paid results
+
+| | |
+|---|---|
+| **ATLAS** | AML.T0057 — LLM Data Leakage |
+| **Vector** | `/receipts` published every `jobId`; `/jobs/:id` and `/jobs/:id/result` were unauthenticated. Enumerate the first, read the other two: every buyer's input and every paid result, free. |
+| **Mitigations** | A job token (HMAC over a per-hub secret, so nothing is stored or expires) is issued with the 202 and required on both job endpoints, compared in constant time. `/jobs/:id` no longer echoes `input` at all. `/receipts` omits `jobId` and `buyer` — it is evidence that settlement happens, not a directory of who bought what. |
+| **Residual** | **Low.** A hub restart rotates the secret unless `ARCADE_HUB_SECRET` is set, invalidating outstanding tokens — acceptable for jobs, since the buyer holds the result already, and stated here rather than discovered. |
+
+### T-PRIV-002 — Unpaid delivery
+
+| | |
+|---|---|
+| **Vector** | `/jobs/:id/result` released the output as soon as a receipt *existed*. The pipeline writes a receipt on every terminal outcome, settled or not — so a job whose settlement failed still handed over the work. |
+| **Mitigations** | Delivery requires `receipt.settled === true`; otherwise the result is withheld with the reason. |
+| **Residual** | **Low**, and worth stating as a principle: "non-settlement is the refund" only holds if it also leaves the buyer without the goods. Otherwise it is a transfer. |
+
+### T-RATING-001 — Attributed ratings without the buyer
+
+| | |
+|---|---|
+| **Vector** | `/ratings` took a `jobId`, looked up the receipt, and attributed the rating to `receipt.buyer` — authenticating nothing. Since job ids were public, anyone could rate any skill as any buyer. |
+| **Mitigations** | The rating must carry an EIP-191 signature over `ratingDigest(jobId, stars)` recovering to the receipt's buyer. Stars are bound into the digest, so a captured signature cannot be replayed with a different score. |
+| **Residual** | **Low.** "Reputation is bought, not asserted" is now true; previously the receipt gate proved possession of a public identifier. |
+
 ### T-PAYMENT-001 — Authorization replay
 
 | | |
