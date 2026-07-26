@@ -12,6 +12,7 @@ import { execSkill } from "./exec.ts"
 import { loadSkills } from "./skills.ts"
 import { dispatchMap, gate } from "./publishable.ts"
 import { privateKeyToAccount } from "viem/accounts"
+import { resolveSellerKey } from "./wallet.ts"
 import type { RunnerConfig } from "./config.ts"
 
 /**
@@ -53,27 +54,14 @@ export const startDaemon = (args: DaemonArgs) =>
       )
     }
 
-    // Read from the environment, never the config file — a payout key on disk beside a
-    // seller's address is the one secret this project must not encourage storing.
-    const sellerKey = process.env["ARCADE_SELLER_KEY"]
-    if (sellerKey === undefined) {
-      return yield* Effect.fail(
-        new Error(
-          "ARCADE_SELLER_KEY is required: the runner signs its handshake with the key " +
-            "controlling your payout address, which is what stops anyone else claiming " +
-            "your listings. Export it; do not put it in ~/.arcade/config.json."
-        )
-      )
-    }
+    // Environment first, then the keychain `arcade init` wrote — never the config file. A
+    // payout key on disk beside a seller's address is the one secret this project must not
+    // encourage storing. `resolveSellerKey` also refuses a key that controls a *different*
+    // address, so a misconfiguration fails here with a message about configuration rather
+    // than later with one about signatures.
+    const resolved = yield* resolveSellerKey(args.config.sellerAddress)
+    const sellerKey = resolved.privateKey
     const sellerAccount = privateKeyToAccount(sellerKey as `0x${string}`)
-    if (sellerAccount.address.toLowerCase() !== args.config.sellerAddress.toLowerCase()) {
-      return yield* Effect.fail(
-        new Error(
-          `ARCADE_SELLER_KEY controls ${sellerAccount.address} but config says ` +
-            `${args.config.sellerAddress} — the hub would reject this handshake.`
-        )
-      )
-    }
 
     console.log(`[runner] ${args.config.runnerId}`)
     for (const s of gated.sellable) {
