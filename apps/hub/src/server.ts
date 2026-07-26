@@ -1,6 +1,7 @@
 import { Effect, Layer, Runtime, Schema } from "effect"
 import {
   ARC_CAIP2,
+  USDC_ADDRESS,
   JobOutcome,
   PublicListing,
   Rating,
@@ -30,6 +31,7 @@ import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
 import { StoreLive, StoreTag } from "./store.ts"
 import { runJob } from "./pipeline.ts"
 import { renderIndex } from "./ui.ts"
+import { buildOpenApi, buildWellKnownX402 } from "./openapi.ts"
 
 /**
  * ARCADE hub.
@@ -294,20 +296,23 @@ const main = Effect.gen(function* () {
         })
       }
 
-      if (path === "/openapi.json") {
-        const { JSONSchema } = await import("effect")
-        return json({
-          openapi: "3.1.0",
-          info: { title: "ARCADE", version: "0.1.0", description: "Paid agent skills on Arc" },
-          "x-payment": { network: ARC_CAIP2, scheme: "exact", rail: rail.name },
-          components: {
-            schemas: {
-              // Derived from the same Effect Schemas the runtime enforces — cannot drift.
-              PublicListing: JSONSchema.make(PublicListing),
-              PaymentPayload: JSONSchema.make(PaymentPayload)
-            }
-          }
-        })
+      // ---- discovery ---------------------------------------------------------
+      // Both documents are generated from the live listing set, so they cannot describe a
+      // skill that is not currently served, and cannot drift from the schemas the runtime
+      // actually enforces. `ARCADE_PUBLIC_URL` matters behind a proxy: the advertised
+      // origin has to be the one buyers can reach, not the socket the hub is bound to.
+      if (path === "/openapi.json" || path === "/.well-known/x402") {
+        const listings = await run(store.allListings)
+        const discovery = {
+          listings,
+          origin: process.env["ARCADE_PUBLIC_URL"] ?? url.origin,
+          rail: rail.name,
+          network: ARC_CAIP2,
+          asset: USDC_ADDRESS
+        }
+        return json(
+          path === "/openapi.json" ? buildOpenApi(discovery) : buildWellKnownX402(discovery)
+        )
       }
 
       if (path === "/listings" && req.method === "GET") {
