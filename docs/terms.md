@@ -10,7 +10,7 @@ Ten providers checked. The API/consumer split holds everywhere it was checked �
 
 | Provider | API / business terms | Consumer subscription | Wrinkle |
 |---|---|---|---|
-| **Anthropic** | ✅ explicit: may power products for end users | ❌ three separate prohibitions | — |
+| **Anthropic** | ✅ explicit: may power products for end users | ⚠️ third-party apps on your own sub are **permitted and metered**; resale and credential-routing are not | policy moved 4× in 2026 |
 | **OpenAI** | ✅ explicit; customer **owns Output** | ❌ no selling Services; no programmatic extraction of Output | no blanket automated-access clause in the API terms |
 | **DeepSeek** | ✅ explicit: services to **external end users**; assigns Output rights | ❌ | most permissive API terms checked |
 | **Moonshot (Kimi)** | ✅ explicit: Customer Applications offered to End Users | ❌ **strictest of all — no commercial use at all** | ⚠️ API tier **trains on your content by default** |
@@ -37,7 +37,27 @@ Ten providers checked. The API/consumer split holds everywhere it was checked �
 
 > §2: "**You also may not make your Account available to anyone else.**"
 
-Note the carve-out in the second: *"or where we otherwise explicitly permit it"*. Anthropic ships Claude Code and the Agent SDK, both of which run programmatically on a subscription — that is the permission, and it covers **your own** use. It does not extend to serving paid third-party requests.
+Note the carve-out in the second: *"or where we otherwise explicitly permit it"*. That carve-out is **not hypothetical, and it is broader than a reading of the terms alone suggests** — which is why market evidence was worth gathering rather than reasoning from documents.
+
+Anthropic's Help Center, [updated 16 June 2026](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan):
+
+> "We're pausing the changes to Claude Agent SDK usage described below. For now, nothing has changed: Claude Agent SDK, `claude -p`, and **third-party app usage still draw from your subscription's usage limits**."
+
+So running a **third-party application** on your own Claude subscription is currently permitted and metered against your plan. That is exactly what OpenClaw, Conductor and similar harnesses do, and Anthropic staff have named them as covered.
+
+The policy has moved repeatedly and the record is worth keeping, because the direction of travel matters more than any single snapshot:
+
+| When | What happened |
+|---|---|
+| Feb 2026 | Docs stated OAuth from Free/Pro/Max in "any other product/tool/service — including Agent SDK" was not permitted. Walked back by the Claude Code team as a docs-cleanup error: "Nothing is changing about how you can use the Agent SDK and MAX subscriptions" — with an explicit split: **local development and experimentation on a subscription, businesses on the Agent SDK use an API key**. |
+| Apr 2026 | Included subscription quota stopped covering third-party tools; usable via extra usage or an API key. |
+| May 2026 | A separate metered monthly credit for third-party Agent SDK apps was announced. |
+| **Jun 2026** | **That credit was paused. Third-party app usage draws from subscription limits again — the current state.** |
+
+**What this changes, and what it does not.** It settles that *programmatic* and *third-party* are not themselves the problem. Two things remain prohibited, and they are the two ARCADE actually touches:
+
+- **Third-party developers offering Claude login, or routing Free/Pro/Max credentials on behalf of users.** OpenClaw is fine because the user authenticates on their own machine and the credential never reaches a hosted service. A platform that held or proxied a user's subscription credential would be doing the banned thing.
+- **Building a business on it.** The Claude Code team's own line is that businesses on the Agent SDK use an API key — and §3's resale prohibition is untouched by any of the above. A stranger paying you for what your seat produced is resale regardless of which harness ran it.
 
 ### OpenAI
 
