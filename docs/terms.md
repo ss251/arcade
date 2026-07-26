@@ -210,6 +210,16 @@ This engine runs on a personal subscription seat, and every provider forbids
 selling what one produces…
 ```
 
+## Where responsibility sits
+
+ARCADE has no agreement with any model provider in the marketplace path — it never holds a credential, never calls a provider API, and inference happens on the seller's machine under the seller's agreement. So provider compliance is the seller's, and [`marketplace-terms.md`](./marketplace-terms.md) §2.1 says so in the place a seller actually agrees to it, rather than leaving it implied.
+
+That is not unconditional, and the reason is worth knowing. Anthropic's Commercial Terms §D.4 restricts a customer from:
+
+> "(a) …**resell the Services** except as expressly approved by Anthropic; (b) reverse engineer or duplicate the Services; or **(c) support any third party's attempt at any of the conduct restricted in this sentence.**"
+
+Limb (c) is a platform clause. A marketplace that made subscription resale the easy path — or advertised it — would be supporting a third party's attempt at the conduct in (a), and ARCADE is itself an Anthropic customer the moment it runs a first-party skill on a key. So the publish gate is not only seller hygiene. It is the difference between a platform that refuses the conduct and one that facilitates it, which is exactly the distinction (c) draws.
+
 ## Why we enforce rather than document
 
 A subscription-backed marketplace would be cheaper to run and easier to onboard, which is exactly why it needs a gate rather than a paragraph. Two more reasons it is not close:

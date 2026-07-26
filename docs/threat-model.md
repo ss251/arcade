@@ -100,8 +100,8 @@ What it does not eliminate — and what this document is mostly about — is tha
 | | |
 |---|---|
 | **Vector** | A seller lists a skill backed by a personal Claude/ChatGPT/Grok seat, which every provider's consumer terms prohibit. |
-| **Mitigations** | `assertPublishable` refuses on both routes to the hub — `arcade publish` and the daemon's announce. Default credential is never `subscription`. |
-| **Residual** | **Low.** Structural. See `docs/terms.md`. |
+| **Mitigations** | `assertPublishable` refuses on both routes to the hub — `arcade publish` and the daemon's announce. Default credential is never `subscription`. `SecretName` rejects a manifest naming `HOME`, which would otherwise restore reach of a seat's keychain while declaring `api-key`. |
+| **Residual** | **Medium, and irreducible.** The controls make the correct path the default and the incorrect path deliberate; they cannot stop a seller pointing a `script` skill at a local proxy fronting their own subscription, because the runner is their hardware. That is the same property that makes the secrecy claim work. It matters to the platform as well as the seller: Anthropic's Commercial Terms §D.4(c) restricts "support any third party's attempt" at reselling the Services, so a marketplace that facilitated this would be exposed on its own account. See `docs/terms.md` and `docs/marketplace-terms.md` §2.1. |
 
 ## 3. Out of scope
 
