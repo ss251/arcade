@@ -20,13 +20,41 @@ It prints two blocks: what goes to the hub, and what stays on your machine.
 ## Setup
 
 ```bash
-bun run arcade runner init --seller 0xYourAddress --hub https://hub.example.com
-bun run arcade runner start
+bun run arcade init --hub https://hub.example.com
+bun run arcade status
+bun run arcade start
 ```
 
-`--seller` is where your USDC earnings are paid. That address and a runner id are the only identifying things the hub learns.
+That is the whole of it. `init` creates a payout identity, stores its key in your OS keychain, writes the config and checks the hub. You do not need a wallet beforehand, and you never fund anything — buyers sign offline and the facilitator pays the gas, so this address only ever receives.
+
+Note what is *not* here: no server to deploy, no port to open, no public origin, no KV store, no facilitator credentials, no registration form. The runner dials out, so there is nothing to host.
+
+If you already have an address or a key:
+
+```bash
+bun run arcade init --seller 0xYourAddress   # reuse an address you control
+bun run arcade init --import 0x<privatekey>  # adopt an existing key
+```
+
+**About the key.** The runner signs its handshake with the key controlling your payout address. That signature is the only thing stopping someone else announcing your listings with payment pointed at themselves. It never moves funds.
+
+It is looked up in this order:
+
+1. `ARCADE_SELLER_KEY` if set — use this on Linux, in CI, and in containers
+2. your OS keychain, written by `arcade init`
+3. otherwise the runner refuses to start, and tells you which of the two to do
+
+It is never written to `~/.arcade/config.json`. That file holds only the **address**, which is public by definition — it is where earnings are paid and it is already in every handshake. Back the key up with `arcade wallet export`; a key that exists only in a keychain is an identity you cannot leave with.
 
 Config lives at `~/.arcade/config.json`, deliberately outside any repo.
+
+## Checking your setup
+
+```bash
+bun run arcade status
+```
+
+One screen: your payout address, where the signing key came from, whether the hub is up, your on-chain earnings, and which skills are sellable versus refused and why.
 
 ## Writing a skill
 

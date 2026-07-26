@@ -1,6 +1,6 @@
 import { JSONSchema } from "effect"
 import { PublicListing, parsePrice } from "@arcade/core"
-import { PaymentPayload } from "@arcade/payments"
+import { PaymentPayload, PaymentRequirements } from "@arcade/payments"
 
 /**
  * OpenAPI 3.1 for the marketplace, derived from live listings.
@@ -71,6 +71,11 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
     PublicListing: JSONSchema.make(PublicListing),
     PaymentPayload: JSONSchema.make(PaymentPayload),
 
+    // `accepts[]` items are generated from the same `PaymentRequirements` schema the rail
+    // constructs and the buyer SDK decodes. Hand-writing the field list here drifted
+    // immediately on the first live probe — it documented `maxAmountRequired`, an x402 v1
+    // name this rail does not use, while the wire carries `amount`. Deriving it means the
+    // document cannot describe a field the implementation does not emit.
     PaymentRequired: {
       type: "object",
       description:
@@ -80,22 +85,7 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
       properties: {
         x402Version: { type: "integer", const: 2 },
         error: { type: "string" },
-        accepts: {
-          type: "array",
-          items: {
-            type: "object",
-            description: "One acceptable payment method.",
-            properties: {
-              scheme: { type: "string", examples: ["exact"] },
-              network: { type: "string", examples: [network] },
-              asset: { type: "string", examples: [asset] },
-              payTo: { type: "string", description: "Seller's payout address." },
-              maxAmountRequired: { type: "string", description: "Price in atomic USDC units." },
-              resource: { type: "string", format: "uri" },
-              description: { type: "string" }
-            }
-          }
-        }
+        accepts: { type: "array", items: JSONSchema.make(PaymentRequirements) }
       }
     },
 
@@ -359,7 +349,10 @@ export const buildWellKnownX402 = (params: OpenApiParams): Record<string, unknow
         network: params.network,
         asset: params.asset,
         payTo: seller,
-        maxAmountRequired: parsePrice(listing.price).toString(),
+        // `amount`, matching what the rail puts on the wire. This document advertises what
+        // a call will cost; the authoritative requirements — including the signing domain
+        // and validity window — come from the 402 the endpoint itself returns.
+        amount: parsePrice(listing.price).toString(),
         resource: `${params.origin}/x/${seller}/${listing.id}`,
         description: listing.description
       }

@@ -103,6 +103,21 @@ describe("openapi document", () => {
     expect(required.required).toContain("accepts")
   })
 
+  it("derives accepts[] from the real PaymentRequirements schema", () => {
+    // Caught live: this block was hand-written and documented `maxAmountRequired`, an x402
+    // v1 field name this rail does not use — the wire carries `amount`. A generated client
+    // would have read the price from a key that is never present. Deriving from the schema
+    // the rail actually constructs makes that class of drift unrepresentable.
+    const accepts = (buildOpenApi(params([record()]))["components"] as any).schemas.PaymentRequired
+      .properties.accepts.items
+
+    expect(Object.keys(accepts.properties)).toContain("amount")
+    expect(Object.keys(accepts.properties)).not.toContain("maxAmountRequired")
+    expect(Object.keys(accepts.properties)).toEqual(
+      expect.arrayContaining(["scheme", "network", "asset", "payTo", "resource"])
+    )
+  })
+
   it("returns 202, because a real skill takes longer than a request", () => {
     const op = (buildOpenApi(params([record()]))["paths"] as any)[`/x/${SELLER}/counterparty-brief`].post
     expect(Object.keys(op.responses)).toContain("202")
@@ -190,8 +205,10 @@ describe("/.well-known/x402", () => {
       network: ARC_CAIP2,
       asset: USDC_ADDRESS,
       payTo: SELLER,
-      maxAmountRequired: parsePrice("$0.25").toString()
+      // `amount` is the field the rail puts on the wire — see the drift caught above.
+      amount: parsePrice("$0.25").toString()
     })
+    expect(wk.resources[0].accepts[0].maxAmountRequired).toBeUndefined()
   })
 
   it("leaks nothing private either", () => {

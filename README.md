@@ -64,8 +64,9 @@ bun install
 ARCADE_RAIL=eip3009 ARCADE_FACILITATOR_KEY=0x<funded-arc-testnet-key> bun run hub
 
 # 2. seller (any machine — it dials out, no open ports)
-bun run arcade runner init --seller 0xYourAddress --hub http://<hub-host>:8787
-bun run arcade runner start
+bun run arcade init --hub http://<hub-host>:8787   # wallet + config + hub check, one command
+bun run arcade status                              # identity, hub, skills, earnings
+bun run arcade start
 
 # 3. buyer
 ARCADE_BUYER_KEY=0x<testnet-key> bun run arcade-buy usdc-flow-check \
@@ -110,6 +111,24 @@ Sellers set a flat per-call price *and* hard work bounds (`maxTurns`, `maxTokens
 
 The platform fee is **visible on every receipt**. It is accrued and swept rather than settled per call — two on-chain transactions would cost ~4.4% of a $0.10 call on this rail (measured: 0.00218 USDC per settlement). The sweep transaction hash is backfilled into every receipt it covers, so the take-rate stays individually auditable while being batched — the same trick Gateway itself uses.
 
+## Discovery
+
+`GET /openapi.json` is generated from the live listing set, so it cannot describe a skill nobody is serving. Each listing gets its own concrete operation — not a `/x/{seller}/{skill}` template, which would require the client to already know which sellers exist:
+
+```
+POST /x/<seller>/<skill-id>
+  requestBody   the listing's declared input schema
+  402           x402 payment requirements
+  202           jobId + jobToken + status/result URLs
+  x-arcade-*    price (human and atomic), bounds, output schema, seller
+```
+
+Any agent that reads OpenAPI can find a skill, see its price *before* calling, and call it — no ARCADE-specific client. `GET /.well-known/x402` carries the same thing for clients that speak the protocol and not OpenAPI.
+
+The document is standard OpenAPI 3.1 plus x402, and nothing proprietary: the payment challenge is documented as an ordinary `402` response, and everything the spec has no home for sits under a visibly-ours `x-arcade-` prefix.
+
+One field is deliberate. `x-arcade-payment.settlement` is `on-validated-output`. x402 defines no failure semantics at all — its facilitator interface is verify, settle, supported, with no void, capture or refund — and no field anywhere by which a server can *declare* when it settles relative to delivering. Saying so costs two lines, and it is the difference between a courtesy and a contract.
+
 ## Layout
 
 | path | what |
@@ -128,16 +147,17 @@ Both payment rails are complete, conformance-tested `Layer`s of one `Rail` servi
 
 | shipped | next |
 |---|---|
-| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + lane E · buyer SDK/CLI · schema-derived OpenAPI · 57 tests | Gateway round-trip on Arc (Jul 26) · Claude Agent SDK adapter (Jul 28) · web UI + MCP server (Jul 29) · container sandbox (Jul 30) · agent-hires-agent chain + ratings (Aug 2) |
+| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · 302 tests | Gateway round-trip on Arc · web UI + MCP server · container sandbox · agent-hires-agent chain + ratings |
 
 ## Verify
 
 ```bash
-bun test                                                  # 57 tests
+bun test                                                  # 302 tests
 bun test packages/core/test/secrecy.property.test.ts      # the thesis
 bun test packages/payments/test/rail.conformance.test.ts  # all three rails agree
 bunx tsc --noEmit
 curl -s localhost:8787/listings/usdc-flow-check | jq 'has("engine")'   # must be false
+curl -s localhost:8787/openapi.json | jq '.paths | keys'               # one path per listing
 ```
 
 Built for the [Encode × Circle Programmable Money hackathon](https://www.encodeclub.com/programmes/arc-hackathon). Author: ss251.
