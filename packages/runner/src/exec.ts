@@ -4,6 +4,7 @@ import {
   BoundsExceeded,
   EngineRefused,
   isRefusal,
+  isReservedEnvName,
   JobOutcome,
   type SkillManifest
 } from "@arcade/core"
@@ -61,8 +62,28 @@ const BASE_ENV = (skillDir: string): Record<string, string> => ({
  * absent rather than passed as empty.
  */
 export const buildEnv = (manifest: SkillManifest, skillDir: string): Record<string, string> => {
-  const env = BASE_ENV(skillDir)
+  const env: Record<string, string> = {}
 
+  // Seller secrets FIRST, so the sandbox's own variables and the engine's grants overwrite
+  // them rather than the other way round. `SecretName` already rejects a manifest that
+  // names a reserved variable, so this ordering should never matter — which is exactly why
+  // it is worth having. A validation rule and an ordering rule fail independently, and the
+  // thing they jointly protect is that a job cannot get the seller's real `HOME` back: that
+  // would undo the scrub and, separately, put a subscription seat's keychain in reach of a
+  // skill that publishes as `api-key`.
+  for (const name of manifest.secrets) {
+    if (isReservedEnvName(name)) continue
+    const value = process.env[name]
+    if (value !== undefined) env[name] = value
+  }
+
+  // Then the sandbox's own definition, which a seller can never displace.
+  Object.assign(env, BASE_ENV(skillDir))
+
+  // Engine grants last, because an engine CAN legitimately need to override a sandbox
+  // variable — a subscription-backed engine needs the real `HOME` to reach the login
+  // keychain. That widening is declared by the engine, visible in one place, and asserted
+  // in tests; the seller cannot request it, which is the distinction that matters.
   const engine = ENGINES[manifest.engine.adapter]
   if (engine !== undefined) {
     const agent: SkillAgent = {
@@ -77,10 +98,6 @@ export const buildEnv = (manifest: SkillManifest, skillDir: string): Record<stri
     }
   }
 
-  for (const name of manifest.secrets) {
-    const value = process.env[name]
-    if (value !== undefined) env[name] = value
-  }
   return env
 }
 

@@ -85,16 +85,30 @@ describe("runner env scrub", () => {
     })
   })
 
-  it("never leaks the platform's own signing keys, even if a skill names them", () => {
+  it("refuses to load a manifest that names a platform variable at all", () => {
+    // This used to be allowed-but-harmless: the platform never sets its own keys on a
+    // seller's box, so naming one got you nothing. It is now rejected at decode time,
+    // because the same passthrough could name HOME — which would restore the seller's real
+    // home directory and, with it, reach of a subscription seat's keychain.
+    expect(() => manifest({ secrets: ["ARCADE_FACILITATOR_KEY"] })).toThrow()
+  })
+
+  it("adds nothing beyond the sandbox base and the declared allowlist", () => {
     withPollutedEnv(() => {
-      // A malicious manifest naming our facilitator key still only gets what the SELLER's
-      // environment holds — but this asserts we don't special-case or pre-inject anything.
-      const env = buildEnv(manifest({ secrets: ["ARCADE_FACILITATOR_KEY"] }), "/tmp/skill")
-      // It is the seller's own env var; the platform never sets it on their box. The point
-      // of the assertion is that buildEnv adds NOTHING beyond the declared allowlist.
-      const allowed = new Set(["PATH", "HOME", "LANG", "ARCADE_SANDBOX", "ARCADE_FACILITATOR_KEY"])
+      const env = buildEnv(manifest({ secrets: ["ANTHROPIC_API_KEY"] }), "/tmp/skill")
+      const allowed = new Set(["PATH", "HOME", "LANG", "ARCADE_SANDBOX", "ANTHROPIC_API_KEY"])
       for (const key of Object.keys(env)) expect(allowed.has(key)).toBe(true)
     })
+  })
+
+  it("keeps the sandbox's own HOME even if a reserved name reaches buildEnv directly", () => {
+    // Defence in depth. `SecretName` should mean this can never happen, so the assertion is
+    // about the ordering surviving independently of the validation — two rules that fail
+    // separately are worth more than one rule asserted twice.
+    const forged = { ...manifest(), secrets: ["HOME", "USER"] } as never
+    const env = buildEnv(forged, "/tmp/skill")
+    expect(env["HOME"]).toBe("/tmp/skill")
+    expect(env["USER"]).toBeUndefined()
   })
 
   it("builds a minimal base env, not a copy of process.env", () => {

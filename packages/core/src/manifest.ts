@@ -67,6 +67,59 @@ export const Price = Schema.String.pipe(
   Schema.annotations({ identifier: "Price", description: 'e.g. "$0.25"' })
 )
 
+// ── the sandbox's own variables ─────────────────────────────────────────────
+
+/**
+ * Environment variables a manifest may NOT request through `secrets`.
+ *
+ * `secrets` exists so a seller can hand their own credentials to their own code. It is not
+ * a general passthrough, and treating it as one collapses two guarantees at once.
+ *
+ * `HOME` is the sharp example. The sandbox redirects it into the skill directory so a job
+ * cannot reach `~/.ssh`, `~/.aws` or a shell history by relative path. A manifest naming
+ * `HOME` in `secrets` gets the real one back — which defeats the env scrub, and separately
+ * puts the OS login keychain back in reach, so a skill could authenticate against a
+ * subscription seat while declaring `credential: "api-key"` and publishing normally.
+ *
+ * So this list is doing double duty: it keeps the sandbox a sandbox, and it keeps the
+ * publish gate from being a formality. Rejected at decode time, which means a manifest
+ * naming one of these does not load at all — there is no path where it is merely warned
+ * about.
+ */
+export const RESERVED_ENV_NAMES: ReadonlySet<string> = new Set([
+  // the sandbox's own definition
+  "HOME",
+  "PATH",
+  "LANG",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TMPDIR",
+  // engine mechanics, granted by an engine's `envGrants` and never by a manifest
+  "CLAUDE_CONFIG_DIR",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME"
+])
+
+/** Everything the runner reserves for itself, by prefix. */
+const RESERVED_PREFIX = "ARCADE_"
+
+export const isReservedEnvName = (name: string): boolean =>
+  RESERVED_ENV_NAMES.has(name) || name.startsWith(RESERVED_PREFIX)
+
+export const SecretName = Schema.String.pipe(
+  Schema.filter((name) => !isReservedEnvName(name), {
+    message: (issue) =>
+      `"${String(issue.actual)}" is reserved by the sandbox and cannot be listed in \`secrets\`. ` +
+      "Those variables define the sandbox itself — `HOME` in particular is redirected into " +
+      "the skill directory so a job cannot read the seller's home by relative path, and " +
+      "restoring it would also put a subscription seat's keychain back in reach. Engines " +
+      "request what they need through their own grants; `secrets` is for your credentials."
+  }),
+  Schema.annotations({ identifier: "SecretName" })
+)
+
 // ── Bounded work (D1): the seller's margin guard ────────────────────────────
 
 export class Bounds extends Schema.Class<Bounds>("Bounds")({
@@ -169,7 +222,7 @@ export class SkillManifest extends Schema.Class<SkillManifest>("SkillManifest")(
   // ---- private below this line: never leaves the seller's machine ----
   engine: Engine,
   /** Environment variable NAMES the sandbox may pass through. Never values. */
-  secrets: Schema.optionalWith(Schema.Array(Schema.String), { default: () => [] }),
+  secrets: Schema.optionalWith(Schema.Array(SecretName), { default: () => [] }),
   /** Hostnames the sandbox may reach. Empty means no network. */
   egress: Schema.optionalWith(Schema.Array(Schema.String), { default: () => [] }),
   /** Working directory relative to the skill dir. */

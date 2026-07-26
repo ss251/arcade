@@ -5,6 +5,7 @@ import {
   SERVICE_NAME_MAX,
   SkillManifest,
   decodeManifest,
+  isReservedEnvName,
   toPublicListing
 } from "../src/manifest.ts"
 
@@ -174,5 +175,70 @@ describe("manifest validation", () => {
     const { Effect } = await import("effect")
     const exit = await Effect.runPromiseExit(decodeManifest({ ...base, id: "BAD" }))
     expect(exit._tag).toBe("Failure")
+  })
+})
+
+describe("reserved environment names", () => {
+  /**
+   * `secrets` is how a seller hands their own credentials to their own code. It is not a
+   * general passthrough, and treating it as one collapsed two guarantees at once: naming
+   * `HOME` restored the seller's real home directory — undoing the scrub that stops a job
+   * reading `~/.ssh` by relative path — and separately put the OS login keychain back in
+   * reach, so a skill could authenticate against a subscription seat while declaring
+   * `credential: "api-key"` and publishing normally.
+   */
+
+  const withSecrets = (secrets: ReadonlyArray<string>) =>
+    Schema.decodeUnknownSync(SkillManifest)({
+      id: "test-skill",
+      version: "1.0.0",
+      serviceName: "T",
+      description: "d",
+      tags: [],
+      price: "$0.01",
+      bounds: { timeoutSec: 10 },
+      inputSchema: {},
+      outputSchema: {},
+      engine: { adapter: "claude-agent", credential: "api-key", entry: "agent.ts" },
+      secrets,
+      egress: []
+    })
+
+  it("refuses HOME, which is the one that reopens the seat", () => {
+    expect(() => withSecrets(["HOME"])).toThrow()
+  })
+
+  it("refuses the rest of the sandbox's own definition", () => {
+    for (const name of ["PATH", "LANG", "USER", "LOGNAME", "SHELL", "TMPDIR"]) {
+      expect(() => withSecrets([name])).toThrow()
+    }
+  })
+
+  it("refuses the variables an engine grants for itself", () => {
+    for (const name of ["CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "XDG_CONFIG_HOME"]) {
+      expect(() => withSecrets([name])).toThrow()
+    }
+  })
+
+  it("refuses anything the runner reserves by prefix", () => {
+    for (const name of ["ARCADE_SANDBOX", "ARCADE_SEAT_DIR", "ARCADE_CLAUDE_BIN", "ARCADE_ANYTHING"]) {
+      expect(() => withSecrets([name])).toThrow()
+    }
+  })
+
+  it("refuses a reserved name hidden among legitimate ones", () => {
+    expect(() => withSecrets(["ANTHROPIC_API_KEY", "HOME", "MY_TOKEN"])).toThrow()
+  })
+
+  it("still accepts ordinary credentials", () => {
+    expect(() => withSecrets(["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "MY_SERVICE_TOKEN"])).not.toThrow()
+  })
+
+  it("classifies names without needing a manifest", () => {
+    expect(isReservedEnvName("HOME")).toBe(true)
+    expect(isReservedEnvName("ARCADE_WHATEVER")).toBe(true)
+    expect(isReservedEnvName("ANTHROPIC_API_KEY")).toBe(false)
+    // Case matters: env vars are case-sensitive, and `home` is not `HOME`.
+    expect(isReservedEnvName("home")).toBe(false)
   })
 })
