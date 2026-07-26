@@ -72,9 +72,16 @@ Three consequences, and the second is the one that closes a door people keep try
 
 1. The Agent SDK is named on the **API-key** side. It is not a subscription carve-out, whatever the X discourse says.
 2. **"On behalf of their users" forecloses the buyer-brings-their-own-subscription design.** A marketplace that let a buyer connect their Claude plan — even with the credential staying on the buyer's machine — is a third-party developer offering Claude login. That architecture is viable on Codex (below) and not here.
-3. "Native Anthropic applications" is narrower than "any client you run yourself", so third-party harnesses sit outside the intended scope even for personal use.
+3. It does **not** foreclose a user running a third-party harness on their own plan. The Help Center names "third-party app usage" as drawing from subscription limits, so Anthropic contemplates and meters it. Confirmed empirically: OpenClaw's `claude-cli` runtime drives `claude -p` — Claude Code itself — and usage lands on the plan, not on extra usage. OpenClaw's own docs cite the same Anthropic article for this.
 
-Enforcement is real and **billing-shaped rather than punitive**: third-party OAuth traffic is repriced at the account level — reported server copy, "Third-party apps now draw from your extra usage, not your plan limits" — rather than accounts being closed. That is a reason to expect the *cost* of evasion to rise silently, not a reason to read the restriction as unenforced.
+So the operative distinction is not "programmatic vs interactive" and not "first-party vs third-party". It is **who is doing it**:
+
+| | |
+|---|---|
+| A **user** running a tool that drives Claude Code on their own plan | metered against the plan; contemplated |
+| A **developer** shipping a product that offers Claude login or routes plan credentials for its users | prohibited |
+
+A caution that survives regardless: extracting the OAuth token and using it as a raw API bearer against `/v1/messages` is a different path from driving Claude Code, and it is refused — "This credential is only authorized for use with Claude Code." Anthropic can also change billing and rate-limit behaviour without notice, which the legal page reserves explicitly.
 
 ### The Codex contrast
 
