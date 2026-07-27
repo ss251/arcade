@@ -44,7 +44,12 @@ if (seller.toLowerCase() === treasury.toLowerCase()) {
       "  The 95/5 split still happens on chain and is readable from `accruedFees` and the\n" +
       "  Settled event — but the fee ultimately returns to the seller, so it is a take-rate\n" +
       "  enforced against yourself rather than platform revenue. Both fields are IMMUTABLE.\n" +
-      "  Set ARCADE_TREASURY_IS_SELLER=1 on the hub so the page says so.\n"
+      "  The hub DETECTS this on chain and discloses it automatically — it compares\n" +
+      "  seller() and treasury() off the splitter it reads at handshake, so there is\n" +
+      "  nothing to set and nothing to forget. (An earlier version of this note told you\n" +
+      "  to set ARCADE_TREASURY_IS_SELLER=1; no code has ever read that variable, so\n" +
+      "  following it produced the feeling of having disclosed something while disclosing\n" +
+      "  nothing — which is worse than no advice at all.)\n"
   )
 }
 

@@ -270,6 +270,34 @@ beside listings served by another.
 
 ---
 
+## The seller key is BURNED — demo only
+
+`0xcf821769ED3c0E55e152745377bb833d7155A78a` is the seller, its key is in the Keychain as
+`arcade-deployer-key`, and **that key has been exposed in plaintext**. `bun run` echoes the
+resolved command line, so `bun run arcade wallet import 0x<key>` printed it — piping from
+the Keychain to avoid a `cat` did not help, because the wrapper prints argv.
+
+Not rotated, deliberately. The only settled receipt on the production hub names this
+address — `usdc-flow-check`, tx
+[`0x6366215e…`](https://testnet.arcscan.app/tx/0x6366215e96a33e97e4a177453c858e9b1b8639fcff4bb72e1e7dcf5459fc8143),
+10000 atomic split 9500/500 at 500bps — and it is the single most valuable artifact in the
+submission: a real on-chain settlement showing the exact split this marketplace argues from.
+Rotating would make the only proof on the tape name an address that is no longer the seller,
+recreating the receipt-versus-listing mismatch the repoint just closed, and would force a
+third splitter because `seller` and `treasury` are immutable. The exposure is a testnet key
+holding faucet USDC worth $0, on its owner's own machine. Containment sized to the exposure
+is a label, not a rotation.
+
+**So the constraint travels with the credential:** this address is demo-only and faucet-only.
+Never fund it beyond faucet USDC, never reuse it on mainnet, never carry it into a real
+deployment. If ARCADE is ever operated for anyone else, it starts with a fresh key that has
+never been printed.
+
+`arcade wallet import` now reads `--stdin` by default for exactly this reason. The
+positional form still works and warns, because scripts use it.
+
+---
+
 ## Host requirements
 
 The runner dials **out** over a websocket and the hub holds that connection open, so the host
