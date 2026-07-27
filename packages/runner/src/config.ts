@@ -59,6 +59,16 @@ const hydrate = (stored: StoredConfig): RunnerConfig => ({
   maxConcurrency: stored.maxConcurrency
 })
 
+/**
+ * Whether this machine already has a runner identity.
+ *
+ * Separate from `readConfig` on purpose: the caller that needs this — `arcade init` —
+ * needs to know a config EXISTS even if it is unreadable or from an older shape. A
+ * malformed config is still an identity someone may have earnings against, and replacing
+ * it because it failed to decode would be the worst possible reading of the situation.
+ */
+export const configExists = Effect.promise(async () => await Bun.file(configPath()).exists())
+
 export const readConfig = Effect.tryPromise({
   try: async (): Promise<RunnerConfig> => {
     const file = Bun.file(configPath())

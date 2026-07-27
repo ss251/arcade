@@ -8,7 +8,7 @@ import {
   toPublicListing
 } from "@arcade/core"
 import { formatUsdc } from "@arcade/core"
-import { defaultConfig, configPath, readConfig, writeConfig } from "./config.ts"
+import { defaultConfig, configExists, configPath, readConfig, writeConfig } from "./config.ts"
 import { loadSkills } from "./skills.ts"
 import { startDaemon } from "./daemon.ts"
 import { buildEnv } from "./exec.ts"
@@ -38,6 +38,16 @@ const cmd = args[0]
 const sub = args[1]
 
 const skillsDirDefault = `${process.cwd()}/skills`
+
+/**
+ * `--help` is handled BEFORE any command runs.
+ *
+ * It was not, and `arcade init --help` therefore fell through to `init` and minted a new
+ * identity over a live one. Asking a CLI what a command does is the single most reasonable
+ * thing to type at an unfamiliar tool, and it is the one input that must never be
+ * destructive — a tool that punishes curiosity teaches people to guess instead.
+ */
+const wantsHelp = args.length === 0 || args.includes("--help") || args.includes("-h")
 
 const usage = () => {
   console.log(`arcade — publish agent skills as paid endpoints on Arc
@@ -207,9 +217,46 @@ const runStatus = (skillsDir: string) =>
   })
 
 const main = Effect.gen(function* () {
+  // Before anything can act. See `wantsHelp`.
+  if (wantsHelp) {
+    usage()
+    return
+  }
+
   // `runner init` kept as an alias: it is in the README, the two-machine script and every
   // doc written so far, and breaking it to rename a command would be a poor trade.
   if (cmd === "init" || (cmd === "runner" && sub === "init")) {
+    // `init` MINTS A NEW IDENTITY and rewrites the config. Run against a machine that
+    // already has one, it silently replaces the payout address, the runner id and the hub
+    // — so a seller with earnings against the old address keeps serving under a new one and
+    // finds out later. It cost exactly that here: a stray `--help` (which this CLI does not
+    // parse, so it fell through to the command) replaced a live config pointed at
+    // production with a fresh identity pointed at localhost.
+    //
+    // So an existing config is now a refusal rather than something to overwrite. The
+    // failure this prevents is not data loss — it is CONTINUING TO WORK under a different
+    // identity, which is the same shape as every other quiet failure in this repo.
+    if (!args.includes("--force") && (yield* configExists)) {
+      // `Effect.either`, NOT a bare read. A config that fails to decode still EXISTS, and
+      // its owner may have earnings against the address inside it — so a decode failure has
+      // to keep the refusal rather than replace it with a crash. Getting this wrong meant
+      // the guard threw instead of refusing on exactly the configs most likely to tempt
+      // someone into re-running `init`.
+      const cfgE = yield* readConfig.pipe(Effect.either)
+      const cfg = cfgE._tag === "Right" ? cfgE.right : undefined
+      console.error(
+        `there is already a runner on this machine — refusing to replace it.\n\n` +
+          `  config   ${configPath()}\n` +
+          `  seller   ${cfg?.sellerAddress ?? "(unreadable — but present)"}\n` +
+          `  hub      ${cfg?.hubUrl ?? "(unreadable — but present)"}\n\n` +
+          `\`init\` mints a NEW payout address and runner id. If this ran by accident, ` +
+          `nothing has changed.\n\n` +
+          `  to repoint at another hub   edit hubUrl in that file (one field; the socket is derived)\n` +
+          `  to store an existing key    arcade wallet import\n` +
+          `  to genuinely start over     arcade init --force  (the current address keeps any earnings)`
+      )
+      process.exit(2)
+    }
     yield* runInit
     return
   }
