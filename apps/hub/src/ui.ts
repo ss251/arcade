@@ -17,11 +17,17 @@ import type { ListingRecord } from "./store.ts"
  *
  * Two decisions carry that, and both are load-bearing rather than decorative:
  *
- * **Typeface is a provenance encoding.** Sans is what someone CLAIMED — descriptions,
- * `replaces`, tags. Mono is what was MEASURED — prices, fees, latencies, hashes, addresses,
- * bounds. A reader can separate seller copy from computed fact by glyph alone, without
- * being told. (design-sauce Law 3, promoted from "machine truth is monospace" to a
- * page-wide rule.)
+ * **Typeface is a provenance encoding — but MEASURED means the machine string, not every
+ * digit.** Sans is what someone CLAIMED: descriptions, `replaces`, tags. Mono is reserved
+ * for values read GLYPH BY GLYPH — hex addresses, tx hashes, chain ids, skill ids — where a
+ * reader is verifying characters against another source and a wrong one matters.
+ *
+ * Prices, fees and latencies are SANS with `font-variant-numeric: tabular-nums`. They are
+ * read as quantities, not compared character by character, and Geist Sans ships `tnum` so
+ * they still hold their columns. The earlier rule said mono for both, which is how 18 of 23
+ * type declarations on the confirmation card ended up mono and the surface read as
+ * monotonous — the distinction it was reaching for is verification, not machine-origin.
+ * (design-sauce Law 3.)
  *
  * **Every semantic colour has exactly one meaning.** Blue is USDC amounts and nothing else;
  * green is the word "settled" and nothing else; red is "not settled" and nothing else.
@@ -157,18 +163,29 @@ export const renderReceiptRows = (receipts: ReadonlyArray<Receipt>, limit = 12):
 // ── shell ───────────────────────────────────────────────────────────────────
 
 const STYLE = `
+/* Self-hosted, one variable file per family (wght 100-900). font-display:swap so the page
+   is readable before the fonts land — a judge on a slow connection reads the system
+   fallback rather than nothing. NOTE: no backticks in this comment; it lives inside a
+   template literal and one would end the string. */
+@font-face{font-family:"Geist Variable";font-style:normal;font-weight:100 900;
+  font-display:swap;src:url("/fonts/geist.woff2") format("woff2")}
+@font-face{font-family:"Geist Mono Variable";font-style:normal;font-weight:100 900;
+  font-display:swap;src:url("/fonts/geist-mono.woff2") format("woff2")}
 :root{
   color-scheme: light dark;
   --paper: light-dark(#FAF9F6, #161513);
   --ink:   light-dark(#211F1C, #E8E6E1);
   --slate: light-dark(#6E6A61, #9B968B);
-  --usdc:  light-dark(#2775CA, #4E94DC);
+  --usdc:  light-dark(#0B53BF, #4E94DC);
   --stamp: light-dark(#1A8A4A, #2CA96C);
   --refuse:light-dark(#97231A, #C24840);
   --line:  light-dark(rgba(33,31,28,.12), rgba(232,230,225,.14));
   --tint:  light-dark(rgba(39,117,202,.07), rgba(78,148,220,.12));
-  --sans: system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  /* System fallbacks kept deliberately: a font that fails to load must degrade, not vanish.
+     The fontsource variable packages append "Variable" to the family name — "Geist" alone
+     silently falls back to system-ui and nothing tells you. */
+  --sans: "Geist Variable",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono: "Geist Mono Variable",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 var(--sans);

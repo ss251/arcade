@@ -644,6 +644,31 @@ const main = Effect.gen(function* () {
         )
       }
 
+      /*
+       * Fonts, vendored and self-served.
+       *
+       * The hub is the submission URL and had no static route at all — six `new Response`
+       * sites, none of them a file. Two reasons this is not a CDN link: a judge's network
+       * is not our network, and a page whose typography depends on someone else's DNS
+       * renders differently for the person evaluating it than it did for us. And not
+       * base64-inlined either — that adds ~70KB to EVERY html response, uncacheable, to
+       * save one round trip on the first.
+       *
+       * Immutable caching is safe because the filenames are ours and the bytes never change
+       * in place; a new cut gets a new name.
+       */
+      const fontMatch = /^\/fonts\/(geist|geist-mono)\.woff2$/.exec(path)
+      if (fontMatch !== null && req.method === "GET") {
+        const file = Bun.file(`${import.meta.dir}/../fonts/${fontMatch[1]}.woff2`)
+        if (!(await file.exists())) return new Response("not found", { status: 404 })
+        return new Response(file, {
+          headers: {
+            "content-type": "font/woff2",
+            "cache-control": "public, max-age=31536000, immutable"
+          }
+        })
+      }
+
       if (path === "/listings" && req.method === "GET") {
         const all = await run(store.allListings)
         return json(all.map((r) => ({ ...r.listing, seller: r.seller })))
