@@ -265,3 +265,88 @@ describe("tool output is rendered, not just narrated", () => {
     }
   })
 })
+
+/**
+ * The buyer must receive what they bought, not a narration of it.
+ *
+ * A purchased result exists twice — the fenced text the model reads, and the raw object
+ * only code parses. Rendering only the model's message would put the least trustworthy
+ * component in the system between the person who paid and the thing they paid for. It is
+ * the figures problem with higher stakes: a price rendered from prose can be checked
+ * against the hub in one click, and a skill result cannot be checked against anything. It
+ * is the only copy the buyer will ever have.
+ *
+ * It renders in the QUOTED voice because it is a stranger's text, exactly as seller copy
+ * does. Fencing exists to stop the MODEL from obeying it; the human is not the model.
+ */
+describe("a purchased result reaches the buyer verbatim", () => {
+  const purchase = (over: Record<string, unknown> = {}) => [
+    {
+      id: "p1",
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-arcade_call_skill",
+          state: "output-available",
+          output: {
+            skillId: "diff-triage",
+            settled: true,
+            pricePaidUsdc: "$0.12",
+            settleTx: "0xabc123",
+            result: { verdict: "ship", notes: "no blocking issues" },
+            ...over
+          }
+        },
+        { type: "text", text: "It says the diff looks fine." }
+      ]
+    }
+  ]
+
+  it("renders the result itself, not only the model's summary", () => {
+    const html = render(purchase())
+    expect(html).toContain("verdict")
+    expect(html).toContain("ship")
+    expect(html).toContain("no blocking issues")
+    // The model's paraphrase may stay — it just cannot be the only copy.
+    expect(html).toContain("It says the diff looks fine.")
+  })
+
+  it("renders it in the quoted voice, as seller-authored text", () => {
+    const html = render(purchase())
+    expect(html).toContain("quoted")
+    expect(html).toContain("returned by the seller")
+    // No fence machinery reaches the reader; the fence is addressed to the model.
+    expect(html).not.toContain("UNTRUSTED")
+  })
+
+  it("states completeness rather than claiming a truncation", () => {
+    const html = render(purchase({ result: "a\nb\nc" }))
+    expect(html).toContain("3 lines, complete")
+    expect(html).not.toContain("first")
+    expect(html).not.toContain("…")
+  })
+
+  it("discloses a long result without dropping any of it", () => {
+    const long = Array.from({ length: 40 }, (_, i) => `line ${i}`).join("\n")
+    const html = render(purchase({ result: long }))
+    expect(html).toContain("show the full result (40 lines)")
+    // Every line is in the DOM in the collapsed state — a disclosure, not a truncation.
+    expect(html).toContain("line 0")
+    expect(html).toContain("line 39")
+  })
+
+  it("shows an unsettled purchase as unpaid, with the reason", () => {
+    const html = render(
+      purchase({ settled: false, reason: "engine refused", settleTx: undefined, result: null })
+    )
+    expect(html).toContain("not settled")
+    expect(html).toContain("engine refused")
+    expect(html).toContain("you were not charged")
+    // Red means "did not settle" — the one meaning it carries anywhere in this product.
+    expect(html).toContain("unsettled")
+  })
+
+  it("links the settlement to Arc when there is one", () => {
+    expect(render(purchase())).toContain("https://testnet.arcscan.app/tx/0xabc123")
+  })
+})

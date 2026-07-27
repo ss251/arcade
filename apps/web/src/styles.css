@@ -262,6 +262,33 @@ a {
   color: var(--slate);
 }
 
+/*
+ * A purchased result. Mono because it is the artifact rather than a description of it, and
+ * `user-select: text` is stated explicitly: a result you can read but not keep is half a
+ * purchase, and the receipt tape's design was already shaped by a presenter needing to copy
+ * a hash before it vanished.
+ */
+.result {
+  margin: 0;
+  font: 12px/1.6 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+/* A disclosure, never a truncation — the full text is in the DOM in both states. */
+.disclose {
+  margin-top: 8px;
+}
+
+.disclose > summary {
+  font: 11px/1.6 var(--mono);
+  color: var(--slate);
+  cursor: pointer;
+}
+
 .to-latest[data-active="false"] {
   display: none;
 }

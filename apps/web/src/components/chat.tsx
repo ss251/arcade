@@ -91,6 +91,96 @@ const Quote = ({ skillId, price }: { skillId: string; price: string }) => (
   </div>
 )
 
+/**
+ * What the buyer actually bought — verbatim, from the structured half.
+ *
+ * A purchased result exists twice: the fenced text the model reads, and the raw object only
+ * code parses. If the chat rendered only the model's message, the person who paid would
+ * receive a NARRATION of their purchase, with the least trustworthy component in the system
+ * standing between them and the thing they bought.
+ *
+ * That is the figures problem with higher stakes. A price rendered from prose can be
+ * checked against the hub in one click; a skill result cannot be checked against anything.
+ * It is the only copy the buyer will ever have, and it would arrive paraphrased.
+ *
+ * It renders in the QUOTED voice for the same reason seller copy does — it is a stranger's
+ * text, and the page says so by construction rather than by disclaimer. Fencing exists to
+ * stop the MODEL from obeying it; the human is not the model, so nothing about fencing
+ * argues for hiding it from the person who paid.
+ *
+ * Long results collapse behind a disclosure, never a truncation: "showing the first N
+ * lines" is a claim about completeness, and the whole text is in the DOM either way, so it
+ * stays selectable and copyable. A result you can read but not keep is half a purchase.
+ */
+const asText = (result: unknown): string =>
+  typeof result === "string" ? result : JSON.stringify(result, null, 2)
+
+const Purchase = ({
+  skillId,
+  settled,
+  pricePaidUsdc,
+  settleTx,
+  reason,
+  result
+}: {
+  skillId: string
+  settled: boolean
+  pricePaidUsdc?: string | undefined
+  settleTx?: string | undefined
+  reason?: string | undefined
+  result: unknown
+}) => {
+  const text = asText(result)
+  const lines = text.split("\n").length
+  const long = lines > 12 || text.length > 1200
+
+  const body = (
+    <blockquote className="quoted">
+      <span className="quoted-label">
+        returned by the seller · {lines} line{lines === 1 ? "" : "s"}, complete
+      </span>
+      <pre className="result">{text}</pre>
+    </blockquote>
+  )
+
+  return (
+    <div className="tool-out">
+      <div className="tool-row">
+        <span className="tool-id">{skillId}</span>
+        {settled ? (
+          <span className="usdc">{pricePaidUsdc ?? ""}</span>
+        ) : (
+          <span className="unsettled">not settled</span>
+        )}
+      </div>
+      {settled ? null : (
+        <p className="tool-note">
+          {reason ?? "the job did not produce a valid result"} — you were not charged.
+        </p>
+      )}
+      {settleTx === undefined ? null : (
+        <p className="tool-note">
+          <a
+            href={`https://testnet.arcscan.app/tx/${settleTx}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            settled on Arc ↗
+          </a>
+        </p>
+      )}
+      {result === undefined || result === null ? null : long ? (
+        <details className="disclose">
+          <summary>show the full result ({lines} lines)</summary>
+          {body}
+        </details>
+      ) : (
+        body
+      )}
+    </div>
+  )
+}
+
 /** Read the structured half, defensively — a shape we do not recognise renders nothing. */
 const ToolOutput = ({ name, output }: { name: string; output: unknown }) => {
   if (output === null || typeof output !== "object") return null
@@ -105,6 +195,19 @@ const ToolOutput = ({ name, output }: { name: string; output: unknown }) => {
 
   if (name === "arcade_quote" && typeof o["price"] === "string" && typeof o["skillId"] === "string") {
     return <Quote skillId={o["skillId"] as string} price={o["price"] as string} />
+  }
+
+  if (name === "arcade_call_skill" && typeof o["skillId"] === "string") {
+    return (
+      <Purchase
+        skillId={o["skillId"] as string}
+        settled={o["settled"] === true}
+        pricePaidUsdc={typeof o["pricePaidUsdc"] === "string" ? o["pricePaidUsdc"] : undefined}
+        settleTx={typeof o["settleTx"] === "string" ? o["settleTx"] : undefined}
+        reason={typeof o["reason"] === "string" ? o["reason"] : undefined}
+        result={o["result"]}
+      />
+    )
   }
 
   return null

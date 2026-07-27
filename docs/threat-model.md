@@ -85,6 +85,17 @@ What it does not eliminate — and what this document is mostly about — is tha
 | **Required tests** | Three, and the first two are the only ones that mean anything — a suite that walks only the approve path passes identically whether the gate is wired or missing. (1) A **denied** approval blocks the purchase. (2) A replayed approval with **mutated arguments** is refused by the HMAC binding. (3) An approval for skill A followed by an attempt to settle skill B is refused — the composition mutation. If (3) passes *by construction* because the client cannot express the mismatch, the test documents why; if it does not pass, the gap is found before it ships. |
 | **Configuration** | `ARCADE_APPROVAL_SECRET` is required the moment a spending tool is mounted, and `apps/web/src/preflight.ts` already refuses without it. AI SDK 7 is explicit that an unconfigured secret means "approvals work as before (backward compatible)" — issued and honoured **unsigned** — so its absence removes the binding while leaving every visible behaviour identical. The guard is keyed off the tool registry rather than a flag, and is tested by injecting the future state, because a guard that cannot fire is indistinguishable from one that does not work. |
 
+### T-PRIV-003 — Who holds the job token, and therefore who can read what was bought
+
+**Status: decision recorded before implementation.**
+
+| | |
+|---|---|
+| **The question** | A job token is the capability to fetch a paid result. Under browser-signed purchases it can end up held by the web server or by the browser, and that choice decides two things at once: whether the buyer can retrieve what they paid for after the tab closes, and whether ARCADE can read it. "The buyer can retrieve their purchase later" is either a property you have or one you do not, and it is far easier to have on purpose. |
+| **Decision** | **The browser holds it.** The web service stores no job tokens, so it cannot re-fetch any buyer's result — which is the only answer consistent with the rest of the product: ARCADE holds no funds, no buyer keys, and no seller code, and holding buyers' job tokens would make the one component that custodies nothing suddenly able to read everything anyone bought. That would contradict T-PRIV-001 directly, and it would do it invisibly, since nothing about the UI would change. |
+| **The cost, stated** | Clearing browser storage, or opening the chat on another device, loses the ability to re-fetch. That is a real limitation and it is named rather than hidden — the hub's receipt feed still proves the settlement happened, but the *result* is the buyer's copy alone. A marketplace that could recover it for them would be one that could read it. |
+| **Consequence for the UI** | The result must therefore reach the buyer completely and be keepable at the moment it arrives: rendered verbatim from the structured half, selectable, and collapsed only behind a disclosure that states the full size — never a truncation, which is a claim about completeness this page cannot back. Pinned by `apps/web/test/thread.test.tsx`. |
+
 ### T-SPEND-001 — A model with access to a spending key
 
 | | |
