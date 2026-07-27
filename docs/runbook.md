@@ -188,6 +188,36 @@ The hub is Bun-only — `Bun.serve` provides the websocket upgrade and `bun:sqli
 
 ---
 
+## `apps/web` is a second service, on the same runtime
+
+The chat surface deploys separately from the hub. It needs `ARCADE_HUB` (the public hub
+origin — it holds no key and can only read) and `ANTHROPIC_API_KEY` (without it `/api/chat`
+returns a 503 saying so; discovery still works through the hub's own API).
+
+**It is not a Node service.** TanStack Start's Vite build emits `dist/server/server.js` whose
+default export is `{ fetch(request): Response }` — the Web-standard handler shape, which is
+also what `Bun.serve` takes. `apps/web/server.ts` is the twenty lines that serve `dist/client`
+and fall through to it, so this runs on the same `oven/bun` image as the hub. Verified: `bun run
+build` completes with **`node` absent from `PATH` entirely**, because Bun's script runner execs
+`vite`'s bin itself rather than honouring its `#!/usr/bin/env node` shebang. The musl rollup
+binaries are in `bun.lock` and esbuild's Linux build is statically linked Go, so Alpine's two
+usual native-binary failures do not apply either.
+
+If a future toolchain change breaks that, the fix is a build stage with Node ≥ **22.12.0** —
+not 22. `@tanstack/react-start` declares `>=22.12.0` and vite `^20.19.0 || >=22.12.0`; an image
+satisfying "22" but not "22.12" dies the same way Nixpacks did on Node 18. That floor is
+declared in `apps/web/package.json`, **not** the root, whose `engines` names only Bun.
+
+Two things that only show up at runtime, both found by running it:
+
+- The router entry must export **`getRouter`**. Any other name builds cleanly and fails on the
+  first request with `getRouter is not a function` — there is no compile-time signal.
+- `apps/web` has its **own** tsconfig and is excluded from the root project. The root types
+  against `bun`; merging them lets `Bun.*` typecheck inside code that ships to a Vite bundle
+  where no such global exists. `bun run typecheck` runs both projects.
+
+---
+
 ## Deploy checklist
 
 1. `ARCADE_PUBLIC_URL`, `ARCADE_HUB_SECRET`, `ARCADE_FACILITATOR_KEY`, `ARCADE_DB`,
