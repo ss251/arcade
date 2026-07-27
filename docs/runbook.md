@@ -103,6 +103,18 @@ not to the host anyone is reading.
 bun run arcade init --seller 0x3b2Bbb840A9570223aDbF2172a33BB77fE8D21AF --hub https://<public-host>
 ```
 
+**The public catalogue is only populated while a runner is dialled into it.** Point the
+config back at localhost and the public URL immediately serves zero listings — correctly,
+because a listing is valid only while its runner is connected. So the public host is a live
+demo rather than a standing shopfront. Two things follow: **shoot the video with the runner
+pointed at production**, and if you send the link to a judge, send it while a runner is up
+or say plainly that it serves what is actually being served. That framing is the stronger
+one anyway — an empty catalogue is the discovery guarantee working, and most marketplaces
+cannot make that claim about themselves.
+
+**Live deployment:** `https://arcade-hub-production.up.railway.app` (Railway project
+`arcade-hub`, personal workspace, volume mounted at `/data`).
+
 ---
 
 ## Restart semantics
