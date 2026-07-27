@@ -69,9 +69,26 @@ const RAIL = process.env["ARCADE_RAIL"] ?? "eip3009"
  * than run misconfigured somewhere a judge is looking.
  */
 const preflight = (): void => {
-  if (process.env["ARCADE_PUBLIC_URL"] === undefined) return
+  // Arming this on `ARCADE_PUBLIC_URL` alone made the guard depend on remembering the one
+  // variable whose absence it cannot detect: forget it, and the hub boots with every
+  // insecure default and no refusal at all. So the deployment detects ITSELF — Railway
+  // injects `RAILWAY_*` into every container, and their presence is evidence this is not a
+  // laptop. Same move as deriving the treasury disclosure from the contract, one level up:
+  // read the fact that this is public, do not configure it.
+  const onPlatform = Object.keys(process.env).some(
+    (k) => k.startsWith("RAILWAY_") || k.startsWith("FLY_") || k.startsWith("RENDER_")
+  )
+  const publicUrl = process.env["ARCADE_PUBLIC_URL"]
+  if (publicUrl === undefined && !onPlatform) return
 
   const missing: Array<string> = []
+  if (publicUrl === undefined) {
+    missing.push(
+      "ARCADE_PUBLIC_URL — a hosting platform was detected, so this is public. Without it " +
+        "every 402 challenge and /openapi.json advertise the socket Bun bound rather than " +
+        "the URL buyers can reach, and the challenge names an unreachable resource"
+    )
+  }
   if (process.env["ARCADE_HUB_SECRET"] === undefined) {
     missing.push(
       "ARCADE_HUB_SECRET — job tokens are HMAC'd with it, so leaving it unset mints a new " +
@@ -102,9 +119,9 @@ const preflight = (): void => {
   }
   if (missing.length > 0) {
     console.error(
-      `[hub] refusing to start: ARCADE_PUBLIC_URL is set, so this is a public deployment.\n\n` +
+      `[hub] refusing to start: this is a public deployment.\n\n` +
         missing.map((m) => `  - ${m}`).join("\n\n") +
-        `\n\nSet them, or unset ARCADE_PUBLIC_URL to run locally.`
+        `\n\nSet them. (Detected via ARCADE_PUBLIC_URL or a hosting platform's own env.)`
     )
     process.exit(2)
   }
@@ -390,7 +407,9 @@ const main = Effect.gen(function* () {
                     seller: msg.seller,
                     // Carried per listing from the signed handshake, never from a global.
                     ...(msg.feeSplitter === undefined ? {} : { feeSplitter: msg.feeSplitter }),
-                    ...(splitterInfo === undefined ? {} : { treasuryIsSeller: splitterInfo.treasuryIsSeller }),
+                    ...(splitterInfo === undefined
+                      ? { splitterVerified: msg.feeSplitter === undefined }
+                      : { treasuryIsSeller: splitterInfo.treasuryIsSeller, splitterVerified: true }),
                     runnerId: msg.runnerId,
                     publishedAtMs: Date.now()
                   })
@@ -463,13 +482,15 @@ const main = Effect.gen(function* () {
         const records = await run(store.allListings)
         const receipts = await run(store.allReceipts)
         const listings = await Promise.all(
-          records.map(async ({ listing, seller, treasuryIsSeller }) => {
+          records.map(async ({ listing, seller, treasuryIsSeller, splitterVerified, feeSplitter }) => {
             const stats = await run(store.statsFor(listing.id))
             const ratings = await run(store.ratingsFor(listing.id))
             return {
               listing,
               seller,
               treasuryIsSeller,
+              splitterVerified,
+              feeSplitter,
               stats,
               ratingCount: ratings.length,
               ratingAverage:

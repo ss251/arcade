@@ -40,6 +40,14 @@ const esc = (s: string): string =>
 export interface ListingView {
   readonly listing: PublicListing
   readonly seller: string
+  /** Announced splitter, if any. */
+  readonly feeSplitter?: string | undefined
+  /**
+   * Whether that splitter was actually read on chain. False means the hub could not reach
+   * it — so the fee claim is WITHHELD rather than printed unbacked. A page whose whole
+   * argument is "every statistic is computed" cannot print one that isn't.
+   */
+  readonly splitterVerified?: boolean | undefined
   readonly stats: ObjectiveStats
   readonly ratingCount: number
   readonly ratingAverage: number | null
@@ -384,6 +392,15 @@ export const renderListingPage = (
     <dt>rating</dt><dd>${ratingText(ratingCount, ratingAverage)}</dd>
     <dt>seller</dt><dd><a href="https://testnet.arcscan.app/address/${esc(seller)}" target="_blank" rel="noreferrer">${esc(shortAddr(seller))}</a></dd>
   </dl>
+
+  <h2>Fee</h2>
+  <p class="note">${
+    view.feeSplitter === undefined
+      ? "no splitter — this seller receives the full price and no fee is taken"
+      : view.splitterVerified === true
+        ? `split on chain by <a href="https://testnet.arcscan.app/address/${esc(view.feeSplitter)}" target="_blank" rel="noreferrer">${esc(shortAddr(view.feeSplitter))}</a>, whose feeBps is immutable and readable`
+        : "a splitter is announced but could not be read on chain, so the split is unverified — the fee shown on receipts is what this hub computed, not something checked against the contract"
+  }</p>
 
   <h2>Bounds</h2>
   <p class="note">the seller's declared ceilings for one call — a buyer can read these against the price</p>

@@ -36,6 +36,16 @@ export interface ListingRecord {
    * day a second seller lists with a genuinely separate treasury.
    */
   readonly treasuryIsSeller?: boolean | undefined
+  /**
+   * Whether the announced splitter was actually read on chain.
+   *
+   * The `feeBps` check fails OPEN when the RPC is unreachable, because refusing a seller
+   * for someone else's outage is the wrong trade. But admitting them silently meant the
+   * page printed a fee claim nothing had verified. Carrying it as state instead of a gate
+   * lets a reconnect storm degrade what the page ASSERTS rather than what the marketplace
+   * SERVES — the listing still sells, the unbacked claim is simply withheld.
+   */
+  readonly splitterVerified?: boolean | undefined
   readonly runnerId: string
   readonly publishedAtMs: number
 }
