@@ -1,0 +1,90 @@
+# Docker is a SECOND channel off this machine, and it had no exclusion list at all.
+#
+# The Dockerfile ends in `COPY . .`, so before this file existed the build context was the
+# whole working tree — including `internal/`, which is 1.5MB of private research that the
+# repo's first hard rule says must never be published. `git` was enforcing that rule and
+# `docker` was not, so the corpus shipped to a third-party registry in the production
+# image. Not served — the hub answers routes, not the filesystem — but present, and the
+# only thing between it and anyone with registry access was that nobody had looked.
+#
+# EVERY PATTERN IN .gitignore MUST APPEAR HERE. That is asserted by
+# `packages/core/test/repo-hygiene.test.ts`, not left to whoever edits one file next: an
+# exclusion enforced in one channel and absent in another is the shape of every failure
+# this repo has hit. Adding a pattern to .gitignore alone will fail the suite.
+
+# ── mirrors .gitignore ──────────────────────────────────────────────────────
+
+# Internal only — research, competitive analysis, build decisions, run state.
+internal/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*-recovery-file.json
+throwaway-keys.json
+
+# Dependencies — reinstalled inside the image from the lockfile, and a host's
+# node_modules may carry the wrong platform's native binaries.
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+
+# Local caches
+.cache/
+.turbo/
+/lib/
+contracts/out/
+/cache/
+
+# Sandbox litter
+skills/*/Library/
+skills/*/.cache/
+skills/*/.bun/
+skills/*/.npm/
+skills/*/.config/
+
+# ── docker-only, beyond what git excludes ───────────────────────────────────
+
+# History is bulk and carries every past state of the tree. The image needs the working
+# tree, never how it got there.
+.git
+.gitignore
+.github
+
+# The hub is the only thing this image runs. `apps/web` is a separate service with its own
+# image, and shipping its source here would grow the hub for nothing.
+apps/web
+
+# Docs, evidence scripts and agent config are not runtime inputs.
+docs/
+.claude/
+.mcp.json
+*.md
+!README.md

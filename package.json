@@ -5,7 +5,9 @@
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "typecheck": "tsc --build --force && tsc --noEmit -p apps/web/tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run && bun test .bun.test",
+    "test:vitest": "vitest run",
+    "test:bun": "bun test .bun.test",
     "test:watch": "vitest",
     "hub": "bun run --cwd apps/hub start",
     "web": "bun run --cwd apps/web dev",

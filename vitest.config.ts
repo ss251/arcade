@@ -15,8 +15,14 @@ export default defineConfig({
     // store, which needs `bun:sqlite` (Node has `node:sqlite`, Bun has no such module, and
     // there is no shared built-in). That is not a coverage gap being hidden: the hub is
     // already Bun-only because `Bun.serve` provides its websocket upgrade, so a store that
-    // cannot load under Node belongs to a server that cannot either. `bun test` — the
-    // command the README gives — runs these; vitest skips them.
+    // cannot load under Node belongs to a server that cannot either.
+    //
+    // Excluding them here means `bun run test` MUST run them separately, and it does —
+    // the root `test` script is `vitest run && bun test .bun.test`. It was not always: for
+    // a while the script was `vitest run` alone, so the seven durable-store tests that
+    // make the deploy's persistence claim true were reachable only by a human who
+    // remembered a second command, while the suite read green without them. If you ever
+    // have to say "plus seven" when quoting a number, the seven are not gated.
     exclude: ["**/node_modules/**", "**/*.live.test.ts", "**/*.bun.test.ts"],
     testTimeout: 30_000
   },

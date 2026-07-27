@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 /**
@@ -52,6 +54,13 @@ const ignoredSources = (): ReadonlyArray<string> =>
     .map((s) => s.trim())
     .filter((s) => s !== "")
 
+/** Meaningful patterns from an ignore file: no comments, no blanks, no negations. */
+const patternsOf = (file: string): ReadonlyArray<string> =>
+  readFileSync(join(REPO_ROOT, file), "utf8")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "" && !l.startsWith("#") && !l.startsWith("!"))
+
 describe("repo hygiene", () => {
   it("does not gitignore any source file", () => {
     const ignored = ignoredSources()
@@ -66,5 +75,80 @@ describe("repo hygiene", () => {
           `not. Anchor it rather than deleting it, and if something under src genuinely must\n` +
           `be ignored, make that an explicit exception here rather than a silent one.`
     ).toEqual([])
+  })
+
+  /**
+   * Git and Docker are two channels off this machine, and an exclusion enforced in one and
+   * absent in the other is the shape of every failure this repo has hit. The Dockerfile
+   * ends in `COPY . .`, so without a `.dockerignore` the build context was the whole tree
+   * — `internal/` included, which the repo's first hard rule says must never be published.
+   *
+   * So the rule is not "remember to update both files", which is exactly the kind of rule
+   * that has failed here repeatedly. It is this assertion: `.dockerignore` must be a
+   * superset of `.gitignore`. Adding a pattern to one alone fails the suite.
+   */
+  it("excludes from the Docker build context everything git excludes", () => {
+    const docker = new Set(patternsOf(".dockerignore"))
+    const missing = patternsOf(".gitignore").filter((p) => !docker.has(p))
+    expect(
+      missing,
+      missing.length === 0
+        ? ""
+        : `.gitignore excludes these but .dockerignore does not, so they ship inside the\n` +
+          `production image even though they are absent from the repo:\n\n` +
+          missing.map((p) => `  ${p}`).join("\n") +
+          `\n\nAdd them to .dockerignore. The Dockerfile ends in \`COPY . .\`, so anything\n` +
+          `not excluded here is in the image.`
+    ).toEqual([])
+  })
+
+  /**
+   * The Bun-only tests must actually be reached by `bun run test`.
+   *
+   * They were not: the root script was `vitest run` alone while `vitest.config.ts`
+   * excludes `*.bun.test.ts`, so the seven durable-store tests that make the deploy's
+   * persistence claim true ran only when a human remembered a second command — and the
+   * suite read green without them.
+   *
+   * Fixing the script is not enough, because `bun test <filter>` **exits 0 when the filter
+   * matches nothing**. So a renamed file or an edited filter would restore the silence
+   * with a passing gate, which is the same vacuum as a pathspec that can never match. This
+   * asserts the filter and the files still meet.
+   */
+  it("routes every Bun-only test through the root test script", () => {
+    const files = execFileSync("git", ["ls-files", "*.bun.test.ts"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8"
+    })
+      .split("\n")
+      .filter((f) => f.trim() !== "")
+
+    // If this ever legitimately reaches zero, delete this test deliberately rather than
+    // letting it pass on an empty set.
+    expect(files.length).toBeGreaterThan(0)
+
+    const script = String(
+      (JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as {
+        scripts: Record<string, string>
+      }).scripts["test"]
+    )
+    expect(script).toContain("vitest run")
+    expect(script).toContain("bun test")
+
+    // The filter `bun test` is invoked with must actually select those files.
+    const filter = /bun test (\S+)/.exec(script)?.[1]
+    expect(filter, "root `test` script must pass a filter to `bun test`").toBeDefined()
+    for (const f of files) {
+      expect(f, `${f} is not matched by \`bun test ${filter}\` and would never run`).toContain(
+        filter!
+      )
+    }
+  })
+
+  it("keeps internal/ out of both channels — the repo's first hard rule", () => {
+    // Named explicitly rather than left to the superset check. This one is the reason the
+    // superset check exists, and a rule worth stating is worth being able to grep for.
+    expect(patternsOf(".gitignore")).toContain("internal/")
+    expect(patternsOf(".dockerignore")).toContain("internal/")
   })
 })
