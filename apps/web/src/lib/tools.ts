@@ -1,5 +1,6 @@
-import { tool } from "ai"
-import { Schema } from "effect"
+import { jsonSchema, tool } from "ai"
+import { JSONSchema, Schema } from "effect"
+import { TreeFormatter } from "effect/ParseResult"
 import { fenceListing, fenceListings, formatPrice, parsePrice } from "@arcade/core"
 import * as hub from "./hub.ts"
 
@@ -42,7 +43,32 @@ const SkillIdArgs = Schema.Struct({
   })
 })
 
-const std = <A, I>(schema: Schema.Schema<A, I>) => Schema.standardSchemaV1(schema)
+/**
+ * Effect Schema → an AI SDK tool schema.
+ *
+ * `Schema.standardSchemaV1` is NOT enough, and the failure is invisible without a model.
+ * A Standard Schema satisfies the AI SDK's type for `inputSchema`, so this typechecks and
+ * every render test passes — but the SDK also has to describe the tool to the model as
+ * JSON Schema, and it cannot derive that from Effect's Standard Schema implementation. The
+ * first real tool call throws "Standard schema vendor 'effect' does not support JSON Schema
+ * conversion." These tools would never have worked against a live model.
+ *
+ * So the JSON Schema is DERIVED from the same Effect schema (`JSONSchema.make`, the trick
+ * `packages/buyer/src/mcp.ts` already uses for MCP's raw schemas) and Effect's decoder is
+ * supplied as the validator. One definition, two consumers: the model gets a description it
+ * can generate against, and arguments are still decoded rather than cast.
+ */
+const std = <A, I>(schema: Schema.Schema<A, I>) => {
+  const decode = Schema.decodeUnknownEither(schema)
+  return jsonSchema<A>(JSONSchema.make(schema) as never, {
+    validate: (value) => {
+      const r = decode(value)
+      return r._tag === "Right"
+        ? { success: true as const, value: r.right }
+        : { success: false as const, error: new Error(TreeFormatter.formatErrorSync(r.left)) }
+    }
+  })
+}
 
 // ── tools ───────────────────────────────────────────────────────────────────
 
