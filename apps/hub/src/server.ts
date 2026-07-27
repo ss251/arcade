@@ -2,6 +2,7 @@ import { Effect, Layer, Runtime, Schema } from "effect"
 import {
   ARC_CAIP2,
   USDC_ADDRESS,
+  Job,
   JobOutcome,
   PublicListing,
   Rating,
@@ -28,7 +29,8 @@ import { createHmac, timingSafeEqual } from "node:crypto"
 import { recoverMessageAddress } from "viem"
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
-import { StoreLive, StoreTag } from "./store.ts"
+import { StoreTag } from "./store.ts"
+import { StoreFromEnv } from "./store-sqlite.ts"
 import { runJob } from "./pipeline.ts"
 import {
   renderIndex,
@@ -146,7 +148,7 @@ const railLayer = () => {
 // configuration it is refusing.
 preflight()
 
-const AppLive = Layer.mergeAll(StoreLive, BrokerLive, railLayer())
+const AppLive = Layer.mergeAll(StoreFromEnv(), BrokerLive, railLayer())
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2), {
@@ -587,6 +589,27 @@ const main = Effect.gen(function* () {
 
         const input = await req.json().catch(() => ({}))
         const jobId = newJobId()
+
+        // Record the job BEFORE answering, so the 202 is backed by state that survives this
+        // process. `pipeline.ts` writes the row once, already terminal, which meant an
+        // interrupted job left no row at all — and the poll endpoint answers "pending" when
+        // it cannot find one, so a buyer whose job was in flight during a restart polled
+        // forever with no terminal answer. This row is what the boot reaper can then find
+        // and fail honestly (see `store-sqlite.ts`).
+        await run(
+          store.putJob(
+            Job.make({
+              id: jobId,
+              skillId: listing.id,
+              seller,
+              buyer: verified.payer,
+              priceAtomic,
+              input,
+              status: "queued",
+              createdAtMs: Date.now()
+            })
+          )
+        )
 
         // 202 immediately: real skills take seconds to minutes, so the request cannot block.
         const accrualId = `acc_${new Date().toISOString().slice(0, 10)}`

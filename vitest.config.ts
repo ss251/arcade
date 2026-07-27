@@ -4,7 +4,14 @@ export default defineConfig({
   test: {
     include: ["packages/*/test/**/*.test.ts", "apps/*/test/**/*.test.ts"],
     // Live-chain tests are opt-in: `bun test --project=live` style runs, or ARCADE_LIVE=1.
-    exclude: ["**/node_modules/**", "**/*.live.test.ts"],
+    //
+    // `*.bun.test.ts` covers code that can only run under Bun — currently the hub's sqlite
+    // store, which needs `bun:sqlite` (Node has `node:sqlite`, Bun has no such module, and
+    // there is no shared built-in). That is not a coverage gap being hidden: the hub is
+    // already Bun-only because `Bun.serve` provides its websocket upgrade, so a store that
+    // cannot load under Node belongs to a server that cannot either. `bun test` — the
+    // command the README gives — runs these; vitest skips them.
+    exclude: ["**/node_modules/**", "**/*.live.test.ts", "**/*.bun.test.ts"],
     testTimeout: 30_000
   },
   resolve: {
