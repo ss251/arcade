@@ -371,3 +371,144 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── purchase confirmation ──────────────────────────────────────────────────
+ *
+ * Takes no new semantic colour. Blue is USDC, green is settled, red is not-settled;
+ * a fourth hue for "important" would erode the three that carry money meaning. Weight,
+ * a border and the hold do the work.
+ */
+
+.confirm {
+  margin: 4px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 14px 16px;
+  max-width: 46ch;
+}
+
+.confirm-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font: 13px/1.5 var(--mono);
+}
+
+.confirm-what {
+  color: var(--slate);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.confirm-head .tool-id {
+  flex: 1;
+}
+
+.confirm-head .usdc {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.confirm-facts {
+  margin: 12px 0 0;
+  display: grid;
+  gap: 4px;
+}
+
+.confirm-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.confirm-facts dt {
+  font: 11px/1.6 var(--sans);
+  color: var(--slate);
+}
+
+.confirm-facts dd {
+  margin: 0;
+  font: 11px/1.6 var(--mono);
+  color: var(--ink);
+}
+
+.confirm-law {
+  margin: 12px 0 0;
+  font: 12px/1.5 var(--sans);
+  color: var(--slate);
+}
+
+/*
+ * NOT --refuse. Red means "this call did not settle" everywhere else in this product, and a
+ * blocked card has not attempted a settlement at all — it is a precondition that has not
+ * been met. Borrowing the colour would tell a reader a payment failed when none was tried,
+ * which is the same argument that kept the sandbox band off red. Caught in a screenshot
+ * after being written in the stylesheet, which is why Law 11 is a gate.
+ */
+.confirm-blocked {
+  margin: 12px 0 0;
+  font: 12px/1.5 var(--mono);
+  color: var(--ink);
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.deny {
+  font: 12px/1 var(--mono);
+  color: var(--slate);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 16px;
+  cursor: pointer;
+}
+
+/*
+ * Law 5, asymmetric: 900ms LINEAR while the user deliberates, ~200ms ease-out on release.
+ * The fill is a transform so it stays on the compositor, and it is the only moving thing.
+ */
+.approve {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  font: 600 12px/1 var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--paper);
+  background: var(--ink);
+  border: 0;
+  border-radius: 3px;
+  padding: 12px 16px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.approve:disabled {
+  color: var(--slate);
+  background: transparent;
+  border: 1px solid var(--line);
+  cursor: default;
+}
+
+.approve-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: var(--usdc);
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.approve-label {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .approve-fill {
+    transition: none;
+  }
+}
