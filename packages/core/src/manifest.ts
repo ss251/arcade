@@ -140,6 +140,15 @@ export class Bounds extends Schema.Class<Bounds>("Bounds")({
    * seller's margin is real.
    */
   maxCostUsd: Schema.optional(Schema.Number.pipe(Schema.positive())),
+  /**
+   * Max this skill may spend hiring OTHER skills during one call, in USD.
+   *
+   * Only meaningful with the `hire-skills` capability. Published deliberately: a buyer can
+   * read it against the price and see how much of what they pay is being subcontracted,
+   * and a seller who forgets to set it gets no sub-spend budget at all rather than an
+   * unbounded one.
+   */
+  maxSubSpendUsd: Schema.optional(Schema.Number.pipe(Schema.positive())),
   /** Hard wall-clock ceiling. Always required — every job must be able to die. */
   timeoutSec: Schema.Int.pipe(Schema.positive(), Schema.lessThanOrEqualTo(900))
 }) {}

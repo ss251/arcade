@@ -114,7 +114,13 @@ const CAPABILITY_TOOLS: Record<Capability, ReadonlyArray<string>> = {
   "web-fetch": ["WebFetch"],
   "read-workdir": ["Read", "Glob", "Grep"],
   "write-workdir": ["Read", "Glob", "Grep", "Write", "Edit"],
-  "run-code": ["Bash", "BashOutput", "KillShell"]
+  "run-code": ["Bash", "BashOutput", "KillShell"],
+  // Deliberately empty. Hiring is not a built-in tool: it is `hire()` from
+  // `@arcade/buyer`, supplied by the seller's own agent module as a client-side tool. The
+  // capability still has to be declared, because that is what makes the runner grant the
+  // sub-purchase wallet into the sandbox and what shows a buyer, in the published
+  // listing, that this skill subcontracts.
+  "hire-skills": []
 }
 
 export const toolsForCapabilities = (

@@ -183,7 +183,8 @@ export const Capability = Schema.Literal(
   "web-fetch", // retrieve a specific URL already in context
   "read-workdir", // read files inside the skill's own directory
   "write-workdir", // write files inside the skill's own directory
-  "run-code" // execute code in the engine's sandbox
+  "run-code", // execute code in the engine's sandbox
+  "hire-skills" // buy from other sellers mid-run — this one SPENDS MONEY
 )
 export type Capability = typeof Capability.Type
 

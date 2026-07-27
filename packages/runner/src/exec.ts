@@ -80,6 +80,23 @@ export const buildEnv = (manifest: SkillManifest, skillDir: string): Record<stri
   // Then the sandbox's own definition, which a seller can never displace.
   Object.assign(env, BASE_ENV(skillDir))
 
+  // The one capability that spends money. Granted only when the manifest declares
+  // `hire-skills`, so the ability to buy is visible in `arcade publish` next to everything
+  // else a skill can reach — and never requestable through `secrets`, because `ARCADE_` is
+  // a reserved prefix.
+  //
+  // The budget comes from the manifest, not the environment, so it is per-skill and
+  // published. Absent means zero rather than unlimited: a seller who declares the
+  // capability but forgets `maxSubSpendUsd` gets a skill that cannot spend, which is the
+  // safe way round to be wrong.
+  if (manifest.engine.capabilities.includes("hire-skills")) {
+    const hub = process.env["ARCADE_HUB"]
+    const subKey = process.env["ARCADE_SUBBUY_KEY"]
+    if (hub !== undefined) env["ARCADE_HUB"] = hub
+    if (subKey !== undefined) env["ARCADE_SUBBUY_KEY"] = subKey
+    env["ARCADE_SUB_BUDGET_USD"] = String(manifest.bounds.maxSubSpendUsd ?? 0)
+  }
+
   // Engine grants last, because an engine CAN legitimately need to override a sandbox
   // variable — a subscription-backed engine needs the real `HOME` to reach the login
   // keychain. That widening is declared by the engine, visible in one place, and asserted

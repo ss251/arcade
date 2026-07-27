@@ -63,6 +63,31 @@ export const startDaemon = (args: DaemonArgs) =>
     const sellerKey = resolved.privateKey
     const sellerAccount = privateKeyToAccount(sellerKey as `0x${string}`)
 
+    // A sub-purchase key goes INTO the sandbox; the payout key proves listing ownership and
+    // must never. Reusing one for both would mean any skill that can hire could also
+    // re-announce this seller's listings with payment redirected elsewhere.
+    const subKey = process.env["ARCADE_SUBBUY_KEY"]
+    if (subKey !== undefined && subKey === sellerKey) {
+      return yield* Effect.fail(
+        new Error(
+          "ARCADE_SUBBUY_KEY must not be the same key as your payout address. That key is " +
+            "handed to skills declaring `hire-skills`, and it also signs the handshake " +
+            "proving these listings are yours — a skill holding it could redirect your " +
+            "payments. Create a separate wallet and fund it with what you are willing to " +
+            "let your skills spend."
+        )
+      )
+    }
+    if (subKey !== undefined) {
+      const hiring = gated.sellable.filter((s) => s.manifest.engine.capabilities.includes("hire-skills"))
+      for (const s of hiring) {
+        console.log(
+          `  ${s.manifest.id} may hire other skills, up to ` +
+            `$${s.manifest.bounds.maxSubSpendUsd ?? 0} per call`
+        )
+      }
+    }
+
     console.log(`[runner] ${args.config.runnerId}`)
     for (const s of gated.sellable) {
       console.log(`  ${s.manifest.id}@${s.manifest.version}  ${s.manifest.price}  (${s.manifest.engine.adapter})`)
