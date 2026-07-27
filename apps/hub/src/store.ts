@@ -29,6 +29,13 @@ export interface ListingRecord {
    * first seller's contract irrecoverably.
    */
   readonly feeSplitter?: string | undefined
+  /**
+   * Read off the splitter at handshake, not configured. Whether the fee returns to the
+   * seller is a fact about a contract the seller announced, so a process-wide boolean
+   * would be wrong for any seller it did not describe — and would go stale silently the
+   * day a second seller lists with a genuinely separate treasury.
+   */
+  readonly treasuryIsSeller?: boolean | undefined
   readonly runnerId: string
   readonly publishedAtMs: number
 }

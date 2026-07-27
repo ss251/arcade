@@ -158,23 +158,55 @@ const newJobId = () => `job_${crypto.randomUUID().replaceAll("-", "").slice(0, 2
  * unreachable RPC, a non-contract address, or something that is not a splitter — which is
  * deliberately distinct from a value that disagrees.
  */
-const splitterFeeBps = async (address: string): Promise<number | undefined> => {
+const SPLITTER_ABI = [
+  { type: "function", name: "feeBps", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint16" }] },
+  { type: "function", name: "seller", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] },
+  { type: "function", name: "treasury", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] }
+] as const
+
+export interface SplitterFacts {
+  readonly feeBps: number
+  readonly seller: string
+  readonly treasury: string
+  /** Whether the fee ultimately returns to the seller — read, never configured. */
+  readonly treasuryIsSeller: boolean
+}
+
+const splitterFacts = async (address: string): Promise<SplitterFacts | undefined> => {
   try {
     const client = createPublicClient({ transport: http(ARC_RPC_URL) })
-    const bps = await client.readContract({
-      address: address as `0x${string}`,
-      abi: [
-        {
-          type: "function",
-          name: "feeBps",
-          stateMutability: "view",
-          inputs: [],
-          outputs: [{ name: "", type: "uint16" }]
+    const read = <T>(fn: "feeBps" | "seller" | "treasury") =>
+      client.readContract({ address: address as `0x${string}`, abi: SPLITTER_ABI, functionName: fn }) as Promise<T>
+
+    // Sequential, spaced, and retried on -32011. Arc's public RPC answers
+    // `request limit reached` to a burst, and a runner reconnect storm turns three reads
+    // per handshake into exactly that — at which point every seller with a splitter would
+    // be admitted unverified, since the read failing is the fail-open branch.
+    const paced = async <T>(fn: "feeBps" | "seller" | "treasury"): Promise<T> => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await read<T>(fn)
+        } catch (e) {
+          const m = String((e as Error)?.message ?? e).toLowerCase()
+          const rateLimited = m.includes("request limit") || m.includes("-32011")
+          if (!rateLimited || attempt >= 4) throw e
+          await Bun.sleep(750 * 2 ** attempt)
         }
-      ] as const,
-      functionName: "feeBps"
-    })
-    return Number(bps)
+      }
+    }
+
+    const feeBps = Number(await paced<bigint | number>("feeBps"))
+    await Bun.sleep(250)
+    const seller = String(await paced<string>("seller"))
+    await Bun.sleep(250)
+    const treasury = String(await paced<string>("treasury"))
+
+    return {
+      feeBps,
+      seller,
+      treasury,
+      treasuryIsSeller: seller.toLowerCase() === treasury.toLowerCase()
+    }
   } catch {
     return undefined
   }
@@ -302,8 +334,10 @@ const main = Effect.gen(function* () {
             // Fail-closed on a real mismatch, fail-OPEN on an unreachable RPC: a seller
             // should not be refused because Arc's public endpoint hiccuped, but a
             // contract that genuinely disagrees must not be allowed to produce receipts.
+            let splitterInfo: SplitterFacts | undefined
             if (msg.feeSplitter !== undefined) {
-              const onChain = await splitterFeeBps(msg.feeSplitter)
+              splitterInfo = await splitterFacts(msg.feeSplitter)
+              const onChain = splitterInfo?.feeBps
               if (onChain !== undefined && onChain !== FEE_BPS) {
                 console.error(
                   `[hub] rejected ${msg.runnerId}: splitter ${msg.feeSplitter} charges ` +
@@ -356,6 +390,7 @@ const main = Effect.gen(function* () {
                     seller: msg.seller,
                     // Carried per listing from the signed handshake, never from a global.
                     ...(msg.feeSplitter === undefined ? {} : { feeSplitter: msg.feeSplitter }),
+                    ...(splitterInfo === undefined ? {} : { treasuryIsSeller: splitterInfo.treasuryIsSeller }),
                     runnerId: msg.runnerId,
                     publishedAtMs: Date.now()
                   })
@@ -428,12 +463,13 @@ const main = Effect.gen(function* () {
         const records = await run(store.allListings)
         const receipts = await run(store.allReceipts)
         const listings = await Promise.all(
-          records.map(async ({ listing, seller }) => {
+          records.map(async ({ listing, seller, treasuryIsSeller }) => {
             const stats = await run(store.statsFor(listing.id))
             const ratings = await run(store.ratingsFor(listing.id))
             return {
               listing,
               seller,
+              treasuryIsSeller,
               stats,
               ratingCount: ratings.length,
               ratingAverage:
@@ -449,7 +485,8 @@ const main = Effect.gen(function* () {
           rail: rail.name,
           network: ARC_CAIP2,
           feeBps: FEE_BPS,
-          treasuryIsSeller: process.env["ARCADE_TREASURY_IS_SELLER"] === "1"
+          // Derived per listing from the announced contract — never a process-wide flag.
+          treasuryIsSeller: listings.some((l) => l.treasuryIsSeller === true)
         }
       }
 
