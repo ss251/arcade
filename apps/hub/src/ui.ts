@@ -430,7 +430,11 @@ export const renderListingPage = (
       ? "no splitter — this seller receives the full price and no fee is taken"
       : view.splitterVerified === true
         ? `split on chain by <a href="https://testnet.arcscan.app/address/${esc(view.feeSplitter)}" target="_blank" rel="noreferrer">${esc(shortAddr(view.feeSplitter))}</a>, whose feeBps is immutable and readable`
-        : "a splitter is announced but could not be read on chain, so the split is unverified — the fee shown on receipts is what this hub computed, not something checked against the contract"
+        : // Both facts are unverified in exactly the same circumstance, so both are named.
+          // Saying only that the SPLIT is unverified would let a reader assume the
+          // recipient had been checked — the smaller uncertainty announced while the
+          // larger one exists, which is the shape these disclosures exist to prevent.
+          "a splitter is announced but could not be read on chain, so neither the split nor the payee is verified — the fee shown on receipts is what this hub computed rather than something checked against the contract, and nothing confirmed the splitter pays this seller"
   }</p>
 
   <h2>Bounds</h2>

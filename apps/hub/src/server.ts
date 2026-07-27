@@ -410,8 +410,15 @@ const main = Effect.gen(function* () {
               }
               if (onChain === undefined) {
                 console.warn(
-                  `[hub] could not read feeBps() from ${msg.feeSplitter} — accepting ${msg.runnerId}, ` +
-                    "but its receipts are unverified against the contract."
+                  // Widened rather than duplicated. When the contract cannot be read, BOTH
+                  // checks fail open in the same breath: the split is unverified AND the
+                  // payee was never compared to the announcing seller. Reporting only the
+                  // first would announce the smaller uncertainty while the larger one
+                  // exists, which is the failure the page's own disclosures exist to avoid.
+                  `[hub] could not read ${msg.feeSplitter} on chain — accepting ${msg.runnerId}, ` +
+                    "but BOTH its split and its payee are unverified: receipts state a fee " +
+                    "this hub computed rather than one checked against the contract, and " +
+                    "nothing confirmed the splitter pays the seller announcing it."
                 )
               }
 
