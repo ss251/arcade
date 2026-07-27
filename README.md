@@ -149,12 +149,12 @@ Both payment rails are complete, conformance-tested `Layer`s of one `Rail` servi
 
 | shipped | next |
 |---|---|
-| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · MCP server + skill file · 321 tests | Gateway round-trip on Arc · web UI · container sandbox · agent-hires-agent chain + ratings |
+| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · MCP server + skill file · 328 tests | Gateway round-trip on Arc · web UI · container sandbox · agent-hires-agent chain + ratings |
 
 ## Verify
 
 ```bash
-bun test                                                  # 321 tests
+bun test                                                  # 328 tests
 bun test packages/core/test/secrecy.property.test.ts      # the thesis
 bun test packages/payments/test/rail.conformance.test.ts  # all three rails agree
 bunx tsc --noEmit

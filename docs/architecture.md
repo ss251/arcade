@@ -55,6 +55,20 @@ All three are held to one conformance suite (`packages/payments/test/rail.confor
 - **Gateway requires ≥7 days of authorization validity**, so all rails advertise the same `maxTimeoutSeconds` (604900) and a buyer can sign once for either.
 - **Circle's spending policies are mainnet-only**, so buyer-side caps (`--max-amount`) are ours.
 
+## Discovery and the buyer surface
+
+Three documents, all generated from the live listing set so none can advertise a skill nobody is serving:
+
+| endpoint | for | contains |
+|---|---|---|
+| `/openapi.json` | any OpenAPI client | one concrete `POST /x/<seller>/<skill>` per listing, with input schema, documented `402`, and price in dollars and atomic units |
+| `/.well-known/x402` | clients that speak the protocol and not OpenAPI | the same payment envelope the paid endpoints return |
+| `/skill.md` | an agent's context | the catalogue as markdown, deliberately short because every line costs the reader |
+
+`accepts[]` in the OpenAPI document is derived from the `PaymentRequirements` schema the rail itself constructs, not hand-written — the first live probe caught a hand-written version documenting `maxAmountRequired`, an x402 v1 field name this rail does not emit.
+
+The buyer side is an **MCP server** (`packages/buyer/src/mcp.ts`, `bunx arcade-mcp`): list → describe → quote → call, over stdio because the process holds a spending key. Its tool arguments are Effect Schemas, with `JSONSchema.make` producing what the agent reads and `Schema.decodeUnknownEither` enforcing what its call is held to, so the advertised contract and the runtime check cannot disagree. Two spending ceilings and the result-fencing rule are covered in [`threat-model.md`](./threat-model.md) T-SPEND-001 and T-EXEC-003.
+
 ## Deviations from the plan
 
 - **`Bun.serve` instead of `@effect/platform` HttpApi.** Runners need a real websocket server; Bun provides it natively with fewer moving parts, and all logic remains Effect. OpenAPI is still derived from the same Effect Schemas (`JSONSchema.make` at `/openapi.json`), so the discovery surface cannot drift from the domain model.
