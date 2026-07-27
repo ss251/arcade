@@ -15,6 +15,7 @@
     "maxTurns": 8,
     "maxToolCalls": 6,
     "maxCostUsd": 0.12,
+    "maxSubSpendUsd": 0.02,
     "timeoutSec": 90
   },
   "inputSchema": {
@@ -36,6 +37,10 @@
           "leadership"
         ],
         "description": "Optional emphasis for the brief. Defaults to general."
+      },
+      "onchainAddress": {
+        "type": "string",
+        "description": "Optional wallet address the counterparty claims to control. When given, the brief verifies it is genuinely active on chain rather than taking the claim at face value."
       }
     }
   },
@@ -135,7 +140,8 @@
     "credential": "api-key",
     "entry": "agent.ts",
     "capabilities": [
-      "web-search"
+      "web-search",
+      "hire-skills"
     ]
   },
   "secrets": [

@@ -33,6 +33,7 @@
       "version": "0.1.0",
       "bin": {
         "arcade-buy": "./src/cli.ts",
+        "arcade-mcp": "./src/mcp.ts",
       },
       "dependencies": {
         "@arcade/core": "workspace:*",
@@ -67,6 +68,7 @@
       },
       "dependencies": {
         "@anthropic-ai/sdk": "^0.115.0",
+        "@arcade/buyer": "workspace:*",
         "@arcade/core": "workspace:*",
         "effect": "^3.22.0",
         "viem": "^2.31.3",
