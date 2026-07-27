@@ -8,7 +8,8 @@ import {
   toUIMessageStream,
   type UIMessage
 } from "ai"
-import { READ_ONLY_TOOLS } from "~/lib/tools.ts"
+import { ALL_TOOLS } from "~/lib/tools.ts"
+import { decide } from "~/lib/approval.ts"
 
 /**
  * The chat endpoint. Read-only for now: none of the five tools mounted here can spend.
@@ -88,11 +89,32 @@ const handler = async ({ request }: { request: Request }): Promise<Response> => 
 
   const { messages } = (await request.json()) as { messages: ReadonlyArray<UIMessage> }
 
+  const approvalSecret =
+    (process.env["ARCADE_APPROVAL_SECRET"] ?? "") === ""
+      ? undefined
+      : process.env["ARCADE_APPROVAL_SECRET"]
+
   const result = streamText({
     model: resolveModel(choice),
     system: SYSTEM,
     messages: await convertToModelMessages([...messages]),
-    tools: READ_ONLY_TOOLS,
+    tools: ALL_TOOLS,
+    // Hand-written, per Vercel's own note that the codemods cannot decide approval policy
+    // placement — and this is the one piece here that is load-bearing. `decide` returns
+    // "denied" above the configured ceiling and "user-approval" for everything else; there
+    // is no auto-approve branch, because parsePrice rejects $0 and therefore no purchase on
+    // this marketplace is free. Every purchase asks.
+    // NB: the docs show the callback destructuring `{ parsedInput }`, but the installed
+    // v7 types pass the PARSED ARGUMENTS directly. Written against the types rather than
+    // the prose — the fourth name today where a recollection or a doc would have been wrong.
+    toolApproval: {
+      arcade_call_skill: async (input) => decide(input)
+    },
+    // HMAC-binds each approval to the exact tool name, call id and input arguments, and
+    // rejects unsigned or tampered ones fail-closed. Without it the SDK issues approvals
+    // UNSIGNED and nothing visible changes — which is why apps/web refuses to boot on a
+    // platform without it once a spending tool is mounted (`preflight.ts`).
+    ...(approvalSecret === undefined ? {} : { experimental_toolApprovalSecret: approvalSecret }),
     // A tool result does not by itself produce a follow-up answer — the default stops after
     // one step, which reads to a user as the model going silent after a lookup.
     stopWhen: isStepCount(6)

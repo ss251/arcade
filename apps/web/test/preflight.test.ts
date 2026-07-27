@@ -16,7 +16,14 @@ import { SPENDING_TOOLS } from "../src/lib/tools.ts"
  * pure function: `server.ts` calls this same function, so there is no copy to drift.
  */
 
-const PLATFORM = { RAILWAY_SERVICE_ID: "svc" }
+/*
+ * `ARCADE_APPROVAL_SECRET` is in the baseline because a spending tool is now mounted, so a
+ * public deployment genuinely requires it. That is the guard working: it was written while
+ * `SPENDING_TOOLS` was empty and armed itself the moment `arcade_call_skill` was
+ * registered, with no edit to the guard. Every fixture below then had to acknowledge it,
+ * which is the check proving it is wired to the real registry rather than to a constant.
+ */
+const PLATFORM = { RAILWAY_SERVICE_ID: "svc", ARCADE_APPROVAL_SECRET: "test-secret" }
 
 describe("apps/web preflight", () => {
   it("refuses on a platform when ARCADE_HUB is unset", () => {
@@ -102,7 +109,8 @@ describe("approval secret — guarded before the purchase edge lands", () => {
   }
 
   it("refuses when a spending tool is mounted and no secret is set", () => {
-    const { fatal } = partition(preflightWeb(LIVE, ["arcade_call_skill"]).problems)
+    const { ARCADE_APPROVAL_SECRET: _drop, ...noSecret } = LIVE
+    const { fatal } = partition(preflightWeb(noSecret, ["arcade_call_skill"]).problems)
     expect(fatal).toHaveLength(1)
     expect(fatal[0]).toContain("ARCADE_APPROVAL_SECRET")
     expect(fatal[0]).toContain("arcade_call_skill")
@@ -119,17 +127,24 @@ describe("approval secret — guarded before the purchase edge lands", () => {
   })
 
   it("stays silent while no tool can spend", () => {
-    // Today's real state. A guard that fired now would be a false positive on a deployment
-    // where nothing can spend, and false positives are how guards get ignored.
-    const { fatal } = partition(preflightWeb(LIVE, []).problems)
+    // A guard that fired on a deployment where nothing can spend would be a false positive,
+    // and false positives are how guards get ignored. Injected empty rather than real, since
+    // the real registry now mounts one.
+    const { ARCADE_APPROVAL_SECRET: _drop, ...noSecret } = LIVE
+    const { fatal } = partition(preflightWeb(noSecret, []).problems)
     expect(fatal).toHaveLength(0)
   })
 
-  it("is wired to the real registry, which currently mounts nothing that spends", () => {
-    // Pins today's fact AND the wiring: the default argument is the live registry, so the
-    // day `arcade_call_skill` is registered this guard arms itself with no edit here.
-    expect(SPENDING_TOOLS).toEqual([])
-    const { fatal } = partition(preflightWeb(LIVE).problems)
-    expect(fatal).toHaveLength(0)
+  it("is wired to the real registry, which now mounts a spending tool", () => {
+    // This assertion previously read `toEqual([])`. Registering `arcade_call_skill` flipped
+    // it, and the guard armed without a line changed in `preflight.ts` — which is the whole
+    // point of keying it off the registry rather than a flag.
+    expect(SPENDING_TOOLS).toContain("arcade_call_skill")
+
+    // With the secret absent it now refuses, using the LIVE registry as the default.
+    const { ARCADE_APPROVAL_SECRET: _drop, ...noSecret } = LIVE
+    const { fatal } = partition(preflightWeb(noSecret).problems)
+    expect(fatal).toHaveLength(1)
+    expect(fatal[0]).toContain("ARCADE_APPROVAL_SECRET")
   })
 })

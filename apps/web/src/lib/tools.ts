@@ -3,6 +3,7 @@ import { JSONSchema, Schema } from "effect"
 import { TreeFormatter } from "effect/ParseResult"
 import { fenceListing, fenceListings, formatPrice, parsePrice } from "@arcade/core"
 import * as hub from "./hub.ts"
+import { deriveSigningRequest, PriceMovedAboveApproval } from "./purchase.ts"
 
 /**
  * The five READ-ONLY tools. Nothing here can spend.
@@ -210,7 +211,58 @@ export const READ_ONLY_TOOLS = {
  * guard cannot drift from what is actually mounted — a hand-written list is the second copy
  * this codebase keeps deleting.
  */
-export const PURCHASE_TOOLS = {} as const
+const CallArgs = Schema.Struct({
+  skillId: Schema.String.annotations({
+    description: "The skill's id, exactly as returned by arcade_list_skills."
+  }),
+  maxAmountUsd: Schema.String.annotations({
+    description:
+      'The most this call may cost, as a dollar string like "$0.25". The purchase is ' +
+      "refused if the endpoint asks for more. This is the number the visitor approves."
+  })
+})
+
+/**
+ * The purchase edge. Returns a SIGNING REQUEST, never a completed purchase.
+ *
+ * This tool cannot spend on its own: it holds no key, and the visitor's wallet performs the
+ * signature in their browser. What it produces is the exact payment requirements derived
+ * from the arguments the visitor approved — see `purchase.ts` and T-EXEC-005 for why
+ * derivation rather than validation is what makes the two bindings compose.
+ */
+export const arcade_call_skill = tool({
+  description:
+    "Prepare a purchase. THIS SPENDS THE VISITOR'S USDC once they approve and sign it in " +
+    "their own wallet — this service holds no key and cannot pay on anyone's behalf. The " +
+    "payment is verified before any work starts and is only broadcast if the output " +
+    "validates against the skill's declared schema, so a refusal, timeout or malformed " +
+    "result leaves the balance untouched. Quote first if the price matters.",
+  inputSchema: std(CallArgs),
+  execute: async ({ skillId, maxAmountUsd }, { toolCallId }) => {
+    try {
+      const request = await deriveSigningRequest({ skillId, maxAmountUsd, toolCallId })
+      return {
+        awaitingSignature: true,
+        ...request,
+        note:
+          "Nothing has been spent yet. This is what the visitor's wallet will be asked to " +
+          "sign; it was derived from the approved skill and ceiling, not supplied by you."
+      }
+    } catch (e) {
+      if (e instanceof PriceMovedAboveApproval) {
+        return {
+          awaitingSignature: false,
+          refused: true,
+          reason: e.message,
+          skillId
+        }
+      }
+      throw e
+    }
+  }
+})
+
+export const PURCHASE_TOOLS = { arcade_call_skill } as const
 
 export const SPENDING_TOOLS: ReadonlyArray<string> = Object.keys(PURCHASE_TOOLS)
 
