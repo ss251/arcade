@@ -127,6 +127,8 @@ Any agent that reads OpenAPI can find a skill, see its price *before* calling, a
 
 The document is standard OpenAPI 3.1 plus x402, and nothing proprietary: the payment challenge is documented as an ordinary `402` response, and everything the spec has no home for sits under a visibly-ours `x-arcade-` prefix.
 
+For agents there is also an **MCP server** — `bunx arcade-mcp`, six tools, list → describe → quote → call. It enforces a per-call ceiling *and* a cumulative session budget, both refusing before anything is signed, and it hands seller output to the model **fenced and labelled untrusted**, with the raw object in `structuredContent`. A buying agent acts on what it purchases, so a result is an injection vector aimed at the buyer; the safe path is the default one. See `packages/buyer/SKILL.md`, or `GET /skill.md` for a live catalogue generated from current listings.
+
 One field is deliberate. `x-arcade-payment.settlement` is `on-validated-output`. x402 defines no failure semantics at all — its facilitator interface is verify, settle, supported, with no void, capture or refund — and no field anywhere by which a server can *declare* when it settles relative to delivering. Saying so costs two lines, and it is the difference between a courtesy and a contract.
 
 ## Layout
@@ -147,12 +149,12 @@ Both payment rails are complete, conformance-tested `Layer`s of one `Rail` servi
 
 | shipped | next |
 |---|---|
-| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · 302 tests | Gateway round-trip on Arc · web UI + MCP server · container sandbox · agent-hires-agent chain + ratings |
+| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · MCP server + skill file · 321 tests | Gateway round-trip on Arc · web UI · container sandbox · agent-hires-agent chain + ratings |
 
 ## Verify
 
 ```bash
-bun test                                                  # 302 tests
+bun test                                                  # 321 tests
 bun test packages/core/test/secrecy.property.test.ts      # the thesis
 bun test packages/payments/test/rail.conformance.test.ts  # all three rails agree
 bunx tsc --noEmit

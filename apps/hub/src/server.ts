@@ -31,7 +31,7 @@ import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
 import { StoreLive, StoreTag } from "./store.ts"
 import { runJob } from "./pipeline.ts"
 import { renderIndex } from "./ui.ts"
-import { buildOpenApi, buildWellKnownX402 } from "./openapi.ts"
+import { buildAgentSkill, buildOpenApi, buildWellKnownX402 } from "./openapi.ts"
 
 /**
  * ARCADE hub.
@@ -301,7 +301,7 @@ const main = Effect.gen(function* () {
       // skill that is not currently served, and cannot drift from the schemas the runtime
       // actually enforces. `ARCADE_PUBLIC_URL` matters behind a proxy: the advertised
       // origin has to be the one buyers can reach, not the socket the hub is bound to.
-      if (path === "/openapi.json" || path === "/.well-known/x402") {
+      if (path === "/openapi.json" || path === "/.well-known/x402" || path === "/skill.md") {
         const listings = await run(store.allListings)
         const discovery = {
           listings,
@@ -309,6 +309,11 @@ const main = Effect.gen(function* () {
           rail: rail.name,
           network: ARC_CAIP2,
           asset: USDC_ADDRESS
+        }
+        if (path === "/skill.md") {
+          return new Response(buildAgentSkill(discovery), {
+            headers: { "content-type": "text/markdown; charset=utf-8" }
+          })
         }
         return json(
           path === "/openapi.json" ? buildOpenApi(discovery) : buildWellKnownX402(discovery)

@@ -4,11 +4,18 @@
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
-  "bin": { "arcade-buy": "./src/cli.ts" },
-  "exports": { ".": "./src/index.ts", "./*": "./src/*.ts" },
+  "bin": {
+    "arcade-buy": "./src/cli.ts",
+    "arcade-mcp": "./src/mcp.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
   "dependencies": {
     "@arcade/core": "workspace:*",
     "@arcade/payments": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "effect": "^3.22.0",
     "viem": "^2.31.3"
   }

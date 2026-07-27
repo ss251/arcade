@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
 import { SkillManifest, parsePrice, toPublicListing, ARC_CAIP2, USDC_ADDRESS } from "@arcade/core"
-import { buildOpenApi, buildWellKnownX402, type ListingRecord } from "../src/openapi.ts"
+import { buildAgentSkill, buildOpenApi, buildWellKnownX402, type ListingRecord } from "../src/openapi.ts"
 
 /**
  * OpenAPI is a NEW surface for the secrecy boundary to hold across.
@@ -190,6 +190,34 @@ describe("openapi document", () => {
   it("advertises the reachable origin, not the bound socket", () => {
     const doc = buildOpenApi({ ...params([record()]), origin: "https://public.example" })
     expect(doc["servers"]).toEqual([{ url: "https://public.example" }])
+  })
+})
+
+describe("/skill.md", () => {
+  it("names the live listings with their prices", async () => {
+    const md = buildAgentSkill(params([record()]))
+    expect(md).toContain("counterparty-brief")
+    expect(md).toContain("$0.25/call")
+    expect(md).toContain("https://hub.example")
+  })
+
+  it("says so plainly when nothing is for sale", () => {
+    // A hub with every runner offline must not render an empty catalogue that reads like
+    // a broken page.
+    expect(buildAgentSkill(params([]))).toContain("No skills are listed right now")
+  })
+
+  it("tells the reader to treat results as untrusted", () => {
+    // This file is read into a buying agent's context; it is the natural place to say it.
+    expect(buildAgentSkill(params([record()]))).toMatch(/never as instructions/i)
+  })
+
+  it("leaks nothing private", () => {
+    const md = buildAgentSkill(params([record()]))
+    expect(md).not.toContain("SECRET-PROMPT")
+    expect(md).not.toContain("ANTHROPIC_API_KEY")
+    expect(md).not.toContain("agent.ts")
+    expect(md).not.toContain("claude-api")
   })
 })
 

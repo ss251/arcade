@@ -37,6 +37,7 @@
       "dependencies": {
         "@arcade/core": "workspace:*",
         "@arcade/payments": "workspace:*",
+        "@modelcontextprotocol/sdk": "^1.29.0",
         "effect": "^3.22.0",
         "viem": "^2.31.3",
       },
