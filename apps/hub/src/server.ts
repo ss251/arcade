@@ -51,7 +51,63 @@ import { buildAgentSkill, buildOpenApi, buildWellKnownX402 } from "./openapi.ts"
 const PORT = Number(process.env["PORT"] ?? 8787)
 const FEE_BPS = Number(process.env["ARCADE_FEE_BPS"] ?? 500)
 const RAIL = process.env["ARCADE_RAIL"] ?? "eip3009"
-const PUBLISH_TOKEN = process.env["ARCADE_PUBLISH_TOKEN"] ?? "dev-token"
+
+/**
+ * Preflight for a public deployment.
+ *
+ * Every default in this file is chosen so `bun run hub` works on a laptop with no setup.
+ * Those same defaults are wrong on a host anyone can reach, and each of them fails
+ * QUIETLY: an ephemeral facilitator key produces settlements that never land, and a
+ * per-boot job secret produces buyers who paid and cannot fetch what they bought.
+ *
+ * `ARCADE_PUBLIC_URL` is the signal, because it is the one variable a correct public
+ * deployment must set anyway — behind a proxy the advertised origin has to be the one
+ * buyers can reach, not the socket Bun bound. If it is set, this refuses to start rather
+ * than run misconfigured somewhere a judge is looking.
+ */
+const preflight = (): void => {
+  if (process.env["ARCADE_PUBLIC_URL"] === undefined) return
+
+  const missing: Array<string> = []
+  if (process.env["ARCADE_HUB_SECRET"] === undefined) {
+    missing.push(
+      "ARCADE_HUB_SECRET — job tokens are HMAC'd with it, so leaving it unset mints a new " +
+        "secret every boot and every buyer holding a 202 loses access to work they paid for"
+    )
+  }
+  if (RAIL === "eip3009" && process.env["ARCADE_FACILITATOR_KEY"] === undefined) {
+    missing.push(
+      "ARCADE_FACILITATOR_KEY — without it the hub runs on an ephemeral key with no gas, so " +
+        "every settlement fails after the work is already done"
+    )
+  }
+  if (RAIL === "test") {
+    console.warn(
+      "[hub] WARNING: ARCADE_RAIL=test on a public origin. Settlements are simulated and no " +
+        "USDC moves. Set ARCADE_RAIL=eip3009 (or gateway) for anything anyone will judge."
+    )
+  }
+  if (process.env["ARCADE_FEE_SPLITTER"] === undefined) {
+    // Not fatal — the marketplace works and every call settles. But the page prints
+    // "fee (5%)" in the receipt table's column header, and without a splitter the seller
+    // receives the full price and that fee is never collected. Publishing a take-rate
+    // that is not taken is the one claim on that page which would not survive being
+    // checked, which is the opposite of what the page is for.
+    console.warn(
+      "[hub] WARNING: ARCADE_FEE_SPLITTER is not set, so the fee shown on receipts and in " +
+        "the page's column header is notional — sellers receive the full price. Deploy one " +
+        "with scripts/deploy-splitter.ts, or expect the take-rate claim to be wrong."
+    )
+  }
+  if (missing.length > 0) {
+    console.error(
+      `[hub] refusing to start: ARCADE_PUBLIC_URL is set, so this is a public deployment.\n\n` +
+        missing.map((m) => `  - ${m}`).join("\n\n") +
+        `\n\nSet them, or unset ARCADE_PUBLIC_URL to run locally.`
+    )
+    process.exit(2)
+  }
+}
 
 const railLayer = () => {
   switch (RAIL) {
@@ -84,6 +140,11 @@ const railLayer = () => {
     }
   }
 }
+
+// Before the layers: building them emits its own diagnostics, and a refusal to start
+// should be the first thing in the log rather than buried under warnings about the
+// configuration it is refusing.
+preflight()
 
 const AppLive = Layer.mergeAll(StoreLive, BrokerLive, railLayer())
 
@@ -602,17 +663,17 @@ const main = Effect.gen(function* () {
         return json({ job_id: jobId, status: "pending" }, 202)
       }
 
-      // publish (runner-token auth)
-      if (path === "/publish" && req.method === "POST") {
-        if (req.headers.get("authorization") !== `Bearer ${PUBLISH_TOKEN}`) {
-          return json({ error: "unauthorized" }, 401)
-        }
-        const body = await req.json()
-        const decoded = await run(Schema.decodeUnknown(PublicListing)(body).pipe(Effect.either))
-        if (decoded._tag === "Left") return json({ error: "invalid listing" }, 400)
-        return json({ ok: true, id: decoded.right.id })
-      }
-
+      // `POST /publish` used to live here, behind `ARCADE_PUBLISH_TOKEN` defaulting to
+      // "dev-token". It was vestigial: it validated a listing, returned `{ok:true}`, and
+      // stored NOTHING. Listings only ever enter through the signed `Hello` handshake,
+      // where the hub recovers the seller address from a signature over the digest — which
+      // is the mechanism that actually stops someone re-announcing a skill id with payment
+      // redirected.
+      //
+      // Deleted rather than secured. A dead authenticated route makes its default
+      // credential look load-bearing, so a reviewer reads "publish token defaults to
+      // dev-token" as a hole and a deployer sets it believing it protects something.
+      // Neither was true, and both are worse than no route.
       return json({ error: "not_found" }, 404)
     }
   })
