@@ -73,6 +73,18 @@ What it does not eliminate — and what this document is mostly about — is tha
 | **Known adjacent edge** | `arcade_quote` returns numbers only and is therefore safe **by omission, not by construction** — the 402 challenge genuinely carries `listing.description` (`apps/hub/src/server.ts:693`, `:709`). Surfacing "what am I paying for" is an obvious improvement that would reintroduce this while touching nothing that looks security-relevant. Commented at the callsite; if it ships, it ships with `fenceListing`. |
 | **Residual** | **Low–medium.** The fence is a mitigation, not a proof: a sufficiently persuasive fenced instruction can still influence a model. On the web the backstop is that a purchase needs the visitor's own signature. On the MCP server there is no such backstop today, only the ceilings — which is the strongest argument for the approval policy landing with the purchase edge. |
 
+### T-EXEC-005 — Two bindings that do not compose, on the purchase edge
+
+**Status: design decision recorded before implementation. Not yet built.**
+
+| | |
+|---|---|
+| **ATLAS** | AML.T0051.001 |
+| **Vector** | The purchase edge will carry **two** cryptographic bindings covering **different facts**. The AI SDK's approval HMAC binds *tool name + call id + input arguments* — "the visitor agreed to buy skill X for at most $N". The EIP-3009 signature binds *payTo + value + validBefore + nonce* — "pay this address this amount". Nothing inherently ties one to the other. If a client can obtain an approval for one purchase and then produce a signature for a different one, the human gate is decorative. This is T-EXEC-004's descendant one surface along: the fence stops seller prose from being *trusted*, but it does not stop the model from *proposing* a purchase — the approval is what must stop that, so the approval has to be about the same object the signature is about. |
+| **Design (single-copy)** | The server derives the 402 challenge **from the approved arguments** and hands the client only that. The client is then never in possession of an alternative to sign, so the mismatch is unconstructible rather than detected. One authoritative statement of the purchase; the signature covers a payload the approval already fixed. Same shape as `SellerAuthored` and as deriving `hubWsUrl`: delete the second copy, and the boundary replaces the checkpoint. |
+| **Required tests** | Three, and the first two are the only ones that mean anything — a suite that walks only the approve path passes identically whether the gate is wired or missing. (1) A **denied** approval blocks the purchase. (2) A replayed approval with **mutated arguments** is refused by the HMAC binding. (3) An approval for skill A followed by an attempt to settle skill B is refused — the composition mutation. If (3) passes *by construction* because the client cannot express the mismatch, the test documents why; if it does not pass, the gap is found before it ships. |
+| **Configuration** | `ARCADE_APPROVAL_SECRET` is required the moment a spending tool is mounted, and `apps/web/src/preflight.ts` already refuses without it. AI SDK 7 is explicit that an unconfigured secret means "approvals work as before (backward compatible)" — issued and honoured **unsigned** — so its absence removes the binding while leaving every visible behaviour identical. The guard is keyed off the tool registry rather than a flag, and is tested by injecting the future state, because a guard that cannot fire is indistinguishable from one that does not work. |
+
 ### T-SPEND-001 — A model with access to a spending key
 
 | | |

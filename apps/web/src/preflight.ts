@@ -1,4 +1,5 @@
 import { DEFAULT_MODEL, parseModel, SUPPORTED_PROVIDERS } from "./lib/model.ts"
+import { SPENDING_TOOLS } from "./lib/tools.ts"
 
 /**
  * Refuse to serve the chat against a hub that isn't there.
@@ -42,7 +43,16 @@ const isLocal = (url: string): boolean => {
   }
 }
 
-export const preflightWeb = (env: Record<string, string | undefined>): PreflightResult => {
+/**
+ * `spendingTools` is injectable ONLY so the approval-secret guard can be tested before the
+ * purchase edge exists. It is dormant today — `SPENDING_TOOLS` is empty — and a guard that
+ * cannot fire is indistinguishable from one that does not work. Passing the future state in
+ * is what makes it provable now rather than the day it first matters.
+ */
+export const preflightWeb = (
+  env: Record<string, string | undefined>,
+  spendingTools: ReadonlyArray<string> = SPENDING_TOOLS
+): PreflightResult => {
   const onPlatform = Object.keys(env).some(
     (k) => k.startsWith("RAILWAY_") || k.startsWith("FLY_") || k.startsWith("RENDER_")
   )
@@ -87,6 +97,29 @@ export const preflightWeb = (env: Record<string, string | undefined>): Preflight
     problems.push(
       `__warn__${choice.keyVar} is not set, so the chat (${spec}) will answer every message ` +
         "with a 503. The catalogue and receipts still work."
+    )
+  }
+
+  // The approval secret, required only once a spending tool is actually mounted.
+  //
+  // AI SDK 7: with no `experimental_toolApprovalSecret`, "approvals work as before
+  // (backward compatible)" — issued and honoured UNSIGNED. With one, "approval requests
+  // without a valid signature are rejected (fail-closed)". So the unconfigured case is not
+  // a missing feature, it is the same feature with the binding removed and no visible
+  // difference: the card renders, the visitor approves, the purchase proceeds, and nothing
+  // ties that approval to the tool name, call id and arguments it was granted for.
+  //
+  // Keyed off `SPENDING_TOOLS` rather than a flag, so it stays quiet today — no spending
+  // tool is mounted — and refuses automatically the moment one is. A guard written after
+  // the feature works is a guard nobody looks at again.
+  if (spendingTools.length > 0 && (env["ARCADE_APPROVAL_SECRET"] ?? "") === "") {
+    problems.push(
+      `ARCADE_APPROVAL_SECRET — ${spendingTools.join(", ")} can spend, and without this the ` +
+        `AI SDK issues approvals UNSIGNED. Everything looks identical — the approval card ` +
+        `renders, the visitor confirms, the purchase goes through — but nothing binds that ` +
+        `approval to the tool, call id and arguments it was granted for, so an approval ` +
+        `obtained for one purchase can be replayed for another. Generate one with ` +
+        `\`openssl rand -base64 32\`.`
     )
   }
 

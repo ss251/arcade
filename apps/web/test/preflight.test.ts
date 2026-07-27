@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { DEFAULT_HUB, partition, preflightWeb } from "../src/preflight.ts"
+import { SPENDING_TOOLS } from "../src/lib/tools.ts"
 
 /**
  * `apps/web` had no preflight while the hub had one, and its single load-bearing input
@@ -78,5 +79,57 @@ describe("apps/web preflight", () => {
     expect(preflightWeb({ ARCADE_HUB: "http://localhost:8792" }).hub).toBe(
       "http://localhost:8792"
     )
+  })
+})
+
+/**
+ * The approval secret, guarded before the feature exists.
+ *
+ * AI SDK 7 with no `experimental_toolApprovalSecret`: "approvals work as before (backward
+ * compatible)" — issued and honoured UNSIGNED. With one: "approval requests without a valid
+ * signature are rejected (fail-closed)". So an unset secret is not a missing feature, it is
+ * the same feature with the binding quietly removed and nothing visibly different.
+ *
+ * The guard is dormant today because no spending tool is mounted, which is exactly the
+ * problem — a check that cannot fire is indistinguishable from one that does not work. So
+ * the future state is injected and the guard is proved now.
+ */
+describe("approval secret — guarded before the purchase edge lands", () => {
+  const LIVE = {
+    ...PLATFORM,
+    ARCADE_HUB: "https://hub.example",
+    ANTHROPIC_API_KEY: "sk-test"
+  }
+
+  it("refuses when a spending tool is mounted and no secret is set", () => {
+    const { fatal } = partition(preflightWeb(LIVE, ["arcade_call_skill"]).problems)
+    expect(fatal).toHaveLength(1)
+    expect(fatal[0]).toContain("ARCADE_APPROVAL_SECRET")
+    expect(fatal[0]).toContain("arcade_call_skill")
+    // The message must say WHY it matters, not just that it is missing.
+    expect(fatal[0]).toContain("UNSIGNED")
+    expect(fatal[0]).toContain("openssl rand -base64 32")
+  })
+
+  it("accepts when the secret is present", () => {
+    const { fatal } = partition(
+      preflightWeb({ ...LIVE, ARCADE_APPROVAL_SECRET: "s" }, ["arcade_call_skill"]).problems
+    )
+    expect(fatal).toHaveLength(0)
+  })
+
+  it("stays silent while no tool can spend", () => {
+    // Today's real state. A guard that fired now would be a false positive on a deployment
+    // where nothing can spend, and false positives are how guards get ignored.
+    const { fatal } = partition(preflightWeb(LIVE, []).problems)
+    expect(fatal).toHaveLength(0)
+  })
+
+  it("is wired to the real registry, which currently mounts nothing that spends", () => {
+    // Pins today's fact AND the wiring: the default argument is the live registry, so the
+    // day `arcade_call_skill` is registered this guard arms itself with no edit here.
+    expect(SPENDING_TOOLS).toEqual([])
+    const { fatal } = partition(preflightWeb(LIVE).problems)
+    expect(fatal).toHaveLength(0)
   })
 })

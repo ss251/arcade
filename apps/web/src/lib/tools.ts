@@ -194,3 +194,24 @@ export const READ_ONLY_TOOLS = {
   arcade_receipts,
   arcade_budget
 } as const
+
+/**
+ * Tools that can spend. Empty until the purchase edge lands.
+ *
+ * This exists so the approval-secret guard can key off the FACT that a spending tool is
+ * registered rather than off a flag someone has to remember to set. AI SDK 7 is explicit
+ * that with no `experimental_toolApprovalSecret` configured, "approvals work as before
+ * (backward compatible)" — issued and honoured UNSIGNED. So an unset secret would leave the
+ * binding silently absent while every visible thing stayed identical: the card renders, the
+ * visitor holds the button, the purchase proceeds. A working system with a quietly
+ * different guarantee, at the one edge that moves money.
+ *
+ * Deriving `SPENDING_TOOLS` from this registry rather than hand-listing names means the
+ * guard cannot drift from what is actually mounted — a hand-written list is the second copy
+ * this codebase keeps deleting.
+ */
+export const PURCHASE_TOOLS = {} as const
+
+export const SPENDING_TOOLS: ReadonlyArray<string> = Object.keys(PURCHASE_TOOLS)
+
+export const ALL_TOOLS = { ...READ_ONLY_TOOLS, ...PURCHASE_TOOLS }
