@@ -59,12 +59,18 @@ const handler = async ({ request }: { request: Request }): Promise<Response> => 
   if (key === undefined || key === "") {
     // Same posture as the hub's preflight: say which variable and what it costs, rather
     // than degrading into a chat that silently cannot think.
+    // Written for whoever actually reads it. Naming an environment variable helps the
+    // operator; it is useless to a visitor, who needs somewhere to go instead. So the hub's
+    // real URL is in the body — that is the one piece of information that rescues the visit.
+    const hub = process.env["ARCADE_HUB"] ?? "http://localhost:8787"
     return Response.json(
       {
         error: "not_configured",
         detail:
-          "ANTHROPIC_API_KEY is not set on the web service. Discovery still works through " +
-          "the hub's own API; the chat does not."
+          "The chat is not live on this deployment (ANTHROPIC_API_KEY is unset on the web " +
+          `service). The marketplace itself is: listings, prices and settled receipts are at ${hub}, ` +
+          "and every receipt links to its transaction on Arc.",
+        hub
       },
       { status: 503 }
     )

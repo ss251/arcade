@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { createChat } from "@shadcn/helpers/ai-sdk"
 import { MessageScroller } from "@shadcn/react/message-scroller"
 import { fenceListings } from "@arcade/core"
-import { Thread, type UIMessageLike } from "../src/components/chat.tsx"
+import { Empty, Thread, type UIMessageLike } from "../src/components/chat.tsx"
 
 /**
  * The chat's RENDER path, driven by scripted conversations.
@@ -52,13 +52,8 @@ describe("thread rendering — scripted conversations", () => {
     expect(html).toContain('class="who"')
   })
 
-  it("shows the empty state before anything is said", () => {
-    const html = render([])
-    expect(html).toContain("empty-state")
-    expect(html).toContain("signed by your own wallet")
-    // Law 9: the empty state is the product's law plus one real action, not a tour.
-    expect(html).not.toContain("Next")
-    expect(html).not.toContain("Got it")
+  it("renders nothing for an empty transcript — the empty state is the chat's job", () => {
+    expect(render([])).not.toContain("msg-")
   })
 
   it("renders a tool call as a status marker, with the arcade_ prefix stripped", () => {
@@ -123,5 +118,51 @@ describe("thread rendering — scripted conversations", () => {
     expect(html.indexOf("what&#x27;s for sale?")).toBeLessThan(
       html.indexOf("what would diff-triage cost?")
     )
+  })
+})
+
+/**
+ * The page must not invite an action the server has already declined to perform.
+ *
+ * Without `ANTHROPIC_API_KEY`, `/api/chat` returns 503. A page that still says "Ask for
+ * what you need" and prints two suggested prompts is promising something that fails on
+ * every attempt — and unlike an empty catalogue, which is the discovery guarantee working
+ * and visibly so, that just reads as broken. So the invitation is DERIVED from what the
+ * deployment can do rather than asserted.
+ *
+ * The hub link is unconditional. It is the recorded canonical-URL decision — the hub's
+ * origin is canonical and the chat links out to it, never the reverse — and the settlement
+ * page is the artifact the whole pitch rests on. A visitor who reaches the chat must have a
+ * path to it whether or not a model is wired.
+ */
+describe("empty state — the invitation matches what the deployment can do", () => {
+  const HUB = "https://arcade-hub-production.up.railway.app"
+
+  it("invites and suggests when the chat is live", () => {
+    const html = renderToStaticMarkup(<Empty chatLive hubUrl={HUB} />)
+    expect(html).toContain("Ask for what you need")
+    expect(html).toContain("what’s for sale?")
+    // Law 9: the empty state is the product's law plus one real action, not a tour.
+    expect(html).not.toContain("Next")
+    expect(html).not.toContain("Got it")
+  })
+
+  it("says so plainly and points at the hub when it is not live", () => {
+    const html = renderToStaticMarkup(<Empty chatLive={false} hubUrl={HUB} />)
+    expect(html).toContain("not live")
+    expect(html).toContain(HUB)
+    // The invitation and the suggestions must both be gone — a disabled box under a
+    // "try: …" line is the same broken promise in smaller type.
+    expect(html).not.toContain("Ask for what you need")
+    expect(html).not.toContain("what’s for sale?")
+  })
+
+  it("puts the hub link where it rescues the visit", () => {
+    // The header carries an unconditional link (see `routes/index.tsx`, asserted against
+    // the deployed page). `Empty` adds one only in the dead state, where it is the whole
+    // remaining path to something real — repeating it in the live state would be a second
+    // copy of the same affordance, which is the habit this codebase keeps deleting.
+    expect(renderToStaticMarkup(<Empty chatLive={false} hubUrl={HUB} />)).toContain(HUB)
+    expect(renderToStaticMarkup(<Empty chatLive hubUrl={HUB} />)).not.toContain(HUB)
   })
 })

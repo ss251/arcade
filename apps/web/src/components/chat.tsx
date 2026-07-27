@@ -70,7 +70,6 @@ const TextPart = ({ text }: { text: string }) => {
  */
 export const Thread = ({ messages }: { messages: ReadonlyArray<UIMessageLike> }) => (
   <>
-    {messages.length === 0 ? <Empty /> : null}
     {messages.map((m) => (
       <MessageScroller.Item key={m.id} messageId={m.id}>
         <article className={`msg msg-${m.role}`}>
@@ -111,7 +110,13 @@ export interface UIMessageLike {
 
 // ── the chat ────────────────────────────────────────────────────────────────
 
-export const Chat = () => {
+export interface ChatProps {
+  /** Whether this deployment can actually answer. Derived server-side, never assumed. */
+  readonly chatLive: boolean
+  readonly hubUrl: string
+}
+
+export const Chat = ({ chatLive, hubUrl }: ChatProps) => {
   const { messages, sendMessage, status, error } = useChat()
   const [input, setInput] = useState("")
 
@@ -120,7 +125,7 @@ export const Chat = () => {
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const text = input.trim()
-    if (text === "" || busy) return
+    if (text === "" || busy || !chatLive) return
     setInput("")
     void sendMessage({ text })
   }
@@ -131,6 +136,7 @@ export const Chat = () => {
         <MessageScroller.Root className="scroller">
           <MessageScroller.Viewport className="viewport" aria-label="Conversation">
             <MessageScroller.Content className="thread">
+              {messages.length === 0 ? <Empty chatLive={chatLive} hubUrl={hubUrl} /> : null}
               <Thread messages={messages as ReadonlyArray<UIMessageLike>} />
             </MessageScroller.Content>
           </MessageScroller.Viewport>
@@ -151,11 +157,12 @@ export const Chat = () => {
           className="prompt"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="What do you need bought?"
+          placeholder={chatLive ? "What do you need bought?" : "The chat is not live on this deployment"}
           aria-label="Message"
           autoComplete="off"
+          disabled={!chatLive}
         />
-        <button className="send" type="submit" disabled={busy || input.trim() === ""}>
+        <button className="send" type="submit" disabled={!chatLive || busy || input.trim() === ""}>
           {busy ? "…" : "send"}
         </button>
       </form>
@@ -168,12 +175,31 @@ export const Chat = () => {
  * suggestions are real prompts, and the sentence states what is free, because "does this
  * cost me anything to look" is the first question a visitor actually has.
  */
-const Empty = () => (
-  <div className="empty-state">
-    <p className="law">
-      Ask for what you need. Listing, describing and quoting are <b>free</b> and sign
-      nothing. A purchase is signed by your own wallet, in your browser.
-    </p>
-    <p className="note">try: “what’s for sale?” · “what would a flow check cost?”</p>
-  </div>
-)
+export const Empty = ({ chatLive, hubUrl }: ChatProps) =>
+  chatLive ? (
+    <div className="empty-state">
+      <p className="law">
+        Ask for what you need. Listing, describing and quoting are <b>free</b> and sign
+        nothing. A purchase is signed by your own wallet, in your browser.
+      </p>
+      <p className="note">try: “what’s for sale?” · “what would a flow check cost?”</p>
+    </div>
+  ) : (
+    // No key on this deployment, so do not invite what the server has already declined to
+    // do. Say what is true and send the visitor somewhere that works — the settlement page
+    // is the artifact worth reaching, and it is live.
+    <div className="empty-state">
+      <p className="law">
+        The chat is <b>not live</b> on this deployment. The marketplace it reads from is:
+        every listing, price and settled receipt is on the{" "}
+        <a href={hubUrl} target="_blank" rel="noreferrer">
+          hub
+        </a>
+        , and each receipt links to its transaction on Arc.
+      </p>
+      <p className="note">
+        Listing, describing and quoting are free and sign nothing. A purchase is signed by
+        your own wallet, in your browser — ARCADE never holds funds.
+      </p>
+    </div>
+  )
