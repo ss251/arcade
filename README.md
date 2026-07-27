@@ -132,7 +132,9 @@ Three more things:
 - **An absent `maxSubSpendUsd` means zero**, never unlimited. Forgetting the bound fails closed.
 - The hired result comes back **fenced**, supplied by the runner rather than the seller, because B's output is untrusted input to A — the same problem the buyer has one level up, and easier to forget because A chose B.
 
-[`threat-model.md`](docs/threat-model.md) T-SPEND-002 has the residual: **Low**. What remains is a seller whose own skill goes looking for the socket — their machine, their wallet, not a threat.
+[`threat-model.md`](docs/threat-model.md) T-SPEND-002 has the residual: **Low** — for one job.
+
+**Across hops it does not yet compose.** A hire carries no lineage, so the hub cannot tell a sub-hire from an ordinary buyer call and each job opens a fresh ledger from its own manifest. `A → B → A` runs whenever each price fits the other's budget, settling real USDC every hop. It is depth-1 and acyclic today only because one skill declares the capability and the thing it hires has none. T-SPEND-003 states it, and the fix — a hop count and ancestor set in the 402 metadata — is not built yet.
 
 ## Discovery
 
