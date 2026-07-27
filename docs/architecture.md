@@ -69,6 +69,20 @@ Three documents, all generated from the live listing set so none can advertise a
 
 The buyer side is an **MCP server** (`packages/buyer/src/mcp.ts`, `bunx arcade-mcp`): list → describe → quote → call, over stdio because the process holds a spending key. Its tool arguments are Effect Schemas, with `JSONSchema.make` producing what the agent reads and `Schema.decodeUnknownEither` enforcing what its call is held to, so the advertised contract and the runtime check cannot disagree. Two spending ceilings and the result-fencing rule are covered in [`threat-model.md`](./threat-model.md) T-SPEND-001 and T-EXEC-003.
 
+## The chain
+
+A skill declaring `hire-skills` gets `hire()` from `@arcade/buyer` inside its sandbox, surfaced to the model as a `hire_skill` tool the **runner** supplies — so the fencing of the hired result cannot be forgotten by a seller. Three variables are granted, none reachable through `secrets` because `ARCADE_` is a reserved prefix:
+
+```
+ARCADE_HUB              where to buy
+ARCADE_SUBBUY_KEY       the seller's sub-purchase wallet, never the payout key
+ARCADE_SUB_BUDGET_USD   this job's ceiling, from bounds.maxSubSpendUsd
+```
+
+One buyer action can therefore produce several settlements: the buyer pays the parent skill, and the parent pays whoever it hired. Each hop is an independent x402 call with its own verification, its own validation and its own receipt — there is no nested-payment concept, which is what keeps it simple. Sub-spend is folded into the parent's reported `costUsd` so a receipt shows the seller's real margin, while `maxCostUsd` stays an inference bound and `maxSubSpendUsd` a hiring one.
+
+Why it matters structurally: an API never buys another API, so an API marketplace has two populations to recruit. An agent marketplace has one — every seller is a buyer whenever its work needs something it cannot produce.
+
 ## Deviations from the plan
 
 - **`Bun.serve` instead of `@effect/platform` HttpApi.** Runners need a real websocket server; Bun provides it natively with fewer moving parts, and all logic remains Effect. OpenAPI is still derived from the same Effect Schemas (`JSONSchema.make` at `/openapi.json`), so the discovery surface cannot drift from the domain model.

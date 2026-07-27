@@ -111,6 +111,27 @@ Sellers set a flat per-call price *and* hard work bounds (`maxTurns`, `maxTokens
 
 The platform fee is **visible on every receipt**. It is accrued and swept rather than settled per call — two on-chain transactions would cost ~4.4% of a $0.10 call on this rail (measured: 0.00218 USDC per settlement). The sweep transaction hash is backfilled into every receipt it covers, so the take-rate stays individually auditable while being batched — the same trick Gateway itself uses.
 
+## Agents hiring agents
+
+An API never buys another API, so supply and demand in an API marketplace are separate populations that both have to be recruited. An agent hires other agents — which makes every seller a buyer the moment its work needs something it cannot produce, and each hop settles on its own.
+
+A skill declares the capability and its ceiling:
+
+```jsonc
+"bounds":  { "maxCostUsd": 0.12, "maxSubSpendUsd": 0.02, "timeoutSec": 90 },
+"engine":  { "capabilities": ["web-search", "hire-skills"] }
+```
+
+and its agent gets a `hire_skill` tool. `counterparty-brief` uses it: given a wallet address the counterparty claims to control, it buys `usdc-flow-check` for a cent rather than taking the claim on faith. One buyer action, two sellers, two settlements — **$0.25 in, ~$0.01 subcontracted**, and both bounds published so a buyer can see how much of the price is being passed on.
+
+Three things make this safe enough to hand a skill a wallet:
+
+- The sub-purchase wallet is **separate from the payout key**, and the runner refuses to start if they match — the payout key also proves listing ownership, so a skill holding it could redirect the seller's own payments.
+- **An absent `maxSubSpendUsd` means zero**, never unlimited. A seller who declares the capability and forgets the bound gets a skill that cannot spend.
+- The hired result comes back **fenced**, supplied by the runner rather than the seller, because B's output is untrusted input to A — the same problem the buyer has one level up, and easier to forget because A chose B.
+
+The honest limit is in [`threat-model.md`](docs/threat-model.md) T-SPEND-002: the budget binds code that goes through `hire`, and what actually caps the loss is how much you put in that wallet.
+
 ## Discovery
 
 `GET /openapi.json` is generated from the live listing set, so it cannot describe a skill nobody is serving. Each listing gets its own concrete operation — not a `/x/{seller}/{skill}` template, which would require the client to already know which sellers exist:
@@ -149,12 +170,12 @@ Both payment rails are complete, conformance-tested `Layer`s of one `Rail` servi
 
 | shipped | next |
 |---|---|
-| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · MCP server + skill file · 328 tests | Gateway round-trip on Arc · web UI · container sandbox · agent-hires-agent chain + ratings |
+| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · MCP server + skill file · agents hiring agents · 344 tests | Gateway round-trip on Arc · web UI · container sandbox · ratings |
 
 ## Verify
 
 ```bash
-bun test                                                  # 328 tests
+bun test                                                  # 344 tests
 bun test packages/core/test/secrecy.property.test.ts      # the thesis
 bun test packages/payments/test/rail.conformance.test.ts  # all three rails agree
 bunx tsc --noEmit

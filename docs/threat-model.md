@@ -122,6 +122,15 @@ What it does not eliminate — and what this document is mostly about — is tha
 | **Residual** | **Low**, with a stated window: the check is a chain read at verify time, so two requests racing inside one block can both pass. Only one settles, so the loss is bounded at one duplicate job rather than N. |
 | **History** | Asserted in three documents and implemented in none — the ABI entry sat unused, and only the in-memory fake enforced it, so the conformance suite's "all three rails agree" was false. Found by the compliance fan-out. |
 
+### T-SPEND-002 — A hiring skill spending the seller's wallet
+
+| | |
+|---|---|
+| **ATLAS** | AML.T0034 — Cost Harvesting |
+| **Vector** | `hire-skills` puts a funded wallet **inside the sandbox**, where the agent reads the buyer's input and web pages. A prompt injection that lands can ask the skill to buy — repeatedly, or from a listing the attacker controls, turning a $0.25 call into an outbound transfer to themselves. |
+| **Mitigations** | Granted only when the manifest declares the capability, so it is visible in `arcade publish` and in the published listing. `bounds.maxSubSpendUsd` caps one job's total hiring and is enforced in `hire` before anything is signed; an absent bound means **zero**, never unlimited. A `maxAmountUsd` on a call may only narrow the remaining budget. Only settled purchases are charged, so a failed sub-call does not consume budget. The daemon **refuses to start** if `ARCADE_SUBBUY_KEY` equals the payout key — that key also signs the handshake proving listing ownership, and a skill holding it could redirect the seller's own payments. |
+| **Residual** | **Medium, and bounded by funding rather than by code.** The budget binds code that goes through `hire`; a seller's own skill could bypass it and use the key directly, and the sandbox protects sellers from the platform, not from themselves. What actually caps the loss is that the sub-purchase wallet is separate and holds only what the seller is willing to have their skills spend. Fund it accordingly — this is the one place where an operational choice, not a control in this repo, is the real boundary. |
+
 ### T-IMPACT-001 — Cost exhaustion of the seller
 
 | | |

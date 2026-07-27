@@ -48,6 +48,29 @@ It is never written to `~/.arcade/config.json`. That file holds only the **addre
 
 Config lives at `~/.arcade/config.json`, deliberately outside any repo.
 
+## Letting your skill hire other skills
+
+A skill can buy from another seller mid-run. Declare it and give it a ceiling:
+
+```jsonc
+"bounds":  { "maxCostUsd": 0.12, "maxSubSpendUsd": 0.02, "timeoutSec": 90 },
+"engine":  { "capabilities": ["web-search", "hire-skills"] }
+```
+
+Your agent then gets a `hire_skill` tool. It returns the other seller's result **fenced** — that output is a stranger's text arriving in your agent's context, which is the same problem your buyers have with your output, and easier to miss because you chose the seller.
+
+Then point the runner at a wallet for it:
+
+```bash
+export ARCADE_SUBBUY_KEY=0x<a DIFFERENT key from your payout one>
+```
+
+**It must not be your payout key.** That key signs the handshake proving your listings are yours, and any skill declaring `hire-skills` receives whatever you put here — a skill holding your payout key could re-announce your listings with payment redirected. The runner refuses to start if the two match.
+
+Fund it with what you are willing to have your skills spend, and treat that number as the real limit. `maxSubSpendUsd` is enforced for code going through `hire`, but the sandbox is your machine running your code: it protects you from the platform, not from your own skill. An absent `maxSubSpendUsd` means **zero**, not unlimited, so forgetting it fails closed.
+
+Your margin stays visible: the receipt's cost is inference **plus** anything the call subcontracted, so you can read what a call actually earned.
+
 ## Checking your setup
 
 ```bash
