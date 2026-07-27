@@ -119,13 +119,22 @@ and therefore nobody will.
 `~/.arcade/config.json` still holds development values:
 
 ```json
-{ "hubUrl": "http://localhost:8792", "hubWsUrl": "ws://localhost:8792/ws" }
+{ "hubUrl": "http://localhost:8792" }
 ```
 
-**Both must change** to the public origin (`https://` and `wss://`). If they do not, the
-runner stays happily connected to a local hub and the public URL serves an **empty
-catalogue** — and it looks healthy from both ends, because the runner *is* connected, just
-not to the host anyone is reading.
+**One field, on purpose.** `hubWsUrl` used to be stored alongside it and derived only when
+absent, with nothing reconciling the two — so this step was two edits wearing the shape of
+one. Change `hubUrl` to the public origin, leave `hubWsUrl` on localhost, and the runner
+reads listings from production while announcing over the local socket. Every surface then
+reports health: `checkHub` pings production and says up, the daemon logs "connected to
+ws://localhost…" and genuinely is, and the public catalogue stays empty for a reason
+visible from neither end. It is the empty-catalogue trap with a second way in, opened by
+the step that fixes the first one.
+
+`hubWsUrl` is now **derived from `hubUrl` and never written to disk** (`wsUrlFor`:
+`https` → `wss`, `http` → `ws`). Two values that must agree cannot disagree when only one
+is written down. A leftover `hubWsUrl` in an older config is ignored, and if it disagreed
+the runner says so on startup rather than quietly announcing somewhere else.
 
 ```bash
 bun run arcade init --seller 0x3b2Bbb840A9570223aDbF2172a33BB77fE8D21AF --hub https://<public-host>
