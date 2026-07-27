@@ -306,10 +306,31 @@ const main = Effect.gen(function* () {
      * This writes the keychain and NOTHING else. It does not touch the config, mint an
      * address, or change the hub.
      */
-    const key = args[2] ?? flag("--key")
+    /*
+     * READ FROM STDIN BY DEFAULT. A private key passed as an argument is unsafe by
+     * construction: it lands in shell history, in `ps` output, and in anything that echoes
+     * argv — `bun run` prints the resolved command line, so even piping the value in from
+     * the keychain to avoid a `cat` still printed it to the terminal. That happened here,
+     * with a real key, which is why this now exists.
+     *
+     * The positional form is kept because scripts use it, and it warns loudly.
+     */
+    const positional = args[2] ?? flag("--key")
+    let key = positional
+    if (positional !== undefined) {
+      console.error(
+        "WARNING: passing a key as an argument exposes it in shell history, in `ps`, and in\n" +
+          "any wrapper that echoes the command line (`bun run` does). Prefer:\n" +
+          "  security find-generic-password -s <item> -w | bun run arcade wallet import --stdin\n"
+      )
+    } else if (args.includes("--stdin")) {
+      key = (yield* Effect.promise(() => Bun.stdin.text())).trim()
+      if (key === "") key = undefined
+    }
     if (key === undefined) {
       console.error(
-        `usage: arcade wallet import 0x<private-key>\n\n` +
+        `usage: arcade wallet import --stdin        (preferred — reads the key from stdin)\n` +
+          `       arcade wallet import 0x<key>       (exposes it in history and process args)\n\n` +
           `Stores the payout key for this runner's existing address in your OS keychain, so\n` +
           `it survives shell restarts. Changes nothing else.`
       )
