@@ -73,6 +73,18 @@ What it does not eliminate — and what this document is mostly about — is tha
 | **Known adjacent edge** | `arcade_quote` returns numbers only and is therefore safe **by omission, not by construction** — the 402 challenge genuinely carries `listing.description` (`apps/hub/src/server.ts:693`, `:709`). Surfacing "what am I paying for" is an obvious improvement that would reintroduce this while touching nothing that looks security-relevant. Commented at the callsite; if it ships, it ships with `fenceListing`. |
 | **Residual** | **Low–medium.** The fence is a mitigation, not a proof: a sufficiently persuasive fenced instruction can still influence a model. On the web the backstop is that a purchase needs the visitor's own signature. On the MCP server there is no such backstop today, only the ceilings — which is the strongest argument for the approval policy landing with the purchase edge. |
 
+### T-EXEC-005a — approval and signature are two objects, because the SDK has no third option
+
+**Status: constraint established from the installed types. Determines the wiring.**
+
+| | |
+|---|---|
+| **The question** | A purchase has TWO human-gated steps — approve, then sign. If the approval response could carry the signature they would be one object: consent and authorization arriving together, with no interval in which one exists without the other. That is the single-copy shape, and it is what T-EXEC-005 reaches for at the layer above. |
+| **The answer, from the types not the docs** | It is **not available**. `ToolApprovalResponse` in the installed `@ai-sdk/provider-utils` is exactly `{ type, approvalId, approved, reason?, providerExecuted? }`, and `ChatAddToolApproveResponseFunction` takes `{ id, approved, reason, options }`. There is no payload field. So the signature cannot ride along with the approval, and the two are necessarily separate objects with a window between them. |
+| **Consequence** | The binding must be **reconstructed explicitly at settle time**, and this is the one place in the product where "two facts that must agree" cannot be collapsed by deleting a copy. The reconstruction: the approval HMAC binds `{tool name, call id, input arguments}`; `deriveSigningRequest` produces the requirements from those same arguments and carries the `toolCallId`; and the settle endpoint must **re-derive from the approved arguments and compare**, never accept client-supplied requirements. A signature is then only settleable against requirements the server itself produced for a live approval. |
+| **Required tests, both directions** | (1) An approval that exists with **no matching signature** must not settle. (2) A signature that does **not correspond to a live approval** must not settle. Deny-first, as with the rest — a suite walking only the happy path passes identically whether the reconstruction is wired or missing. |
+| **Why it is written down before the wiring** | Because the wiring would otherwise silently assume the single-copy shape was available. Checked against the installed types rather than the prose — the fifth API shape today where the two differed. |
+
 ### T-EXEC-005 — Two bindings that do not compose, on the purchase edge
 
 **Status: design decision recorded before implementation. Not yet built.**
