@@ -231,6 +231,45 @@ address is 6 decimals. Reading the wrong one is the most common bug on this chai
 
 ---
 
+## The commands in this file are unverified claims
+
+Every command printed here is an instruction whose success signal is that a reader
+succeeds — which makes it exactly the kind of artifact that can be silently wrong, in the
+same family as a gitignore that drops source or a pathspec that can never match. One has
+already been wrong: `arcade` is **not on PATH**. The invocation is `bun run arcade …` from
+the repo root, through the package script.
+
+Worth a gate eventually — asserting that every command a doc prints at least *resolves* to
+a real binary or package script belongs with the hygiene tests. Not built, deliberately
+recorded rather than rediscovered by a judge.
+
+---
+
+## The seller identity and its key
+
+`arcade status` reporting `key MISSING` is not a new requirement — the runner has always
+needed a signing key. It simply had one implicitly, from a shell that happened to export
+`ARCADE_SELLER_KEY`, and the repoint is what surfaced that the implicit path was the only
+one.
+
+**Where it actually is.** The keychain holds `arcade-buyer-key`
+(`0xdaACA688…`) and `arcade-deployer-key` (`0xcf821769ED3c0E55e152745377bb833d7155A78a`)
+but no `arcade-seller-key`. The settled receipt on the production hub names
+**`0xcf821769…`** as its seller — the deployer key's address — so that is the identity that
+served the paid call, and its key is already stored.
+
+The config currently names `0x3b2Bbb84…`, which no keychain item controls. `resolveSellerKey`
+refuses a key whose address does not match the configured one rather than using it, so this
+mismatch fails loudly instead of announcing the wrong seller — but it means listings stay at
+zero until the two agree. Either point `sellerAddress` at `0xcf821769…` and run
+`bun run arcade wallet import 0x<deployer-key>`, or supply the key for `0x3b2Bbb84…`.
+
+Reusing `0xcf821769…` has one advantage for a recording: the receipt tape and the live
+listings would then name the same seller, instead of showing a settled call from one address
+beside listings served by another.
+
+---
+
 ## Host requirements
 
 The runner dials **out** over a websocket and the hub holds that connection open, so the host
