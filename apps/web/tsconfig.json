@@ -1,6 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  // `server.ts` is the production entry and was previously excluded, because it imports the
+  // Vite build output which does not exist on a clean checkout — leaving the one file that
+  // actually runs in production as the one file nothing typechecked. `types/` declares that
+  // module so it can be included without a build.
+  "include": ["src/**/*.ts", "src/**/*.tsx", "types/**/*.d.ts", "server.ts", "vite.config.ts"],
   "compilerOptions": {
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],

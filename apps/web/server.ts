@@ -14,6 +14,22 @@
 import { existsSync, statSync } from "node:fs"
 import { join, normalize } from "node:path"
 import handler from "./dist/server/server.js"
+import { partition, preflightWeb } from "./src/preflight.ts"
+
+// Before anything binds. A chat pointed at a hub that isn't there passes every health
+// check there is and fails only at the thing it exists to do, in prose.
+const { problems, hub } = preflightWeb(process.env)
+const { fatal, warnings } = partition(problems)
+for (const w of warnings) console.warn(`[web] WARNING: ${w}`)
+if (fatal.length > 0) {
+  console.error(
+    `[web] refusing to start: this is a public deployment.\n\n` +
+      fatal.map((p) => `  - ${p}`).join("\n\n") +
+      `\n\nSet them. (Detected via a hosting platform's own env.)`
+  )
+  process.exit(2)
+}
+console.log(`[web] hub: ${hub}`)
 
 const PORT = Number(process.env["PORT"] ?? 3000)
 const CLIENT = join(import.meta.dir, "dist", "client")

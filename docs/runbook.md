@@ -231,6 +231,30 @@ The chat surface deploys separately from the hub. It needs `ARCADE_HUB` (the pub
 origin — it holds no key and can only read) and `ANTHROPIC_API_KEY` (without it `/api/chat`
 returns a 503 saying so; discovery still works through the hub's own API).
 
+**Let Railway tell it the hub's address rather than typing one.** Both services live in the
+same project, so the platform already knows the answer:
+
+```
+ARCADE_HUB=https://${{ arcade-hub.RAILWAY_PUBLIC_DOMAIN }}
+```
+
+Same principle as arming the hub's preflight off `RAILWAY_*` and deriving the treasury
+disclosure from the contract: read the fact, don't restate it. A typed URL is a second place
+for the truth to live, and it goes stale silently when the service is renamed.
+
+`apps/web` refuses to boot if `ARCADE_HUB` is unset **or points at loopback** while a
+hosting platform is detected. That check exists because the failure it prevents is
+invisible: `ARCADE_HUB` defaults to `http://localhost:8787`, nothing listens on 8787 inside
+a container, and the resulting fetch failure lands in a tool result → the model's context →
+the model's prose. SSR returns 200, the page renders, the chat streams, the model answers —
+and the only broken thing is the entire point of the app, phrased as "I wasn't able to
+reach the marketplace just now", which a judge cannot tell from a transient. A missing
+`ANTHROPIC_API_KEY` only warns, because that is honest degradation of one feature rather
+than a deployment pointed at nothing.
+
+On boot it logs the hub it resolved (`[web] hub: …`), so a local run never leaves you
+guessing which hub you were actually watching.
+
 **It is not a Node service.** TanStack Start's Vite build emits `dist/server/server.js` whose
 default export is `{ fetch(request): Response }` — the Web-standard handler shape, which is
 also what `Bun.serve` takes. `apps/web/server.ts` is the twenty lines that serve `dist/client`
