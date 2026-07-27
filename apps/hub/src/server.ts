@@ -41,6 +41,7 @@ import {
   renderReceiptRows
 } from "./ui.ts"
 import { buildAgentSkill, buildOpenApi, buildWellKnownX402 } from "./openapi.ts"
+import { splitterRefusal } from "./splitter.ts"
 
 /**
  * ARCADE hub.
@@ -412,6 +413,40 @@ const main = Effect.gen(function* () {
                   `[hub] could not read feeBps() from ${msg.feeSplitter} — accepting ${msg.runnerId}, ` +
                     "but its receipts are unverified against the contract."
                 )
+              }
+
+              /*
+               * The splitter must pay the seller that announced it.
+               *
+               * `FeeSplitter.seller` is immutable, and `ARCADE_FEE_SPLITTER` is a runner
+               * ENVIRONMENT variable read at `daemon.ts:135` — not part of the config. So
+               * the two move independently: change `sellerAddress` and the announced
+               * splitter does not follow. Without this comparison the handshake passes on
+               * `feeBps` alone, the listings publish under the new seller, and every buyer
+               * payment routes into a contract that pays the OLD one.
+               *
+               * That is not hypothetical here. The pilot splitter's `seller()` is
+               * 0x3b2Bbb84…, an address whose key nobody holds — so repointing the runner
+               * to a signable seller while leaving `ARCADE_FEE_SPLITTER` set would have
+               * published listings naming one address while paying an unspendable other,
+               * and every purchase in a recording would have landed somewhere unrecoverable.
+               *
+               * Two facts that must agree, one immutable on chain and one an environment
+               * variable. The usual answer in this codebase is to delete the second copy;
+               * here the on-chain copy is beyond anyone's reach to change, so the only
+               * remaining move is to refuse the combination. `seller()` is already read for
+               * the treasury disclosure, so this costs a comparison and no extra RPC.
+               */
+              const refusal = splitterRefusal(
+                msg.seller,
+                splitterInfo?.seller,
+                msg.feeSplitter
+              )
+              if (refusal !== undefined) {
+                console.error(`[hub] rejected ${msg.runnerId}: ${refusal}`)
+                ws.send(JSON.stringify({ _tag: "Ack", ok: false, detail: refusal }))
+                ws.close()
+                return
               }
             }
 
