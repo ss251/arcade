@@ -1,3 +1,5 @@
+import { DEFAULT_MODEL, parseModel, SUPPORTED_PROVIDERS } from "./lib/model.ts"
+
 /**
  * Refuse to serve the chat against a hub that isn't there.
  *
@@ -65,14 +67,26 @@ export const preflightWeb = (env: Record<string, string | undefined>): Preflight
     )
   }
 
-  if (env["ANTHROPIC_API_KEY"] === undefined || env["ANTHROPIC_API_KEY"] === "") {
+  // Which key matters depends on which model was chosen, so both are read from the single
+  // ARCADE_MODEL spec rather than hardcoded — a provider set one way and a key checked the
+  // other way would warn about the wrong variable, which is worse than not warning.
+  const spec = env["ARCADE_MODEL"] ?? DEFAULT_MODEL
+  const choice = parseModel(spec)
+  if (choice === null) {
+    problems.push(
+      `ARCADE_MODEL is "${spec}", which is not "provider:model-id" with a supported ` +
+        `provider (${SUPPORTED_PROVIDERS.join(", ")}). One variable carries both halves on ` +
+        `purpose — a provider and a model set separately can be an incompatible pair that ` +
+        `boots fine and fails on the first message.`
+    )
+  } else if (env[choice.keyVar] === undefined || env[choice.keyVar] === "") {
     // NOT a refusal. Without it `/api/chat` already returns a 503 that names the variable
     // and says discovery still works through the hub's API — honest degradation of one
     // feature rather than a broken deployment, which is a different thing from pointing at
     // a hub that does not exist.
     problems.push(
-      "__warn__ANTHROPIC_API_KEY is not set: the catalogue and receipts still work, but the " +
-        "chat will answer every message with a 503."
+      `__warn__${choice.keyVar} is not set, so the chat (${spec}) will answer every message ` +
+        "with a 503. The catalogue and receipts still work."
     )
   }
 

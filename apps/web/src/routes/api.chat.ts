@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { anthropic } from "@ai-sdk/anthropic"
+import { DEFAULT_MODEL, parseModel, resolveModel } from "~/lib/model.ts"
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
@@ -55,19 +55,29 @@ How to behave:
 Be brief. Quote figures exactly as given; never round a price or invent a statistic.`
 
 const handler = async ({ request }: { request: Request }): Promise<Response> => {
-  const key = process.env["ANTHROPIC_API_KEY"]
+  const spec = process.env["ARCADE_MODEL"] ?? DEFAULT_MODEL
+  const choice = parseModel(spec)
+  const hub = process.env["ARCADE_HUB"] ?? "http://localhost:8787"
+
+  // A bad ARCADE_MODEL is refused here as well as at boot, because the boot check only
+  // runs on a detected platform and this route is reachable on a laptop too.
+  if (choice === null) {
+    return Response.json(
+      { error: "bad_model", detail: `ARCADE_MODEL="${spec}" is not "provider:model-id".`, hub },
+      { status: 503 }
+    )
+  }
+
+  const key = process.env[choice.keyVar]
   if (key === undefined || key === "") {
-    // Same posture as the hub's preflight: say which variable and what it costs, rather
-    // than degrading into a chat that silently cannot think.
-    // Written for whoever actually reads it. Naming an environment variable helps the
+    // Written for whoever actually reads it. Naming the environment variable helps the
     // operator; it is useless to a visitor, who needs somewhere to go instead. So the hub's
     // real URL is in the body — that is the one piece of information that rescues the visit.
-    const hub = process.env["ARCADE_HUB"] ?? "http://localhost:8787"
     return Response.json(
       {
         error: "not_configured",
         detail:
-          "The chat is not live on this deployment (ANTHROPIC_API_KEY is unset on the web " +
+          `The chat is not live on this deployment (${choice.keyVar} is unset on the web ` +
           `service). The marketplace itself is: listings, prices and settled receipts are at ${hub}, ` +
           "and every receipt links to its transaction on Arc.",
         hub
@@ -79,7 +89,7 @@ const handler = async ({ request }: { request: Request }): Promise<Response> => 
   const { messages } = (await request.json()) as { messages: ReadonlyArray<UIMessage> }
 
   const result = streamText({
-    model: anthropic("claude-opus-5"),
+    model: resolveModel(choice),
     system: SYSTEM,
     messages: await convertToModelMessages([...messages]),
     tools: READ_ONLY_TOOLS,

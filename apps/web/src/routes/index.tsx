@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { Chat } from "~/components/chat.tsx"
 import { DEFAULT_HUB } from "~/preflight.ts"
+import { DEFAULT_MODEL, parseModel } from "~/lib/model.ts"
 
 /**
  * What this deployment can actually do, read on the server.
@@ -18,7 +19,10 @@ import { DEFAULT_HUB } from "~/preflight.ts"
  * every message with an error just reads as broken.
  */
 const siteFacts = createServerFn({ method: "GET" }).handler(() => ({
-  chatLive: (process.env["ANTHROPIC_API_KEY"] ?? "") !== "",
+  chatLive: (() => {
+    const c = parseModel(process.env["ARCADE_MODEL"] ?? DEFAULT_MODEL)
+    return c !== null && (process.env[c.keyVar] ?? "") !== ""
+  })(),
   hubUrl: process.env["ARCADE_HUB"] ?? DEFAULT_HUB
 }))
 
