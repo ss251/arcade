@@ -2,7 +2,13 @@ import { defineConfig } from "vitest/config"
 
 export default defineConfig({
   test: {
-    include: ["packages/*/test/**/*.test.ts", "apps/*/test/**/*.test.ts"],
+    // `.tsx` is included for `apps/web`'s component tests. Without it a component test
+    // file is not "failing" — it is not collected at all, which looks identical to green.
+    include: [
+      "packages/*/test/**/*.test.ts",
+      "apps/*/test/**/*.test.ts",
+      "apps/*/test/**/*.test.tsx"
+    ],
     // Live-chain tests are opt-in: `bun test --project=live` style runs, or ARCADE_LIVE=1.
     //
     // `*.bun.test.ts` covers code that can only run under Bun — currently the hub's sqlite
@@ -14,6 +20,11 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/*.live.test.ts", "**/*.bun.test.ts"],
     testTimeout: 30_000
   },
+  // The root project is not a React project — only `apps/web` is — so JSX has no automatic
+  // runtime unless it is asked for here. Set at the esbuild layer rather than by adding
+  // `jsx` to the root tsconfig, which would make `.tsx` compile in packages that must
+  // never contain any.
+  esbuild: { jsx: "automatic" },
   resolve: {
     // These are prefix matches, so subpath entries MUST come before their bare package —
     // otherwise `@arcade/buyer/hire` rewrites to `<…>/src/index.ts/hire`. Bun resolves

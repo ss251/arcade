@@ -56,6 +56,59 @@ const TextPart = ({ text }: { text: string }) => {
   return quoted ? <Quoted>{body}</Quoted> : <p className="prose">{body}</p>
 }
 
+// ── the thread ──────────────────────────────────────────────────────────────
+
+/**
+ * Rendering is a pure function of the transcript, deliberately separated from `useChat`.
+ *
+ * Transport and presentation are different failure modes and only one of them can be
+ * checked cheaply: given `UIMessage[]` this renders to static markup with no DOM, no
+ * hooks and no network, so `@shadcn/helpers`' scripted conversations can drive the real
+ * render path in a plain node test. What that does NOT cover is streaming, scroll
+ * anchoring and re-entry, which need a live DOM — worth stating, because "we tested the
+ * chat" is a sentence that would later be read as covering both.
+ */
+export const Thread = ({ messages }: { messages: ReadonlyArray<UIMessageLike> }) => (
+  <>
+    {messages.length === 0 ? <Empty /> : null}
+    {messages.map((m) => (
+      <MessageScroller.Item key={m.id} messageId={m.id}>
+        <article className={`msg msg-${m.role}`}>
+          <span className="who">{m.role === "user" ? "you" : "arcade"}</span>
+          <div className="body">
+            {m.parts.map((part, i) => {
+              if (part.type === "text") {
+                return <TextPart key={i} text={part.text ?? ""} />
+              }
+              if (part.type.startsWith("tool-")) {
+                return (
+                  <ToolMarker
+                    key={i}
+                    name={part.type.slice("tool-".length)}
+                    state={part.state ?? ""}
+                  />
+                )
+              }
+              return null
+            })}
+          </div>
+        </article>
+      </MessageScroller.Item>
+    ))}
+  </>
+)
+
+/** The subset of `UIMessage` this renders. Structural, so scripted fixtures satisfy it. */
+export interface UIMessageLike {
+  readonly id: string
+  readonly role: string
+  readonly parts: ReadonlyArray<{
+    readonly type: string
+    readonly text?: string | undefined
+    readonly state?: string | undefined
+  }>
+}
+
 // ── the chat ────────────────────────────────────────────────────────────────
 
 export const Chat = () => {
@@ -78,32 +131,7 @@ export const Chat = () => {
         <MessageScroller.Root className="scroller">
           <MessageScroller.Viewport className="viewport" aria-label="Conversation">
             <MessageScroller.Content className="thread">
-              {messages.length === 0 ? <Empty /> : null}
-              {messages.map((m) => (
-                <MessageScroller.Item key={m.id} messageId={m.id}>
-                  <article className={`msg msg-${m.role}`}>
-                    <span className="who">{m.role === "user" ? "you" : "arcade"}</span>
-                    <div className="body">
-                      {m.parts.map((part, i) => {
-                        if (part.type === "text") {
-                          return <TextPart key={i} text={part.text} />
-                        }
-                        if (part.type.startsWith("tool-")) {
-                          const p = part as { type: string; state?: string }
-                          return (
-                            <ToolMarker
-                              key={i}
-                              name={p.type.slice("tool-".length)}
-                              state={p.state ?? ""}
-                            />
-                          )
-                        }
-                        return null
-                      })}
-                    </div>
-                  </article>
-                </MessageScroller.Item>
-              ))}
+              <Thread messages={messages as ReadonlyArray<UIMessageLike>} />
             </MessageScroller.Content>
           </MessageScroller.Viewport>
           <MessageScroller.Button className="to-latest" direction="end">
