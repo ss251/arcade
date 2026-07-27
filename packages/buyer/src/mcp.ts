@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { Effect, JSONSchema, Schema } from "effect"
 import { TreeFormatter } from "effect/ParseResult"
 import { createPublicClient, http } from "viem"
