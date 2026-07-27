@@ -26,6 +26,8 @@ import { RailTag } from "./rail.ts"
 export interface TestRailState {
   /** payer -> balance in atomic units */
   readonly balances: Map<string, bigint>
+  /** What a payer not named in `balances` starts with. Zero in tests, funded for demos. */
+  readonly defaultBalance: bigint
   /** used nonces */
   readonly nonces: Set<string>
   /** settlements performed, newest last */
@@ -88,7 +90,7 @@ export const makeTestRail = (
         return yield* new NonceAlreadyUsed({ nonce: p.nonce, payer: p.from })
       }
 
-      const balance = state.balances.get(p.from.toLowerCase()) ?? 0n
+      const balance = state.balances.get(p.from.toLowerCase()) ?? state.defaultBalance
       if (balance < value) {
         return yield* new InsufficientFunds({
           payer: p.from,
@@ -120,9 +122,13 @@ export const makeTestRail = (
 
       yield* Ref.update(stateRef, (s) => {
         const balances = new Map(s.balances)
-        balances.set(payer, (balances.get(payer) ?? 0n) - verified.amountAtomic)
+        // Both sides fall back to `defaultBalance`, the same as `verify` does. Deducting
+        // from `0n` instead sent an unlisted payer NEGATIVE on their first settlement, so
+        // the second call failed `InsufficientFunds` — verify saw the default, settle did
+        // not, and the two disagreed about what an unknown account holds.
+        balances.set(payer, (balances.get(payer) ?? s.defaultBalance) - verified.amountAtomic)
         const seller = verified.payTo.toLowerCase()
-        balances.set(seller, (balances.get(seller) ?? 0n) + verified.amountAtomic)
+        balances.set(seller, (balances.get(seller) ?? s.defaultBalance) + verified.amountAtomic)
         const nonces = new Set(s.nonces)
         nonces.add(nonce)
         return {
@@ -140,19 +146,34 @@ export const makeTestRail = (
 }
 
 export const makeTestState = (
-  balances: Record<string, bigint> = {}
+  balances: Record<string, bigint> = {},
+  defaultBalance = 0n
 ): TestRailState => ({
   balances: new Map(Object.entries(balances).map(([k, v]) => [k.toLowerCase(), v])),
+  defaultBalance,
   nonces: new Set(),
   settlements: [],
   failSettlement: false
 })
 
-export const RailTest = (initial?: Record<string, bigint>): Layer.Layer<RailTag> =>
+/**
+ * `defaultBalance` is what an unlisted payer starts with, and it exists because this layer
+ * could not do the job it was written for.
+ *
+ * The docstring above says the point is to exercise the hub's entire settle pipeline
+ * without a chain — but with every balance defaulting to zero, a real buyer running
+ * `arcade-buy` against `ARCADE_RAIL=test` always failed at `InsufficientFunds` and never
+ * reached settlement. The failure paths were reachable; the success path was not. Tests
+ * that name their payers are unaffected and still start at zero.
+ */
+export const RailTest = (
+  initial?: Record<string, bigint>,
+  defaultBalance = 0n
+): Layer.Layer<RailTag> =>
   Layer.effect(
     RailTag,
     Effect.gen(function* () {
-      const ref = yield* Ref.make(makeTestState(initial))
+      const ref = yield* Ref.make(makeTestState(initial, defaultBalance))
       return makeTestRail(ref)
     })
   )

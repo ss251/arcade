@@ -61,7 +61,17 @@ export class RpcRateLimited extends Data.TaggedError("RpcRateLimited")<{
 export class RpcFailure extends Data.TaggedError("RpcFailure")<{
   readonly method: string
   readonly reason: string
-}> {}
+}> {
+  /**
+   * `Data.TaggedError` defaults `message` to "An error has occurred", so a failure that
+   * knows exactly what went wrong printed nothing useful — a buyer whose call failed saw
+   * `RpcFailure: An error has occurred` and could not tell payment from dispatch from
+   * polling. The fields exist; they just have to be said.
+   */
+  override get message(): string {
+    return `${this.method}: ${this.reason}`
+  }
+}
 
 // ── Execution (packages/runner, apps/hub broker) ─────────────────────────────
 

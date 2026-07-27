@@ -124,6 +124,24 @@ describe("openapi document", () => {
     expect(Object.keys(op.responses)).not.toContain("200")
   })
 
+  it("documents the 202 body with the field names the hub actually sends", () => {
+    // Second instance of the same drift as `maxAmountRequired`: this block was written
+    // from memory as {jobId, jobToken, statusUrl, resultUrl} — wrong case, wrong names,
+    // and a `statusUrl` the hub does not return. The wire is snake_case, so a client
+    // generated from the old document read every field from a key that is never present.
+    const accepted = (buildOpenApi(params([record()]))["components"] as any).schemas.JobAccepted
+
+    expect(Object.keys(accepted.properties).sort()).toEqual([
+      "job_id",
+      "job_token",
+      "poll_url",
+      "price",
+      "status"
+    ])
+    expect(accepted.properties).not.toHaveProperty("jobId")
+    expect(accepted.properties).not.toHaveProperty("statusUrl")
+  })
+
   it("carries price in both human and atomic form, and they agree", () => {
     // A client that computes an authorization needs atomic units; a human reading the doc
     // needs dollars. Deriving one from the other here means they cannot disagree.

@@ -60,6 +60,34 @@ describe("broker", () => {
     await expect(pending).resolves.toMatchObject({ status: "succeeded" })
   })
 
+  it("reports which runner a JOB was assigned to, not which serves a skill", async () => {
+    // The bug this exists for shipped and broke every paid call. The ownership check on
+    // `JobResult` called `runnerFor(jobId)` — the SKILL routing lookup — which found
+    // nothing, so the hub logged "assigned to nobody" and dropped every result. Jobs
+    // always timed out and nothing ever settled.
+    //
+    // Both functions are `string => string | undefined`, so the compiler could not see it
+    // and no test asked the question. This one asks it directly: the two lookups must not
+    // be interchangeable.
+    const broker = makeBroker(Effect.runSync(Ref.make(emptyState())))
+    await Effect.runPromise(broker.register(fakeConn("r1"), ["demo"]))
+
+    void Effect.runPromise(
+      broker.dispatch({ jobId: "j1", skillId: "demo", skillVersion: "1", input: {}, timeoutSec: 5 })
+    )
+    await sleep(20)
+
+    expect(await Effect.runPromise(broker.runnerForJob("j1"))).toBe("r1")
+    // A job id is not a skill id, and a skill id is not a job id.
+    expect(await Effect.runPromise(broker.runnerFor("j1"))).toBeUndefined()
+    expect(await Effect.runPromise(broker.runnerForJob("demo"))).toBeUndefined()
+
+    await Effect.runPromise(broker.complete("j1", outcome))
+    // …and the assignment is released once the job is done, so a late duplicate result
+    // from the same runner cannot complete it twice.
+    expect(await Effect.runPromise(broker.runnerForJob("j1"))).toBeUndefined()
+  })
+
   it("fails every in-flight job when its runner disconnects — never leaves one hanging", async () => {
     const broker = makeBroker(Effect.runSync(Ref.make(emptyState())))
     await Effect.runPromise(broker.register(fakeConn("r1"), ["demo"]))

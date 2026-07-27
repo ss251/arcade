@@ -46,3 +46,13 @@ Thumbs.db
 lib/
 contracts/out/
 cache/
+
+# Sandbox litter. `HOME` is redirected to the skill's own directory so a job cannot read
+# the seller's home by relative path (packages/runner/src/exec.ts), which means anything a
+# job runs writes its dotfiles and caches THERE. Regenerable, and it must never be
+# committed alongside a skill.
+skills/*/Library/
+skills/*/.cache/
+skills/*/.bun/
+skills/*/.npm/
+skills/*/.config/

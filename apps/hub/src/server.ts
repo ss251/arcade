@@ -30,7 +30,13 @@ import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
 import { StoreLive, StoreTag } from "./store.ts"
 import { runJob } from "./pipeline.ts"
-import { renderIndex } from "./ui.ts"
+import {
+  renderIndex,
+  renderListingPage,
+  renderListingRows,
+  renderMeta,
+  renderReceiptRows
+} from "./ui.ts"
 import { buildAgentSkill, buildOpenApi, buildWellKnownX402 } from "./openapi.ts"
 
 /**
@@ -52,7 +58,9 @@ const railLayer = () => {
     case "gateway":
       return GatewayLive({})
     case "test":
-      return RailTest({})
+      // Seed unlisted payers so a real `arcade-buy` can reach settlement on this rail —
+      // it is what makes the marketplace page demonstrable without a funded chain.
+      return RailTest({}, parsePrice(process.env["ARCADE_TEST_BALANCE"] ?? "$1000"))
     default: {
       const pk = process.env["ARCADE_FACILITATOR_KEY"]
       if (pk === undefined) {
@@ -241,7 +249,7 @@ const main = Effect.gen(function* () {
             // Only the runner the job was assigned to may complete it. Without this any
             // connected socket could forge an outcome for someone else's job — settling a
             // fabricated success, or failing a competitor's work.
-            const owner = await run(broker.runnerFor(msg.jobId))
+            const owner = await run(broker.runnerForJob(msg.jobId))
             if (owner === undefined || owner !== ws.data.runnerId) {
               console.error(
                 `[hub] dropped JobResult for ${msg.jobId} from ${ws.data.runnerId ?? "anonymous"} (assigned to ${owner ?? "nobody"})`
@@ -288,12 +296,62 @@ const main = Effect.gen(function* () {
 
       if (path === "/healthz") return json({ ok: true, rail: rail.name, network: ARC_CAIP2 })
 
-      if (path === "/" ) {
-        const listings = await run(store.allListings)
+      // ---- the marketplace page ----------------------------------------------
+      // Statistics are computed per listing rather than stored, so the page cannot show a
+      // number the receipts do not support.
+      const pageData = async () => {
+        const records = await run(store.allListings)
         const receipts = await run(store.allReceipts)
-        return new Response(renderIndex(listings, receipts, rail.name), {
+        const listings = await Promise.all(
+          records.map(async ({ listing, seller }) => {
+            const stats = await run(store.statsFor(listing.id))
+            const ratings = await run(store.ratingsFor(listing.id))
+            return {
+              listing,
+              seller,
+              stats,
+              ratingCount: ratings.length,
+              ratingAverage:
+                ratings.length === 0
+                  ? null
+                  : ratings.reduce((a, r) => a + r.stars, 0) / ratings.length
+            }
+          })
+        )
+        return { listings, receipts, rail: rail.name, network: ARC_CAIP2, feeBps: FEE_BPS }
+      }
+
+      if (path === "/") {
+        return new Response(renderIndex(await pageData()), {
           headers: { "content-type": "text/html; charset=utf-8" }
         })
+      }
+
+      // Feeds the 4s poll. Returning rendered fragments rather than raw rows keeps the
+      // markup in one place — the client swaps innerHTML and never re-implements a row.
+      if (path === "/_feed") {
+        const d = await pageData()
+        return json({
+          listings: renderListingRows(d.listings),
+          receipts: renderReceiptRows(d.receipts),
+          meta: renderMeta(d),
+          total: d.receipts.length
+        })
+      }
+
+      const skillPage = /^\/skill\/([a-z0-9-]+)$/.exec(path)
+      if (skillPage !== null) {
+        const d = await pageData()
+        const view = d.listings.find((l) => l.listing.id === skillPage[1])
+        if (view === undefined) return new Response("no such listing", { status: 404 })
+        return new Response(
+          renderListingPage(
+            view,
+            d.receipts.filter((r) => r.skillId === view.listing.id),
+            { rail: d.rail, network: d.network, feeBps: d.feeBps }
+          ),
+          { headers: { "content-type": "text/html; charset=utf-8" } }
+        )
       }
 
       // ---- discovery ---------------------------------------------------------

@@ -89,18 +89,25 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
       }
     },
 
+    // Field names are snake_case and match the wire exactly. The first version of this
+    // block was written from memory as `{jobId, jobToken, statusUrl, resultUrl}` — wrong
+    // case, wrong names, and inventing a `statusUrl` the hub does not return. Same failure
+    // as the hand-written `maxAmountRequired`: a generated client would have read every
+    // field from a key that is never present.
     JobAccepted: {
       type: "object",
       description:
         "The job was accepted and is running. Real skills take seconds to minutes, so the " +
-        "call is asynchronous: poll `statusUrl`, then fetch `resultUrl` once it reports " +
-        "`succeeded`. `jobToken` authenticates both — it is issued once and not recoverable.",
-      required: ["jobId", "jobToken", "statusUrl", "resultUrl"],
+        "call is asynchronous: GET `poll_url` until it stops returning 202. `job_token` is " +
+        "the capability to read this job's result — it is issued once, held only by " +
+        "whoever paid, and is already embedded in `poll_url`.",
+      required: ["job_id", "status", "poll_url", "job_token", "price"],
       properties: {
-        jobId: { type: "string" },
-        jobToken: { type: "string" },
-        statusUrl: { type: "string", format: "uri" },
-        resultUrl: { type: "string", format: "uri" }
+        job_id: { type: "string" },
+        status: { type: "string", const: "queued" },
+        poll_url: { type: "string", format: "uri" },
+        job_token: { type: "string" },
+        price: { type: "string", examples: ["$0.25"] }
       }
     },
 
@@ -203,9 +210,19 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
         {
           name: "x-job-token",
           in: "header",
-          required: true,
+          required: false,
           schema: { type: "string" },
-          description: "Issued with the 202. Compared in constant time."
+          description:
+            "The `job_token` from the 202, compared in constant time. May instead be passed " +
+            "as a `?token=` query parameter, which is what `poll_url` already does — supply " +
+            "one of the two."
+        },
+        {
+          name: "token",
+          in: "query",
+          required: false,
+          schema: { type: "string" },
+          description: "Alternative to the `x-job-token` header."
         }
       ],
       responses: {
@@ -228,7 +245,14 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
       tags: ["jobs"],
       parameters: [
         { name: "jobId", in: "path", required: true, schema: { type: "string" } },
-        { name: "x-job-token", in: "header", required: true, schema: { type: "string" } }
+        { name: "x-job-token", in: "header", required: false, schema: { type: "string" } },
+        {
+          name: "token",
+          in: "query",
+          required: false,
+          schema: { type: "string" },
+          description: "Alternative to the header. `poll_url` from the 202 already carries it."
+        }
       ],
       responses: {
         "200": {

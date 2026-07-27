@@ -43,7 +43,10 @@ export interface Broker {
     readonly timeoutSec: number
   }) => Effect.Effect<JobOutcome, NoRunnerAvailable | RunnerDisconnected>
   readonly complete: (jobId: string, outcome: JobOutcome) => Effect.Effect<void>
+  /** Routing: which connected runner can serve this SKILL. */
   readonly runnerFor: (skillId: string) => Effect.Effect<string | undefined>
+  /** Ownership: which runner this JOB was dispatched to. Used to authorise its result. */
+  readonly runnerForJob: (jobId: string) => Effect.Effect<string | undefined>
 }
 
 export class BrokerTag extends Context.Tag("@arcade/hub/Broker")<BrokerTag, Broker>() {}
@@ -102,6 +105,17 @@ export const makeBroker = (ref: Ref.Ref<BrokerState>): Broker => {
       return undefined
     })
 
+  /**
+   * Which runner a JOB was dispatched to — not which runner serves a skill.
+   *
+   * These are different questions with identical signatures (`string => string | undefined`),
+   * which is how the ownership check on `JobResult` came to call `runnerFor` with a job id.
+   * It looked a skill id up in the routing table, found nothing, and dropped every result
+   * as "assigned to nobody" — so no job could complete and no call could settle.
+   */
+  const runnerForJob: Broker["runnerForJob"] = (jobId) =>
+    Effect.map(Ref.get(ref), (s) => s.assigned.get(jobId))
+
   const dispatch: Broker["dispatch"] = (args) =>
     Effect.gen(function* () {
       const rid = yield* runnerFor(args.skillId)
@@ -151,7 +165,7 @@ export const makeBroker = (ref: Ref.Ref<BrokerState>): Broker => {
       })
     })
 
-  return { register, unregister, dispatch, complete, runnerFor }
+  return { register, unregister, dispatch, complete, runnerFor, runnerForJob }
 }
 
 export const BrokerLive = Layer.effect(

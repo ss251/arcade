@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { Effect } from "effect"
+import { Cause, Effect, Exit } from "effect"
 import { privateKeyToAccount } from "viem/accounts"
 import { explorerTxUrl, parsePrice } from "@arcade/core"
 import { callSkill } from "./index.ts"
@@ -78,7 +78,12 @@ const main = Effect.gen(function* () {
   }
 })
 
-Effect.runPromise(main).catch((e) => {
-  console.error(String((e as Error)?.message ?? e))
+// `Effect.runPromise` rejects with a FiberFailure whose `.message` is the literal string
+// "An error has occurred" — which is what a buyer saw when a call failed, with no
+// indication of whether the payment, the job or the poll was at fault. Running to an Exit
+// and printing the Cause gives the tagged error and its fields instead.
+const exit = await Effect.runPromiseExit(main)
+if (Exit.isFailure(exit)) {
+  console.error(Cause.pretty(exit.cause))
   process.exit(1)
-})
+}
