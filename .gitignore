@@ -43,9 +43,17 @@ Thumbs.db
 # Local caches
 .cache/
 .turbo/
-lib/
+# ANCHORED with a leading slash, and it must stay that way. A bare `lib/` matches a
+# directory of that name at ANY depth, so it silently swallowed `apps/web/src/lib/` — the
+# entire tool layer of the chat surface — while `git status` stayed clean and the tests
+# passed locally because the files were right there. `src/lib/` is a standard source
+# layout, and `cache/` can name a source module just as easily; both of these are real
+# directories at the repo ROOT and that is the only place they should be ignored.
+# Unanchored patterns are fine for `dist/`, `build/`, `out/` and `coverage/` above, whose
+# names mean build output wherever they appear.
+/lib/
 contracts/out/
-cache/
+/cache/
 
 # Sandbox litter. `HOME` is redirected to the skill's own directory so a job cannot read
 # the seller's home by relative path (packages/runner/src/exec.ts), which means anything a
