@@ -1,4 +1,5 @@
-import { Effect } from "effect"
+import { Effect, JSONSchema, Schema } from "effect"
+import { TreeFormatter } from "effect/ParseResult"
 import { createPublicClient, http } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import {
@@ -164,6 +165,95 @@ const balanceAtomic = async (address: string): Promise<bigint> => {
   })
 }
 
+// ── tool arguments ──────────────────────────────────────────────────────────
+
+/**
+ * Arguments are Effect Schemas, and both the advertised JSON Schema and the runtime check
+ * are derived from them.
+ *
+ * They were hand-written JSON Schema literals with no validation at all, which is the same
+ * shape of mistake that produced the `maxAmountRequired` drift in the hub's OpenAPI: two
+ * descriptions of one contract, free to disagree. It also meant a malformed argument was
+ * coerced rather than rejected — `{skillId: 123}` became the string "123" and failed later,
+ * somewhere else, with a message about a missing listing.
+ *
+ * One definition now produces the schema an agent reads and the check its call is held to,
+ * so they cannot drift, and a bad argument is refused immediately with the field named.
+ */
+
+const NoArgs = Schema.Struct({})
+
+// `title` is set explicitly on every refined field: without it Effect names the field after
+// its last filter, so an agent reads `"title": "minLength(1)"` where it expected a name.
+const SkillIdArgs = Schema.Struct({
+  skillId: Schema.String.pipe(
+    Schema.minLength(1),
+    Schema.annotations({
+      title: "skillId",
+      description: "Skill id, e.g. counterparty-brief. From arcade_list_skills."
+    })
+  )
+})
+
+const CallArgs = Schema.Struct({
+  skillId: Schema.String.pipe(
+    Schema.minLength(1),
+    Schema.annotations({ title: "skillId", description: "Skill id, from arcade_list_skills." })
+  ),
+  input: Schema.Record({ key: Schema.String, value: Schema.Unknown }).pipe(
+    Schema.annotations({
+      description: "Must satisfy the skill's inputSchema — see arcade_describe_skill."
+    })
+  ),
+  maxAmountUsd: Schema.optional(
+    Schema.Number.pipe(
+      Schema.positive(),
+      Schema.annotations({
+        title: "maxAmountUsd",
+        description:
+          "Refuse to sign anything above this, in USD. Can only NARROW the server's " +
+          "per-call ceiling, never raise it. Lower it when unsure what a call will cost."
+      })
+    )
+  )
+})
+
+/**
+ * MCP requires a bare object schema at the top level. Two adjustments are needed:
+ *
+ * `$schema` and `$id` belong to a standalone document, not an embedded one.
+ *
+ * And an EMPTY struct is not rendered as an object at all — Effect emits
+ * `{anyOf: [{type:"object"},{type:"array"}]}` for `Schema.Struct({})`, which is a correct
+ * description of "an empty structure" and an invalid MCP `inputSchema`. The three no-arg
+ * tools would have advertised a schema no client could read. Normalised explicitly rather
+ * than by hand-writing those three, so they still share the one definition that the
+ * runtime check uses.
+ */
+const toolInput = (schema: Schema.Schema<any, any, never>): Tool["inputSchema"] => {
+  const { $schema: _s, $id: _i, ...rest } = JSONSchema.make(schema) as unknown as Record<string, unknown>
+  if (rest["type"] !== "object") {
+    return { type: "object", properties: {}, additionalProperties: false }
+  }
+  return rest as Tool["inputSchema"]
+}
+
+/**
+ * Decode or refuse. Throwing here is correct: `handleTool` turns every throw into an error
+ * *result*, so the agent reads which field was wrong and retries, rather than watching the
+ * call fail somewhere downstream for an unrelated-looking reason.
+ */
+const decodeArgs = <A>(schema: Schema.Schema<A, any, never>, raw: unknown, tool: string): A => {
+  const decoded = Schema.decodeUnknownEither(schema)(raw ?? {}, { errors: "all" })
+  if (decoded._tag === "Left") {
+    throw new Error(
+      `${tool}: invalid arguments.\n${TreeFormatter.formatErrorSync(decoded.left)}\n\n` +
+        `Expected: ${JSON.stringify(toolInput(schema))}`
+    )
+  }
+  return decoded.right
+}
+
 // ── tools ───────────────────────────────────────────────────────────────────
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, openWorldHint: true } as const
@@ -175,7 +265,7 @@ export const TOOLS: ReadonlyArray<Tool> = [
     description:
       "Every skill currently for sale, with its price and what it does. Start here. Prices " +
       "are per call in USDC; nothing is charged for listing or describing.",
-    inputSchema: { type: "object", properties: {}, required: [] },
+    inputSchema: toolInput(NoArgs),
     annotations: { title: "List paid skills", ...READ_ONLY, idempotentHint: true }
   },
   {
@@ -186,11 +276,7 @@ export const TOOLS: ReadonlyArray<Tool> = [
       "work bounds, and measured statistics (success rate, latency, availability) computed " +
       "from settled receipts rather than claimed by the seller. Read this before calling, " +
       "so the input matches the schema on the first attempt.",
-    inputSchema: {
-      type: "object",
-      properties: { skillId: { type: "string", description: "Skill id, e.g. counterparty-brief" } },
-      required: ["skillId"]
-    },
+    inputSchema: toolInput(SkillIdArgs),
     annotations: { title: "Describe a skill", ...READ_ONLY, idempotentHint: true }
   },
   {
@@ -200,11 +286,7 @@ export const TOOLS: ReadonlyArray<Tool> = [
       "What one call would cost, taken from the endpoint's own payment challenge rather " +
       "than the catalogue. Free, signs nothing, charges nothing. Also reports the " +
       "remaining session budget, so you can check affordability before committing.",
-    inputSchema: {
-      type: "object",
-      properties: { skillId: { type: "string" } },
-      required: ["skillId"]
-    },
+    inputSchema: toolInput(SkillIdArgs),
     annotations: { title: "Quote a skill", ...READ_ONLY, idempotentHint: true }
   },
   {
@@ -216,23 +298,7 @@ export const TOOLS: ReadonlyArray<Tool> = [
       "against the skill's declared schema — a refusal, timeout or malformed result is " +
       "never settled and leaves your balance untouched. Skills take seconds to minutes; " +
       "this waits for completion. Call arcade_quote first if the price matters.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        skillId: { type: "string", description: "Skill id, from arcade_list_skills" },
-        input: {
-          type: "object",
-          description: "Must satisfy the skill's inputSchema — see arcade_describe_skill"
-        },
-        maxAmountUsd: {
-          type: "number",
-          description:
-            "Refuse to sign anything above this, in USD. Defaults to the server's per-call " +
-            "ceiling. Lower it when you are unsure what a call will cost."
-        }
-      },
-      required: ["skillId", "input"]
-    },
+    inputSchema: toolInput(CallArgs),
     annotations: {
       title: "Buy and run a skill",
       readOnlyHint: false,
@@ -250,7 +316,7 @@ export const TOOLS: ReadonlyArray<Tool> = [
       "The public settlement feed: what settled, for how much, the platform fee, and the " +
       "on-chain transaction. Evidence that payment happens and what the take-rate is — not " +
       "a record of who bought what.",
-    inputSchema: { type: "object", properties: {}, required: [] },
+    inputSchema: toolInput(NoArgs),
     annotations: { title: "Recent settlements", ...READ_ONLY, idempotentHint: false }
   },
   {
@@ -259,7 +325,7 @@ export const TOOLS: ReadonlyArray<Tool> = [
     description:
       "Your wallet address, on-chain USDC balance, and how much of this session's spending " +
       "budget remains. Check this before a series of calls.",
-    inputSchema: { type: "object", properties: {}, required: [] },
+    inputSchema: toolInput(NoArgs),
     annotations: { title: "Wallet and budget", ...READ_ONLY, idempotentHint: false }
   }
 ]
@@ -297,8 +363,6 @@ export const handleTool = async (name: string, rawArgs: unknown): Promise<CallTo
 }
 
 const dispatch = async (name: string, rawArgs: unknown): Promise<CallToolResult> => {
-  const args = (rawArgs ?? {}) as Record<string, unknown>
-
   switch (name) {
     case "arcade_list_skills": {
       const all = await listings()
@@ -319,7 +383,7 @@ const dispatch = async (name: string, rawArgs: unknown): Promise<CallToolResult>
     }
 
     case "arcade_describe_skill": {
-      const skillId = String(args["skillId"] ?? "")
+      const { skillId } = decodeArgs(SkillIdArgs, rawArgs, name)
       // Resolves against the live set first, so an unknown id produces "no listing X,
       // available: …" rather than a bare 404 the agent has to guess at.
       await findListing(skillId)
@@ -337,7 +401,7 @@ const dispatch = async (name: string, rawArgs: unknown): Promise<CallToolResult>
     }
 
     case "arcade_quote": {
-      const skillId = String(args["skillId"] ?? "")
+      const { skillId } = decodeArgs(SkillIdArgs, rawArgs, name)
       const listing = await findListing(skillId)
       const atomic = await quoteAtomic(listing)
       const affordable = atomic <= remainingAtomic() && atomic <= MAX_CALL_ATOMIC
@@ -359,25 +423,31 @@ const dispatch = async (name: string, rawArgs: unknown): Promise<CallToolResult>
     }
 
     case "arcade_call_skill": {
-      const skillId = String(args["skillId"] ?? "")
-      const input = args["input"] ?? {}
+      const { skillId, input, maxAmountUsd } = decodeArgs(CallArgs, rawArgs, name)
       const listing = await findListing(skillId)
       const price = await quoteAtomic(listing)
 
-      const requested =
-        typeof args["maxAmountUsd"] === "number"
-          ? parsePrice(String(args["maxAmountUsd"]))
-          : MAX_CALL_ATOMIC
+      // The agent's cap never *raises* the server's: an argument in a prompt must not be
+      // able to widen a limit set in the environment by whoever configured this process.
+      const requested = maxAmountUsd === undefined ? MAX_CALL_ATOMIC : parsePrice(String(maxAmountUsd))
       const cap = requested < MAX_CALL_ATOMIC ? requested : MAX_CALL_ATOMIC
 
       // Both refusals happen before anything is signed. An agent that hits one has spent
       // nothing and is told the exact numbers, rather than discovering the limit by
       // watching a call fail.
       if (price > cap) {
+        // Name the limit that actually bound, and only suggest a remedy that works. When
+        // the server ceiling is binding, telling an agent to raise `maxAmountUsd` sends it
+        // into a retry loop that cannot succeed, because that argument can only narrow.
+        const serverBound = cap === MAX_CALL_ATOMIC
         return fail(
           `Refused: ${skillId} costs ${formatUsdc(price)} but the cap for this call is ` +
-            `${formatUsdc(cap)}. Nothing was signed. Raise maxAmountUsd, or ARCADE_MAX_CALL_USD ` +
-            `for the server-wide ceiling.`
+            `${formatUsdc(cap)}. Nothing was signed.\n` +
+            (serverBound
+              ? `That is this server's per-call ceiling (ARCADE_MAX_CALL_USD). A maxAmountUsd ` +
+                `argument cannot raise it — the environment has to change.`
+              : `That is the maxAmountUsd you passed. Raise it to at most ` +
+                `${formatUsdc(MAX_CALL_ATOMIC)} (this server's ceiling) to proceed.`)
         )
       }
       if (price > remainingAtomic()) {

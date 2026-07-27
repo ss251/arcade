@@ -91,11 +91,29 @@ describe("tool surface", () => {
   })
 
   it("gives every tool a valid JSON Schema input, since we pass raw schema not zod", async () => {
+    // Guards a real trap: Effect renders `Schema.Struct({})` as
+    // `{anyOf:[{type:"object"},{type:"array"}]}`, so the three no-arg tools advertised a
+    // schema with no `type` at all until `toolInput` normalised it.
     const { TOOLS } = await load()
     for (const t of TOOLS) {
       expect(t.inputSchema.type).toBe("object")
       expect(t.inputSchema).toHaveProperty("properties")
+      expect(t.inputSchema).not.toHaveProperty("$schema")
+      expect(t.inputSchema).not.toHaveProperty("anyOf")
     }
+  })
+
+  it("advertises the arguments it actually enforces", async () => {
+    // One definition produces both, so the advertised schema and the runtime check cannot
+    // drift — the failure mode that produced `maxAmountRequired` in the hub's OpenAPI.
+    const { TOOLS } = await load()
+    const call = TOOLS.find((t) => t.name === "arcade_call_skill")!
+    expect(Object.keys(call.inputSchema.properties ?? {})).toEqual([
+      "skillId",
+      "input",
+      "maxAmountUsd"
+    ])
+    expect(call.inputSchema.required).toEqual(["skillId", "input"])
   })
 
   it("marks exactly one tool as non-read-only — the one that spends money", async () => {
@@ -154,6 +172,51 @@ describe("discovery", () => {
   })
 })
 
+describe("argument validation", () => {
+  it("refuses a wrong-typed argument instead of coercing it", async () => {
+    // Previously `String(args["skillId"])` turned 123 into "123", which then failed later
+    // as "no listing 123" — a message about the wrong problem, in the wrong place.
+    const { handleTool } = await load()
+    const r = await handleTool("arcade_quote", { skillId: 123 })
+
+    expect(r.isError).toBe(true)
+    const text = (r.content as Array<{ text: string }>)[0]!.text
+    expect(text).toContain("invalid arguments")
+    expect(text).toContain("skillId")
+  })
+
+  it("refuses a missing required argument", async () => {
+    const { handleTool } = await load()
+    const r = await handleTool("arcade_call_skill", { skillId: "diff-triage" })
+    expect(r.isError).toBe(true)
+    expect((r.content as Array<{ text: string }>)[0]!.text).toContain("input")
+  })
+
+  it("refuses an empty skill id rather than querying for it", async () => {
+    const { handleTool } = await load()
+    const r = await handleTool("arcade_describe_skill", { skillId: "" })
+    expect(r.isError).toBe(true)
+    expect((r.content as Array<{ text: string }>)[0]!.text).toContain("invalid arguments")
+  })
+
+  it("refuses a non-positive spend cap", async () => {
+    const { handleTool } = await load()
+    const r = await handleTool("arcade_call_skill", {
+      skillId: "diff-triage",
+      input: {},
+      maxAmountUsd: -5
+    })
+    expect(r.isError).toBe(true)
+    expect((r.content as Array<{ text: string }>)[0]!.text).toContain("maxAmountUsd")
+  })
+
+  it("shows the expected shape on a bad call, so the agent can retry correctly", async () => {
+    const { handleTool } = await load()
+    const r = await handleTool("arcade_quote", {})
+    expect((r.content as Array<{ text: string }>)[0]!.text).toContain("Expected:")
+  })
+})
+
 describe("spend control", () => {
   it("refuses a call above the per-call ceiling without signing", async () => {
     const { handleTool, spentSoFarAtomic } = await load()
@@ -166,6 +229,26 @@ describe("spend control", () => {
     expect(spentSoFarAtomic()).toBe(0n)
   })
 
+  it("does not let an argument raise the server's ceiling", async () => {
+    // The important direction. `maxAmountUsd` may only narrow the environment-configured
+    // limit — otherwise a value chosen in a prompt could widen a limit set by whoever
+    // configured the process, and a prompt is attacker-reachable.
+    const { handleTool, spentSoFarAtomic } = await load()
+    const r = await handleTool("arcade_call_skill", {
+      skillId: "expensive-thing", // $0.90, above the $0.50 ceiling
+      input: {},
+      maxAmountUsd: 2.0 // would permit it, if it were honoured
+    })
+
+    expect(r.isError).toBe(true)
+    const text = (r.content as Array<{ text: string }>)[0]!.text
+    expect(text).toContain("0.500000")
+    // …and it must say the argument cannot raise it, rather than inviting a retry loop
+    // that can never succeed.
+    expect(text).toContain("cannot raise it")
+    expect(spentSoFarAtomic()).toBe(0n)
+  })
+
   it("honours a lower per-call cap supplied by the agent", async () => {
     const { handleTool } = await load()
     const r = await handleTool("arcade_call_skill", {
@@ -174,7 +257,11 @@ describe("spend control", () => {
       maxAmountUsd: 0.05
     })
     expect(r.isError).toBe(true)
-    expect((r.content as Array<{ text: string }>)[0]!.text).toContain("Nothing was signed")
+    const text = (r.content as Array<{ text: string }>)[0]!.text
+    expect(text).toContain("Nothing was signed")
+    // Here raising it IS the fix, so the message must say so and name the headroom.
+    expect(text).toContain("That is the maxAmountUsd you passed")
+    expect(text).toContain("0.500000")
   })
 
   it("refuses once the cumulative session budget is exhausted", async () => {
