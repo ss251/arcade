@@ -7,6 +7,8 @@ import {
   ARC_RPC_URL,
   USDC_ADDRESS,
   explorerTxUrl,
+  fenceListing,
+  fenceListings,
   fenceResult,
   formatUsdc,
   parsePrice
@@ -26,6 +28,21 @@ import { callSkill } from "./index.ts"
  * bought it (`docs/threat-model.md` T-EXEC-003). So `arcade_call_skill` puts the *fenced*
  * form in `content`, which is what the model reads, and the raw object only in
  * `structuredContent`, which is what code parses. Never the other way round.
+ *
+ * **The catalogue is the same attack, earlier and cheaper** (T-EXEC-004). A listing's
+ * name, description, tags and `replaces` are free text a stranger typed, and they reach
+ * this model during discovery — before any purchase and, on this front-end, before any
+ * human sees anything at all. That last part is why it matters more here than in the web
+ * chat: there a steered purchase still meets a confirmation someone must grant, whereas
+ * this process holds a spending key and gates only on ceilings. So `arcade_list_skills`
+ * and `arcade_describe_skill` fence the seller's copy and state only hub-computed figures
+ * — price, id, seller address, measured stats — in the server's own voice.
+ *
+ * `arcade_quote` returns numbers only, and that is currently safe by OMISSION rather than
+ * by construction: the 402 challenge really does carry `listing.description`
+ * (`apps/hub/src/server.ts:693`, `:709`). Surfacing "what am I paying for" here is an
+ * obvious future improvement that would reintroduce the hole while touching nothing that
+ * looks security-relevant. If you add it, add `fenceListing` with it.
  *
  * **Spending is the other half.** The buyer's key is in this process. The comparable
  * clients in this market ship exactly one control — a per-call maximum — on a hot key
@@ -373,14 +390,21 @@ const dispatch = async (name: string, rawArgs: unknown): Promise<CallToolResult>
             "currently connected, so this usually means no runner is online."
         )
       }
-      const lines = all.map(
-        (l) =>
-          `- ${l.id} — ${l.serviceName} — ${l.price}/call\n  ${l.description}` +
-          (l.replaces === undefined ? "" : `\n  replaces: ${l.replaces}`)
+      // Prices and ids are hub-computed and safe to state plainly. The seller's own copy
+      // is fenced — see the module note and T-EXEC-004.
+      const priced = all.map((l) => `- ${l.id} — ${l.price}/call`).join("\n")
+      return ok(
+        `${all.length} skill(s) for sale on ${HUB}:\n\n${priced}\n\n` +
+          `${fenceListings(all)}\n\n${budgetLine()}`,
+        {
+          skills: all.map((l) => ({
+            id: l.id,
+            price: l.price,
+            serviceName: l.serviceName,
+            seller: l.seller
+          }))
+        }
       )
-      return ok(`${all.length} skill(s) for sale on ${HUB}:\n\n${lines.join("\n")}\n\n${budgetLine()}`, {
-        skills: all.map((l) => ({ id: l.id, price: l.price, serviceName: l.serviceName, seller: l.seller }))
-      })
     }
 
     case "arcade_describe_skill": {
@@ -390,8 +414,9 @@ const dispatch = async (name: string, rawArgs: unknown): Promise<CallToolResult>
       await findListing(skillId)
       const detail = (await hubJson(`/listings/${skillId}`)) as Listing
       return ok(
-        `${detail.serviceName} (${skillId}) — ${detail.price}/call, seller ${detail.seller}\n\n` +
-          `${detail.description}\n\n` +
+        `${skillId} — ${detail.price}/call, seller ${detail.seller}\n\n` +
+          // Name and description are the seller's, so they are quoted rather than spoken.
+          `${fenceListing(detail)}\n\n` +
           `INPUT SCHEMA\n${JSON.stringify(detail.inputSchema, null, 2)}\n\n` +
           `OUTPUT SCHEMA\n${JSON.stringify(detail.outputSchema, null, 2)}\n\n` +
           `BOUNDS (the seller's declared limits for one call)\n${JSON.stringify(detail.bounds, null, 2)}\n\n` +
