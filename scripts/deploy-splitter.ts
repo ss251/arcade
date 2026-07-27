@@ -29,11 +29,23 @@ if (!key || !seller || !treasury) {
   process.exit(2)
 }
 if (seller.toLowerCase() === treasury.toLowerCase()) {
-  console.error(
-    "SELLER and TREASURY are the same address — the split would be invisible.\n" +
-      "Use distinct addresses so the fee is observably separate from the seller's share."
+  // Warning, not a refusal — the original guard rested on a false premise about this
+  // contract. `settle` does `accruedFees += feeAmount` and transfers only `sellerAmount`,
+  // so the fee sits in the splitter until someone calls `withdrawFees()`. The split is
+  // therefore observable in contract state (`accruedFees` is public) and in
+  // `Settled(buyer, total, sellerAmount, feeAmount, nonce)` regardless of where the
+  // treasury points. What coincides is the eventual destination, not the split.
+  //
+  // That makes a single-party splitter a legitimate pilot configuration — an operator who
+  // is also the only seller — and refusing it would have blocked a deliberate choice on a
+  // reason that is not true.
+  console.warn(
+    "NOTE: SELLER and TREASURY are the same address.\n" +
+      "  The 95/5 split still happens on chain and is readable from `accruedFees` and the\n" +
+      "  Settled event — but the fee ultimately returns to the seller, so it is a take-rate\n" +
+      "  enforced against yourself rather than platform revenue. Both fields are IMMUTABLE.\n" +
+      "  Set ARCADE_TREASURY_IS_SELLER=1 on the hub so the page says so.\n"
   )
-  process.exit(2)
 }
 
 // Pace through the local proxy by default: Arc's public RPC rate-limits bursts, and a
