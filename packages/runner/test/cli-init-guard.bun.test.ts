@@ -123,3 +123,69 @@ describe("arcade --help never acts", () => {
     expect(configOf(home)["sellerAddress"]).toBe(EXISTING.sellerAddress)
   })
 })
+
+/**
+ * `arcade wallet import` — the door that tightening `init` revealed had always been the
+ * only one.
+ *
+ * Both `keychainStore` callsites lived inside `init`, so writing a key to the keychain was
+ * only ever a SIDE EFFECT of creating an identity. Once `init` refused to replace a live
+ * config, an existing runner could not get its key into the keychain at all. Nobody deleted
+ * that capability, because nobody had written it — it was implied by the bundling, which is
+ * a different failure shape from a missing check or an unreachable branch.
+ *
+ * **Not covered, and it cannot be here:** the successful store. An isolated HOME does not
+ * isolate the macOS Keychain, so exercising the write would put a key in the developer's
+ * real keychain and stall on an authorization dialog. Every path below is one that must
+ * store NOTHING, which is also where the risk is.
+ */
+describe("arcade wallet import — refuses before it stores", () => {
+  // Well-known public test key (anvil account #1). Controls 0x7099…, not 0x3b2B…
+  const OTHER_KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+
+  it("refuses a key that controls a different address", () => {
+    // The check that matters. Storing it would leave a credential that cannot sign this
+    // runner's handshake — the same identity-substitution failure `init` was just guarded
+    // against, arriving through the other door.
+    const home = withHome()
+    seed(home)
+    const { out, code } = run(home, ["wallet", "import", OTHER_KEY])
+
+    expect(code).toBe(2)
+    expect(out).toContain("Nothing has been stored")
+    expect(out).toContain(EXISTING.sellerAddress)
+    expect(out.toLowerCase()).toContain("0x70997970c51812dc3a010c7d01b50e0d17dc79c8")
+    // And it names the thing someone might actually have meant.
+    expect(out).toContain("--force")
+  })
+
+  it("prints usage when given no key, rather than doing anything", () => {
+    const home = withHome()
+    seed(home)
+    const { out, code } = run(home, ["wallet", "import"])
+    expect(code).toBe(2)
+    expect(out).toContain("usage: arcade wallet import")
+    expect(out).toContain("Changes nothing else")
+  })
+
+  it("refuses something that is not a private key", () => {
+    // Exit 1 rather than 2: `planIdentity` throws with its own message and the top-level
+    // handler reports it. Pinning the message rather than inventing a second one — a
+    // `_tag !== "Import"` branch here would be unreachable, since planIdentity either
+    // returns Import or throws.
+    const home = withHome()
+    seed(home)
+    const { out, code } = run(home, ["wallet", "import", "definitely-not-a-key"])
+    expect(code).not.toBe(0)
+    expect(out).toContain("not a private key")
+    expect(out).not.toContain("stored the payout key")
+  })
+
+  it("is listed in the usage output, so it is discoverable at all", () => {
+    // The capability existing but being unfindable would be the same gap in a new costume.
+    const home = withHome()
+    const { out } = run(home, ["--help"])
+    expect(out).toContain("arcade wallet import")
+    expect(out).toContain("arcade wallet export")
+  })
+})

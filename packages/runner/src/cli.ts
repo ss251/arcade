@@ -59,6 +59,7 @@ const usage = () => {
   arcade start [--skills DIR]                      connect to the hub and serve jobs
 
   arcade publish <skillDir>                        preview the PUBLIC projection
+  arcade wallet import 0x<key>                     store an existing payout key in the keychain
   arcade wallet export                             print the payout key, to back it up
   arcade runner seat                               set up a local development seat
   arcade doctor [--skills DIR]                     validate config + skills
@@ -284,6 +285,71 @@ const main = Effect.gen(function* () {
     console.error(`Payout key for ${cfg.sellerAddress}. Anyone holding this controls that`)
     console.error(`address. Do not paste it into a chat, a commit, or an issue.\n`)
     console.log(stored)
+    return
+  }
+
+  if (cmd === "wallet" && sub === "import") {
+    /*
+     * The mirror of `wallet export`, and it exists because tightening `init` revealed there
+     * was only ever one door.
+     *
+     * Both `keychainStore` callsites lived inside `init`, so writing a key to the keychain
+     * was only ever available as a SIDE EFFECT of creating an identity. Once `init`
+     * correctly refused to replace a live config, an existing runner could no longer get
+     * its key into the keychain at all — and nobody deleted that capability, because nobody
+     * had written it. It was implied by the bundling.
+     *
+     * That is why a seller ends up on `export ARCADE_SELLER_KEY` forever: it works, and it
+     * dies with the shell. Restart the daemon from a different terminal and the listings
+     * vanish — which on a public hub is an empty catalogue nobody can explain.
+     *
+     * This writes the keychain and NOTHING else. It does not touch the config, mint an
+     * address, or change the hub.
+     */
+    const key = args[2] ?? flag("--key")
+    if (key === undefined) {
+      console.error(
+        `usage: arcade wallet import 0x<private-key>\n\n` +
+          `Stores the payout key for this runner's existing address in your OS keychain, so\n` +
+          `it survives shell restarts. Changes nothing else.`
+      )
+      process.exit(2)
+    }
+
+    const cfg = yield* readConfig
+    if (!keychainAvailable()) {
+      console.error("no keychain on this platform — the key lives in ARCADE_SELLER_KEY")
+      process.exit(2)
+    }
+
+    // `planIdentity` THROWS on a malformed key with its own message ("not a private key —
+    // expected 32 hex bytes"), so there is no `_tag !== "Import"` branch to write here: a
+    // check for it would be unreachable, and an unreachable branch guarding a credential
+    // implies a path that does not exist. The throw surfaces through the top-level handler.
+    const plan = planIdentity({ importKey: key }) as Extract<
+      ReturnType<typeof planIdentity>,
+      { _tag: "Import" }
+    >
+
+    // THE CHECK THAT MATTERS. A key controlling a different address would store a
+    // credential that cannot sign this runner's handshake — the runner would keep
+    // announcing `cfg.sellerAddress` and fail to prove it, or worse, quietly become a
+    // different seller. Same identity-substitution failure `init` was just guarded against.
+    if (plan.address.toLowerCase() !== cfg.sellerAddress.toLowerCase()) {
+      console.error(
+        `that key controls ${plan.address}, but this runner is configured to be paid at\n` +
+          `${cfg.sellerAddress}.\n\n` +
+          `Nothing has been stored. Either import the key for the configured address, or\n` +
+          `if you meant to become ${plan.address}, that is a new identity: arcade init --force --import <key>`
+      )
+      process.exit(2)
+    }
+
+    yield* keychainStore(plan.address, plan.privateKey)
+    console.log(
+      `stored the payout key for ${cfg.sellerAddress} in your keychain.\n` +
+        `It now survives shell restarts — \`arcade start\` no longer needs ARCADE_SELLER_KEY.`
+    )
     return
   }
 
