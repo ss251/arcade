@@ -1,0 +1,113 @@
+/*
+ * ARCADE design tokens — ported verbatim from `apps/hub/src/ui.ts`, which stays the source
+ * of truth for the design language.
+ *
+ * The chat is a SECOND surface, not a second aesthetic. Two rules carry over unchanged
+ * because they are semantic rather than decorative:
+ *
+ *   Typeface is a provenance encoding. Sans is what someone CLAIMED — a seller's
+ *   description, a model's prose. Mono is what was MEASURED — prices, fees, latencies,
+ *   hashes, addresses. In a chat that mapping gets sharper, not looser: the assistant's
+ *   sentences are claims, and every figure quoted inside them is a measurement. A reader
+ *   can tell which is which by glyph alone, mid-sentence, without being told.
+ *
+ *   Every semantic colour has exactly one meaning. Blue is USDC amounts. Green is
+ *   "settled". Red is "not settled". Links are underlined ink — the moment blue also means
+ *   "clickable" it stops meaning money. An approval card may NOT invent a fourth
+ *   semantic colour; it earns attention through weight and border, not hue.
+ */
+
+:root {
+  color-scheme: light dark;
+  --paper: light-dark(#faf9f6, #161513);
+  --ink: light-dark(#211f1c, #e8e6e1);
+  --slate: light-dark(#6e6a61, #9b968b);
+  --usdc: light-dark(#2775ca, #4e94dc);
+  --stamp: light-dark(#1a8a4a, #2ca96c);
+  --refuse: light-dark(#97231a, #c24840);
+  --line: light-dark(rgba(33, 31, 28, 0.12), rgba(232, 230, 225, 0.14));
+  --tint: light-dark(rgba(39, 117, 202, 0.07), rgba(78, 148, 220, 0.12));
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 40px 24px 88px;
+}
+
+a {
+  color: inherit;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.mark {
+  font: 600 15px/1 var(--mono);
+  letter-spacing: 0.12em;
+}
+
+.meta {
+  font: 12px/1.6 var(--mono);
+  color: var(--slate);
+  text-align: right;
+}
+
+.law {
+  margin: 14px 0 0;
+  max-width: 62ch;
+  color: var(--ink);
+}
+
+.law b {
+  font-weight: 600;
+}
+
+/* Machine truth inside human prose. This is the provenance rule at word scale. */
+.measured {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.usdc {
+  color: var(--usdc);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.settled {
+  color: var(--stamp);
+}
+
+.unsettled {
+  color: var(--refuse);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

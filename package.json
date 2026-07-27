@@ -4,10 +4,12 @@
   "type": "module",
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "typecheck": "tsc --build --force",
+    "typecheck": "tsc --build --force && tsc --noEmit -p apps/web/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "hub": "bun run --cwd apps/hub start",
+    "web": "bun run --cwd apps/web dev",
+    "web:build": "bun run --cwd apps/web build",
     "arcade": "bun run packages/runner/src/cli.ts",
     "arcade-buy": "bun run packages/buyer/src/cli.ts",
     "arcade-mcp": "bun run packages/buyer/src/mcp.ts"

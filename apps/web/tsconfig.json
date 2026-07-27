@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // The hub is a Bun program and types against `bun`. This is a browser+Node bundle, and
+    // pulling Bun's globals in here would let a `Bun.*` call typecheck in code that ships to
+    // a Vite build where it does not exist.
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@arcade/core": ["../../packages/core/src/index.ts"],
+      "@arcade/core/*": ["../../packages/core/src/*"],
+      "~/*": ["./src/*"]
+    }
+  }
+}

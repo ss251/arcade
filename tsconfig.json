@@ -1,6 +1,10 @@
 {
   "extends": "./tsconfig.base.json",
   "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "apps/*/src/**/*.ts", "scripts/**/*.ts", "skills/*/*.ts"],
+  // `apps/web` has its own tsconfig and is checked separately. It is a browser+Node bundle;
+  // this project types against `bun`, and merging them would make `Bun.*` typecheck inside
+  // code that ships to a Vite build where no such global exists.
+  "exclude": ["apps/web"],
   "compilerOptions": {
     "paths": {
       "@arcade/core": ["./packages/core/src/index.ts"],
