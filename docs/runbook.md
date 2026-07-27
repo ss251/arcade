@@ -67,6 +67,18 @@ someone calls `withdrawFees()`. So the take-rate is real and checkable; what coi
 only the eventual destination. The page discloses this rather than calling it platform
 revenue.
 
+**Verified live on Arc**, not asserted — a $0.01 call settled through it
+([tx `0x9a706d57…`](https://testnet.arcscan.app/tx/0x9a706d5760f11ba0c5aa1fe30afc6f4fa87e908bafa4a78cdafe3af1415eefd2))
+and the split was then read off the chain rather than off the receipt:
+`accruedFees` = 0.0005 USDC (5%) and the seller balance rose by exactly 0.0095 (95%).
+
+**Buyers must not be well-known test accounts either.** A settlement pulling USDC *from* a
+blocklisted address fails at broadcast with `RpcFailure`, after the work is done — the job
+succeeds, nothing settles, and the buyer is correctly not charged. The blocklist applies to
+the authorization's signer, not just the transaction sender, so a demo buyer needs a real
+funded address. Test buyer for this pilot: `0xdaACA688cE93d6EA0BDf4cdA9925C5526f3cA5e1`,
+key in Keychain as `arcade-buyer-key`.
+
 **Replacing it later** is deploy-a-new-one plus a runner restart to re-announce — not a
 migration, because the address is per-seller and announced. **Withdraw any accrued balance
 from the old contract first**: `withdrawFees()` is permissionless, so anyone *can* call it
