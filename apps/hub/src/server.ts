@@ -101,6 +101,40 @@ const preflight = (): void => {
         "every settlement fails after the work is already done"
     )
   }
+
+  // Durability. `StoreFromEnv` reads an ABSENT `ARCADE_DB` as a legitimate configuration —
+  // it returns the in-memory store, which is exactly right on a laptop — so its absence
+  // does not raise an error, it produces a working hub with a quietly different guarantee:
+  // one that takes payments, writes receipts, and forgets them on the next deploy. That is
+  // the one claim a marketplace cannot afford to make falsely, so it is checked here
+  // rather than left to whoever set the variable last.
+  const dbPath = process.env["ARCADE_DB"]
+  const volumeMount = process.env["RAILWAY_VOLUME_MOUNT_PATH"]
+  if (dbPath === undefined || dbPath === "") {
+    missing.push(
+      "ARCADE_DB — unset means the in-memory store, which is correct on a laptop and " +
+        "catastrophic here: this hub would accept payments and write receipts to RAM, then " +
+        "lose every one of them on the next deploy. Point it at a file on a mounted volume" +
+        (volumeMount === undefined ? "" : `, e.g. ${volumeMount}/arcade.db`)
+    )
+  } else if (volumeMount !== undefined && !dbPath.startsWith(volumeMount)) {
+    // A path outside the volume is the same failure wearing a different hat: the file is
+    // created, writes succeed, and the container filesystem is discarded on redeploy.
+    missing.push(
+      `ARCADE_DB is ${dbPath}, which is NOT under this service's only mounted volume ` +
+        `(${volumeMount}). A container filesystem is ephemeral, so the store would be ` +
+        `written successfully and thrown away on every deploy — the same silent loss as ` +
+        `leaving it unset, but harder to spot because the file exists`
+    )
+  } else if (volumeMount === undefined) {
+    // Fly and Render mount volumes at operator-chosen paths with no comparable variable to
+    // read, so this cannot be verified there. Say so rather than implying it was checked.
+    console.warn(
+      `[hub] NOTE: ARCADE_DB=${dbPath}. No RAILWAY_VOLUME_MOUNT_PATH is set, so durability ` +
+        `could not be verified — confirm this path is on a persistent volume yourself. ` +
+        `If it is not, receipts are lost on every deploy.`
+    )
+  }
   if (RAIL === "test") {
     console.warn(
       "[hub] WARNING: ARCADE_RAIL=test on a public origin. Settlements are simulated and no " +

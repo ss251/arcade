@@ -18,7 +18,35 @@ refuses to start when `ARCADE_PUBLIC_URL` is set and the load-bearing ones are m
 | `ARCADE_PUBLIC_URL` | hub | The origin written into every 402 challenge and into `/openapi.json`. Behind a proxy it must be the URL buyers can reach, not the socket Bun bound — otherwise the challenge names an unreachable resource. **Setting it is also the signal that this is a public deployment**, which turns on the refusals below. |
 | `ARCADE_HUB_SECRET` | hub | Job tokens are `HMAC(secret, jobId)`. Unset, a fresh secret is minted **every boot**, so every buyer holding a 202 loses access to work they already paid for. Harmless while the store was in RAM (the receipt died too); with `ARCADE_DB` set, this is what strands paying buyers. Pin it. |
 | `ARCADE_FACILITATOR_KEY` | hub | The key that broadcasts settlements. Unset, the hub generates an ephemeral one with no gas and **every settlement fails after the work is already done** — the seller has burned inference and nobody gets paid. |
-| `ARCADE_DB` | hub | Path to the sqlite file, **which must be inside a mounted volume**. Container filesystems are ephemeral: point it anywhere else and sqlite writes into the container, receipts persist across a process restart *inside* it, and durability fails only on redeploys — which nobody thinks of as restarts, and which happen on every push. Provision and mount the volume **before the first deploy**, because the first thing you do after one is push a fix. DoD "a receipt survives a restart" is only true on a host with a volume; the sqlite Layer alone does not get you there. |
+| `ARCADE_DB` | hub | Path to the sqlite file, **which must be inside a mounted volume**. Container filesystems are ephemeral: point it anywhere else and sqlite writes into the container, receipts persist across a process restart *inside* it, and durability fails only on redeploys — which nobody thinks of as restarts, and which happen on every push. Provision and mount the volume **before the first deploy**, because the first thing you do after one is push a fix. DoD "a receipt survives a restart" is only true on a host with a volume; the sqlite Layer alone does not get you there. **Now enforced** — see below. |
+
+### `ARCADE_DB` is checked, and so is where it points
+
+This one was the last hole in the preflight and the worst-shaped. `StoreFromEnv`
+(`apps/hub/src/store-sqlite.ts:213`) reads an **absent** `ARCADE_DB` as a legitimate
+configuration and returns the in-memory store — correct on a laptop. So its absence raised
+no error at all: the hub booted on a public origin, passed preflight, served the page,
+accepted payments, wrote receipts to RAM, and lost them on the next push. The absence of a
+value did not produce a failure, it produced a working system with a quietly different
+guarantee — and it was the guarantee DoD item 2 rests on.
+
+The preflight now refuses on both halves:
+
+- **unset** → refuses, and names the volume path to use if the platform exposes one.
+- **set, but outside the mounted volume** → also refuses. This is the nastier case: the
+  file is created, every write succeeds, and the container filesystem is discarded on
+  redeploy. Silent loss that looks *more* correct than the unset case.
+
+Verification is real rather than declared: Railway injects **`RAILWAY_VOLUME_MOUNT_PATH`**
+(verified against the running service, which reports `/data` alongside
+`ARCADE_DB=/data/arcade.db`), and the check is that the db path sits under it. Fly and
+Render mount volumes at operator-chosen paths with no comparable variable, so there the hub
+**warns that durability could not be verified** rather than pretending it checked — a
+refusal there would be a false positive, and a silent pass would be the failure this whole
+section is about.
+
+Pinned by `apps/hub/test/preflight.test.ts`, which boots the real process with real
+environments rather than unit-testing a copy of the guard.
 | `ARCADE_FEE_SPLITTER` | **runner** | The seller's `FeeSplitter`. **On the runner, never the hub** — see below. |
 | `ARCADE_RAIL` | hub | `eip3009` (proven), `gateway`, or `test`. `test` simulates settlement and moves no USDC; the preflight warns loudly if it is set on a public origin. |
 
@@ -221,9 +249,12 @@ Two things that only show up at runtime, both found by running it:
 ## Deploy checklist
 
 1. `ARCADE_PUBLIC_URL`, `ARCADE_HUB_SECRET`, `ARCADE_FACILITATOR_KEY`, `ARCADE_DB`,
-   `ARCADE_RAIL=eip3009` set on the host. The hub refuses to boot without the middle two.
+   `ARCADE_RAIL=eip3009` set on the host. The hub refuses to boot without any of them, and
+   refuses if `ARCADE_DB` is not under the mounted volume.
 2. Facilitator key funded — it pays gas for every settlement.
-3. Persistent volume mounted for `ARCADE_DB`, or the store is lost on each deploy.
+3. Persistent volume mounted for `ARCADE_DB`, or the store is lost on each deploy. Confirm
+   with `railway variables --kv | grep -E 'ARCADE_DB|VOLUME_MOUNT'` — the db path must
+   start with the mount path, and the preflight will now refuse the deploy if it does not.
 4. Runner repointed at the public `https`/`wss` origin, with `ARCADE_FEE_SPLITTER` set.
 5. `GET /` and `GET /openapi.json` both serve.
 6. One paid call round-trips end to end, and the receipt carries a real tx hash.
