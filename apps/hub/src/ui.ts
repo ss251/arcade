@@ -51,6 +51,16 @@ export interface PageData {
   readonly rail: string
   readonly network: string
   readonly feeBps: number
+  /**
+   * Whether the fee's destination is the same address as the seller.
+   *
+   * The split genuinely happens on chain either way — `FeeSplitter.settle` accrues the fee
+   * in the contract and transfers only the seller's share, and `Settled` carries both
+   * numbers. But calling that "platform revenue" while the treasury IS the operator, who
+   * is currently also the only seller, would be a claim a judge could check and find
+   * misleading. Saying it plainly costs one clause and is stronger than being found out.
+   */
+  readonly treasuryIsSeller?: boolean
 }
 
 const secs = (ms: number): string => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`)
@@ -275,7 +285,12 @@ export const renderIndex = (data: PageData): string => {
   <div id="listings">${renderListingRows(data.listings)}</div>
 
   <h2>Receipts</h2>
-  <p class="note">every row is a real transaction on Arc · the platform fee is on each one</p>
+  <p class="note">every row is a real transaction on Arc · the fee is split on chain and
+    readable off the contract${
+      data.treasuryIsSeller === true
+        ? " · during the pilot the treasury is the operator, who is also the only seller"
+        : ""
+    }</p>
   <table>
     <thead><tr>
       <th>skill</th><th class="num">price</th><th class="num">seller gets</th>

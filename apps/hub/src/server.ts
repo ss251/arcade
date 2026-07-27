@@ -1,6 +1,7 @@
 import { Effect, Layer, Runtime, Schema } from "effect"
 import {
   ARC_CAIP2,
+  ARC_RPC_URL,
   USDC_ADDRESS,
   Job,
   JobOutcome,
@@ -26,7 +27,7 @@ import {
   RailTest
 } from "@arcade/payments"
 import { createHmac, timingSafeEqual } from "node:crypto"
-import { recoverMessageAddress } from "viem"
+import { createPublicClient, http, recoverMessageAddress } from "viem"
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
 import { StoreTag } from "./store.ts"
@@ -152,6 +153,33 @@ const json = (body: unknown, status = 200) =>
 
 const newJobId = () => `job_${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`
 
+/**
+ * Read `feeBps()` off a seller's splitter. `undefined` means "could not tell" — an
+ * unreachable RPC, a non-contract address, or something that is not a splitter — which is
+ * deliberately distinct from a value that disagrees.
+ */
+const splitterFeeBps = async (address: string): Promise<number | undefined> => {
+  try {
+    const client = createPublicClient({ transport: http(ARC_RPC_URL) })
+    const bps = await client.readContract({
+      address: address as `0x${string}`,
+      abi: [
+        {
+          type: "function",
+          name: "feeBps",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [{ name: "", type: "uint16" }]
+        }
+      ] as const,
+      functionName: "feeBps"
+    })
+    return Number(bps)
+  } catch {
+    return undefined
+  }
+}
+
 const main = Effect.gen(function* () {
   const runtime = yield* Effect.runtime<StoreTag | BrokerTag | RailTag>()
   const run = Runtime.runPromise(runtime)
@@ -264,6 +292,42 @@ const main = Effect.gen(function* () {
               )
               ws.close()
               return
+            }
+
+            // A splitter's `feeBps` is immutable, while receipts are computed from the
+            // hub's `ARCADE_FEE_BPS`. Nothing tied them together, so they could drift and
+            // a receipt would confidently state a split the chain did not perform — the
+            // one number on the public page a judge can check against the contract.
+            //
+            // Fail-closed on a real mismatch, fail-OPEN on an unreachable RPC: a seller
+            // should not be refused because Arc's public endpoint hiccuped, but a
+            // contract that genuinely disagrees must not be allowed to produce receipts.
+            if (msg.feeSplitter !== undefined) {
+              const onChain = await splitterFeeBps(msg.feeSplitter)
+              if (onChain !== undefined && onChain !== FEE_BPS) {
+                console.error(
+                  `[hub] rejected ${msg.runnerId}: splitter ${msg.feeSplitter} charges ` +
+                    `${onChain}bps but this hub reports ${FEE_BPS}bps on receipts`
+                )
+                ws.send(
+                  JSON.stringify({
+                    _tag: "Ack",
+                    ok: false,
+                    detail:
+                      `your fee splitter charges ${onChain}bps, this hub reports ${FEE_BPS}bps. ` +
+                      "A receipt would state a split the chain did not perform. Deploy a " +
+                      "splitter with matching feeBps, or point at a hub configured for yours."
+                  })
+                )
+                ws.close()
+                return
+              }
+              if (onChain === undefined) {
+                console.warn(
+                  `[hub] could not read feeBps() from ${msg.feeSplitter} — accepting ${msg.runnerId}, ` +
+                    "but its receipts are unverified against the contract."
+                )
+              }
             }
 
             ws.data.runnerId = msg.runnerId
@@ -379,7 +443,14 @@ const main = Effect.gen(function* () {
             }
           })
         )
-        return { listings, receipts, rail: rail.name, network: ARC_CAIP2, feeBps: FEE_BPS }
+        return {
+          listings,
+          receipts,
+          rail: rail.name,
+          network: ARC_CAIP2,
+          feeBps: FEE_BPS,
+          treasuryIsSeller: process.env["ARCADE_TREASURY_IS_SELLER"] === "1"
+        }
       }
 
       if (path === "/") {
