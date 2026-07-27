@@ -11,10 +11,14 @@
  *   a reader verifies characters against another source.
  *
  *   Prices, fees and latencies are SANS with `font-variant-numeric: tabular-nums`: they are
- *   read as quantities rather than compared character by character, and Geist Sans ships
- *   `tnum` so they still hold their columns. Writing `tabular-nums` on the MONO stack is a
- *   no-op — Geist Mono has no `tnum` table and is already fixed-pitch — so it belongs only
- *   where the sans is doing the work.
+ *   read as quantities rather than compared character by character.
+ *
+ *   That guarantee is the OS's now, not ours. fonttools against the real binaries: SFNS.ttf
+ *   has `tnum` and `pnum`; SFNSMono.ttf has neither. So on macOS the sans holds its columns
+ *   and `tabular-nums` on the mono stack is a no-op — but off macOS `system-ui` is whatever
+ *   that platform picked, and where the face lacks `tnum` the figures still render and just
+ *   stop holding their column. The cost of shipping no webfont is that the face is the
+ *   reader's machine's choice.
  *
  *   Every semantic colour has exactly one meaning. Blue is USDC amounts. Green is
  *   "settled". Red is "not settled". Links are underlined ink — the moment blue also means
@@ -22,42 +26,29 @@
  *   semantic colour; it earns attention through weight and border, not hue.
  */
 
-/*
- * Self-hosted from `public/fonts`, the same two files the hub vendors and serves — one
- * variable file per family covers wght 100-900. Not a CDN link: a judge's network is not
- * our network, and typography that depends on someone else's DNS renders differently for
- * the person evaluating it. `swap` so the page is readable before the fonts arrive.
- */
-@font-face {
-  font-family: "Geist Variable";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("/fonts/geist.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Geist Mono Variable";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("/fonts/geist-mono.woff2") format("woff2");
-}
-
 :root {
   color-scheme: light dark;
   --paper: light-dark(#faf9f6, #161513);
   --ink: light-dark(#211f1c, #e8e6e1);
   --slate: light-dark(#6e6a61, #9b968b);
   --usdc: light-dark(#0b53bf, #4e94dc);
+  /*
+   * Same hue, TWO jobs, and they cannot share a token.
+   *
+   * `--usdc` is a TEXT colour and stays scheme-aware: #0b53bf as type on our dark paper is
+   * 2.43:1, so re-tokening it globally would fail the price nobody asked to change.
+   * `--usdc-bar` is a FILL, read against its own track rather than against paper, so it is
+   * the same blue in both schemes.
+   */
+  --usdc-bar: #0b53bf;
+  /* The one colour legible on that bar: 6.64:1 on #0b53bf. */
+  --on-usdc: #faf9f6;
   --stamp: light-dark(#1a8a4a, #2ca96c);
   --refuse: light-dark(#97231a, #c24840);
   --line: light-dark(rgba(33, 31, 28, 0.12), rgba(232, 230, 225, 0.14));
   --tint: light-dark(rgba(39, 117, 202, 0.07), rgba(78, 148, 220, 0.12));
-  /* System fallbacks kept deliberately — a font that fails to load must degrade, not
-     vanish. The fontsource variable packages append "Variable"; "Geist" alone silently
-     falls back to system-ui and nothing tells you. */
-  --sans: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 * {
@@ -530,7 +521,9 @@ a {
   position: absolute;
   inset: 0;
   transform-origin: left center;
-  background: var(--usdc);
+  background: var(--usdc-bar);
+  /* Driven from --p, the SINGLE source of hold progress. */
+  transform: scaleX(var(--p, 0));
   transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -538,8 +531,38 @@ a {
   position: relative;
 }
 
+/*
+ * A second copy of the label, white, clipped to exactly the filled region.
+ *
+ * In dark mode `.approve` is a LIGHT button with a dark label (--ink base, --paper text).
+ * Painting the fill in #0b53bf puts that dark label at 2.61:1 across the region that is
+ * filling — which is the region that means "you are about to be charged". So the fill
+ * carries its own label in --on-usdc, clipped off the SAME --p that scales the bar: two
+ * facts that must agree, made one variable, because this repo has found that shape too many
+ * times to build another instance of it deliberately.
+ *
+ * In light mode the normal label is already --paper, so this overlay is a no-op rather than
+ * a special case.
+ */
+.approve-invert {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  clip-path: inset(0 calc((1 - var(--p, 0)) * 100%) 0 0);
+  transition: clip-path 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.approve-invert .approve-label {
+  color: var(--on-usdc);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .approve-fill {
+  /* Both, or the bar snaps while its label eases and they visibly disagree. */
+  .approve-fill,
+  .approve-invert {
     transition: none;
   }
 }

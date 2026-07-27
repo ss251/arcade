@@ -23,8 +23,15 @@ import type { ListingRecord } from "./store.ts"
  * reader is verifying characters against another source and a wrong one matters.
  *
  * Prices, fees and latencies are SANS with `font-variant-numeric: tabular-nums`. They are
- * read as quantities, not compared character by character, and Geist Sans ships `tnum` so
- * they still hold their columns. The earlier rule said mono for both, which is how 18 of 23
+ * read as quantities, not compared character by character.
+ *
+ * That guarantee is now the OS's rather than ours. Verified with fonttools against the real
+ * binaries: `SFNS.ttf` exposes both `tnum` and `pnum`, and `SFNSMono.ttf` exposes neither —
+ * so on macOS the sans holds its columns and `tabular-nums` on the mono stack is a no-op,
+ * exactly as when a webfont was carried. Off macOS, `system-ui` is Segoe UI Variable or
+ * whatever the distribution picked, and where the face has no `tnum` the figures still
+ * render, they just stop holding their column. That is the cost of dropping the webfont:
+ * the face is the judge's machine's choice, not ours. The earlier rule said mono for both, which is how 18 of 23
  * type declarations on the confirmation card ended up mono and the surface read as
  * monotonous — the distinction it was reaching for is verification, not machine-origin.
  * (design-sauce Law 3.)
@@ -163,14 +170,6 @@ export const renderReceiptRows = (receipts: ReadonlyArray<Receipt>, limit = 12):
 // ── shell ───────────────────────────────────────────────────────────────────
 
 const STYLE = `
-/* Self-hosted, one variable file per family (wght 100-900). font-display:swap so the page
-   is readable before the fonts land — a judge on a slow connection reads the system
-   fallback rather than nothing. NOTE: no backticks in this comment; it lives inside a
-   template literal and one would end the string. */
-@font-face{font-family:"Geist Variable";font-style:normal;font-weight:100 900;
-  font-display:swap;src:url("/fonts/geist.woff2") format("woff2")}
-@font-face{font-family:"Geist Mono Variable";font-style:normal;font-weight:100 900;
-  font-display:swap;src:url("/fonts/geist-mono.woff2") format("woff2")}
 :root{
   color-scheme: light dark;
   --paper: light-dark(#FAF9F6, #161513);
@@ -181,11 +180,8 @@ const STYLE = `
   --refuse:light-dark(#97231A, #C24840);
   --line:  light-dark(rgba(33,31,28,.12), rgba(232,230,225,.14));
   --tint:  light-dark(rgba(39,117,202,.07), rgba(78,148,220,.12));
-  /* System fallbacks kept deliberately: a font that fails to load must degrade, not vanish.
-     The fontsource variable packages append "Variable" to the family name — "Geist" alone
-     silently falls back to system-ui and nothing tells you. */
-  --sans: "Geist Variable",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono: "Geist Mono Variable",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans: system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 var(--sans);

@@ -114,6 +114,13 @@ export const Confirm = ({
         <button
           type="button"
           className="approve"
+          /*
+           * `--p` is the ONLY statement of hold progress. The fill scales off it and the
+           * inverted label clips off it, so the bar and the text it has to stay legible
+           * against cannot drift apart. Writing progress into two inline styles would be
+           * two facts that must agree — the shape this codebase keeps deleting.
+           */
+          style={{ "--p": progress } as React.CSSProperties}
           disabled={blocked !== undefined}
           onPointerDown={start}
           onPointerUp={stop}
@@ -121,13 +128,19 @@ export const Confirm = ({
           onPointerCancel={stop}
           aria-label={`Hold to approve paying ${price} for ${skillId}`}
         >
-          <span
-            className="approve-fill"
-            style={{ transform: `scaleX(${progress})` }}
-            aria-hidden="true"
-          />
+          <span className="approve-fill" aria-hidden="true" />
           <span className="approve-label">
             {blocked === undefined ? `hold to pay ${price}` : "unavailable"}
+          </span>
+          {/*
+            The same label again, in the colour legible on the fill, clipped to the filled
+            region. aria-hidden because a screen reader must not read the button twice — it
+            is a contrast device, not content.
+          */}
+          <span className="approve-invert" aria-hidden="true">
+            <span className="approve-label">
+              {blocked === undefined ? `hold to pay ${price}` : "unavailable"}
+            </span>
           </span>
         </button>
       </div>
