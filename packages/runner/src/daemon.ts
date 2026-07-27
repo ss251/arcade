@@ -128,11 +128,17 @@ export const startDaemon = (args: DaemonArgs) =>
             // a self-asserted address let anyone re-announce an existing skill id and
             // redirect every subsequent buyer's payment to themselves.
             const nonce = `${Date.now()}-${crypto.randomUUID()}`
+            // Per-seller, from this runner's own config. The hub must never substitute a
+            // global one: `FeeSplitter.seller` is immutable, so one seller's contract
+            // cannot pay another, and routing everyone through the first-deployed splitter
+            // would make the rest of the revenue unrecoverable.
+            const feeSplitter = process.env["ARCADE_FEE_SPLITTER"]
             const digest = helloDigest({
               runnerId: args.config.runnerId,
               seller: args.config.sellerAddress,
               nonce,
-              skillIds: listings.map((l) => l.id)
+              skillIds: listings.map((l) => l.id),
+              ...(feeSplitter === undefined ? {} : { feeSplitter })
             })
             const signature = await sellerAccount.signMessage({ message: digest })
 
@@ -146,6 +152,7 @@ export const startDaemon = (args: DaemonArgs) =>
                 maxConcurrency: args.config.maxConcurrency,
                 agentVersion: "0.1.0",
                 nonce,
+                ...(feeSplitter === undefined ? {} : { feeSplitter }),
                 signature
               })
             )

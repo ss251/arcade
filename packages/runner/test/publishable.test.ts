@@ -111,6 +111,36 @@ describe("hello digest", () => {
 
   it("is domain-separated and versioned", () => {
     // So a signature for this protocol can never be a valid signature for another one.
-    expect(helloDigest(base).startsWith("arcade-runner-hello\nv1\n")).toBe(true)
+    // v2 added `feeSplitter`; bumped rather than appended silently, because a runner and
+    // hub disagreeing about the bytes fail every handshake with only a signature error to
+    // go on.
+    expect(helloDigest(base).startsWith("arcade-runner-hello\nv2\n")).toBe(true)
+  })
+
+  it("signs the fee splitter — the address money is routed to", () => {
+    // THE reason this field is in the digest. A splitter receives the buyer's payment and
+    // splits it; an unsigned one would mean a valid signature over everything except where
+    // the funds go, so anyone able to alter the handshake could substitute their own
+    // contract and take every payment to this seller.
+    const withSplitter = helloDigest({ ...base, feeSplitter: "0xSplitterA" })
+    const withOther = helloDigest({ ...base, feeSplitter: "0xSplitterB" })
+
+    expect(withSplitter).not.toBe(helloDigest(base))
+    expect(withSplitter).not.toBe(withOther)
+  })
+
+  it("treats an absent splitter as a distinct, stable value", () => {
+    // "no splitter" has to hash to something, and to the SAME something every time, or a
+    // seller without one cannot produce a reproducible signature.
+    expect(helloDigest(base)).toBe(helloDigest({ ...base, feeSplitter: undefined }))
+    expect(helloDigest(base)).toContain("none")
+  })
+
+  it("is case-insensitive on the splitter, as it is on the seller", () => {
+    // Addresses are checksummed inconsistently in the wild; a case difference must not
+    // invalidate an otherwise correct handshake.
+    expect(helloDigest({ ...base, feeSplitter: "0xABC" })).toBe(
+      helloDigest({ ...base, feeSplitter: "0xabc" })
+    )
   })
 })

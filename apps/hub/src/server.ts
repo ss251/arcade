@@ -89,16 +89,14 @@ const preflight = (): void => {
         "USDC moves. Set ARCADE_RAIL=eip3009 (or gateway) for anything anyone will judge."
     )
   }
-  if (process.env["ARCADE_FEE_SPLITTER"] === undefined) {
-    // Not fatal — the marketplace works and every call settles. But the page prints
-    // "fee (5%)" in the receipt table's column header, and without a splitter the seller
-    // receives the full price and that fee is never collected. Publishing a take-rate
-    // that is not taken is the one claim on that page which would not survive being
-    // checked, which is the opposite of what the page is for.
+  if (process.env["ARCADE_FEE_SPLITTER"] !== undefined) {
+    // Set on the HUB it does nothing, and used to do something dangerous. Saying so beats
+    // ignoring it, because a deployer who sets it here believes fees are being collected.
     console.warn(
-      "[hub] WARNING: ARCADE_FEE_SPLITTER is not set, so the fee shown on receipts and in " +
-        "the page's column header is notional — sellers receive the full price. Deploy one " +
-        "with scripts/deploy-splitter.ts, or expect the take-rate claim to be wrong."
+      "[hub] WARNING: ARCADE_FEE_SPLITTER is set on the hub and is ignored. A splitter is " +
+        "per SELLER — its `seller` is immutable, so one hub-wide address would route every " +
+        "other seller's revenue into the first seller's contract. Set it on the RUNNER; it " +
+        "travels in the signed handshake."
     )
   }
   if (missing.length > 0) {
@@ -127,17 +125,13 @@ const railLayer = () => {
             "      Settlement will fail without gas. Set it to a funded Arc testnet key."
         )
       }
-      const splitter = process.env["ARCADE_FEE_SPLITTER"]
-      if (splitter === undefined) {
-        console.warn(
-          "[hub] ARCADE_FEE_SPLITTER not set — sellers will receive the FULL price and the\n" +
-            "      platform fee on receipts will be uncollectable. Deploy one with\n" +
-            "      scripts/deploy-splitter.ts and set this to route payments through it."
-        )
-      }
+      // No `feeSplitter` here, deliberately. It used to be a hub-wide setting substituted
+      // for every listing's payout, which is correct with one seller and loses money with
+      // two — `FeeSplitter.seller` is immutable, so a second seller's buyers would sign
+      // authorizations paying the first seller's contract. It now travels per seller in
+      // the signed handshake; see `Hello.feeSplitter`.
       return Eip3009Live({
-        facilitator: privateKeyToAccount((pk ?? generatePrivateKey()) as `0x${string}`),
-        ...(splitter === undefined ? {} : { feeSplitter: splitter })
+        facilitator: privateKeyToAccount((pk ?? generatePrivateKey()) as `0x${string}`)
       })
     }
   }
@@ -227,7 +221,9 @@ const main = Effect.gen(function* () {
               runnerId: msg.runnerId,
               seller: msg.seller,
               nonce: msg.nonce,
-              skillIds: msg.listings.map((l) => l.id)
+              skillIds: msg.listings.map((l) => l.id),
+              // Signed, so the address money routes to cannot be altered in transit.
+              ...(msg.feeSplitter === undefined ? {} : { feeSplitter: msg.feeSplitter })
             })
             let recovered: string
             try {
@@ -294,6 +290,8 @@ const main = Effect.gen(function* () {
                   yield* store.putListing({
                     listing,
                     seller: msg.seller,
+                    // Carried per listing from the signed handshake, never from a global.
+                    ...(msg.feeSplitter === undefined ? {} : { feeSplitter: msg.feeSplitter }),
                     runnerId: msg.runnerId,
                     publishedAtMs: Date.now()
                   })
@@ -563,7 +561,7 @@ const main = Effect.gen(function* () {
           req.headers.get(HEADER_PAYMENT_SIGNATURE) ?? req.headers.get(HEADER_PAYMENT_LEGACY)
 
         if (header === null) {
-          const requirements = await run(rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description }))
+          const requirements = await run(rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description, ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }) }))
           return json(
             { x402Version: 2, error: "payment required", accepts: [requirements] },
             402
@@ -579,7 +577,7 @@ const main = Effect.gen(function* () {
         if (decoded._tag === "Left") return json({ error: "malformed payment header" }, 400)
 
         const requirements = await run(
-          rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description })
+          rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description, ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }) })
         )
         const verifiedE = await run(rail.verify(decoded.right, requirements).pipe(Effect.either))
         if (verifiedE._tag === "Left") {

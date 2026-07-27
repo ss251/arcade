@@ -169,8 +169,16 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
       Effect.retry({ schedule: rpcRetry, while: (e) => e._tag === "RpcRateLimited" })
     )
 
-  const challenge = (input: ChallengeInput) =>
-    Effect.succeed(
+  const challenge = (input: ChallengeInput) => {
+    // Per-call ONLY. There is deliberately no process-wide fallback: a global would route
+    // the payments of any seller who has not deployed a splitter into whichever splitter
+    // the deployment happens to be configured with, and `FeeSplitter.seller` is immutable,
+    // so that contract can only ever pay someone else. A seller without a splitter simply
+    // collects the full price — which is their choice to make, and not one another
+    // seller's configuration can make for them.
+    const splitterFor = input.feeSplitter
+
+    return Effect.succeed(
       PaymentRequirements.make({
         scheme: "exact",
         network: ARC_CAIP2,
@@ -179,7 +187,7 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
         // When a splitter is deployed, the buyer pays IT, not the seller — that is what makes
         // the fee collectable on-chain. The buyer signs one ordinary authorization either way,
         // so this is invisible to any standards-compliant x402 client.
-        payTo: config.feeSplitter ?? input.payTo,
+        payTo: splitterFor ?? input.payTo,
         resource: input.resource,
         ...(input.description === undefined ? {} : { description: input.description }),
         mimeType: "application/json",
@@ -194,9 +202,17 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
          * buyer happened to work because it hardcodes USDC/2, which masked the bug until a
          * third-party client tried to pay.
          */
-        extra: { name: USDC_EIP712_NAME, version: USDC_EIP712_VERSION }
+        // `feeSplitter` here is what tells `settle` to call the contract rather than the
+        // token. It is part of the challenge the buyer signs against, so the routing
+        // decision is visible to them and cannot be changed afterwards by configuration.
+        extra: {
+          name: USDC_EIP712_NAME,
+          version: USDC_EIP712_VERSION,
+          ...(splitterFor === undefined ? {} : { feeSplitter: splitterFor })
+        }
       })
     )
+  }
 
   const verify = (payload: PaymentPayload, requirements: PaymentRequirements) =>
     Effect.gen(function* () {
@@ -303,8 +319,19 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
 
       // Two settlement shapes. With a splitter, we call IT and it pulls the payment in and
       // splits atomically; without one, we submit the authorization straight to the token and
-      // the seller receives the full amount (fee uncollected — see Eip3009Config.feeSplitter).
-      const useSplitter = config.feeSplitter !== undefined
+      // the seller receives the full amount (fee uncollected).
+      //
+      // Derived from what the BUYER SIGNED, not from process config. The authorization
+      // names its own recipient, so if that recipient is a splitter this must call it — and
+      // reading a global here could route a settlement at a contract the buyer never
+      // authorised, or miss one they did. `p.to` is the single source of truth for where
+      // this specific payment goes.
+      // Whether this payment routes through a splitter is a fact about the challenge the
+      // buyer signed, so it travels in the requirements rather than being re-derived from
+      // process config. Reading a global here could call a contract the buyer never
+      // authorised, or miss one they did.
+      const target = p.to
+      const useSplitter = verified.requirements.extra?.["feeSplitter"] === target
       const data = useSplitter
         ? encodeFunctionData({
             abi: FEE_SPLITTER_ABI,
@@ -338,7 +365,7 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
 
       const hash = yield* call("sendTransaction", () =>
         wallet.sendTransaction({
-          to: (useSplitter ? config.feeSplitter! : USDC_ADDRESS) as Hex,
+          to: (useSplitter ? target : USDC_ADDRESS) as Hex,
           data
         })
       )

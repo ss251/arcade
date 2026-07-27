@@ -15,6 +15,17 @@ export interface ChallengeInput {
   readonly resource: string
   readonly payTo: string
   readonly description?: string
+  /**
+   * THIS seller's fee splitter, if they have one. Per call, never per process.
+   *
+   * A rail configured with one global splitter substituted it for every listing's payout,
+   * which is correct with a single seller and silently catastrophic with two:
+   * `FeeSplitter.seller` is immutable, so a second seller's buyers would sign
+   * authorizations paying the first seller's contract, which can only ever pay the first
+   * seller. Passing it alongside `payTo` makes "whose money is this" a property of the
+   * call instead of the deployment.
+   */
+  readonly feeSplitter?: string | undefined
 }
 
 export type VerifyError =

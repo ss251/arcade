@@ -22,6 +22,13 @@ export interface RunnerRecord {
 export interface ListingRecord {
   readonly listing: PublicListing
   readonly seller: string
+  /**
+   * This seller's fee splitter, from their signed handshake. Per listing because it is per
+   * SELLER — `FeeSplitter.seller` is immutable, so one seller's contract can never pay
+   * another, and a single global splitter would route everyone else's revenue into the
+   * first seller's contract irrecoverably.
+   */
+  readonly feeSplitter?: string | undefined
   readonly runnerId: string
   readonly publishedAtMs: number
 }

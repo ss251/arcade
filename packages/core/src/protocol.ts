@@ -15,6 +15,21 @@ import { JobOutcome } from "./job.ts"
 export class Hello extends Schema.TaggedClass<Hello>()("Hello", {
   runnerId: Schema.String,
   seller: Schema.String,
+  /**
+   * This seller's `FeeSplitter`, if they deployed one.
+   *
+   * Per SELLER, never global. The contract's `seller` is immutable — one splitter can only
+   * ever pay one address — so a hub that substituted a single configured splitter for every
+   * listing's payout would route every other seller's revenue into the first seller's
+   * contract, where the same immutability makes it unrecoverable. Absent means the seller
+   * collects the full price and the fee goes uncollected, which is a choice they make and
+   * not one another seller can make for them.
+   *
+   * Signed as part of the digest: an unsigned payout-routing field would let anyone who
+   * reaches the socket redirect payments, which is the exact attack the signature exists
+   * to stop.
+   */
+  feeSplitter: Schema.optional(Schema.String),
   /** Only public projections — the runner never sends a full manifest. */
   listings: Schema.Array(PublicListing),
   maxConcurrency: Schema.Int.pipe(Schema.positive()),
@@ -42,14 +57,22 @@ export const helloDigest = (args: {
   readonly seller: string
   readonly nonce: string
   readonly skillIds: ReadonlyArray<string>
+  readonly feeSplitter?: string | undefined
 }): string =>
   [
     "arcade-runner-hello",
-    "v1",
+    // v2 adds `feeSplitter`. Bumped rather than appended silently: a runner and hub that
+    // disagreed about the bytes would fail every handshake with a signature error and no
+    // indication that the protocol moved.
+    "v2",
     args.runnerId,
     args.seller.toLowerCase(),
     args.nonce,
-    [...args.skillIds].sort().join(",")
+    [...args.skillIds].sort().join(","),
+    // The address money is routed to MUST be signed. Leaving it out would mean a valid
+    // signature over everything except where the funds go — anyone able to alter the
+    // message could substitute their own splitter and take every payment to this seller.
+    (args.feeSplitter ?? "none").toLowerCase()
   ].join("\n")
 
 /**
