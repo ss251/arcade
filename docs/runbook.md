@@ -136,6 +136,22 @@ the step that fixes the first one.
 is written down. A leftover `hubWsUrl` in an older config is ignored, and if it disagreed
 the runner says so on startup rather than quietly announcing somewhere else.
 
+**Proven in production, not just in tests.** The first real repoint ran against a config
+that still carried `hubWsUrl: ws://localhost:8792/ws`, so the stale field disagreed for the
+first time rather than hypothetically. The runner said so at startup and named all three
+values:
+
+```
+[runner] ignoring stale hubWsUrl: it said ws://localhost:8792/ws, but hubUrl is
+https://arcade-hub-production.up.railway.app, so the socket is
+wss://arcade-hub-production.up.railway.app/ws
+```
+
+Note the derived socket is **`wss`**. Under the old behaviour the runner would have read
+listings from production while announcing over a cleartext local socket — reading from one
+hub and serving to another, with both halves individually reporting health. Deleting the
+field silences the notice; the derivation is unaffected either way.
+
 ```bash
 bun run arcade init --seller 0x3b2Bbb840A9570223aDbF2172a33BB77fE8D21AF --hub https://<public-host>
 ```
