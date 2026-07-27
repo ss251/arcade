@@ -13,6 +13,7 @@ import { loadSkills } from "./skills.ts"
 import { dispatchMap, gate } from "./publishable.ts"
 import { privateKeyToAccount } from "viem/accounts"
 import { resolveSellerKey } from "./wallet.ts"
+import { startHireBroker } from "./hire-broker.ts"
 import type { RunnerConfig } from "./config.ts"
 
 /**
@@ -78,14 +79,33 @@ export const startDaemon = (args: DaemonArgs) =>
         )
       )
     }
-    if (subKey !== undefined) {
-      const hiring = gated.sellable.filter((s) => s.manifest.engine.capabilities.includes("hire-skills"))
+    // The broker holds the sub-purchase key and does the buying, so the key never enters a
+    // sandbox. Started only when there is a key to hold; skills declaring `hire-skills` on
+    // a runner without one simply fail to hire, with a message saying why.
+    const hiring = gated.sellable.filter((s) =>
+      s.manifest.engine.capabilities.includes("hire-skills")
+    )
+    const broker =
+      subKey === undefined || hiring.length === 0
+        ? undefined
+        : startHireBroker({
+            hubUrl: args.config.hubUrl,
+            subBuyKey: subKey,
+            socketPath: `${process.env["TMPDIR"] ?? "/tmp"}/arcade-hire-${args.config.runnerId}.sock`
+          })
+
+    if (broker !== undefined) {
       for (const s of hiring) {
         console.log(
           `  ${s.manifest.id} may hire other skills, up to ` +
             `$${s.manifest.bounds.maxSubSpendUsd ?? 0} per call`
         )
       }
+    } else if (hiring.length > 0) {
+      console.error(
+        `${hiring.length} skill(s) declare hire-skills but ARCADE_SUBBUY_KEY is not set — ` +
+          "they will run, and any attempt to hire will be refused."
+      )
     }
 
     console.log(`[runner] ${args.config.runnerId}`)
@@ -185,14 +205,29 @@ export const startDaemon = (args: DaemonArgs) =>
 
               activeJobs++
               console.log(`[runner] job ${msg.jobId} -> ${msg.skillId}`)
+              // The job's ceiling is fixed before it starts and revoked when it ends, so a
+              // token cannot outlive the work it was issued for.
+              const canHire =
+                broker !== undefined &&
+                skill.manifest.engine.capabilities.includes("hire-skills")
+              const hireGrant = canHire
+                ? {
+                    socketPath: broker!.socketPath,
+                    jobId: msg.jobId,
+                    token: broker!.openJob(msg.jobId, skill.manifest.bounds.maxSubSpendUsd)
+                  }
+                : undefined
+
               const outcome = yield* execSkill({
                 manifest: skill.manifest,
                 skillDir: skill.dir,
                 jobId: msg.jobId,
                 input: msg.input,
+                ...(hireGrant === undefined ? {} : { hire: hireGrant }),
                 onLog: (line) =>
                   ws.send(JSON.stringify({ _tag: "JobLog", jobId: msg.jobId, line, atMs: Date.now() }))
               }).pipe(
+                Effect.ensuring(Effect.sync(() => broker?.closeJob(msg.jobId))),
                 Effect.catchAllCause(() =>
                   Effect.succeed(
                     JobOutcome.make({

@@ -32,6 +32,8 @@ export interface ExecArgs {
   readonly jobId: string
   readonly input: unknown
   readonly onLog?: (line: string) => void
+  /** Present only for a skill that declared `hire-skills` on a runner with a broker. */
+  readonly hire?: HireGrant
 }
 
 /** Minimal base env. Notably absent: everything the seller has in their real environment. */
@@ -61,7 +63,18 @@ const BASE_ENV = (skillDir: string): Record<string, string> => ({
  * Grants are names, never values, and a name that is not set in the parent is simply
  * absent rather than passed as empty.
  */
-export const buildEnv = (manifest: SkillManifest, skillDir: string): Record<string, string> => {
+/** What a job needs to reach the runner's hire broker. Absent means it cannot hire. */
+export interface HireGrant {
+  readonly socketPath: string
+  readonly jobId: string
+  readonly token: string
+}
+
+export const buildEnv = (
+  manifest: SkillManifest,
+  skillDir: string,
+  hire?: HireGrant
+): Record<string, string> => {
   const env: Record<string, string> = {}
 
   // Seller secrets FIRST, so the sandbox's own variables and the engine's grants overwrite
@@ -89,12 +102,14 @@ export const buildEnv = (manifest: SkillManifest, skillDir: string): Record<stri
   // published. Absent means zero rather than unlimited: a seller who declares the
   // capability but forgets `maxSubSpendUsd` gets a skill that cannot spend, which is the
   // safe way round to be wrong.
-  if (manifest.engine.capabilities.includes("hire-skills")) {
-    const hub = process.env["ARCADE_HUB"]
-    const subKey = process.env["ARCADE_SUBBUY_KEY"]
-    if (hub !== undefined) env["ARCADE_HUB"] = hub
-    if (subKey !== undefined) env["ARCADE_SUBBUY_KEY"] = subKey
-    env["ARCADE_SUB_BUDGET_USD"] = String(manifest.bounds.maxSubSpendUsd ?? 0)
+  //
+  // Note what is NOT here: the sub-purchase key. The sandbox gets a socket and a per-job
+  // token, and the runner does the buying. Handing over the key would make the budget
+  // advisory — the code holding it would be the code being bounded.
+  if (manifest.engine.capabilities.includes("hire-skills") && hire !== undefined) {
+    env["ARCADE_HIRE_SOCKET"] = hire.socketPath
+    env["ARCADE_JOB_ID"] = hire.jobId
+    env["ARCADE_JOB_TOKEN"] = hire.token
   }
 
   // Engine grants last, because an engine CAN legitimately need to override a sandbox
@@ -171,7 +186,7 @@ export const execSkill = (args: ExecArgs) =>
   Effect.gen(function* () {
     const startedAtMs = Date.now()
     const { manifest, skillDir } = args
-    const env = buildEnv(manifest, skillDir)
+    const env = buildEnv(manifest, skillDir, args.hire)
     const cmd = commandFor(manifest, skillDir)
 
     const proc = yield* spawnScoped(cmd, env, skillDir)

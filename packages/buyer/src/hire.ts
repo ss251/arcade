@@ -1,7 +1,4 @@
-import { Effect } from "effect"
-import { privateKeyToAccount } from "viem/accounts"
-import { fenceResult, formatUsdc, parsePrice } from "@arcade/core"
-import { callSkill } from "./index.ts"
+import { request } from "node:http"
 
 /**
  * `hire` — one skill buying from another, mid-run.
@@ -11,25 +8,24 @@ import { callSkill } from "./index.ts"
  * recruited. An agent hires other agents: every seller is also a buyer the moment its work
  * needs something it cannot produce, and each hop settles on its own.
  *
- * Runs inside the sandbox, so it deliberately depends on nothing but environment variables
- * the RUNNER granted:
+ * **There is no key in this module, and none in the sandbox.** An earlier version handed
+ * `ARCADE_SUBBUY_KEY` to the skill and enforced the budget here, which made the budget
+ * advisory — the code holding the key was the code being bounded, so an injection that
+ * reached the agent could spend past the ceiling and the only real cap was the wallet
+ * balance. Now the runner keeps the key and this asks it to buy, over a Unix socket, with
+ * a per-job token. The ledger lives in the runner. An injected agent can spend exactly
+ * `maxSubSpendUsd` and not a cent more, because it never holds the means to.
  *
- *   ARCADE_HUB               where to buy
- *   ARCADE_SUBBUY_KEY        the seller's sub-purchase wallet — NOT their payout key
- *   ARCADE_SUB_BUDGET_USD    ceiling for this whole job, from `bounds.maxSubSpendUsd`
+ * Three variables, all granted by the RUNNER and none reachable through `secrets` — the
+ * `ARCADE_` prefix is reserved, so a manifest cannot ask for them:
  *
- * None of them are grantable through `secrets`: `ARCADE_` is a reserved prefix, so a
- * manifest cannot ask for them. They appear only when the manifest declares the
- * `hire-skills` capability, which means the ability to spend is visible in
- * `arcade publish` alongside everything else a skill can reach.
+ *   ARCADE_HIRE_SOCKET   the runner's broker socket
+ *   ARCADE_JOB_ID        which job is asking
+ *   ARCADE_JOB_TOKEN     HMAC over the job id; useless for any other job, and revoked
+ *                        when the job ends
  *
- * **The wallet is the real bound.** The budget below is enforced honestly for code that
- * goes through this function, and a seller's own skill could always bypass it and use the
- * key directly — the sandbox protects sellers from the platform, not sellers from
- * themselves. What genuinely caps the loss is that `ARCADE_SUBBUY_KEY` is a separate
- * wallet holding what the seller is willing to have their skills spend. The runner refuses
- * to start if it is the same key as the payout address, because that one also proves
- * listing ownership.
+ * They appear only when the manifest declares `hire-skills`, so the ability to spend shows
+ * up in `arcade publish` beside everything else a skill can reach.
  */
 
 export interface HireOptions {
@@ -67,85 +63,80 @@ export const __resetSubSpend = (): void => {
   spentAtomic = 0n
 }
 
-const budgetAtomic = (): bigint => {
-  const raw = process.env["ARCADE_SUB_BUDGET_USD"]
-  // Absent means zero, never unlimited. A seller who forgets `maxSubSpendUsd` gets a skill
-  // that cannot spend, which is the safe way round to be wrong.
-  //
-  // "0" is the runner's literal default in exactly that case, and `parsePrice` rejects it —
-  // its floor is $0.000001, since a *price* of zero is meaningless. A budget of zero is
-  // perfectly meaningful, so it is handled here rather than letting a valid configuration
-  // surface as "Invalid price".
-  if (raw === undefined || raw === "") return 0n
-  const numeric = Number(raw.replace("$", ""))
-  if (!Number.isFinite(numeric) || numeric <= 0) return 0n
-  return parsePrice(raw)
-}
-
 export const hire = async (
   skillId: string,
   input: unknown,
   options: HireOptions = {}
 ): Promise<Hired> => {
-  const hubUrl = options.hubUrl ?? process.env["ARCADE_HUB"]
-  const key = process.env["ARCADE_SUBBUY_KEY"]
+  const socketPath = process.env["ARCADE_HIRE_SOCKET"]
+  const jobId = process.env["ARCADE_JOB_ID"]
+  const jobToken = process.env["ARCADE_JOB_TOKEN"]
 
-  if (hubUrl === undefined || key === undefined || key === "") {
+  if (socketPath === undefined || jobId === undefined || jobToken === undefined) {
     throw new HireRefused(
-      "this skill cannot hire other skills. Add \"hire-skills\" to engine.capabilities in " +
+      'this skill cannot hire other skills. Add "hire-skills" to engine.capabilities in ' +
         "arcade.json and set bounds.maxSubSpendUsd, then make sure the runner has " +
-        "ARCADE_SUBBUY_KEY set to a funded sub-purchase wallet."
+        "ARCADE_SUBBUY_KEY set to a funded sub-purchase wallet (kept by the runner — it is " +
+        "never placed in this sandbox)."
     )
   }
 
-  const budget = budgetAtomic()
-  const remaining = budget > spentAtomic ? budget - spentAtomic : 0n
-  if (remaining === 0n) {
-    throw new HireRefused(
-      `sub-spend budget exhausted for this job (${formatUsdc(budget)} total, ` +
-        `${formatUsdc(spentAtomic)} spent). Nothing was signed. Raise bounds.maxSubSpendUsd ` +
-        "if this skill genuinely needs to subcontract more than that per call."
-    )
-  }
-
-  const requested =
-    options.maxAmountUsd === undefined ? remaining : parsePrice(String(options.maxAmountUsd))
-  // Only ever narrows: a value chosen inside the skill cannot widen the job's budget.
-  const cap = requested < remaining ? requested : remaining
-
-  const seller = await (async () => {
-    const res = await fetch(`${hubUrl}/listings/${skillId}`)
-    if (!res.ok) {
-      throw new HireRefused(`cannot hire "${skillId}": hub returned ${res.status}`)
+  // `node:http` over the socket rather than `fetch`'s Bun-only `unix` option, so this is
+  // the same code path under Bun and Node and can be tested against a real broker.
+  const { status, text } = await new Promise<{ status: number; text: string }>(
+    (resolve, reject) => {
+      const payload = JSON.stringify({
+        skillId,
+        input,
+        ...(options.maxAmountUsd === undefined ? {} : { maxAmountUsd: options.maxAmountUsd })
+      })
+      const req = request(
+        {
+          socketPath,
+          path: "/hire",
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "content-length": Buffer.byteLength(payload),
+            "x-job-id": jobId,
+            "x-job-token": jobToken
+          }
+        },
+        (res) => {
+          let acc = ""
+          res.on("data", (c) => (acc += String(c)))
+          res.on("end", () => resolve({ status: res.statusCode ?? 500, text: acc }))
+        }
+      )
+      req.on("error", reject)
+      req.end(payload)
     }
-    return ((await res.json()) as { seller: string }).seller
-  })()
-
-  const out = await Effect.runPromise(
-    callSkill({
-      hubUrl,
-      seller,
-      skillId,
-      input,
-      account: privateKeyToAccount(key as `0x${string}`),
-      maxAmountAtomic: cap
-    })
   )
 
-  const receipt = out.receipt as Record<string, unknown>
-  const settled = receipt["settled"] === true
-  const paidAtomic = settled ? parsePrice(String(receipt["price"] ?? "$0")) : 0n
+  const body = ((): Record<string, unknown> => {
+    try {
+      return JSON.parse(text)
+    } catch {
+      return {}
+    }
+  })()
 
-  // Only settled work is charged: an unsettled sub-purchase cost the seller nothing, and
-  // counting it would shrink the budget for work that never happened.
-  spentAtomic += paidAtomic
+  if (status < 200 || status >= 300) {
+    // The broker's refusals are already phrased for whoever has to act on them; passing
+    // them through unchanged beats restating them one layer up with less information.
+    throw new HireRefused(String(body["error"] ?? `hire failed with ${status}`))
+  }
+
+  // The broker's ledger is the one that binds. This accumulator only feeds the harness's
+  // cost report, so it follows the broker rather than deciding anything.
+  spentAtomic += BigInt(Math.round(Number(body["costUsd"] ?? 0) * 1e6))
 
   return {
     skillId,
-    jobId: out.jobId,
-    settled,
-    result: out.result,
-    fenced: fenceResult(out.result, seller),
-    costUsd: Number(paidAtomic) / 1e6
+    jobId: String(body["jobId"] ?? ""),
+    settled: body["settled"] === true,
+    result: body["result"],
+    fenced: String(body["fenced"] ?? ""),
+    costUsd: Number(body["costUsd"] ?? 0)
   }
 }

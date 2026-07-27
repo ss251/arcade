@@ -42,10 +42,16 @@ describe("hire_skill tool", () => {
   })
 
   it("surfaces a refusal to the model as a readable tool error, not a crash", async () => {
-    // No wallet granted → `hire` throws HireRefused. The tool runner turns a thrown value
-    // into tool-result content, so the model can read it and continue; killing the job
-    // would waste everything the buyer already paid for.
-    delete process.env["ARCADE_SUBBUY_KEY"]
+    // No grant → `hire` throws HireRefused. The tool runner turns a thrown value into
+    // tool-result content, so the model can read it and continue; killing the job would
+    // waste everything the buyer already paid for.
+    //
+    // All three are deleted, not just one: Bun's runner shares a process across test
+    // files, so a variable another file set would otherwise leak in and let this proceed.
+    delete process.env["ARCADE_HIRE_SOCKET"]
+    delete process.env["ARCADE_JOB_ID"]
+    delete process.env["ARCADE_JOB_TOKEN"]
+
     await expect(hireTool().run({ skillId: "usdc-flow-check", input: {} })).rejects.toThrow(
       /hire-skills/
     )

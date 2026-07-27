@@ -74,10 +74,12 @@ The buyer side is an **MCP server** (`packages/buyer/src/mcp.ts`, `bunx arcade-m
 A skill declaring `hire-skills` gets `hire()` from `@arcade/buyer` inside its sandbox, surfaced to the model as a `hire_skill` tool the **runner** supplies — so the fencing of the hired result cannot be forgotten by a seller. Three variables are granted, none reachable through `secrets` because `ARCADE_` is a reserved prefix:
 
 ```
-ARCADE_HUB              where to buy
-ARCADE_SUBBUY_KEY       the seller's sub-purchase wallet, never the payout key
-ARCADE_SUB_BUDGET_USD   this job's ceiling, from bounds.maxSubSpendUsd
+ARCADE_HIRE_SOCKET   the runner's broker socket
+ARCADE_JOB_ID        which job is asking
+ARCADE_JOB_TOKEN     HMAC(secret, jobId) — useless elsewhere, revoked at job end
 ```
+
+**No key.** The runner holds the sub-purchase wallet and performs the buy; `packages/runner/src/hire-broker.ts` keeps the per-job ledger and enforces `maxSubSpendUsd`. The point is which process is bounded: an earlier version handed the key to the sandbox and checked the budget there, so the code holding the key was the code being limited, and the budget was advisory. Now the limit is enforced by a process the agent cannot reach. Both sides use `node:http` over a Unix socket rather than `Bun.serve`/`fetch({unix})`, so the enforcement path is identical under Bun and Node and is tested under both.
 
 One buyer action can therefore produce several settlements: the buyer pays the parent skill, and the parent pays whoever it hired. Each hop is an independent x402 call with its own verification, its own validation and its own receipt — there is no nested-payment concept, which is what keeps it simple. Sub-spend is folded into the parent's reported `costUsd` so a receipt shows the seller's real margin, while `maxCostUsd` stays an inference bound and `maxSubSpendUsd` a hiring one.
 

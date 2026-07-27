@@ -124,13 +124,15 @@ A skill declares the capability and its ceiling:
 
 and its agent gets a `hire_skill` tool. `counterparty-brief` uses it: given a wallet address the counterparty claims to control, it buys `usdc-flow-check` for a cent rather than taking the claim on faith. One buyer action, two sellers, two settlements — **$0.25 in, ~$0.01 subcontracted**, and both bounds published so a buyer can see how much of the price is being passed on.
 
-Three things make this safe enough to hand a skill a wallet:
+**The sandbox never receives a key.** The runner keeps the sub-purchase wallet and brokers each buy over a Unix socket; the skill gets a per-job token — an HMAC over the job id, useless for any other job, revoked when the job ends. The ledger lives in the runner, so `maxSubSpendUsd` is enforced by a process the agent doesn't control. **An injected agent can spend the declared budget and not a cent more, because it never holds the means to.**
 
-- The sub-purchase wallet is **separate from the payout key**, and the runner refuses to start if they match — the payout key also proves listing ownership, so a skill holding it could redirect the seller's own payments.
-- **An absent `maxSubSpendUsd` means zero**, never unlimited. A seller who declares the capability and forgets the bound gets a skill that cannot spend.
+Three more things:
+
+- The sub-purchase wallet must be **separate from the payout key**, and the runner refuses to start if they match — the payout key also proves listing ownership, so anything holding it could redirect the seller's own payments.
+- **An absent `maxSubSpendUsd` means zero**, never unlimited. Forgetting the bound fails closed.
 - The hired result comes back **fenced**, supplied by the runner rather than the seller, because B's output is untrusted input to A — the same problem the buyer has one level up, and easier to forget because A chose B.
 
-The honest limit is in [`threat-model.md`](docs/threat-model.md) T-SPEND-002: the budget binds code that goes through `hire`, and what actually caps the loss is how much you put in that wallet.
+[`threat-model.md`](docs/threat-model.md) T-SPEND-002 has the residual: **Low**. What remains is a seller whose own skill goes looking for the socket — their machine, their wallet, not a threat.
 
 ## Discovery
 
@@ -170,12 +172,12 @@ Both payment rails are complete, conformance-tested `Layer`s of one `Rail` servi
 
 | shipped | next |
 |---|---|
-| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · MCP server + skill file · agents hiring agents · 344 tests | Gateway round-trip on Arc · web UI · container sandbox · ratings |
+| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · MCP server + skill file · agents hiring agents · 354 tests | Gateway round-trip on Arc · web UI · container sandbox · ratings |
 
 ## Verify
 
 ```bash
-bun test                                                  # 344 tests
+bun test                                                  # 354 tests
 bun test packages/core/test/secrecy.property.test.ts      # the thesis
 bun test packages/payments/test/rail.conformance.test.ts  # all three rails agree
 bunx tsc --noEmit

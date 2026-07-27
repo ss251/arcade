@@ -65,9 +65,11 @@ Then point the runner at a wallet for it:
 export ARCADE_SUBBUY_KEY=0x<a DIFFERENT key from your payout one>
 ```
 
-**It must not be your payout key.** That key signs the handshake proving your listings are yours, and any skill declaring `hire-skills` receives whatever you put here — a skill holding your payout key could re-announce your listings with payment redirected. The runner refuses to start if the two match.
+**It must not be your payout key.** That key signs the handshake proving your listings are yours; anything holding it could re-announce them with payment redirected. The runner refuses to start if the two match.
 
-Fund it with what you are willing to have your skills spend, and treat that number as the real limit. `maxSubSpendUsd` is enforced for code going through `hire`, but the sandbox is your machine running your code: it protects you from the platform, not from your own skill. An absent `maxSubSpendUsd` means **zero**, not unlimited, so forgetting it fails closed.
+**Your skill never receives this key.** The runner keeps it and does the buying, handing the sandbox only a per-job token over a local socket. That is what makes `maxSubSpendUsd` a real limit rather than a request: the ledger lives in the runner, so a skill that gets prompt-injected mid-run can spend the declared budget and nothing beyond it. An absent `maxSubSpendUsd` means **zero**, not unlimited, so forgetting it fails closed.
+
+Fund the wallet with what you are comfortable having your skills spend anyway — belt and braces, and it bounds mistakes across jobs as well as within one.
 
 Your margin stays visible: the receipt's cost is inference **plus** anything the call subcontracted, so you can read what a call actually earned.
 
