@@ -145,6 +145,88 @@ describe("repo hygiene", () => {
     }
   })
 
+  /**
+   * Every Dockerfile that runs a frozen install must COPY every workspace manifest.
+   *
+   * `bun install --frozen-lockfile` resolves the whole workspace graph, so a missing
+   * manifest fails the build with "lockfile had changes, but lockfile is frozen". The
+   * hub's Dockerfile enumerated five workspaces, which was correct when written and became
+   * wrong the moment `apps/web` was added — the build was broken for real, and nothing
+   * said so until someone deployed. Docker COPY cannot glob directories selectively, so
+   * the enumeration has to exist; this is the assertion that it stays complete.
+   */
+  it("copies every workspace manifest in every Dockerfile that installs", () => {
+    const manifests = execFileSync(
+      "git",
+      ["ls-files", "packages/*/package.json", "apps/*/package.json"],
+      { cwd: REPO_ROOT, encoding: "utf8" }
+    )
+      .split("\n")
+      .filter((f) => f.trim() !== "")
+
+    expect(manifests.length).toBeGreaterThan(0)
+
+    const dockerfiles = execFileSync("git", ["ls-files", "*Dockerfile"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8"
+    })
+      .split("\n")
+      .filter((f) => f.trim() !== "")
+
+    expect(dockerfiles.length).toBeGreaterThan(0)
+
+    for (const df of dockerfiles) {
+      const body = readFileSync(join(REPO_ROOT, df), "utf8")
+      if (!body.includes("--frozen-lockfile")) continue
+      const missing = manifests.filter((m) => !body.includes(m))
+      expect(
+        missing,
+        missing.length === 0
+          ? ""
+          : `${df} runs a frozen install but never COPYs:\n\n` +
+            missing.map((m) => `  ${m}`).join("\n") +
+            `\n\nbun resolves the whole workspace graph, so the build fails with\n` +
+            `"lockfile had changes, but lockfile is frozen" even though this image never\n` +
+            `runs that workspace. Add a COPY line for each.`
+      ).toEqual([])
+    }
+  })
+
+  /**
+   * Railway's monorepo guide: "The Railway Config File does not follow the Root Directory
+   * path." So a second service inherits the ROOT `railway.json` — which pins the hub's
+   * Dockerfile — even when given its own root directory. It would build a valid Dockerfile,
+   * succeed, and start a SECOND HUB, with Railway reporting a healthy deploy. Every app
+   * therefore needs its own config naming its own Dockerfile, and the service must be
+   * pointed at it explicitly.
+   */
+  it("gives every deployable app its own Dockerfile and railway config", () => {
+    const apps = execFileSync("git", ["ls-files", "apps/*/package.json"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8"
+    })
+      .split("\n")
+      .filter((f) => f.trim() !== "")
+      .map((f) => f.replace(/\/package\.json$/, ""))
+
+    for (const app of apps) {
+      // The hub is the root Dockerfile's subject, for historical reasons and because the
+      // live service is already wired to it. Everything else must carry its own.
+      if (app === "apps/hub") continue
+      const files = execFileSync("git", ["ls-files", `${app}/Dockerfile`, `${app}/railway.json`], {
+        cwd: REPO_ROOT,
+        encoding: "utf8"
+      })
+      expect(files, `${app} must have its own Dockerfile — otherwise Railway builds the root one`).toContain(
+        `${app}/Dockerfile`
+      )
+      expect(
+        files,
+        `${app} must have its own railway.json, and the service's Config File Path must point at it`
+      ).toContain(`${app}/railway.json`)
+    }
+  })
+
   it("keeps internal/ out of both channels — the repo's first hard rule", () => {
     // Named explicitly rather than left to the superset check. This one is the reason the
     // superset check exists, and a rule worth stating is worth being able to grep for.

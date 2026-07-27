@@ -255,6 +255,36 @@ than a deployment pointed at nothing.
 On boot it logs the hub it resolved (`[web] hub: …`), so a local run never leaves you
 guessing which hub you were actually watching.
 
+### Set the web service's Config File Path, or you get two hubs
+
+Railway's monorepo guide says it outright: **"The Railway Config File does not follow the
+Root Directory path. You have to specify the absolute path for the `railway.json` or
+`railway.toml` file."**
+
+So a second service in this project inherits the **root** `railway.json` — which pins the
+**hub's** Dockerfile — even if you give the service its own root directory. It would then
+build a perfectly valid Dockerfile, succeed, and start a **second hub**. Railway reports a
+healthy deploy. You would have two hubs, no web service, and two URLs both serving a
+settlement page; if the second gets its own volume, two divergent receipt stores, both
+looking authoritative, with no way for a visitor to tell which is real.
+
+When creating the web service, set **Config File Path → `apps/web/railway.json`**. That
+file pins `apps/web/Dockerfile`. Both exist and are asserted by
+`packages/core/test/repo-hygiene.test.ts`, which requires every deployable app outside the
+hub to carry its own pair.
+
+**Decide the canonical URL before both exist.** The hub's public origin is the one that goes
+in the submission; the chat links out to it, never the reverse.
+
+### The Dockerfile COPY list is enumerated, and that already broke once
+
+Both Dockerfiles `COPY` every workspace manifest, including ones the image never runs,
+because `bun install --frozen-lockfile` resolves the whole workspace graph. The hub's list
+enumerated five workspaces and was correct until `apps/web` was added — after which its
+build failed with `lockfile had changes, but lockfile is frozen`, and nothing said so,
+because the last successful deploy predated the new workspace. Adding a workspace means
+adding a `COPY` line to every Dockerfile; the hygiene test fails until you do.
+
 **It is not a Node service.** TanStack Start's Vite build emits `dist/server/server.js` whose
 default export is `{ fetch(request): Response }` — the Web-standard handler shape, which is
 also what `Bun.serve` takes. `apps/web/server.ts` is the twenty lines that serve `dist/client`

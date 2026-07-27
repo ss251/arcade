@@ -78,9 +78,14 @@ skills/*/.config/
 .gitignore
 .github
 
-# The hub is the only thing this image runs. `apps/web` is a separate service with its own
-# image, and shipping its source here would grow the hub for nothing.
-apps/web
+# `apps/web` is deliberately NOT excluded, even though the hub image does not run it.
+#
+# Docker resolves one `.dockerignore` per build context, and both services build from the
+# repo root — so excluding `apps/web` here would make it invisible to its OWN Dockerfile.
+# The cost of keeping it is a few hundred KB of source in the hub image (its node_modules
+# and dist are excluded above). The cost of excluding it is a web build that fails, or
+# worse, succeeds against a stale copy. One ignore file that is slightly generous beats two
+# that can disagree.
 
 # Docs, evidence scripts and agent config are not runtime inputs.
 docs/

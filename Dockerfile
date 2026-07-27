@@ -7,12 +7,21 @@ FROM oven/bun:1.3-alpine
 WORKDIR /app
 
 # Manifests first so a source-only change reuses the dependency layer.
+#
+# EVERY workspace manifest must be here, including ones this image never runs.
+# `bun install --frozen-lockfile` resolves the whole workspace graph, so omitting one fails
+# with "lockfile had changes, but lockfile is frozen" — which is what happened the moment
+# `apps/web` was added: this list was correct when it was written and silently incomplete
+# the day a workspace appeared. `packages/core/test/repo-hygiene.test.ts` now asserts it
+# stays complete, because an enumeration nobody checks is a list that is right until it
+# isn't.
 COPY package.json bun.lock ./
 COPY packages/core/package.json packages/core/
 COPY packages/payments/package.json packages/payments/
 COPY packages/runner/package.json packages/runner/
 COPY packages/buyer/package.json packages/buyer/
 COPY apps/hub/package.json apps/hub/
+COPY apps/web/package.json apps/web/
 
 RUN bun install --frozen-lockfile
 
