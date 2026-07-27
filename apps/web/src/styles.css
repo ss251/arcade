@@ -102,6 +102,206 @@ a {
   color: var(--refuse);
 }
 
+/* ── chat ──────────────────────────────────────────────────────────────────
+ *
+ * Motion here is governed by design-sauce Law 4's frequency test. Streaming chunks arrive
+ * many times per second, so nothing about streaming animates. Message arrival is a
+ * tens-per-day event, so it gets `arrive` — opacity only, 200ms, strong ease-out — which is
+ * the keyframe `apps/hub/src/ui.ts:233` already defines, reused rather than reinvented.
+ * Nothing animates layout, and nothing animates inside the scroller.
+ */
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: calc(100dvh - 160px);
+  min-height: 380px;
+}
+
+/*
+ * `MessageScroller.Root` renders its own element between `.chat` and the viewport. Without
+ * this it is an unstyled block and the flex chain breaks silently — the viewport stops
+ * growing and the composer floats up the page instead of sitting at the bottom. Only
+ * visible in a screenshot, which is why Law 11 is a gate and not a formality.
+ */
+.scroller {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.viewport {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* The scrim fades content into the composer instead of ruling a line under it. */
+  mask-image: linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 12px), transparent 100%);
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 18px 0 12px;
+}
+
+.msg {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 14px;
+  animation: arrive 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Who is speaking is metadata, so it is demoted — the message is the brightest text. */
+.who {
+  font: 11px/1.6 var(--mono);
+  color: var(--slate);
+  letter-spacing: 0.06em;
+  padding-top: 2px;
+}
+
+.msg-user .body {
+  color: var(--slate);
+}
+
+.body {
+  min-width: 0;
+}
+
+.prose {
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+}
+
+.prose:last-child {
+  margin-bottom: 0;
+}
+
+/*
+ * Seller copy, shown as quotation. No semantic colour: blue is USDC, green is settled, red
+ * is not-settled, and spending a fourth hue on "untrusted" would erode the three that carry
+ * money meaning. A rule and a label do the work.
+ */
+.quoted {
+  margin: 0 0 10px;
+  padding: 8px 0 8px 14px;
+  border-left: 2px solid var(--line);
+  white-space: pre-wrap;
+}
+
+.quoted-label {
+  display: block;
+  font: 10px/1.6 var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--slate);
+  margin-bottom: 4px;
+}
+
+/* Tool activity is a status row, not an event worth animating — it is high-frequency. */
+.marker {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font: 11px/1.8 var(--mono);
+  color: var(--slate);
+  padding: 3px 0;
+}
+
+.marker-name {
+  color: var(--ink);
+  letter-spacing: 0.04em;
+}
+
+/*
+ * The jump-to-latest affordance is meaningless when you are already at the latest, and the
+ * component reports that as `data-active`. Hiding it is not decoration: a control that is
+ * always visible stops carrying information, and this one's whole job is to say "there is
+ * something below you".
+ */
+.to-latest[data-active="false"] {
+  display: none;
+}
+
+.to-latest {
+  align-self: center;
+  font: 11px/1 var(--mono);
+  color: var(--slate);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.empty-state {
+  padding: 8px 0 0;
+}
+
+.composer {
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.prompt {
+  flex: 1;
+  font: 15px/1.5 var(--sans);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 10px 12px;
+}
+
+.prompt:focus-visible,
+.send:focus-visible,
+.to-latest:focus-visible {
+  outline: 2px solid var(--usdc);
+  outline-offset: 2px;
+}
+
+.send {
+  font: 600 12px/1 var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--paper);
+  background: var(--ink);
+  border: 0;
+  border-radius: 3px;
+  padding: 0 18px;
+  cursor: pointer;
+  /* Law 5: feedback on pointer-down, ~150ms ease-out. */
+  transition: transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.send:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.send:disabled {
+  color: var(--slate);
+  background: transparent;
+  border: 1px solid var(--line);
+  cursor: default;
+}
+
+.chat-error {
+  margin: 0;
+  font: 12px/1.6 var(--mono);
+  color: var(--refuse);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
