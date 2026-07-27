@@ -183,6 +183,14 @@ a{color:inherit}
 .law{margin:14px 0 0;max-width:62ch;color:var(--ink)}
 .law b{font-weight:600}
 
+/* The sandbox disclosure is a MEASURED fact about the deployment, so it is mono like every
+   other measured fact. It deliberately does not take --refuse: red means "this call did not
+   settle" and every row under a sandbox banner did settle, simulated. Borrowing the colour
+   would make the page argue with itself. */
+.sandbox{margin:16px 0 0;max-width:62ch;font:12px/1.6 var(--mono);color:var(--ink);
+  border:1px solid var(--line);border-left-width:3px;padding:10px 12px;border-radius:2px}
+.sandbox b{font-weight:600;letter-spacing:.04em}
+
 h2{font:600 11px/1 var(--sans);text-transform:uppercase;letter-spacing:.08em;
   color:var(--slate);margin:44px 0 4px}
 .note{font:12px/1.5 var(--sans);color:var(--slate);margin:0 0 14px}
@@ -279,26 +287,49 @@ export const renderIndex = (data: PageData): string => {
   const volume = settled.reduce((acc, r) => acc + r.priceAtomic, 0n)
   const feePct = (data.feeBps / 100).toFixed(data.feeBps % 100 === 0 ? 0 : 1)
 
+  // On the test rail every number on this page is real arithmetic over a simulated
+  // settlement — which is exactly the shape of a lie, because the page's whole argument is
+  // that its figures are evidence rather than claims. So the claim is WITHHELD rather than
+  // the page refused, the same move as an unverifiable fee splitter: run the sandbox, and
+  // say what it is. A screenshot taken here must not be able to pass as proof.
+  const simulated = data.rail === "test"
+
   const body = `
   <header class="top">
     <span class="mark">ARCADE</span>
     <span class="meta">${esc(data.network)} · ${esc(data.rail)}<br>
       ${settled.length} settled · ${esc(formatPrice(volume))} · fee ${esc(feePct)}%</span>
   </header>
-  <p class="law">Every price is public. Every statistic is computed from settled on-chain
-    receipts, not claimed by the seller. <b>Failed calls are never charged.</b></p>
+  ${
+    simulated
+      ? `<p class="sandbox"><b>Sandbox.</b> This deployment runs the simulated rail. No USDC
+    moves, and no transaction below exists on Arc — these figures are a working demonstration
+    of the mechanism, not evidence that it settled.</p>`
+      : ""
+  }
+  <p class="law">Every price is public. ${
+    simulated
+      ? `Every statistic is computed from the receipts the pipeline actually produced, but on
+    this deployment those settlements are simulated.`
+      : `Every statistic is computed from settled on-chain
+    receipts, not claimed by the seller.`
+  } <b>Failed calls are never charged.</b></p>
 
   <h2>Listings</h2>
   <p class="note">ordered by settled calls · no paid placement</p>
   <div id="listings">${renderListingRows(data.listings)}</div>
 
   <h2>Receipts</h2>
-  <p class="note">every row is a real transaction on Arc · the fee is split on chain and
-    readable off the contract${
-      data.treasuryIsSeller === true
-        ? " · during the pilot the treasury is the operator, who is also the only seller"
-        : ""
-    }</p>
+  <p class="note">${
+    simulated
+      ? "simulated settlement · no row below is a transaction on Arc"
+      : `every row is a real transaction on Arc · the fee is split on chain and
+    readable off the contract`
+  }${
+    data.treasuryIsSeller === true
+      ? " · during the pilot the treasury is the operator, who is also the only seller"
+      : ""
+  }</p>
   <table>
     <thead><tr>
       <th>skill</th><th class="num">price</th><th class="num">seller gets</th>
