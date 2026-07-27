@@ -166,3 +166,102 @@ describe("empty state — the invitation matches what the deployment can do", ()
     expect(renderToStaticMarkup(<Empty chatLive hubUrl={HUB} />)).not.toContain(HUB)
   })
 })
+
+/**
+ * Figures on screen come from the TOOL'S OUTPUT, not the model's sentence about it.
+ *
+ * The price exists twice on every turn: once in `part.output`, computed by the hub and
+ * already formatted, and once in whatever the model chose to say. Rendering the second made
+ * the model's arithmetic load-bearing — a small free model writing "about half a cent" for
+ * $0.0005 would have been uncatchable, because the trustworthy copy was discarded a layer
+ * earlier and nothing downstream could compare against it.
+ *
+ * This is the boundary version of the figure problem rather than the detection version: the
+ * failure is removed instead of caught, which is what made it worth more than another test.
+ * These pin that the structured half is actually rendered, and that it is rendered in the
+ * MEASURED voice — mono and the USDC colour — so the two surfaces speak one language.
+ */
+describe("tool output is rendered, not just narrated", () => {
+  const listingsMsg = (skills: ReadonlyArray<{ id: string; price: string }>) => [
+    {
+      id: "m1",
+      role: "assistant",
+      parts: [
+        { type: "tool-arcade_list_skills", state: "output-available", output: { count: skills.length, skills } },
+        { type: "text", text: "There are a couple of things listed." }
+      ]
+    }
+  ]
+
+  it("renders each listing's hub-computed price", () => {
+    const html = render(listingsMsg([{ id: "diff-triage", price: "$0.12" }]))
+    expect(html).toContain("diff-triage")
+    expect(html).toContain("$0.12")
+    // The MEASURED voice: the price carries the USDC class, same encoding as the hub page.
+    expect(html).toMatch(/class="usdc"[^>]*>\$0\.12/)
+  })
+
+  it("renders a sub-cent figure exactly, where a model would be tempted to round", () => {
+    const html = render(listingsMsg([{ id: "usdc-flow-check", price: "$0.0005" }]))
+    // Scoped to the price cell: a bare /e-/ also matches MessageScroller's own
+    // `data-message-scroller-spacer` attribute, which would have made this pass for the
+    // wrong reason in one direction and fail for the wrong reason in the other.
+    expect(html).toMatch(/class="usdc"[^>]*>\$0\.0005</)
+    expect(html).not.toContain("0.001")
+    expect(html).not.toMatch(/class="usdc"[^>]*>[^<]*e-/i)
+  })
+
+  it("renders a quote from its structured half", () => {
+    const html = render([
+      {
+        id: "m2",
+        role: "assistant",
+        parts: [
+          {
+            type: "tool-arcade_quote",
+            state: "output-available",
+            output: { skillId: "diff-triage", price: "$0.12", amountAtomic: "120000" }
+          }
+        ]
+      }
+    ])
+    expect(html).toContain("$0.12")
+    expect(html).toContain("signs nothing")
+  })
+
+  it("does NOT mirror receipts into the chat", () => {
+    // They already live on the hub page. A second home for them would be the second copy
+    // this codebase keeps deleting.
+    const html = render([
+      {
+        id: "m3",
+        role: "assistant",
+        parts: [
+          {
+            type: "tool-arcade_receipts",
+            state: "output-available",
+            output: { count: 1, volume: "$0.01", receipts: [{ price: "$0.01", fee: "$0.0005" }] }
+          }
+        ]
+      }
+    ])
+    expect(html).toContain("marker")
+    expect(html).not.toContain("$0.0005")
+  })
+
+  it("renders nothing for a shape it does not recognise, rather than throwing", () => {
+    // Tool output crosses a version boundary — an older or newer shape must degrade to the
+    // marker alone, never to a blank page.
+    for (const output of [null, "a string", { skills: "not-an-array" }, { skills: [{}] }]) {
+      const html = render([
+        {
+          id: "m4",
+          role: "assistant",
+          parts: [{ type: "tool-arcade_list_skills", state: "output-available", output }]
+        }
+      ])
+      expect(html).toContain("marker")
+      expect(html).not.toContain("tool-out")
+    }
+  })
+})

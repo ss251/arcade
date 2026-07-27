@@ -229,6 +229,39 @@ a {
  * always visible stops carrying information, and this one's whole job is to say "there is
  * something below you".
  */
+/*
+ * Tool output. These figures were MEASURED by the hub, so they are mono and the price
+ * carries the USDC colour — the same encoding the settlement page uses for every row it
+ * renders. The model's prose around them stays sans, because it is a claim about them.
+ */
+.tool-out {
+  margin: 2px 0 12px;
+  border-left: 2px solid var(--line);
+  padding: 4px 0 4px 14px;
+}
+
+.tool-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 3px 0;
+  font: 13px/1.6 var(--mono);
+}
+
+.tool-id {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-note {
+  margin: 6px 0 0;
+  font: 11px/1.5 var(--sans);
+  color: var(--slate);
+}
+
 .to-latest[data-active="false"] {
   display: none;
 }

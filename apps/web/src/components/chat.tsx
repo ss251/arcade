@@ -51,6 +51,65 @@ const Quoted = ({ children }: { children: string }) => (
   </blockquote>
 )
 
+/**
+ * Prices, rendered from the TOOL'S OUTPUT rather than from the model's sentence about it.
+ *
+ * The figure exists twice on every turn: once in `part.output`, computed by the hub and
+ * already formatted, and once in whatever the model chose to say about it. Rendering the
+ * second is what made the model's arithmetic load-bearing — a small model writing "about
+ * half a cent" for $0.0005 would be uncatchable, because the trustworthy copy was thrown
+ * away one layer earlier. Rendering the first makes the model's rounding cosmetic.
+ *
+ * It also restores `ui.ts`'s law on this surface. Mono is what was MEASURED, sans is what
+ * was CLAIMED — the settlement page has kept that distinction in every row it has rendered,
+ * and a chat that prints every figure inside a sentence collapses it, putting hub-computed
+ * numbers in the claimed voice. Here the typography does the arguing: the price is mono and
+ * carries the USDC colour because the hub computed it; the prose around it stays sans.
+ *
+ * Scoped to listings and quotes, where a price is the whole point. Receipts are deliberately
+ * NOT mirrored here — they already live on the hub page, and a second home for them would be
+ * the second copy this codebase keeps deleting.
+ */
+const Listings = ({ skills }: { skills: ReadonlyArray<{ id: string; price: string }> }) => (
+  <div className="tool-out">
+    {skills.map((s) => (
+      <div className="tool-row" key={s.id}>
+        <span className="tool-id">{s.id}</span>
+        <span className="usdc">{s.price}</span>
+      </div>
+    ))}
+  </div>
+)
+
+const Quote = ({ skillId, price }: { skillId: string; price: string }) => (
+  <div className="tool-out">
+    <div className="tool-row">
+      <span className="tool-id">{skillId}</span>
+      <span className="usdc">{price}</span>
+    </div>
+    <p className="tool-note">quoted from the endpoint’s own payment challenge · signs nothing</p>
+  </div>
+)
+
+/** Read the structured half, defensively — a shape we do not recognise renders nothing. */
+const ToolOutput = ({ name, output }: { name: string; output: unknown }) => {
+  if (output === null || typeof output !== "object") return null
+  const o = output as Record<string, unknown>
+
+  if (name === "arcade_list_skills" && Array.isArray(o["skills"])) {
+    const skills = (o["skills"] as ReadonlyArray<Record<string, unknown>>)
+      .filter((s) => typeof s["id"] === "string" && typeof s["price"] === "string")
+      .map((s) => ({ id: s["id"] as string, price: s["price"] as string }))
+    return skills.length === 0 ? null : <Listings skills={skills} />
+  }
+
+  if (name === "arcade_quote" && typeof o["price"] === "string" && typeof o["skillId"] === "string") {
+    return <Quote skillId={o["skillId"] as string} price={o["price"] as string} />
+  }
+
+  return null
+}
+
 const TextPart = ({ text }: { text: string }) => {
   const { body, quoted } = unfence(text)
   return quoted ? <Quoted>{body}</Quoted> : <p className="prose">{body}</p>
@@ -80,12 +139,12 @@ export const Thread = ({ messages }: { messages: ReadonlyArray<UIMessageLike> })
                 return <TextPart key={i} text={part.text ?? ""} />
               }
               if (part.type.startsWith("tool-")) {
+                const name = part.type.slice("tool-".length)
                 return (
-                  <ToolMarker
-                    key={i}
-                    name={part.type.slice("tool-".length)}
-                    state={part.state ?? ""}
-                  />
+                  <div key={i}>
+                    <ToolMarker name={name} state={part.state ?? ""} />
+                    <ToolOutput name={name} output={part.output} />
+                  </div>
                 )
               }
               return null
@@ -105,6 +164,8 @@ export interface UIMessageLike {
     readonly type: string
     readonly text?: string | undefined
     readonly state?: string | undefined
+    /** The tool's structured result. THE authoritative copy of every figure. */
+    readonly output?: unknown
   }>
 }
 
