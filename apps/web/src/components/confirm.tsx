@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { ArcMark, UsdcMark } from "./marks.tsx"
 
 /**
  * The purchase confirmation. The one thing in this product a judge will photograph.
@@ -7,23 +8,28 @@ import { useEffect, useRef, useState } from "react"
  *
  * design-sauce Law 5 is asymmetric timing: slow where the user deliberates, snappy where
  * the system responds. A hold-to-approve on a card that spends real USDC is the correct
- * physical expression of that, not decoration — the deliberation is the point, and a button
- * that spends on a single click is indistinguishable from one that dismisses a tooltip.
- * 900ms linear while held; release and dismissal are ~200ms ease-out.
+ * physical expression of that, not decoration — a button that spends on a single click is
+ * indistinguishable from one that dismisses a tooltip. 900ms linear while held; release and
+ * dismissal are ~200ms ease-out.
+ *
+ * ## The price is the subject
+ *
+ * It used to be 17px in a 13px header row — a table cell. It is now its own block at 32px
+ * against 11px labels, which is the ratio every wallet confirmation uses, because the amount
+ * is the thing being decided about and everything else is context for it.
+ *
+ * ## The address is weighted, not truncated
+ *
+ * This card's job is letting someone verify who gets their money, so showing more of the
+ * string beats showing less. The full 42 characters render, with the first six and last four
+ * bold and the middle demoted — the eye checks the ends against another source, and hiding
+ * the middle removes the option of checking anything else.
  *
  * ## It takes no new colour
  *
- * Blue is USDC, green is settled, red is not-settled. Spending a fourth semantic hue on
- * "this is important" would erode the three that carry money meaning — the same call as
- * refusing `--refuse` for the sandbox band. The card earns attention through weight, a
- * border and the hold itself.
- *
- * ## Everything on it is measured
- *
- * Price, payee and network come from the signing request the server derived from the
- * approved arguments (T-EXEC-005), so every figure here is mono. There is no seller prose
- * on this card at all: a purchase confirmation is the last place a stranger's words should
- * be able to influence a decision, and the model's summary lives in the message above it.
+ * Blue is USDC, green is settled, red is not-settled. The card earns attention through
+ * surface, scale and the hold. The two brand marks are self-contained objects, which is a
+ * different category from a semantic hue.
  */
 
 export interface ConfirmProps {
@@ -38,9 +44,53 @@ export interface ConfirmProps {
 }
 
 const HOLD_MS = 900
+const COPIED_MS = 1200
 
-const short = (addr: string): string =>
-  addr.length > 12 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr
+/**
+ * Copy, with the failure path taken seriously.
+ *
+ * `navigator.clipboard` is undefined on a non-secure origin, and `writeText` can reject. A
+ * copy affordance that says "copied" when nothing was copied is worse than none at all on
+ * this card specifically — someone would paste a stale address and send money to it.
+ */
+const CopyButton = ({ value, label }: { value: string; label: string }) => {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle")
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // Same class of leak the hold interval guards against: a card dismissed mid-timeout must
+  // not leave a setState pointed at an unmounted component.
+  useEffect(() => () => clearTimeout(timer.current), [])
+
+  const copy = () => {
+    const done = (s: "copied" | "failed") => {
+      setState(s)
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => setState("idle"), COPIED_MS)
+    }
+    if (navigator.clipboard?.writeText === undefined) return done("failed")
+    navigator.clipboard.writeText(value).then(() => done("copied"), () => done("failed"))
+  }
+
+  return (
+    <span className="copy-wrap">
+      <button type="button" className="copy" onClick={copy} aria-label={`Copy ${label}`}>
+        {state === "copied" ? "✓" : state === "failed" ? "!" : "⧉"}
+      </button>
+      <span className="copy-said" aria-live="polite">
+        {state === "copied" ? "copied" : state === "failed" ? "couldn’t copy" : ""}
+      </span>
+    </span>
+  )
+}
+
+/** First six and last four carry the verification; the middle is demoted, never hidden. */
+const Address = ({ value }: { value: string }) => (
+  <span className="addr" title={value}>
+    <b>{value.slice(0, 6)}</b>
+    <span className="addr-mid">{value.slice(6, -4)}</span>
+    <b>{value.slice(-4)}</b>
+  </span>
+)
 
 export const Confirm = ({
   skillId,
@@ -60,8 +110,6 @@ export const Confirm = ({
     setProgress(0)
   }
 
-  // Teardown on unmount as well as on release: a card that disappears mid-hold must not
-  // leave an interval that fires `onApprove` for a purchase nobody is looking at.
   useEffect(() => stop, [])
 
   const start = () => {
@@ -77,24 +125,53 @@ export const Confirm = ({
     }, 16)
   }
 
+  const label = blocked === undefined ? `hold to pay ${price}` : "unavailable"
+
   return (
     <div className="confirm" role="group" aria-label={`Confirm purchase of ${skillId}`}>
+      {/*
+        The purchase is already a four-node graph — discover → quote → approve → settle — and
+        every other surface renders it as prose. This card IS node three, so saying so costs a
+        constant and no new state, and it is the one element that says the product is a graph
+        rather than a form.
+      */}
+      <div className="steps" aria-label="Step 3 of 4: approve">
+        <span className="step-ticks" aria-hidden="true">
+          <i className="done" />
+          <i className="done" />
+          <i className="now" />
+          <i />
+        </span>
+        <span className="step-said">step 3 of 4 · approve</span>
+      </div>
+
       <div className="confirm-head">
         <span className="confirm-what">buy</span>
         <span className="tool-id">{skillId}</span>
-        <span className="usdc">{price}</span>
+      </div>
+
+      {/* The subject of the card. Mark at cap height beside it, not decorating it. */}
+      <div className="price-block">
+        <UsdcMark />
+        <span className="price-big">{price}</span>
       </div>
 
       <dl className="confirm-facts">
-        <div>
-          <dt>pays</dt>
-          <dd className="measured" title={payTo}>
-            {short(payTo)}
+        <div className="fact">
+          <dt>
+            pays
+            <CopyButton value={payTo} label="the payout address" />
+          </dt>
+          <dd>
+            <Address value={payTo} />
           </dd>
         </div>
-        <div>
+        <div className="fact">
           <dt>network</dt>
-          <dd className="measured">{network}</dd>
+          <dd className="net">
+            <ArcMark />
+            <span className="measured">{network}</span>
+          </dd>
         </div>
       </dl>
 
@@ -116,9 +193,8 @@ export const Confirm = ({
           className="approve"
           /*
            * `--p` is the ONLY statement of hold progress. The fill scales off it and the
-           * inverted label clips off it, so the bar and the text it has to stay legible
-           * against cannot drift apart. Writing progress into two inline styles would be
-           * two facts that must agree — the shape this codebase keeps deleting.
+           * inverted label clips off it, so the bar and the text it must stay legible
+           * against cannot drift apart.
            */
           style={{ "--p": progress } as React.CSSProperties}
           disabled={blocked !== undefined}
@@ -129,18 +205,10 @@ export const Confirm = ({
           aria-label={`Hold to approve paying ${price} for ${skillId}`}
         >
           <span className="approve-fill" aria-hidden="true" />
-          <span className="approve-label">
-            {blocked === undefined ? `hold to pay ${price}` : "unavailable"}
-          </span>
-          {/*
-            The same label again, in the colour legible on the fill, clipped to the filled
-            region. aria-hidden because a screen reader must not read the button twice — it
-            is a contrast device, not content.
-          */}
+          <span className="approve-label">{label}</span>
+          {/* Contrast device, not content — hence aria-hidden. */}
           <span className="approve-invert" aria-hidden="true">
-            <span className="approve-label">
-              {blocked === undefined ? `hold to pay ${price}` : "unavailable"}
-            </span>
+            <span className="approve-label">{label}</span>
           </span>
         </button>
       </div>
