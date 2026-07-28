@@ -31,6 +31,14 @@ import { PaymentPayload, PaymentRequirements } from "@arcade/payments"
 export interface ListingRecord {
   readonly listing: PublicListing
   readonly seller: string
+  /**
+   * The seller's FeeSplitter, when they announced one. Discovery must advertise it, because
+   * it is the address a buyer has to sign `payTo` for — `eip3009.ts` rejects a signature
+   * naming anything else with "payTo mismatch". A discovery document advertising the seller
+   * EOA while the challenge names the splitter is not "less authoritative", it is wrong: it
+   * tells a stranger to sign a payment that will be refused.
+   */
+  readonly feeSplitter?: string | undefined
 }
 
 export interface OpenApiParams {
@@ -424,7 +432,7 @@ phrased. The MCP server fences results for exactly this reason.
  */
 export const buildWellKnownX402 = (params: OpenApiParams): Record<string, unknown> => ({
   x402Version: 2,
-  resources: params.listings.map(({ listing, seller }) => ({
+  resources: params.listings.map(({ listing, seller, feeSplitter }) => ({
     resource: `${params.origin}/x/${seller}/${listing.id}`,
     method: "POST",
     description: listing.description,
@@ -433,7 +441,8 @@ export const buildWellKnownX402 = (params: OpenApiParams): Record<string, unknow
         scheme: "exact",
         network: params.network,
         asset: params.asset,
-        payTo: seller,
+        // The splitter when there is one, exactly as the 402 does. Same fact, one source.
+        payTo: feeSplitter ?? seller,
         // `amount`, matching what the rail puts on the wire. This document advertises what
         // a call will cost; the authoritative requirements — including the signing domain
         // and validity window — come from the 402 the endpoint itself returns.

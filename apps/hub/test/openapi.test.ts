@@ -264,3 +264,69 @@ describe("/.well-known/x402", () => {
     expect(wk).not.toContain("agent.ts")
   })
 })
+
+/**
+ * Discovery and the 402 challenge must describe the SAME resource and the SAME payee.
+ *
+ * Two live interop defects, found by pointing Circle's own CLI at the deployed endpoint:
+ *
+ * 1. `/.well-known/x402` advertised `https://…` while the 402 named `http://…` for the
+ *    identical listing. Behind a proxy `new URL(req.url).origin` is the internal http
+ *    origin — Railway terminates TLS — and only the discovery routes had been routed
+ *    through `ARCADE_PUBLIC_URL`. `resource` is part of what a buyer binds to, so a strict
+ *    client comparing the URL it fetched against the one in the challenge sees a mismatch.
+ *
+ * 2. Discovery advertised the seller EOA while the challenge named the fee splitter. That
+ *    is not "less authoritative", it is wrong: `packages/payments/src/eip3009.ts` rejects a
+ *    signature naming anything but the challenge's payTo with "payTo mismatch", so the
+ *    document whose entire job is telling a stranger how to pay was telling them how to be
+ *    refused.
+ *
+ * These assert the AGREEMENT rather than either value, because the failure was never a bad
+ * constant — it was two places computing the same fact independently.
+ */
+describe("discovery agrees with the challenge", () => {
+  const PUBLIC = "https://arcade-hub-production.up.railway.app"
+  const SPLITTER = "0x10079b0b01d6843460ab784510adfe220862f896"
+
+  const params = (feeSplitter?: string) => ({
+    listings: [
+      { listing: toPublicListing(manifest()), seller: SELLER, ...(feeSplitter === undefined ? {} : { feeSplitter }) }
+    ],
+    origin: PUBLIC,
+    rail: "eip3009",
+    network: ARC_CAIP2,
+    asset: USDC_ADDRESS
+  })
+
+  const first = (p: ReturnType<typeof params>) =>
+    (buildWellKnownX402(p)["resources"] as ReadonlyArray<Record<string, unknown>>)[0]!
+
+  it("advertises the resource on the PUBLIC origin, never the bound socket", () => {
+    const r = String(first(params())["resource"])
+    expect(r.startsWith(`${PUBLIC}/x/`)).toBe(true)
+    // The specific regression: a service that only serves https must never advertise http.
+    expect(r.startsWith("http://")).toBe(false)
+  })
+
+  it("advertises the SPLITTER as payTo when the seller announced one", () => {
+    const accepts = first(params(SPLITTER))["accepts"] as ReadonlyArray<Record<string, unknown>>
+    expect(accepts[0]!["payTo"]).toBe(SPLITTER)
+    expect(accepts[0]!["payTo"]).not.toBe(SELLER)
+  })
+
+  it("falls back to the seller when there is no splitter", () => {
+    // The inverse. Advertising a splitter that does not exist would be the same defect
+    // pointing the other way.
+    const accepts = first(params())["accepts"] as ReadonlyArray<Record<string, unknown>>
+    expect(accepts[0]!["payTo"]).toBe(SELLER)
+  })
+
+  it("uses one origin for the resource path the challenge will build", () => {
+    // The hub builds the 402's resource as `${publicOrigin(url)}${path}` where path is
+    // `/x/<seller>/<id>`. This asserts discovery composes the identical string, which is
+    // what makes the two documents comparable by a client at all.
+    const r = String(first(params())["resource"])
+    expect(r).toBe(`${PUBLIC}/x/${SELLER}/counterparty-brief`)
+  })
+})

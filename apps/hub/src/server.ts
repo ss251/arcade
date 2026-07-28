@@ -162,6 +162,21 @@ const preflight = (): void => {
   }
 }
 
+/**
+ * The origin buyers can actually reach.
+ *
+ * Behind a proxy `new URL(req.url).origin` is the INTERNAL http origin — Railway terminates
+ * TLS, so a service that only serves https advertises `http://…` if it uses that directly.
+ * The discovery documents already went through `ARCADE_PUBLIC_URL`; the 402 challenge did
+ * not, so the same process served an https resource in /.well-known/x402 and an http one in
+ * the challenge for the identical listing. `docs/runbook.md:18` names this exact failure and
+ * the fix had reached only half of it.
+ *
+ * One function rather than two `??` expressions, because two places computing the same fact
+ * is how they came to disagree.
+ */
+const publicOrigin = (url: URL): string => process.env["ARCADE_PUBLIC_URL"] ?? url.origin
+
 const railLayer = () => {
   switch (RAIL) {
     case "gateway":
@@ -629,7 +644,7 @@ const main = Effect.gen(function* () {
         const listings = await run(store.allListings)
         const discovery = {
           listings,
-          origin: process.env["ARCADE_PUBLIC_URL"] ?? url.origin,
+          origin: publicOrigin(url),
           rail: rail.name,
           network: ARC_CAIP2,
           asset: USDC_ADDRESS
@@ -760,7 +775,7 @@ const main = Effect.gen(function* () {
         const { listing, seller } = found.right
 
         const priceAtomic = parsePrice(listing.price)
-        const resource = `${url.origin}${path}`
+        const resource = `${publicOrigin(url)}${path}`
 
         const header =
           req.headers.get(HEADER_PAYMENT_SIGNATURE) ?? req.headers.get(HEADER_PAYMENT_LEGACY)
