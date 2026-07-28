@@ -20,6 +20,12 @@ import { ArcMark, UsdcMark } from "./marks.tsx"
  *
  * ## The address is weighted, not truncated
  *
+ * MEASURED, because demoting 32 of 42 characters to `--slate` was the one change here that
+ * could have hurt a security-critical element. On the card surface the ends read 16.44:1
+ * light / 13.63:1 dark and the demoted middle 5.39:1 / 5.77:1 — both middles clear AA text
+ * at 4.5:1. **This row now depends on `--slate` staying above that**, which was not true of
+ * anything else using it, so changing that token means re-measuring here.
+ *
  * This card's job is letting someone verify who gets their money, so showing more of the
  * string beats showing less. The full 42 characters render, with the first six and last four
  * bold and the middle demoted — the eye checks the ends against another source, and hiding
