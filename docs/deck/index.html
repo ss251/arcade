@@ -198,12 +198,12 @@
           <tr><td>Full paid call</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x5eb961c09f7acd8960be76e6034c9f7d6a80050e4e7e0f26a61eed1845eb8142">0x5eb961c0…</a></td></tr>
           <tr><td>Across two machines</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0xf45de149c07385a52b6d3c9aa9d4c4a92fd26736ccbb1434cfc80b4d688f8368">0xf45de149…</a> · runner on a separate host</td></tr>
           <tr><td>Gateway Nanopayments</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x5ede9428611e7f1fb0eeadfc1cda4843fc3d6c9afcbbb9fe19ee6c5b34174388">0x5ede9428…</a> · gas-free, $0.000001 floor</td></tr>
-          <tr><td>Deployed-hub settlement</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x6366215e96a33e97e4a177453c858e9b1b8639fcff4bb72e1e7dcf5459fc8143">0x6366215e…</a> · public hub's first sale, split 95/5 on-chain by the fee splitter</td></tr>
+          <tr><td>Deployed-hub settlement</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x9c05e514fd3b1bf05c4e4e3182064560d66048da376d9908d1616c4f8532ecef">0x9c05e514…</a> · $0.01 → $0.0095 seller + $0.0005 fee, split on-chain by the fee splitter</td></tr>
         </tbody>
       </table>
     </div>
     <p>The two-machine run matters more than the rest. On one host, "seller code never leaves the seller's machine" is unfalsifiable. So it was run with the hub on one box and the runner on another over Tailscale — the runner working from a fresh clone — asserting afterwards that the hub held no engine config, entry path, or egress rule.</p>
-    <p>Since Checkpoint 2 the whole pipeline moved from dev runs to a deployed marketplace: the hub is live on a public URL, its first sale settled through the fee-splitter contract, and the receipt — hash, split, latency — is served by the hub itself at <a href="https://arcade-hub-production.up.railway.app/receipts"><span class="mono">/receipts</span></a>.</p>
+    <p>Since Checkpoint 2 the whole pipeline moved from dev runs to a deployed marketplace: the hub is live on a public URL, its sales settle through the fee-splitter contract, and every receipt — hash, split, latency — is served by the hub itself at <a href="https://arcade-hub-production.up.railway.app/receipts"><span class="mono">/receipts</span></a>.</p>
   </section>
 
   <section>
