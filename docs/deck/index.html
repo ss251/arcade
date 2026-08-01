@@ -198,10 +198,12 @@
           <tr><td>Full paid call</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x5eb961c09f7acd8960be76e6034c9f7d6a80050e4e7e0f26a61eed1845eb8142">0x5eb961c0…</a></td></tr>
           <tr><td>Across two machines</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0xf45de149c07385a52b6d3c9aa9d4c4a92fd26736ccbb1434cfc80b4d688f8368">0xf45de149…</a> · runner on a separate host</td></tr>
           <tr><td>Gateway Nanopayments</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x5ede9428611e7f1fb0eeadfc1cda4843fc3d6c9afcbbb9fe19ee6c5b34174388">0x5ede9428…</a> · gas-free, $0.000001 floor</td></tr>
+          <tr><td>Deployed-hub settlement</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x6366215e96a33e97e4a177453c858e9b1b8639fcff4bb72e1e7dcf5459fc8143">0x6366215e…</a> · public hub's first sale, split 95/5 on-chain by the fee splitter</td></tr>
         </tbody>
       </table>
     </div>
     <p>The two-machine run matters more than the rest. On one host, "seller code never leaves the seller's machine" is unfalsifiable. So it was run with the hub on one box and the runner on another over Tailscale — the runner working from a fresh clone — asserting afterwards that the hub held no engine config, entry path, or egress rule.</p>
+    <p>Since Checkpoint 2 the whole pipeline moved from dev runs to a deployed marketplace: the hub is live on a public URL, its first sale settled through the fee-splitter contract, and the receipt — hash, split, latency — is served by the hub itself at <a href="https://arcade-hub-production.up.railway.app/receipts"><span class="mono">/receipts</span></a>.</p>
   </section>
 
   <section>
@@ -238,7 +240,7 @@
         <tbody>
           <tr><td>Agent Wallet</td><td>Seller's earnings account — earned <strong>19.99 → 20.00 USDC</strong> live through the marketplace. Funded via CLI faucet.</td></tr>
           <tr><td>Nanopayments</td><td>Verified working on Arc: gas-free both sides, $0.000001 minimum. Ships as a conformance-tested rail.</td></tr>
-          <tr><td>Circle CLI</td><td><code>circle services pay --chain ARC-TESTNET</code> discovers our listing and parses our 402 — its rejections found two real interop bugs in our wire format.</td></tr>
+          <tr><td>Circle CLI</td><td><code>circle services inspect</code>, pointed at the deployed hub, reads our live 402 as <strong>payable · $0.01 USDC · eip155:5042002</strong> — Circle's own tooling parses our paywall with no adapter on either side.</td></tr>
           <tr><td>USDC on Arc</td><td>Native gas <em>and</em> the 6-decimal ERC-20 at one address. Every price, payment and receipt is atomic units; gas math kept strictly separate.</td></tr>
         </tbody>
       </table>
@@ -249,7 +251,7 @@
     <p class="eyebrow">Rigor</p>
     <h2>Where the bodies were found.</h2>
     <div class="figs">
-      <div class="fig"><span class="n">157</span><span class="l">TypeScript tests</span></div>
+      <div class="fig"><span class="n">498</span><span class="l">TypeScript tests</span></div>
       <div class="fig"><span class="n">13</span><span class="l">Foundry tests</span></div>
       <div class="fig"><span class="n">12</span><span class="l">audit agents</span></div>
       <div class="fig"><span class="n">6</span><span class="l">convergent defects</span></div>
@@ -260,7 +262,7 @@
 
   <section>
     <p class="eyebrow">Status</p>
-    <h2>Shipped, and what's next.</h2>
+    <h2>Everything promised at Checkpoint 2, shipped.</h2>
     <div class="split">
       <div>
         <h3>Working today</h3>
@@ -268,18 +270,21 @@
           <li>both payment rails, conformance-tested</li>
           <li>hub: paywall, broker, settle pipeline</li>
           <li>runner with sandboxed execution</li>
-          <li>buyer SDK + CLI</li>
+          <li>buyer SDK + CLI + MCP server</li>
           <li>schema-derived OpenAPI discovery</li>
+          <li>fee splitter audited, deployed, wired</li>
+          <li>Claude Agent SDK engine adapter</li>
+          <li>agent-hires-agent, per-call spend caps</li>
+          <li>receipt-gated ratings</li>
         </ul>
       </div>
       <div>
-        <h3>By final submission</h3>
+        <h3>Live now</h3>
         <ul>
-          <li>fee splitter deployed and wired</li>
-          <li>Claude Agent SDK engine adapter</li>
-          <li>web marketplace + MCP server</li>
-          <li>agent-hires-agent chain</li>
-          <li>receipt-gated ratings</li>
+          <li><a href="https://arcade-hub-production.up.railway.app">the hub</a> — marketplace, paywall, settlement</li>
+          <li><a href="https://arcade-hub-production.up.railway.app/receipts">receipts</a> — settled on Arc, served by the hub</li>
+          <li><a href="https://arcade-web-production-8dc4.up.railway.app">web client</a> — the buyer-side surface</li>
+          <li><a href="https://github.com/ss251/arcade">the repo</a> — public, 511 tests green</li>
         </ul>
       </div>
     </div>
@@ -287,7 +292,7 @@
   </section>
 
   <footer>
-    <p><a href="https://github.com/ss251/arcade">github.com/ss251/arcade</a> · Checkpoint 2 · Agentic Economy track<br>
+    <p><a href="https://arcade-hub-production.up.railway.app">arcade-hub-production.up.railway.app</a> · <a href="https://github.com/ss251/arcade">github.com/ss251/arcade</a> · Checkpoint 3 · Agentic Economy track<br>
     All transaction links resolve on Arc testnet via ArcScan.</p>
   </footer>
 
