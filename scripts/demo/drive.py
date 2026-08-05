@@ -24,6 +24,7 @@ are their own tell, and the jitter is what stops the typing reading as a macro.
 """
 
 import random
+import re
 import time
 
 CPS = 18.0
@@ -45,7 +46,43 @@ def focus_composer() -> None:
     time.sleep(0.25)
 
 
+"""
+Long hex — addresses (40 nibbles) and transaction hashes (64) — is PASTED, not typed.
+
+Nobody types out a 42-character address by hand. Watching one appear key by key at a human
+rate is both slow and quietly false: it says the person memorised an address, which is the
+one thing no viewer will believe. A real user copies it from a wallet or an explorer and
+hits paste, so the prose around it types and the address lands whole.
+"""
+HEX_RUN = re.compile(r"0x[a-fA-F0-9]{40}(?:[a-fA-F0-9]{24})?")
+
+# The beat where a hand leaves the keyboard for ⌘V and comes back.
+PASTE_PAUSE = 0.45
+
+
+def paste_text(text: str) -> None:
+    """Insert in one event, the way a paste arrives — no per-character key events."""
+    cdp("Input.insertText", text=text)
+
+
 def type_text(text: str, cps: float = CPS) -> None:
+    """
+    Type prose at a human rate; paste any address or hash inside it.
+
+    Splitting here rather than at the call site means every prompt in the shoot gets this
+    without the driver having to remember, which is the only way it stays true across takes.
+    """
+    pos = 0
+    for m in HEX_RUN.finditer(text):
+        _type_keys(text[pos : m.start()], cps)
+        time.sleep(PASTE_PAUSE)
+        paste_text(m.group(0))
+        time.sleep(PASTE_PAUSE)
+        pos = m.end()
+    _type_keys(text[pos:], cps)
+
+
+def _type_keys(text: str, cps: float = CPS) -> None:
     """Dispatch real keystrokes. Assumes the composer already has focus."""
     for ch in text:
         # EXACTLY ONE event may carry `text`. Chrome inserts on any key event that has it,
