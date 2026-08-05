@@ -39,7 +39,16 @@ TEXT = ROOT / "docs" / "narration"
 WORK = ROOT / "design" / "work"
 OUT = ROOT / "design" / "arcade-cp3.mp4"
 
+# The recorded frame, and the frame this SHIPS in.
+#
+# Chrome's tab sidebar makes the content area 1864 wide, which is 1.726:1 — not 16:9. A
+# submission that is not 16:9 is at the mercy of whatever player a judge opens it in:
+# letterboxed on one, pillarboxed on another, cropped on a third. So the picture is padded
+# out to 1920×1080 rather than stretched, and padded with the design's own paper colour
+# instead of black, which makes the 28px either side invisible on this composition.
 W, H = 1864, 1080
+OUT_W, OUT_H = 1920, 1080
+PAPER = "0x161513"
 FPS = 30
 
 # take, in-point (s), narration beat, tail of silence after the voice (s)
@@ -246,9 +255,14 @@ def main() -> None:
         )
         prev = label
 
+    # Pad LAST, so caption overlays are positioned against the recorded frame and the bars
+    # land outside everything.
+    chain.append(
+        f"[{prev}]pad={OUT_W}:{OUT_H}:(ow-iw)/2:(oh-ih)/2:color={PAPER}[padded]"
+    )
     args += [
         "-filter_complex", ";".join(chain),
-        "-map", f"[{prev}]", "-map", "1:a",
+        "-map", "[padded]", "-map", "1:a",
         "-c:v", "libx264", "-preset", "slow", "-crf", "19", "-pix_fmt", "yuv420p",
         "-c:a", "copy", "-movflags", "+faststart",
         "-shortest", str(OUT),
