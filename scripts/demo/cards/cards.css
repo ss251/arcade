@@ -57,10 +57,22 @@ body {
   place-items: center;
 }
 
+/*
+ * Fills the VIEWPORT, whatever it is — not a fixed 1920×1080 box.
+ *
+ * The fixed size assumed the recording frame and the browser viewport were the same
+ * rectangle. They are not: Chrome's own chrome (a tab sidebar, here ~55px) eats into it, so
+ * a 1920px card inside an 1810px viewport centred and clipped ~55px off EACH side. On a
+ * screenshot of the file alone it looked perfect; only in the window it will actually be
+ * recorded through did the edges go missing.
+ *
+ * `100vw/100vh` with proportional padding means the composition is correct in any frame,
+ * which is also what makes these safe to re-record at a different size later.
+ */
 .card {
-  width: 1920px;
-  height: 1080px;
-  padding: 110px 130px;
+  width: 100vw;
+  height: 100vh;
+  padding: 10vh 6.8vw;
   display: flex;
   flex-direction: column;
   justify-content: center;

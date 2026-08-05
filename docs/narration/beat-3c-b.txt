@@ -1,0 +1,1 @@
+USDC moves on Arc. Here is the transaction: one cent in, and nought point nine five of a cent out to the seller. If the job had refused, timed out, or returned the wrong shape, nothing would have been broadcast. That is the refund — there is nothing to refund, because nothing was taken.

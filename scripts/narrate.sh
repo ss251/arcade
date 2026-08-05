@@ -33,7 +33,7 @@ MODEL="${ELEVENLABS_MODEL:-eleven_multilingual_v2}"
 window_for() {
   case "$1" in
     beat-1) echo 18 ;; beat-2) echo 14 ;; beat-3a) echo 20 ;; beat-3b) echo 28 ;;
-    beat-3c) echo 28 ;; beat-3d) echo 24 ;; beat-4) echo 22 ;; beat-5) echo 16 ;;
+    beat-3c-a) echo 12 ;; beat-3c-b) echo 22 ;; beat-3d) echo 24 ;; beat-4) echo 22 ;; beat-5) echo 16 ;;
     beat-6) echo 10 ;; *) echo 0 ;;
   esac
 }

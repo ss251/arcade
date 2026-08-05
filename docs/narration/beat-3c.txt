@@ -1,1 +1,0 @@
-The work runs on the seller's own machine. The output is validated against the listing's own schema, and only then is the authorization broadcast. USDC moves on Arc. Here is the transaction. If the job had refused, timed out, or returned the wrong shape, nothing would have been broadcast. That is the refund. There is nothing to refund, because nothing was taken.

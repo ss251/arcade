@@ -1,0 +1,1 @@
+The work runs on the seller's own machine. The output is validated against the listing's own schema, and only then is the authorization broadcast.
