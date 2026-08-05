@@ -2,6 +2,7 @@ import { anthropic } from "@ai-sdk/anthropic"
 import { google } from "@ai-sdk/google"
 import { groq } from "@ai-sdk/groq"
 import { deepseek } from "@ai-sdk/deepseek"
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
 
 /**
@@ -52,7 +53,26 @@ const PROVIDERS: Record<string, { factory: Factory; keyVar: string }> = {
    * provider contract. Worth stating because the number reads like an incompatibility and
    * is not one.
    */
-  deepseek: { factory: (id) => deepseek(id), keyVar: "DEEPSEEK_API_KEY" }
+  deepseek: { factory: (id) => deepseek(id), keyVar: "DEEPSEEK_API_KEY" },
+  /*
+   * OpenRouter, through the OpenAI-compatible transport rather than its own package —
+   * @openrouter/ai-sdk-provider declares no @ai-sdk/provider dependency to check against,
+   * while @ai-sdk/openai-compatible pins 4.0.5, the contract this stack runs. One fewer
+   * unverifiable boundary.
+   *
+   * Model ids are namespaced upstream, so the spec nests: ARCADE_MODEL carries
+   * `openrouter:deepseek/deepseek-v4-flash`. `parseModel` splits on the FIRST colon only,
+   * which is what makes that work without a second variable.
+   */
+  openrouter: {
+    factory: (id) =>
+      createOpenAICompatible({
+        name: "openrouter",
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey: process.env["OPENROUTER_API_KEY"] ?? ""
+      })(id),
+    keyVar: "OPENROUTER_API_KEY"
+  }
 }
 
 export const DEFAULT_MODEL = "anthropic:claude-opus-5"
