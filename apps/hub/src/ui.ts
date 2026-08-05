@@ -220,6 +220,22 @@ const STYLE = `
   --mono: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
+/*
+ * The document scrollbar is hidden, matching apps/web.
+ *
+ * macOS "Show scroll bars: Always" turns overlay scrollbars off system-wide, so this page —
+ * which is always taller than the viewport, because the receipt tape grows — carries a
+ * permanent 15px grey bar down its right edge. On a page whose whole argument is that the
+ * numbers are quiet and the evidence speaks, that bar is the loudest thing in frame.
+ *
+ * Both dialects, because either alone leaves the bar on the other engine. The long version
+ * of this reasoning, and the test that enforces it, live in apps/web/src/styles.css.
+ *
+ * NB: no backticks in this comment. The whole stylesheet is a TS template literal, and one
+ * backtick here ends it — a gotcha this file has already produced once.
+ */
+html{scrollbar-width:none}
+html::-webkit-scrollbar{width:0;height:0}
 body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 var(--sans);
   -webkit-font-smoothing:antialiased}
 .wrap{max-width:920px;margin:0 auto;padding:40px 24px 88px}

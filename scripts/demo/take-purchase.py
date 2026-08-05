@@ -104,8 +104,12 @@ mark("buy sent")
 
 # Wait for the card rather than sleeping a guessed interval — a fixed sleep here is how a
 # take ends up holding on an empty space because the model was half a second slower.
+# 60s, not 30. Measured across ten runs, the model takes anywhere from 9 to 30 seconds to
+# reach the card — it lists, describes and quotes before preparing a purchase, and how long
+# that takes is not ours to control. A poll that expires at the top of the observed range
+# would abort a take that was about to succeed.
 appeared = False
-for _ in range(120):
+for _ in range(240):
     if js("return !!document.querySelector('.approve')") is True:
         appeared = True
         break

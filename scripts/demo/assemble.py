@@ -55,17 +55,21 @@ FPS = 30
 CUT = [
     ("beat1-problem", 0.0, "beat-1", 1.2),
     ("beat2-marketplace", 0.5, "beat-2", 1.2),
-    # The purchase is ONE take; these three enter it at different points.
+    # The purchase is ONE take; these three enter it at different points, and every entry
+    # point below was MEASURED off the footage rather than guessed.
     #
-    # 16.0, not 12.0: macOS paints a "To exit full screen, press and hold esc" hint whenever
-    # a window takes focus in a fullscreen space, and it sits over the top of the frame until
-    # about t=16. Entering after it is free — the beat has headroom — and it is the only one
-    # of these tooltips that CAN be avoided. The one over the wallet prompt cannot: it
-    # overlaps MetaMask's own header, so patching it would cover real content, and a brief
-    # system hint is a better artifact than an edited-over dialog.
-    ("take-purchase", 16.0, "beat-3a", 1.0),
-    ("take-purchase", 33.0, "beat-3b", 1.0),
-    ("take-purchase", 68.0, "beat-3c-a", 0.4),
+    # That distinction cost a whole cut. `beat-3b` was set to 33.0 by estimating where the
+    # card "should" be; the card actually appeared thirteen seconds later, so the hero beat
+    # opened on a near-empty screen while the narration described a confirmation card that
+    # was not there. Nothing caught it — the take was healthy, the segment was the right
+    # length, the caption was the right words. It was pointed at the wrong part of the take.
+    #
+    # `take-purchase.py` now prints a timesheet; these numbers come from it, cross-checked
+    # against extracted frames. Re-derive them after every reshoot: the model takes anywhere
+    # from 9 to 30 seconds to reach the card, so these do NOT survive a new take.
+    ("take-purchase", 23.0, "beat-3a", 1.0),   # catalogue up
+    ("take-purchase", 41.0, "beat-3b", 1.0),   # card at 42, held to ~56, wallet 58+
+    ("take-purchase", 72.0, "beat-3c-a", 0.4),  # settled result on screen
     ("take-arcscan", 2.0, "beat-3c-b", 1.4),
     # 1.0, not 1.2: this line runs 20.85s against a 22s take, so the tail is what is left
     # rather than what is preferred. The assembler refuses to stretch, which is the right
