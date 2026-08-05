@@ -57,10 +57,13 @@ export const COMMANDS: ReadonlyArray<Command> = [
     name: "buy",
     hint: "quote, then ask me to confirm",
     arg: "skill",
+    // Spells out the one-turn requirement. Models reliably quote and then STOP, announcing
+    // a purchase they never prepare — and since the confirmation card only exists once
+    // arcade_call_skill has run, that leaves the visitor staring at a promise.
     expand: (a) =>
       a === ""
-        ? "Which skill should I buy? Quote it first, then prepare the purchase."
-        : `Buy ${a}. Quote it first, then prepare the purchase for me to confirm.`
+        ? "Which skill should I buy? Quote it, then call arcade_call_skill in the same turn."
+        : `Buy ${a}. Quote it, then call arcade_call_skill in the same turn so I get the confirmation card.`
   },
   {
     name: "receipts",

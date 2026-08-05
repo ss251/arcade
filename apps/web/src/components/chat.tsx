@@ -478,10 +478,26 @@ export const Thread = ({
   /** Answer a pending approval. Defaulted so scripted transcripts render without a chat. */
   onApproval?: (id: string, approved: boolean) => void
   quote?: QuoteFn
-}) => (
+}) => {
+  /*
+   * The newest USER turn is the scroll anchor.
+   *
+   * `MessageScrollerItem`'s `scrollAnchor` defaults to false, so every item rendered
+   * `data-scroll-anchor="false"` and `autoScroll` had nothing to follow — the transcript
+   * grew off the bottom of the viewport and never moved. `autoScroll` was set the whole
+   * time, which is why this looked like a broken library rather than a missing prop: the
+   * feature was enabled and inert.
+   *
+   * Anchoring the last user message rather than the last message is the deliberate part.
+   * It pins the question near the top and lets the answer stream downward beneath it —
+   * what `scrollPreviousItemPeek` exists for — so a long reply reads from its beginning
+   * instead of dragging the reader along by the final line.
+   */
+  const anchorId = [...messages].reverse().find((m) => m.role === "user")?.id
+  return (
   <>
     {messages.map((m) => (
-      <MessageScroller.Item key={m.id} messageId={m.id}>
+      <MessageScroller.Item key={m.id} messageId={m.id} scrollAnchor={m.id === anchorId}>
         <article className={`msg msg-${m.role}`}>
           <span className="who">{m.role === "user" ? "you" : "arcade"}</span>
           <div className="body">
@@ -529,7 +545,8 @@ export const Thread = ({
       </MessageScroller.Item>
     ))}
   </>
-)
+  )
+}
 
 /** The subset of `UIMessage` this renders. Structural, so scripted fixtures satisfy it. */
 export interface UIMessageLike {
@@ -629,7 +646,12 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
 
   return (
     <div className="chat">
-      <MessageScroller.Provider autoScroll>
+      {/*
+        `last-anchor` so REOPENING a stored conversation lands on the final exchange from
+        its start, rather than at the very bottom of a long reply with no idea what was
+        asked. Same reasoning as the anchor choice itself.
+      */}
+      <MessageScroller.Provider autoScroll defaultScrollPosition="last-anchor">
         <MessageScroller.Root className="scroller">
           <MessageScroller.Viewport className="viewport" aria-label="Conversation">
             <MessageScroller.Content className="thread">

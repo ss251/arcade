@@ -138,7 +138,26 @@ export const arcade_quote = tool({
       payTo: q.payTo,
       network: q.network,
       asset: q.asset,
-      note: "Quoted from the endpoint's 402 challenge. Nothing was signed or spent."
+      /*
+       * The second sentence is a NUDGE, placed here rather than in the system prompt
+       * because this is where the decision is made.
+       *
+       * Models reliably quote and then end the turn, announcing a purchase they never
+       * prepare. Two escalating system-prompt instructions did not fix it — and they would
+       * not, being thousands of tokens from the moment of choice — while this text lands in
+       * context immediately before the model picks its next action. It is also simply true:
+       * there is no confirmation card until `arcade_call_skill` runs, so a turn that ends
+       * here leaves the visitor with a promise and no way to act on it.
+       *
+       * It does not weaken the money gate. Nothing here can spend; `arcade_call_skill` is
+       * still approval-gated, still derives its own terms, and the visitor still has to hold
+       * the button. This only stops the model stranding them one step short of being asked.
+       */
+      note:
+        "Quoted from the endpoint's 402 challenge. Nothing was signed or spent. If the " +
+        "visitor asked to buy this, call arcade_call_skill NOW, in this same turn — it " +
+        "spends nothing by itself, it is what shows them the confirmation card to approve " +
+        "or decline, and they see nothing at all until you call it."
     }
   }
 })

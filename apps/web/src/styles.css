@@ -251,26 +251,35 @@ body {
 }
 
 /*
- * The app shell. `min-height` + flex rather than a height calculation on the child.
+ * The app shell. Flex, and `height` — NOT `min-height`.
  *
  * `.chat` used to be `height: calc(100dvh - 160px)`, where 160 was this element's padding
  * plus a guess at the header's rendered height. The header is 38px, not 32, so the page
  * overflowed by exactly 6px — enough to paint a full-length document scrollbar down the
- * right edge of a design whose scrim exists to keep that edge soft, and invisible in any
- * check that did not look at the rendered page.
+ * right edge of a design whose scrim exists to keep that edge soft. That constant was the
+ * defect this repo keeps deleting: a second copy of a fact (the header's height) that has
+ * to agree with the first, with nothing enforcing it. Flex measures instead of guessing.
  *
- * That constant was the same defect this repo keeps deleting: a second copy of a fact
- * (the header's height) that has to agree with the first, with nothing enforcing it. Flex
- * measures instead of guessing, so restyling the header can no longer reintroduce this.
+ * The `height`/`min-height` distinction is the load-bearing part, and getting it wrong once
+ * is what taught it. Under `min-height: 100dvh` this element GROWS with its content, so
+ * `.chat`'s `flex: 1` grows, so `.viewport` grows — and a viewport with no ceiling never
+ * scrolls. It reported a `clientHeight` of fifteen million pixels and read on screen as
+ * "autoscroll is broken", because the transcript was extending the page instead of moving
+ * inside a box. The old magic number was wrong about WHERE the bottom was; it was at least
+ * right that there had to be one.
+ *
+ * So: exactly the viewport, border-box, and the overflow lives in `.viewport` alone.
  */
 .wrap {
   max-width: 920px;
   margin: 0 auto;
   padding: 40px 24px 88px;
   box-sizing: border-box;
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  /* Children may not push this open; that is the whole point of the rule above. */
+  min-height: 0;
 }
 
 a {
@@ -352,7 +361,14 @@ a {
   gap: 16px;
   /* Fills whatever the header left. See `.wrap` for why this is not a calc. */
   flex: 1;
-  min-height: 380px;
+  /*
+   * `min-height: 0`, not the 380px that used to be here. A flex item's default
+   * `min-height: auto` refuses to shrink below its content, which silently breaks the
+   * ceiling `.wrap` establishes — the chain only holds if EVERY flex ancestor of the
+   * scrolling element can shrink. A floor here would re-create the unbounded viewport one
+   * level further down, where it would be that much harder to find.
+   */
+  min-height: 0;
 }
 
 /*
