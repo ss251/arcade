@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { createChat } from "@shadcn/helpers/ai-sdk"
 import { MessageScroller } from "@shadcn/react/message-scroller"
 import { fenceListings } from "@arcade/core"
-import { Empty, Thread, type UIMessageLike } from "../src/components/chat.tsx"
+import { Empty, Thread, readSettlement, type UIMessageLike } from "../src/components/chat.tsx"
 
 /**
  * The chat's RENDER path, driven by scripted conversations.
@@ -387,5 +387,66 @@ describe("a purchased result reaches the buyer verbatim", () => {
 
   it("links the settlement to Arc when there is one", () => {
     expect(render(purchase())).toContain("https://testnet.arcscan.app/tx/0xabc123")
+  })
+})
+
+/**
+ * Reading the hub's job response.
+ *
+ * These fixtures are the SHAPE THE HUB ACTUALLY SENDS (`apps/hub/src/server.ts:880`), not a
+ * shape convenient to assert. The defect they pin was a real one: `settled` and `settleTx`
+ * were read from the root instead of from `receipt`, so a purchase that had settled on Arc
+ * — receipt `settled: true`, transaction `0xe174a3ac…` confirmed with status `0x1` —
+ * rendered "not settled · you were not charged" directly above the complete result it had
+ * just paid for. The screen contradicted the chain.
+ */
+describe("the hub's job response is read from the right place", () => {
+  const settledBody = {
+    job_id: "j1",
+    status: "succeeded",
+    result: { address: "0x09928ceb", balanceUsdc: "20.000000" },
+    receipt: {
+      settled: true,
+      reason: "ok",
+      settleTx: "0xe174a3ac195abc7ef24a3dd21e89ad0acf670a7ce7d8abcf8aa87a07daf57734",
+      price: "$0.01",
+      sellerShare: "$0.0095",
+      fee: "$0.0005"
+    }
+  }
+
+  it("reports a settled purchase as settled, with its transaction", () => {
+    const s = readSettlement(settledBody)
+    expect(s.settled).toBe(true)
+    expect(s.settleTx).toBe(settledBody.receipt.settleTx)
+    expect(s.price).toBe("$0.01")
+    expect(s.result).toEqual(settledBody.result)
+  })
+
+  it("carries no excuse onto a success", () => {
+    // The receipt says `reason: "ok"`. Rendering that under a completed purchase would put
+    // an explanation where nothing needs explaining.
+    expect(readSettlement(settledBody).reason).toBeUndefined()
+  })
+
+  it("reports a non-settlement as unsettled, with the hub's own sentence", () => {
+    const s = readSettlement({
+      job_id: "j2",
+      status: "failed",
+      result: null,
+      detail: "not settled — you were not charged, and no result is released",
+      receipt: { settled: false, reason: "job status is failed" }
+    })
+    expect(s.settled).toBe(false)
+    expect(s.settleTx).toBeUndefined()
+    expect(s.reason).toContain("you were not charged")
+  })
+
+  it("does not read settlement from the root, where it never lives", () => {
+    // The exact mistake: these root-level fields must be ignored, because the hub does not
+    // send them and anything that DOES send them is not the hub.
+    const s = readSettlement({ settled: true, settleTx: "0xdead", result: "x" })
+    expect(s.settled).toBe(false)
+    expect(s.settleTx).toBeUndefined()
   })
 })

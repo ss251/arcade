@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiQuoteRouteImport } from './routes/api.quote'
+import { Route as ApiSettleRouteImport } from './routes/api.settle'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,44 @@ const ApiQuoteRoute = ApiQuoteRouteImport.update({
   path: '/api/quote',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSettleRoute = ApiSettleRouteImport.update({
+  id: '/api/settle',
+  path: '/api/settle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/quote': typeof ApiQuoteRoute
+  '/api/settle': typeof ApiSettleRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/quote': typeof ApiQuoteRoute
+  '/api/settle': typeof ApiSettleRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/quote': typeof ApiQuoteRoute
+  '/api/settle': typeof ApiSettleRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/chat' | '/api/quote'
+  fullPaths: '/' | '/api/chat' | '/api/quote' | '/api/settle'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/chat' | '/api/quote'
-  id: '__root__' | '/' | '/api/chat' | '/api/quote'
+  to: '/' | '/api/chat' | '/api/quote' | '/api/settle'
+  id: '__root__' | '/' | '/api/chat' | '/api/quote' | '/api/settle'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiQuoteRoute: typeof ApiQuoteRoute
+  ApiSettleRoute: typeof ApiSettleRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiQuoteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/settle': {
+      id: '/api/settle'
+      path: '/api/settle'
+      fullPath: '/api/settle'
+      preLoaderRoute: typeof ApiSettleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiChatRoute: ApiChatRoute,
   ApiQuoteRoute: ApiQuoteRoute,
+  ApiSettleRoute: ApiSettleRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

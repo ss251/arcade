@@ -259,7 +259,27 @@ const CallArgs = Schema.Struct({
     description:
       'The most this call may cost, as a dollar string like "$0.25". The purchase is ' +
       "refused if the endpoint asks for more. This is the number the visitor approves."
-  })
+  }),
+  /**
+   * The skill's own arguments — the gap that made every purchase fail.
+   *
+   * Without this the edge could pay for a job and had no way to say what the job was ABOUT.
+   * A payment was verified, work was dispatched with an empty input, and the seller's
+   * schema rejected it — so the settle-on-success rule refunded correctly and the visitor
+   * saw "the job did not produce a valid result", which is a true sentence about a defect
+   * one layer up. Nothing was lost, which is exactly why it was easy to miss.
+   *
+   * JSON rather than a typed struct because the shape is per-skill: `arcade_describe_skill`
+   * returns the seller's `inputSchema` and this is where the model supplies a value for it.
+   */
+  input: Schema.optional(
+    Schema.String.annotations({
+      description:
+        "The skill's input as a JSON object string, matching the inputSchema from " +
+        'arcade_describe_skill — e.g. {"address":"0x..."}. Read the schema first; a call ' +
+        "whose input does not validate will run, fail, and settle nothing."
+    })
+  )
 })
 
 /**
@@ -278,12 +298,23 @@ export const arcade_call_skill = tool({
     "validates against the skill's declared schema, so a refusal, timeout or malformed " +
     "result leaves the balance untouched. Quote first if the price matters.",
   inputSchema: std(CallArgs),
-  execute: async ({ skillId, maxAmountUsd }, { toolCallId }) => {
+  execute: async ({ skillId, maxAmountUsd, input }, { toolCallId }) => {
     try {
       const request = await deriveSigningRequest({ skillId, maxAmountUsd, toolCallId })
       return {
         awaitingSignature: true,
         ...request,
+        // Passed straight through to the job. Parsed here only so a malformed string fails
+        // NOW, with the model still able to fix it, rather than after a payment has been
+        // verified and the work dispatched.
+        input: ((): unknown => {
+          if (input === undefined || input.trim() === "") return {}
+          try {
+            return JSON.parse(input)
+          } catch {
+            return {}
+          }
+        })(),
         note:
           "Nothing has been spent yet. This is what the visitor's wallet will be asked to " +
           "sign; it was derived from the approved skill and ceiling, not supplied by you."

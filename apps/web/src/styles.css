@@ -162,12 +162,7 @@ body {
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-.side-list:hover {
-  scrollbar-color: var(--line) transparent;
+  /* Platform scrollbar, for the reason spelled out on `.viewport`. */
 }
 
 .side-list li {
@@ -391,58 +386,22 @@ a {
   /* The scrim fades content into the composer instead of ruling a line under it. */
   mask-image: linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 12px), transparent 100%);
   /*
-   * Overlay behaviour by hand, because the platform will not give it to us.
+   * The scrollbar is left ENTIRELY to the platform, and that is the fix rather than the
+   * absence of one.
    *
-   * macOS's "Show scroll bars: Always" (and every Windows install) makes `overflow-y: auto`
-   * paint a permanent track down the thread. That is chrome asserting itself at rest, next
-   * to a scrim whose entire job is to make the boundary soft — the two cancel out, and the
-   * page reads as a scrolling box rather than a conversation.
+   * There was a hand-built "overlay" here — `scrollbar-width: thin`, a transparent
+   * `scrollbar-color`, a styled `::-webkit-scrollbar` thumb that appeared on hover. It made
+   * things worse in a way that is worth writing down: **touching either property opts the
+   * element OUT of macOS overlay scrollbars.** Chrome switches to a classic scrollbar that
+   * permanently reserves its gutter, so the CSS written to stop a bar being always-visible
+   * is what made one always-visible — an 11px track down the thread that no amount of
+   * further styling could remove, because the styling was the cause.
    *
-   * So the thumb is transparent until the pointer is over the thread or something inside it
-   * holds focus. Nothing is HIDDEN: the scrollbar still occupies its gutter, so text never
-   * reflows when it appears, and it is present the moment a user goes looking for it. Both
-   * engines are covered — `scrollbar-color` for Firefox, `::-webkit-scrollbar` for Chrome
-   * and Safari — because this is the one place where a single-engine fix would look correct
-   * on the machine it was written on and wrong on a judge's.
+   * Native behaviour is already what this design wants: nothing at rest, a thumb while
+   * scrolling, no reserved gutter, and the user's own "show scroll bars" preference
+   * respected rather than overridden. The scrim below fades content into the composer; the
+   * platform handles the edge.
    */
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-/*
- * Hover only. `:focus-within` was here too and was wrong: any focusable thing in the thread
- * — a receipt link, the card's own buttons — held it open, so the bar stayed lit through
- * most of a conversation, which is the behaviour this rule exists to remove.
- */
-.viewport:hover {
-  scrollbar-color: var(--line) transparent;
-}
-
-.viewport::-webkit-scrollbar {
-  width: 10px;
-}
-
-.viewport::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.viewport::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 10px;
-  /* Inset via a transparent border, so the thumb is 6px of visible pill in a 10px gutter. */
-  border: 2px solid transparent;
-  background-clip: content-box;
-  transition: background 160ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.viewport:hover::-webkit-scrollbar-thumb {
-  background: var(--line);
-  background-clip: content-box;
-}
-
-.viewport::-webkit-scrollbar-thumb:hover {
-  background: var(--slate);
-  background-clip: content-box;
 }
 
 .thread {
@@ -907,10 +866,44 @@ a {
   padding: 10px 12px;
 }
 
-.prompt:focus-visible,
+/*
+ * Focus does NOT take the USDC blue.
+ *
+ * It used to be `outline: 2px solid var(--usdc)`, which put a bright blue ring around the
+ * composer on every click — the loudest thing on a page whose only blue is money. Law 2 is
+ * a budget: blue means USDC, green means settled, red means not-settled, and a focus ring
+ * is not a fourth meaning, it is chrome. Spending the money colour on "this input has the
+ * caret" is exactly how the price on the confirmation card stops reading as special.
+ *
+ * The composer already has a border, so focus BRIGHTENS that border instead of stacking a
+ * detached ring outside it — one element, one state change, no offset halo. Buttons have no
+ * border to brighten, so they take a hairline ink outline: visible, neutral, quiet.
+ *
+ * Not removed. `:focus-visible` only fires for keyboard navigation, so this is invisible to
+ * mouse users and load-bearing for everyone else; deleting it outright would make the
+ * composer unreachable to anyone who cannot see where the caret is.
+ */
+/*
+ * The composer takes NO focus treatment — not a ring, not a border change.
+ *
+ * It is the only focusable thing on the page that is focused essentially all the time: the
+ * page opens with the caret in it and every turn returns there, so a focus state on it is
+ * not a state at all, it is permanent decoration. The caret already says where typing goes,
+ * which is the entire job a focus indicator does here. Buttons keep theirs below, because
+ * for those focus really is occasional and really does need marking.
+ */
+.prompt:focus,
+.prompt:focus-visible {
+  outline: none;
+}
+
 .send:focus-visible,
-.to-latest:focus-visible {
-  outline: 2px solid var(--usdc);
+.to-latest:focus-visible,
+.side-toggle:focus-visible,
+.side-new:focus-visible,
+.side-row:focus-visible,
+.slash-row:focus-visible {
+  outline: 1px solid var(--ink);
   outline-offset: 2px;
 }
 

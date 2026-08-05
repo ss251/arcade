@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
+import { lastAssistantMessageIsCompleteWithApprovalResponses } from "ai"
 import { MessageScroller } from "@shadcn/react/message-scroller"
 import { Streamdown } from "streamdown"
 import { Confirm } from "./confirm.tsx"
 import { COMMANDS, matchCommands, parseCommand, type Command } from "../lib/commands.ts"
 import type { StoredMessage } from "../lib/history.ts"
 import { getProvider, currentChainId, connect, walletBlocker } from "../lib/wallet.ts"
+import { signPayment } from "../lib/sign.ts"
 
 /**
  * The buying agent's chat surface.
@@ -239,6 +241,23 @@ const ToolOutput = ({ name, output }: { name: string; output: unknown }) => {
   }
 
   if (name === "arcade_call_skill" && typeof o["skillId"] === "string") {
+    // A signing request is not a purchase. It is the point where the browser takes over,
+    // and rendering it as a "not settled" purchase — which the branch below would do —
+    // would report failure for something that has not been attempted yet.
+    if (o["awaitingSignature"] === true) return <Settlement request={o} />
+    if (o["refused"] === true) {
+      return (
+        <div className="tool-out">
+          <div className="tool-row">
+            <span className="tool-id">{o["skillId"] as string}</span>
+            <span className="unsettled">refused</span>
+          </div>
+          <p className="tool-note">
+            {typeof o["reason"] === "string" ? o["reason"] : "the purchase was refused"}
+          </p>
+        </div>
+      )
+    }
     return (
       <Purchase
         skillId={o["skillId"] as string}
@@ -446,6 +465,170 @@ export const PendingPurchase = ({
   )
 }
 
+/**
+ * Sign, then settle — the half of the purchase that happens after approval.
+ *
+ * `arcade_call_skill` returns a signing REQUEST, never a completed purchase, so this is
+ * where the money actually moves: the wallet signs in the browser, and the signature is
+ * carried to the endpoint by `/api/settle` (see that file for why a courier is sound).
+ *
+ * ## It starts on its own, and the wallet is the gate
+ *
+ * There is no second button. The visitor already held one down to approve, and the wallet's
+ * own prompt is a real confirmation that cannot be skipped or styled — asking them to click
+ * an in-page "sign now" first would add a step that guards nothing, and a confirmation
+ * people click through is how consent gets laundered.
+ *
+ * ## Run-once is a ref, not a state check
+ *
+ * Signing twice would ask the wallet twice and could put two authorizations on one purchase,
+ * both spendable. A `useState` guard is not enough: React can run effects twice before a
+ * state update commits, and the second run would read the stale value. The ref is set
+ * synchronously, before any await.
+ */
+/**
+ * Read the hub's job response. Pure, exported, and tested — because reading it wrong is
+ * exactly what went wrong.
+ *
+ * The hub answers `{job_id, status, result, detail?, receipt:{settled, settleTx, price…}}`.
+ * The outcome lives under `receipt`; only `result` is top-level. Reading `settled` and
+ * `settleTx` off the root made both `undefined`, so a settled purchase rendered
+ * "not settled · you were not charged" directly above the complete result it had just paid
+ * for and received. Every layer beneath was correct — the receipt said settled and the
+ * transaction confirmed on Arc with status 0x1 — which is what made it the worst version of
+ * this bug: the screen contradicted the chain, and the screen is what anyone would believe.
+ *
+ * It is a function rather than inline destructuring so the shape can be pinned by a test
+ * without a network, a wallet, or a chain. The defect was never in the payment; it was in
+ * four property lookups, and those are cheap to hold still.
+ */
+export const readSettlement = (
+  body: Record<string, unknown>
+): {
+  readonly settled: boolean
+  readonly settleTx?: string | undefined
+  readonly reason?: string | undefined
+  readonly price?: string | undefined
+  readonly result: unknown
+} => {
+  const receipt = (body["receipt"] ?? {}) as Record<string, unknown>
+  const settled = receipt["settled"] === true
+  // `detail` is the hub's own sentence for a non-settlement and beats the raw reason code.
+  const reason =
+    typeof body["detail"] === "string"
+      ? body["detail"]
+      : typeof receipt["reason"] === "string"
+        ? receipt["reason"]
+        : undefined
+  return {
+    settled,
+    settleTx: typeof receipt["settleTx"] === "string" ? receipt["settleTx"] : undefined,
+    // A settled purchase has nothing to explain; carrying `reason: "ok"` onto it would put
+    // an apology under a success.
+    reason: settled ? undefined : reason,
+    price: typeof receipt["price"] === "string" ? receipt["price"] : undefined,
+    result: body["result"]
+  }
+}
+
+const Settlement = ({ request }: { request: Record<string, unknown> }) => {
+  const [phase, setPhase] = useState<"signing" | "settling" | "done" | "failed">("signing")
+  const [detail, setDetail] = useState<string | undefined>(undefined)
+  const [outcome, setOutcome] = useState<Record<string, unknown> | undefined>(undefined)
+  const started = useRef(false)
+
+  const skillId = typeof request["skillId"] === "string" ? request["skillId"] : ""
+  const payTo = typeof request["payTo"] === "string" ? request["payTo"] : ""
+  const amountAtomic = typeof request["amountAtomic"] === "string" ? request["amountAtomic"] : ""
+  const price = typeof request["price"] === "string" ? request["price"] : ""
+
+  useEffect(() => {
+    if (started.current) return
+    started.current = true
+
+    void (async () => {
+      const provider = getProvider()
+      if (provider === undefined) {
+        setPhase("failed")
+        setDetail(walletBlocker(false, undefined))
+        return
+      }
+      try {
+        const accounts = (await provider.request({
+          method: "eth_requestAccounts"
+        })) as ReadonlyArray<string>
+        const from = accounts[0]
+        if (from === undefined) throw new Error("no account was authorised")
+
+        const authorization = await signPayment(provider, { from, payTo, amountAtomic })
+        setPhase("settling")
+
+        const res = await fetch("/api/settle", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ skillId, authorization, input: request["input"] ?? {} })
+        })
+        const body = (await res.json()) as Record<string, unknown>
+        if (!res.ok) {
+          setPhase("failed")
+          setDetail(
+            typeof body["detail"] === "string"
+              ? body["detail"]
+              : `the endpoint returned HTTP ${res.status}`
+          )
+          return
+        }
+        setOutcome((body["body"] ?? body) as Record<string, unknown>)
+        setPhase("done")
+      } catch (e) {
+        setPhase("failed")
+        setDetail(String((e as Error)?.message ?? e))
+      }
+    })()
+  }, [skillId, payTo, amountAtomic])
+
+  if (phase === "signing" || phase === "settling") {
+    return (
+      <div className="tool-out">
+        <div className={`marker is-running`} role="status">
+          <span className="marker-dot" aria-hidden="true" />
+          <span className="marker-name">{skillId}</span>
+          <span className="marker-doing">
+            {phase === "signing"
+              ? "waiting for your wallet to sign — no gas, no chain round-trip"
+              : "paid; the seller is running the job"}
+          </span>
+          <span className="marker-state">{price}</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (phase === "failed") {
+    return (
+      <div className="tool-out">
+        <div className="tool-row">
+          <span className="tool-id">{skillId}</span>
+          <span className="unsettled">not settled</span>
+        </div>
+        <p className="tool-note">{detail ?? "the purchase did not complete"} — you were not charged.</p>
+      </div>
+    )
+  }
+
+  const s = readSettlement(outcome ?? {})
+  return (
+    <Purchase
+      skillId={skillId}
+      settled={s.settled}
+      {...(s.settleTx === undefined ? {} : { settleTx: s.settleTx })}
+      {...(s.reason === undefined ? {} : { reason: s.reason })}
+      pricePaidUsdc={s.price ?? price}
+      result={s.result}
+    />
+  )
+}
+
 /** What the visitor decided, kept in the transcript so the record is not just the outcome. */
 const Decided = ({ approved }: { approved: boolean }) => (
   <div className="tool-out">
@@ -583,7 +766,18 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
   // property from one explicitly set to undefined, and `ChatInit` accepts only the former.
   const { messages, sendMessage, status, error, addToolApprovalResponse } = useChat({
     ...(id === undefined ? {} : { id }),
-    ...(initial === undefined ? {} : { messages: initial as never })
+    ...(initial === undefined ? {} : { messages: initial as never }),
+    /*
+     * Answering an approval records it LOCALLY. Without this the decision never travels:
+     * the card vanished, the transcript said "approved", and the tool was never executed —
+     * a purchase that reported consent and did nothing, which is the most expensive version
+     * of this repo's recurring bug, because the visitor believes they bought something.
+     *
+     * `lastAssistantMessageIsCompleteWithApprovalResponses` fires exactly when every
+     * pending approval on the last assistant message has an answer, so a turn holding two
+     * requests waits for both rather than resuming half-decided.
+     */
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses
   })
   const [input, setInput] = useState("")
   // Which row the arrow keys are on. Reset whenever the candidate list changes.

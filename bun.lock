@@ -39,6 +39,7 @@
         "@ai-sdk/openai-compatible": "^3.0.23",
         "@ai-sdk/react": "^4.0.40",
         "@arcade/core": "workspace:*",
+        "@arcade/payments": "workspace:*",
         "@shadcn/react": "^0.2.1",
         "@tanstack/react-router": "^1.170.18",
         "@tanstack/react-start": "^1.168.32",

@@ -88,6 +88,17 @@ export interface Quote {
   readonly asset: string
   readonly network: string
   readonly resource: string
+  /**
+   * The challenge's requirements object, VERBATIM.
+   *
+   * A payment payload has to echo back the requirements the buyer signed against, and the
+   * hub validates that echo against its own schema. Rebuilding it field by field from the
+   * parsed values above dropped `maxTimeoutSeconds` and the settle was rejected with
+   * "malformed payment header" — a true message about a payload we had authored rather than
+   * relayed. Carrying the original object through means the echo cannot disagree with what
+   * was sent, including fields this client never looks at.
+   */
+  readonly requirements: Record<string, unknown>
 }
 
 /**
@@ -115,7 +126,7 @@ export const quote = async (skillId: string): Promise<Quote> => {
     throw new HubUnreachable(resource, `expected a 402 payment challenge, got HTTP ${res.status}`)
   }
   const body = (await res.json()) as {
-    accepts?: ReadonlyArray<Record<string, string>>
+    accepts?: ReadonlyArray<Record<string, unknown>>
   }
   const req = body.accepts?.[0]
   if (req === undefined) throw new HubUnreachable(resource, "402 carried no payment requirements")
@@ -126,6 +137,7 @@ export const quote = async (skillId: string): Promise<Quote> => {
     payTo: String(req["payTo"]),
     asset: String(req["asset"]),
     network: String(req["network"]),
-    resource
+    resource,
+    requirements: req
   }
 }
