@@ -93,65 +93,82 @@ def duration(path: Path) -> float:
     )
 
 
-def ass_time(t: float) -> str:
-    cs = int(round(t * 100))
-    h, cs = divmod(cs, 360_000)
-    m, cs = divmod(cs, 6_000)
-    s, cs = divmod(cs, 100)
-    return f"{h}:{m:02}:{s:02}.{cs:02}"
+def srt_time(t: float) -> str:
+    ms = int(round(t * 1000))
+    h, ms = divmod(ms, 3_600_000)
+    m, ms = divmod(ms, 60_000)
+    s, ms = divmod(ms, 1000)
+    return f"{h:02}:{m:02}:{s:02},{ms:03}"
 
 
-CAPTION_HTML = """<!doctype html><meta charset="utf-8">
-<style>
-  html,body{{margin:0;background:transparent}}
-  body{{width:{w}px;display:flex;justify-content:center;align-items:flex-end;
-        height:{h}px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}}
-  /* The plate is the app's own card surface at 62%, not a black bar: it sits ON the design
-     instead of interrupting it, and it stays legible over the near-black takes. */
-  p{{margin:0 0 40px;max-width:1180px;padding:14px 26px;border-radius:10px;
-     background:rgba(22,21,19,.62);color:#e8e6e1;font-size:27px;line-height:1.42;
-     text-align:center;text-wrap:balance;
-     -webkit-font-smoothing:antialiased}}
-</style>
-<p>{text}</p>"""
+# Broadcast-ish caption geometry: two lines, ~42 characters each.
+LINE = 42
+CUE = LINE * 2
 
 
-def render_captions(subs: list[tuple[float, float, str]]) -> list[Path]:
-    """One transparent PNG per line, rendered by the browser at frame width."""
-    band = 260  # tall enough for two lines plus the bottom margin
-    out: list[Path] = []
-    script = [
-        'cdp("Emulation.setDeviceMetricsOverride", width=%d, height=%d, '
-        'deviceScaleFactor=1, mobile=False)' % (W, band),
-        'cdp("Emulation.setDefaultBackgroundColorOverride", '
-        'color={"r": 0, "g": 0, "b": 0, "a": 0})',
-        "import base64, pathlib, time",
-    ]
-    for i, (_, _, text) in enumerate(subs):
-        html = WORK / f"cap{i:02}.html"
-        html.write_text(CAPTION_HTML.format(w=W, h=band, text=escape(text)))
-        png = WORK / f"cap{i:02}.png"
-        out.append(png)
-        script += [
-            f'goto_url("file://{html}")',
-            "wait_for_load()",
-            "time.sleep(0.35)",
-            'r = cdp("Page.captureScreenshot", format="png")',
-            f'pathlib.Path("{png}").write_bytes(base64.b64decode(r["data"]))',
-        ]
-    script.append('cdp("Emulation.clearDeviceMetricsOverride")')
-    subprocess.run(
-        ["browser-harness"], input="\n".join(script), text=True, cwd=ROOT,
-        capture_output=True, check=True,
-    )
-    missing = [p for p in out if not p.exists()]
-    if missing:
-        sys.exit(f"caption render produced nothing for: {missing[0].name}")
+def cues(text: str, start: float, end: float) -> list[tuple[float, float, str]]:
+    """
+    Split one narration line into timed subtitle cues of at most two lines each.
+
+    A beat's narration runs 8-23 seconds and 150-300 characters. Emitting that as ONE cue
+    produces a wall of text that either overflows the player's caption band or gets wrapped
+    into five lines across the middle of the picture — the first version did exactly that,
+    with a 200-character second line.
+
+    So the line is broken on sentence boundaries where it can be and on words where it
+    cannot, and the beat's duration is shared out in proportion to how much text each cue
+    carries. That keeps the captions in step with the voice without needing word-level
+    timings, which nothing here produces.
+    """
+    words = text.split()
+    chunks: list[str] = []
+    cur = ""
+    for w in words:
+        cand = f"{cur} {w}".strip()
+        if len(cand) > CUE and cur:
+            chunks.append(cur)
+            cur = w
+        else:
+            cur = cand
+        # Prefer to break where the sentence does — a cue that ends on a full stop reads as
+        # a unit rather than as a slice.
+        if cur.endswith((".", "?", "!")) and len(cur) > CUE * 0.55:
+            chunks.append(cur)
+            cur = ""
+    if cur:
+        chunks.append(cur)
+    if not chunks:
+        return []
+
+    total = sum(len(c) for c in chunks)
+    out: list[tuple[float, float, str]] = []
+    t = start
+    span = end - start
+    for c in chunks:
+        dt = span * (len(c) / total)
+        out.append((t, t + dt, wrap_two(c)))
+        t += dt
     return out
 
 
-def escape(s: str) -> str:
-    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+def wrap_two(text: str) -> str:
+    """Balance a cue across two lines, so neither is a stub next to a full one."""
+    words = text.split()
+    if len(" ".join(words)) <= LINE:
+        return " ".join(words)
+    best, score = None, None
+    for i in range(1, len(words)):
+        a, b = " ".join(words[:i]), " ".join(words[i:])
+        if len(a) > LINE or len(b) > LINE:
+            continue
+        d = abs(len(a) - len(b))
+        if score is None or d < score:
+            best, score = (a, b), d
+    if best is None:
+        # Cannot fit two lines; break at the midpoint and let the player handle the rest.
+        mid = len(words) // 2
+        best = (" ".join(words[:mid]), " ".join(words[mid:]))
+    return "\n".join(best)
 
 
 def main() -> None:
@@ -195,16 +212,26 @@ def main() -> None:
 
     # ── captions ────────────────────────────────────────────────────────────
     #
-    # Rendered in the BROWSER as transparent PNGs and composited, rather than burned by a
-    # subtitle filter. Not a preference — this ffmpeg is built without libass AND without
-    # libfreetype, so `subtitles` and `drawtext` both fail to parse at all ("No option name
-    # near 'captions.ass'", which reads like a syntax error and is actually a missing
-    # library). Rebuilding ffmpeg to burn nine lines of text is the larger detour.
+    # A real SUBTITLE TRACK, not pixels burned into the picture.
     #
-    # It is also simply better here: the captions are set in the same face, colour and
-    # measure as the product, on the same plate token, so they read as part of the design
-    # rather than as a player's default subtitle track pasted over it.
-    caption_pngs = render_captions(subs)
+    # The first version composited them in, which meant they could never be turned off — and
+    # they sat over the bottom of the frame, which on this product is exactly where the
+    # composer lives. The one surface a viewer most wants to see clearly was permanently
+    # covered by a description of it.
+    #
+    # As a track they are the viewer's choice, and they default to OFF: the video is
+    # narrated, so captions are an accessibility and sound-off affordance rather than part of
+    # the composition. The .srt is also written beside the .mp4, because some upload targets
+    # want the sidecar and every player can read one.
+    srt = WORK / "captions.srt"
+    split = [c for a, b, t in subs for c in cues(t, a, b)]
+    srt.write_text(
+        "\n".join(
+            f"{n}\n{srt_time(a)} --> {srt_time(b)}\n{t}\n"
+            for n, (a, b, t) in enumerate(split, 1)
+        )
+    )
+    (OUT.with_suffix(".srt")).write_text(srt.read_text())
 
     # ── video ───────────────────────────────────────────────────────────────
     lst = WORK / "segments.txt"
@@ -242,36 +269,28 @@ def main() -> None:
     ])
 
     # ── burn captions, mux, ship ────────────────────────────────────────────
-    # Each caption is one overlay, gated to its own cue window. The band sits at the bottom
-    # of the frame, so `H-h` rather than a magic y.
-    args = ["ffmpeg", "-y", "-v", "error", "-i", str(silent), "-i", str(voiced)]
-    for png in caption_pngs:
-        args += ["-i", str(png)]
-
-    chain, prev = [], "0:v"
-    for i, (a, b, _) in enumerate(subs):
-        label = f"v{i}"
-        # +0.25s of lead so the line is legible the instant the voice starts, and a short
-        # hold after so it does not vanish on the last syllable.
-        chain.append(
-            f"[{prev}][{i + 2}:v]overlay=x=0:y=H-h:"
-            f"enable='between(t,{max(0.0, a - 0.25):.2f},{b + 0.45:.2f})'[{label}]"
-        )
-        prev = label
-
-    # Pad LAST, so caption overlays are positioned against the recorded frame and the bars
-    # land outside everything.
-    chain.append(
-        f"[{prev}]pad={OUT_W}:{OUT_H}:(ow-iw)/2:(oh-ih)/2:color={PAPER}[padded]"
-    )
-    args += [
-        "-filter_complex", ";".join(chain),
-        "-map", "[padded]", "-map", "1:a",
+    run([
+        "ffmpeg", "-y", "-v", "error",
+        "-i", str(silent), "-i", str(voiced), "-i", str(srt),
+        "-vf", f"pad={OUT_W}:{OUT_H}:(ow-iw)/2:(oh-ih)/2:color={PAPER}",
+        "-map", "0:v", "-map", "1:a", "-map", "2:s",
         "-c:v", "libx264", "-preset", "slow", "-crf", "19", "-pix_fmt", "yuv420p",
-        "-c:a", "copy", "-movflags", "+faststart",
+        "-c:a", "copy",
+        # mov_text is the subtitle codec MP4 carries; SRT cannot be muxed as-is.
+        "-c:s", "mov_text",
+        "-metadata:s:s:0", "language=eng",
+        "-metadata:s:s:0", "title=English",
+        # Clear the default flag so players do NOT show them unless asked. The video is
+        # narrated; captions are the viewer's option, not the composition.
+        "-disposition:s:0", "0",
+        "-movflags", "+faststart",
         "-shortest", str(OUT),
-    ]
-    run(args)
+    ])
+
+    # ffmpeg's mov muxer marks every track enabled in this build, whatever `-disposition`
+    # says, so the bit is cleared where it actually lives — in the track header. Run here
+    # rather than by hand, because a step you have to remember is a step that gets skipped.
+    run(["python3", str(Path(__file__).with_name("subs_off.py")), str(OUT)])
 
     total = duration(OUT)
     print(f"\n{OUT}")
