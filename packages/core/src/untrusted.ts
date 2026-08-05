@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto"
 
 /**
  * Fencing untrusted content.
@@ -45,7 +44,26 @@ import { randomBytes } from "node:crypto"
 /** Bytes of entropy in a fence nonce. 96 bits is far beyond guess-in-one-job territory. */
 const NONCE_BYTES = 12
 
-export const newFenceNonce = (): string => randomBytes(NONCE_BYTES).toString("hex")
+/**
+ * A fence nonce, from Web Crypto rather than `node:crypto`.
+ *
+ * `randomBytes` was the original and it made this module — and therefore the whole of
+ * `@arcade/core`, which re-exports it — **import-fatal in a browser**. Vite externalises
+ * `node:crypto` and the access throws at runtime, so the first client component to import
+ * any core symbol took the entire page down. That is a latent defect in the SHARED package:
+ * core is imported by the hub, the runner, the buyer AND the browser, so a Node-only import
+ * anywhere in it is a bug regardless of which symbol pulled it in.
+ *
+ * `crypto.getRandomValues` is a CSPRNG with the same guarantee, and it is a global in Node
+ * 18+ as well as every browser — this repo's floor is Node 22.12, so it is always present.
+ * The security property that matters here is unpredictability, not the module it came from:
+ * an attacker who can guess the delimiter can close the fence, and neither generator lets
+ * them.
+ */
+export const newFenceNonce = (): string =>
+  Array.from(crypto.getRandomValues(new Uint8Array(NONCE_BYTES)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
 
 /**
  * Hard ceiling on untrusted text handed to a model, in characters.

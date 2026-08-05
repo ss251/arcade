@@ -74,10 +74,203 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── shell + sidebar ────────────────────────────────────────────────────────
+ *
+ * The sidebar is a fixed rail, not a grid column, so opening it does not reflow the thread.
+ * A conversation that re-wraps mid-read because a panel appeared beside it is the kind of
+ * motion Law 4 rejects outright — and the thread is centred in the viewport either way, so
+ * a rail overlaying the empty gutter costs nothing at these widths.
+ */
+.shell {
+  min-height: 100dvh;
+}
+
+.side {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 5;
+  width: 46px;
+  padding: 14px 10px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Collapsed it is two glyphs on the page's own paper — no panel, no border, no shadow. */
+  background: none;
+  transition: width 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.side.is-open {
+  width: 244px;
+  background: var(--card);
+  border-right: 1px solid var(--line);
+}
+
+.side-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.side-toggle,
+.side-new,
+.side-row,
+.side-del {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.side-toggle {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 6px;
+  color: var(--slate);
+  transition: color 150ms, background 150ms;
+}
+
+.side-toggle:hover {
+  color: var(--ink);
+  background: var(--line);
+}
+
+.side-new {
+  font: 11px/1 var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--slate);
+  padding: 6px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.side-new:hover {
+  color: var(--ink);
+  background: var(--line);
+}
+
+.side-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.side-list:hover {
+  scrollbar-color: var(--line) transparent;
+}
+
+.side-list li {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.side-list li:hover {
+  background: var(--line);
+}
+
+.side-list li.is-current .side-title {
+  color: var(--ink);
+}
+
+.side-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.side-title {
+  font-size: 12.5px;
+  color: var(--slate);
+  /* One line. A wrapped title turns the list into paragraphs and loses the scan. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-when {
+  font: 10px/1.4 var(--mono);
+  color: var(--slate);
+  opacity: 0.75;
+}
+
+/* Destructive and quiet: revealed on row hover, never competing with the title. */
+.side-del {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-right: 4px;
+  border-radius: 5px;
+  color: var(--slate);
+  opacity: 0;
+  transition: opacity 150ms, color 150ms;
+}
+
+.side-list li:hover .side-del {
+  opacity: 1;
+}
+
+.side-del:hover {
+  color: var(--refuse);
+}
+
+.side-empty {
+  margin: 4px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--slate);
+}
+
+.side-foot {
+  margin: 8px 0 0;
+  padding: 8px 8px 0;
+  border-top: 1px solid var(--line);
+  font: 10px/1.5 var(--mono);
+  color: var(--slate);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side {
+    transition: none;
+  }
+}
+
+/*
+ * The app shell. `min-height` + flex rather than a height calculation on the child.
+ *
+ * `.chat` used to be `height: calc(100dvh - 160px)`, where 160 was this element's padding
+ * plus a guess at the header's rendered height. The header is 38px, not 32, so the page
+ * overflowed by exactly 6px — enough to paint a full-length document scrollbar down the
+ * right edge of a design whose scrim exists to keep that edge soft, and invisible in any
+ * check that did not look at the rendered page.
+ *
+ * That constant was the same defect this repo keeps deleting: a second copy of a fact
+ * (the header's height) that has to agree with the first, with nothing enforcing it. Flex
+ * measures instead of guessing, so restyling the header can no longer reintroduce this.
+ */
 .wrap {
   max-width: 920px;
   margin: 0 auto;
   padding: 40px 24px 88px;
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 a {
@@ -157,7 +350,8 @@ a {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: calc(100dvh - 160px);
+  /* Fills whatever the header left. See `.wrap` for why this is not a calc. */
+  flex: 1;
   min-height: 380px;
 }
 
@@ -180,6 +374,59 @@ a {
   overflow-y: auto;
   /* The scrim fades content into the composer instead of ruling a line under it. */
   mask-image: linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 12px), transparent 100%);
+  /*
+   * Overlay behaviour by hand, because the platform will not give it to us.
+   *
+   * macOS's "Show scroll bars: Always" (and every Windows install) makes `overflow-y: auto`
+   * paint a permanent track down the thread. That is chrome asserting itself at rest, next
+   * to a scrim whose entire job is to make the boundary soft — the two cancel out, and the
+   * page reads as a scrolling box rather than a conversation.
+   *
+   * So the thumb is transparent until the pointer is over the thread or something inside it
+   * holds focus. Nothing is HIDDEN: the scrollbar still occupies its gutter, so text never
+   * reflows when it appears, and it is present the moment a user goes looking for it. Both
+   * engines are covered — `scrollbar-color` for Firefox, `::-webkit-scrollbar` for Chrome
+   * and Safari — because this is the one place where a single-engine fix would look correct
+   * on the machine it was written on and wrong on a judge's.
+   */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+/*
+ * Hover only. `:focus-within` was here too and was wrong: any focusable thing in the thread
+ * — a receipt link, the card's own buttons — held it open, so the bar stayed lit through
+ * most of a conversation, which is the behaviour this rule exists to remove.
+ */
+.viewport:hover {
+  scrollbar-color: var(--line) transparent;
+}
+
+.viewport::-webkit-scrollbar {
+  width: 10px;
+}
+
+.viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.viewport::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 10px;
+  /* Inset via a transparent border, so the thumb is 6px of visible pill in a 10px gutter. */
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.viewport:hover::-webkit-scrollbar-thumb {
+  background: var(--line);
+  background-clip: content-box;
+}
+
+.viewport::-webkit-scrollbar-thumb:hover {
+  background: var(--slate);
+  background-clip: content-box;
 }
 
 .thread {
@@ -212,13 +459,152 @@ a {
   min-width: 0;
 }
 
+/*
+ * The model's prose, rendered from markdown.
+ *
+ * `white-space: pre-wrap` used to live here, from when this was a text node. It has to go
+ * with the markdown renderer: real block elements plus preserved source newlines double
+ * every gap, and the symptom reads as "the model writes with huge paragraph breaks" rather
+ * than as a CSS bug.
+ *
+ * Everything below is deliberately QUIET. This is a stranger's-machine answer inside a page
+ * whose subject is money, so the markdown gets structure and no voice of its own: no colour,
+ * no display sizes, headings that separate rather than announce. Law 3 says the brightest
+ * text is the most important, and on this page that is a price, never a subheading the model
+ * chose to emit.
+ */
 .prose {
   margin: 0 0 10px;
-  white-space: pre-wrap;
 }
 
 .prose:last-child {
   margin-bottom: 0;
+}
+
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose > :last-child {
+  margin-bottom: 0;
+}
+
+.prose p {
+  margin: 0 0 10px;
+}
+
+/*
+ * One heading size for all six levels. A model picks heading depth arbitrarily, so honouring
+ * h1-vs-h3 renders its whim as hierarchy — and an h1 in a chat turn would outweigh the page's
+ * own headings. Weight and spacing mark a heading; scale is reserved for the price block.
+ */
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  margin: 18px 0 8px;
+  font: 600 15px/1.4 var(--sans);
+  color: var(--ink);
+}
+
+.prose ul,
+.prose ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.prose li {
+  margin: 0 0 4px;
+}
+
+.prose li::marker {
+  color: var(--slate);
+}
+
+.prose strong {
+  font-weight: 600;
+}
+
+/* Mono is what was MEASURED — the same law the receipts and the price rows obey. */
+.prose code {
+  font: 0.9em/1.5 var(--mono);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.prose pre {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  /* Wide code scrolls inside its own box; the thread must never scroll sideways. */
+  overflow-x: auto;
+}
+
+.prose pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 12.5px;
+}
+
+/*
+ * Links stay ink, never `--usdc`. Blue means USDC on every surface in this product (Law 2),
+ * and a model that links the word "documentation" in the money colour would spend that
+ * meaning on navigation.
+ */
+.prose a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--line);
+}
+
+.prose a:hover {
+  text-decoration-color: var(--ink);
+}
+
+.prose blockquote {
+  margin: 0 0 10px;
+  padding-left: 14px;
+  border-left: 2px solid var(--line);
+  color: var(--slate);
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 16px 0;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.prose th,
+.prose td {
+  border-bottom: 1px solid var(--line);
+  padding: 6px 10px 6px 0;
+  text-align: left;
+}
+
+.prose th {
+  font: 600 11px/1.6 var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--slate);
+}
+
+/* Figures in a model's table are still figures: they line up. */
+.prose td {
+  font-variant-numeric: tabular-nums;
 }
 
 /*
@@ -254,6 +640,151 @@ a {
 .marker-name {
   color: var(--ink);
   letter-spacing: 0.04em;
+}
+
+/*
+ * The state dot. 5px, aligned to the text baseline rather than the box, so it sits ON the
+ * line of type instead of floating beside it.
+ *
+ * Colour is the ONE thing carrying state here, so it obeys Law 2 exactly: green is settled
+ * and is not spent on "a lookup finished" — a completed read-only tool call is not a
+ * settlement and must not borrow its hue. Done is therefore neutral ink, running is a
+ * dimmed dot that breathes, and only genuine failure takes `--refuse`.
+ */
+.marker-dot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  align-self: center;
+  background: var(--slate);
+}
+
+.marker.is-running .marker-dot {
+  animation: breathe 1400ms ease-in-out infinite;
+}
+
+.marker.is-done .marker-dot {
+  background: var(--ink);
+  opacity: 0.35;
+}
+
+.marker.is-failed .marker-dot {
+  background: var(--refuse);
+}
+
+.marker.is-failed .marker-state {
+  color: var(--refuse);
+}
+
+/* The English gloss takes the remaining width and is the first thing dropped when narrow. */
+.marker-doing {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/*
+ * Reduced motion keeps the dot and drops the pulse. The dot IS the state; the breathing is
+ * the decoration, and Law 8 says drop movement without dropping feedback.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .marker.is-running .marker-dot {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* ── slash commands ─────────────────────────────────────────────────────────
+ *
+ * A menu that exists only while a leading "/" is being typed. It is positioned against the
+ * composer and takes the card surface, so it reads as attached to the input it completes
+ * rather than as a floating palette over the conversation.
+ */
+.slash {
+  position: absolute;
+  left: 0;
+  /* Menu-width, not input-width. Stretched to the composer it read as a second panel; a
+     command list is chrome and should be no wider than its longest row needs. */
+  max-width: 420px;
+  bottom: calc(100% + 8px);
+  z-index: 3;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
+  animation: arrive 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.slash-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Keyboard and pointer share one highlight, so the arrow keys and the mouse never disagree. */
+.slash-row.is-on {
+  background: var(--line);
+}
+
+.slash-name {
+  font: 12px/1.5 var(--mono);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.slash-hint {
+  font-size: 12px;
+  color: var(--slate);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The same two columns in the empty state, as a list rather than a menu. */
+.empty-cmds {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.empty-cmds li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slash {
+    animation: none;
+  }
 }
 
 /*
@@ -346,6 +877,8 @@ a {
   gap: 10px;
   border-top: 1px solid var(--line);
   padding-top: 14px;
+  /* The containing block for the slash menu, which sits above the input. */
+  position: relative;
 }
 
 .prompt {

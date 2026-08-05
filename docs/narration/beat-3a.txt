@@ -1,0 +1,1 @@
+The buyer here is an agent. It finds what is for sale and asks what one call costs. Listing, describing and quoting are free and sign nothing. And the price it reads comes from the endpoint's own payment challenge, not from the catalogue.

@@ -1,0 +1,1 @@
+Built on Circle's stack, on Circle's own chain. On Arc, USDC is both the native gas token and the ERC-20 our prices use. Gateway nanopayments ship as a second, conformance-tested rail. And Circle's own CLI reads our 402.

@@ -65,11 +65,40 @@ describe("thread rendering — scripted conversations", () => {
       })
 
     const html = render(chat.get() as ReadonlyArray<UIMessageLike>)
-    expect(html).toContain('class="marker"')
+    // The state is IN the class now, so the marker is matched by prefix. A tool that has
+    // finished, one still running and one that failed must not render identically — that
+    // was the defect this shape replaced.
+    expect(html).toContain('class="marker is-done"')
     expect(html).toContain('role="status"')
     // The prefix is noise to a reader — every tool here is an arcade tool.
     expect(html).toContain("list_skills")
     expect(html).not.toContain(">arcade_list_skills<")
+    // The gloss is what makes the row legible to someone who has not read the source.
+    expect(html).toContain("reading the catalogue")
+  })
+
+  it("tells a failed tool call apart from a running one", () => {
+    // The regression this guards: `output-error` fell through to the running branch, so a
+    // tool that had FAILED sat on screen claiming to still be working.
+    const failed = [
+      {
+        id: "m1",
+        role: "assistant",
+        parts: [{ type: "tool-arcade_quote", state: "output-error" }]
+      }
+    ] as ReadonlyArray<UIMessageLike>
+    const running = [
+      {
+        id: "m1",
+        role: "assistant",
+        parts: [{ type: "tool-arcade_quote", state: "input-available" }]
+      }
+    ] as ReadonlyArray<UIMessageLike>
+
+    expect(render(failed)).toContain("failed")
+    expect(render(failed)).toContain("is-failed")
+    expect(render(running)).toContain("running")
+    expect(render(running)).not.toContain("failed")
   })
 
   /**
@@ -141,7 +170,11 @@ describe("empty state — the invitation matches what the deployment can do", ()
   it("invites and suggests when the chat is live", () => {
     const html = renderToStaticMarkup(<Empty chatLive hubUrl={HUB} />)
     expect(html).toContain("Ask for what you need")
-    expect(html).toContain("what’s for sale?")
+    // The suggestions are now the real commands rather than sentences describing them, so
+    // the empty state teaches something the composer will actually accept.
+    expect(html).toContain("/skills")
+    expect(html).toContain("/buy")
+    expect(html).toContain("type / for commands")
     // Law 9: the empty state is the product's law plus one real action, not a tour.
     expect(html).not.toContain("Next")
     expect(html).not.toContain("Got it")
@@ -322,8 +355,14 @@ describe("a purchased result reaches the buyer verbatim", () => {
   it("states completeness rather than claiming a truncation", () => {
     const html = render(purchase({ result: "a\nb\nc" }))
     expect(html).toContain("3 lines, complete")
-    expect(html).not.toContain("first")
-    expect(html).not.toContain("…")
+    // Asserted against VISIBLE TEXT, not raw markup. The markdown renderer emits utility
+    // class names — `[&>*:first-child]:mt-0` among them — so a `not.toContain("first")` over
+    // the HTML matched an attribute value and failed on a page that was perfectly correct.
+    // What this test means is "the reader is not told they are seeing only the first N
+    // lines", and that is a claim about text.
+    const text = html.replace(/<[^>]*>/g, " ")
+    expect(text).not.toContain("first")
+    expect(text).not.toContain("…")
   })
 
   it("discloses a long result without dropping any of it", () => {

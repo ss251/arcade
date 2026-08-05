@@ -1,0 +1,1 @@
+The hub cannot see the skill. Not because a filter runs. The published type has nowhere to put a prompt or a key, so leaking one is a compile error, and a property test asserts it over generated manifests. And the runner dials out, so a seller can sell from a laptop behind NAT, with no open ports.

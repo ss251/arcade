@@ -93,3 +93,6 @@ docs/
 .mcp.json
 *.md
 !README.md
+
+# Generated video assets — regenerable from docs/narration + scripts/narrate.sh.
+design/

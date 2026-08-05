@@ -172,19 +172,40 @@ export const arcade_receipts = tool({
 /** Per-call ceiling, mirroring `ARCADE_MAX_CALL_USD` in the MCP server. */
 const MAX_CALL_ATOMIC = parsePrice(process.env["ARCADE_MAX_CALL_USD"] ?? "$1.00")
 
+/**
+ * The spending ceiling. It deliberately does NOT report whether a wallet is connected.
+ *
+ * It used to return `walletConnected: false` — hardcoded, because this tool executes on the
+ * server and the wallet lives in the browser. The server cannot observe `window.ethereum`,
+ * so that field was not a stale value: it was a claim made by a layer with no way to know,
+ * and it was false unconditionally.
+ *
+ * It did real damage. Models read it, correctly concluded no purchase was possible, and
+ * answered "I can't complete the purchase — no wallet is connected yet", so the purchase
+ * edge was unreachable through conversation no matter what the visitor had installed. A
+ * refusal derived from a constant is the worst version of this repo's recurring bug: not a
+ * success signal indistinguishable from nothing, but a FAILURE signal indistinguishable
+ * from a real one.
+ *
+ * The honest answer is that connection is not this layer's fact to report. The wallet is
+ * checked where it exists — `PendingPurchase` reads the provider and the chain, and
+ * `walletBlocker` renders the reason on the card itself if it cannot be used. So the tool
+ * states the ceiling, which it does own, and describes where the wallet question is settled.
+ */
 export const arcade_budget = tool({
   description:
-    "The spending limits that apply to this conversation, and whether a wallet is connected " +
-    "yet. Check this before proposing a purchase. A purchase requires the visitor's own " +
-    "wallet — this service holds no key and cannot spend on anyone's behalf.",
+    "The spending limit that applies to this conversation. Check this before proposing a " +
+    "purchase. A purchase requires the visitor's own wallet — this service holds no key and " +
+    "cannot spend on anyone's behalf — and whether that wallet is usable is determined in " +
+    "the browser when the confirmation card appears, not here.",
   inputSchema: std(NoArgs),
   execute: async () => ({
     maxPerCall: formatPrice(MAX_CALL_ATOMIC),
-    walletConnected: false,
     note:
       "ARCADE never custodies funds. Discovery, describing and quoting are free and need no " +
       "wallet. A purchase is signed in the visitor's own browser by their own wallet, so " +
-      "their key never reaches this server or any seller."
+      "their key never reaches this server or any seller. Preparing a purchase does not " +
+      "spend anything: it asks the visitor to confirm, and they sign — or decline — there."
   })
 })
 

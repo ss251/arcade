@@ -45,6 +45,21 @@ export interface ConfirmProps {
   readonly network: string
   /** Blocked reasons render the card as an explanation instead of an action. */
   readonly blocked?: string | undefined
+  /**
+   * The remedy for a blocked card, when one exists.
+   *
+   * `lib/wallet.ts` states the rule this satisfies: "the chain guard has to be an ACTION,
+   * not a wall" — `wallet_addEthereumChain` adds and switches in a single prompt, so the
+   * refusal can carry its own fix. Until this existed the card only *described* the remedy
+   * ("connecting will offer to add and switch to it in one step") with nothing to click,
+   * which is the worst of both: it named an action and then withheld it, on the one screen
+   * where someone has already decided to pay.
+   *
+   * Absent when nothing can be done from here — no wallet installed at all — because a
+   * button that cannot help is worse than prose that explains.
+   */
+  readonly onConnect?: (() => void) | undefined
+  readonly connecting?: boolean | undefined
   readonly onApprove: () => void
   readonly onDeny: () => void
 }
@@ -104,6 +119,8 @@ export const Confirm = ({
   payTo,
   network,
   blocked,
+  onConnect,
+  connecting,
   onApprove,
   onDeny
 }: ConfirmProps) => {
@@ -194,6 +211,21 @@ export const Confirm = ({
         <button type="button" className="deny" onClick={onDeny}>
           no
         </button>
+        {blocked !== undefined && onConnect !== undefined ? (
+          // Replaces the approve button rather than sitting beside it. There is exactly one
+          // thing to do on a blocked card, and offering two primary actions where one is
+          // inert is how someone ends up holding a button that was never going to fire.
+          <button
+            type="button"
+            className="approve connect"
+            onClick={onConnect}
+            disabled={connecting === true}
+          >
+            <span className="approve-label">
+              {connecting === true ? "check your wallet…" : "connect wallet"}
+            </span>
+          </button>
+        ) : (
         <button
           type="button"
           className="approve"
@@ -217,6 +249,7 @@ export const Confirm = ({
             <span className="approve-label">{label}</span>
           </span>
         </button>
+        )}
       </div>
     </div>
   )

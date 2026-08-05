@@ -1,0 +1,1 @@
+You have an agent skill that works. Today the only way to sell it is to hand someone your prompt and your API key, or to bill them thirty cents to process a call worth four hundredths of a cent. So nobody sells it.

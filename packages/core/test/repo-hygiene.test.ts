@@ -233,4 +233,37 @@ describe("repo hygiene", () => {
     expect(patternsOf(".gitignore")).toContain("internal/")
     expect(patternsOf(".dockerignore")).toContain("internal/")
   })
+
+  /**
+   * `@arcade/core` must import nothing Node-only, because the browser imports it too.
+   *
+   * This is a REGRESSION GATE with a real escape behind it. `untrusted.ts` imported
+   * `randomBytes` from `node:crypto`, and because `index.ts` re-exports that module, the
+   * first client component to import ANY core symbol — a chain constant, in the event —
+   * took the whole page down: Vite externalises `node:` builtins and the access throws at
+   * runtime, not at build time. Nothing caught it, because every consumer up to that point
+   * had been a Node process.
+   *
+   * Scoped to `core` deliberately. `runner`, `hub` and `buyer` are Node processes and SHOULD
+   * use Node builtins freely; core is the one package all four import, which is exactly what
+   * makes a Node-only import in it a defect no matter which symbol drags it in.
+   *
+   * To see it fail: put `import { randomBytes } from "node:crypto"` back in any core source.
+   */
+  it("keeps @arcade/core importable in a browser — no node: builtins in the shared package", () => {
+    // `git grep` exits 1 on NO match, which is the passing case here — so a thrown error
+    // means clean and a zero exit means we found something. Inverted from the usual shape,
+    // hence spelled out rather than left to a reader to notice.
+    let hits = ""
+    try {
+      hits = execFileSync(
+        "git",
+        ["grep", "-nE", 'from "node:|require\\("node:', "--", ":(glob)packages/core/src/**/*.ts"],
+        { cwd: REPO_ROOT, encoding: "utf8" }
+      ).trim()
+    } catch {
+      hits = ""
+    }
+    expect(hits, `packages/core must not import node: builtins — the browser imports it:\n${hits}`).toBe("")
+  })
 })

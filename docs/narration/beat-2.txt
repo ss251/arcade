@@ -1,0 +1,1 @@
+ARCADE turns a skill into a paid endpoint. One command. You get paid per call in USDC on Arc, and your code, your prompts and your keys never leave your machine.

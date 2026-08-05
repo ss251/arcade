@@ -64,3 +64,9 @@ skills/*/.cache/
 skills/*/.bun/
 skills/*/.npm/
 skills/*/.config/
+
+# Generated video assets. The SOURCES are committed — docs/narration/*.txt is the script and
+# scripts/narrate.sh regenerates every clip from it — so these are derived bytes, and the
+# same reasoning that keeps a second copy of a money field out of this codebase keeps
+# regenerable media out of its history.
+design/
