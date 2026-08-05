@@ -46,12 +46,27 @@ describe("styles.css is structurally sound", () => {
     expect(max, "nesting deeper than an at-rule block means an unclosed brace").toBeLessThanOrEqual(2)
   })
 
-  it("keeps the scrollbar native — styling it opts macOS out of overlay scrollbars", () => {
-    // The regression: `scrollbar-width` / `scrollbar-color` / `::-webkit-scrollbar` all
-    // switch Chrome to a CLASSIC scrollbar that permanently reserves its gutter. The CSS
-    // written to stop a bar being always-visible is what made one always-visible.
-    expect(withoutComments).not.toMatch(/scrollbar-width\s*:/)
-    expect(withoutComments).not.toMatch(/scrollbar-color\s*:/)
-    expect(withoutComments).not.toMatch(/::-webkit-scrollbar/)
+  /**
+   * Every scroller hides its scrollbar, in BOTH engine dialects.
+   *
+   * This test previously asserted the exact opposite — that no scrollbar properties appear
+   * at all — because I had concluded that styling was what opted macOS out of overlay
+   * scrollbars. That was wrong, and writing it into a gate made it durable: the real cause
+   * is the system's "Show scroll bars: Always" preference, which no CSS can reach, and the
+   * only thing that removes the bar is not drawing it. The measurement that settles it is
+   * `offsetWidth - clientWidth`, which is 0 on an empty page and 15 once content overflows
+   * — it tracks CONTENT, not CSS.
+   *
+   * Both dialects are required together, deliberately: `scrollbar-width` alone leaves the
+   * bar in older WebKit, and `::-webkit-scrollbar` alone leaves it in Firefox. One without
+   * the other is a fix that works on the machine it was written on.
+   */
+  it("hides the scrollbar on every scroller, in both engine dialects", () => {
+    for (const sel of [".viewport", ".side-list"]) {
+      const rule = new RegExp(`\\${sel}\\s*\\{[^}]*scrollbar-width:\\s*none`, "s")
+      expect(withoutComments, `${sel} must set scrollbar-width: none`).toMatch(rule)
+      const webkit = new RegExp(`\\${sel}::-webkit-scrollbar\\s*\\{[^}]*width:\\s*0`, "s")
+      expect(withoutComments, `${sel} must zero ::-webkit-scrollbar`).toMatch(webkit)
+    }
   })
 })

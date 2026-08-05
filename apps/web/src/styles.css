@@ -162,7 +162,13 @@ body {
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-  /* Platform scrollbar, for the reason spelled out on `.viewport`. */
+  /* Hidden, for the reason spelled out on `.viewport`. */
+  scrollbar-width: none;
+}
+
+.side-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .side-list li {
@@ -386,22 +392,44 @@ a {
   /* The scrim fades content into the composer instead of ruling a line under it. */
   mask-image: linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 12px), transparent 100%);
   /*
-   * The scrollbar is left ENTIRELY to the platform, and that is the fix rather than the
-   * absence of one.
+   * The scrollbar is HIDDEN. Not styled, not thinned — removed.
    *
-   * There was a hand-built "overlay" here — `scrollbar-width: thin`, a transparent
-   * `scrollbar-color`, a styled `::-webkit-scrollbar` thumb that appeared on hover. It made
-   * things worse in a way that is worth writing down: **touching either property opts the
-   * element OUT of macOS overlay scrollbars.** Chrome switches to a classic scrollbar that
-   * permanently reserves its gutter, so the CSS written to stop a bar being always-visible
-   * is what made one always-visible — an 11px track down the thread that no amount of
-   * further styling could remove, because the styling was the cause.
+   * ## Why, and why the previous two attempts were both wrong
    *
-   * Native behaviour is already what this design wants: nothing at rest, a thumb while
-   * scrolling, no reserved gutter, and the user's own "show scroll bars" preference
-   * respected rather than overridden. The scrim below fades content into the composer; the
-   * platform handles the edge.
+   * macOS's "Show scroll bars: Always" turns overlay scrollbars off system-wide. Every
+   * overflowing element then gets a classic bar that permanently reserves a 15px gutter —
+   * here, a bright grey track down the middle of the page, inside the 920px content column
+   * rather than at the window edge, directly beside a scrim whose whole job is to keep that
+   * boundary soft.
+   *
+   * Attempt one hand-built an "overlay" with `scrollbar-width: thin` and a hover-revealed
+   * thumb. Attempt two deleted all of it, on the theory that styling was what opted the
+   * element out of overlay mode. Both were wrong, and the second was wrong in the more
+   * expensive way: it shipped, and a gate was written to enforce it.
+   *
+   * The measurement that settles it: `offsetWidth - clientWidth` is 0 on an empty page and
+   * **15 once the thread overflows**. The gutter tracks CONTENT, not CSS. The system
+   * preference is the cause and no amount of styling reaches it — the only thing that does
+   * is not drawing the bar.
+   *
+   * ## What is lost, and what stands in for it
+   *
+   * A visible scroll affordance. Wheel, trackpad, keyboard and drag all still scroll, and
+   * `MessageScroller.Button` — the "latest" pill — is the affordance that remains, which is
+   * the one that actually matters in a thread that auto-follows.
+   *
+   * ## How to check this
+   *
+   * ONLY on a real screen capture. `Page.captureScreenshot` does not render OS scrollbars,
+   * so every CDP screenshot showed a clean edge while the actual screen had a grey bar down
+   * it. Two rounds of "verified" rested on that, and neither was worth anything.
    */
+  scrollbar-width: none;
+}
+
+.viewport::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .thread {
