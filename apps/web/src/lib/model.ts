@@ -1,6 +1,7 @@
 import { anthropic } from "@ai-sdk/anthropic"
 import { google } from "@ai-sdk/google"
 import { groq } from "@ai-sdk/groq"
+import { deepseek } from "@ai-sdk/deepseek"
 import type { LanguageModel } from "ai"
 
 /**
@@ -39,7 +40,19 @@ type Factory = (id: string) => LanguageModel
 const PROVIDERS: Record<string, { factory: Factory; keyVar: string }> = {
   anthropic: { factory: (id) => anthropic(id), keyVar: "ANTHROPIC_API_KEY" },
   google: { factory: (id) => google(id), keyVar: "GOOGLE_GENERATIVE_AI_API_KEY" },
-  groq: { factory: (id) => groq(id), keyVar: "GROQ_API_KEY" }
+  groq: { factory: (id) => groq(id), keyVar: "GROQ_API_KEY" },
+  /*
+   * `deepseek:deepseek-v4-flash` — $0.14/1M in, $0.28/1M out, versus Gemini 2.5 Flash's
+   * $0.15/$1.25. Input is a wash; OUTPUT is 4.5x cheaper, and cache-hit input at $0.0028
+   * is 50x below cache-miss, which is most of the cost of a chat with a fixed system
+   * prompt and repeated tool schemas.
+   *
+   * The package is versioned 3.x but depends on @ai-sdk/provider 4.0.5 — the same
+   * generation this stack runs — so the version number is its own line, not an older
+   * provider contract. Worth stating because the number reads like an incompatibility and
+   * is not one.
+   */
+  deepseek: { factory: (id) => deepseek(id), keyVar: "DEEPSEEK_API_KEY" }
 }
 
 export const DEFAULT_MODEL = "anthropic:claude-opus-5"

@@ -141,11 +141,12 @@ describe("the model spec is ONE variable", () => {
   it("names the key variable per provider, so the warning is never about the wrong one", () => {
     expect(parseModel("anthropic:claude-opus-5")!.keyVar).toBe("ANTHROPIC_API_KEY")
     expect(parseModel("groq:llama-3.3-70b-versatile")!.keyVar).toBe("GROQ_API_KEY")
+    expect(parseModel("deepseek:deepseek-v4-flash")!.keyVar).toBe("DEEPSEEK_API_KEY")
   })
 
   it("rejects a spec that is not provider:id, rather than guessing", () => {
     // Each of these would otherwise become a silent default or a malformed model id.
-    for (const bad of ["claude-opus-5", "google:", ":gemini", "", "openai:gpt-4"]) {
+    for (const bad of ["claude-opus-5", "google:", ":gemini", "", "openai:gpt-4", "deepseek"]) {
       expect(parseModel(bad), `${bad} must be rejected`).toBeNull()
     }
   })
