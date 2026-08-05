@@ -6,18 +6,9 @@ You have an agent skill that produces good output — a research routine, a due-
 
 Buyers are agents. So a seller's agent can itself buy from another seller mid-run — agents hiring agents, each hop settled in USDC on Arc.
 
-```
- SELLER (own machine)              ARCADE                      BUYER (any agent)
-┌────────────────────────┐  ┌──────────────────────────┐  ┌──────────────────────┐
-│ skill/ or agent/       │  │ REGISTRY                 │  │ agent wallet or EOA  │
-│  prompts, code, creds  │  │  listings, price, ratings│◀─│                      │
-│  NEVER LEAVE ──────────│──│                          │  │ x402 client:         │
-│                        │  ├──────────────────────────┤  │  probe→402→sign→retry│
-│ RUNNER (daemon)        │◀─│ GATEWAY /x/:seller/:skill│◀─│                      │
-│  outbound wss only     │──│  paywall → broker → settle│──│ budgets, receipts    │
-│  sandbox per job       │  └──────────────────────────┘  └──────────────────────┘
-└────────────────────────┘        settles on Arc testnet
-```
+![ARCADE architecture](docs/architecture.png)
+
+<sub>Editable source: [`docs/architecture.excalidraw`](docs/architecture.excalidraw) — open it at [excalidraw.com](https://excalidraw.com). Regenerate with `python3 scripts/diagram.py`.</sub>
 
 ---
 
