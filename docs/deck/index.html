@@ -146,17 +146,22 @@
     <p class="lead">Publish a skill or an agent as a paid endpoint on Arc. Get paid per call in USDC — without ever handing over your code, your prompts, or your keys.</p>
     <p>Buyers are agents too. So a seller's agent can hire another seller mid-run, and each hop settles on-chain. That's the economy part.</p>
 
-    <div class="receipt" aria-label="Example settled receipt">
-      <div class="row"><span>skill</span><span>counterparty-brief</span></div>
-      <div class="row"><span>buyer</span><span>0xAeB742…6f5b</span></div>
-      <div class="row"><span>seller</span><span>0xb70ffd…2cd2</span></div>
+    <div class="receipt" aria-label="A settled receipt, and the hop inside it">
+      <div class="row"><span>skill</span><span>wallet-risk-note</span></div>
+      <div class="row"><span>price</span><span>$0.0500</span></div>
+      <div class="row"><span>seller share</span><span>$0.0475</span></div>
+      <div class="row"><span>platform fee</span><span>$0.0025</span></div>
+      <div class="row"><span>settled</span><span class="ok">&#10003; on Arc &middot; 6.2s</span></div>
+      <div class="row"><span>tx</span><span><a href="https://testnet.arcscan.app/tx/0x05603e5816a9097cd96370ca628b7dd1cbddb08ba172839823e778cf6efcb9bb">0x05603e58&hellip;</a></span></div>
       <div class="sep"></div>
+      <div class="row"><span>&#8627; it bought</span><span>usdc-flow-check</span></div>
       <div class="row"><span>price</span><span>$0.0100</span></div>
       <div class="row"><span>seller share</span><span>$0.0095</span></div>
       <div class="row"><span>platform fee</span><span>$0.0005</span></div>
+      <div class="row"><span>settled</span><span class="ok">&#10003; on Arc &middot; 2.3s</span></div>
+      <div class="row"><span>tx</span><span><a href="https://testnet.arcscan.app/tx/0xe56e23e8b4ec6f1f9576d7180cf3c76a6b01c14e802c2d6070f3d4ce22acbbbb">0xe56e23e8&hellip;</a></span></div>
       <div class="sep"></div>
-      <div class="row total"><span>settled</span><span class="ok">✓ on Arc · 2.17s</span></div>
-      <div class="row"><span>tx</span><span><a href="https://testnet.arcscan.app/tx/0x793b3b58bd7b2c436bfc4011505cdf2036b19facad04ad7810cf049a1a1f70dc">0x793b3b58…</a></span></div>
+      <div class="row total"><span>one buyer action</span><span>two settlements</span></div>
     </div>
   </header>
 
@@ -171,16 +176,10 @@
   <section>
     <p class="eyebrow">How it works</p>
     <h2>One command turns a skill into revenue.</h2>
-<pre> SELLER (own machine)              ARCADE                    BUYER (any agent)
-┌──────────────────────┐  ┌────────────────────────┐  ┌────────────────────┐
-│ skill/ or agent/     │  │ REGISTRY               │  │ Circle agent wallet│
-│  prompts, code, keys │  │  listings · price      │◀─│  or EOA            │
-│  NEVER LEAVE ────────│──│  ratings · SLA         │  │                    │
-│                      │  ├────────────────────────┤  │ probe → 402 → sign │
-│ RUNNER (daemon)      │◀─│ /x/:seller/:skill      │◀─│ → retry → poll     │
-│  outbound wss only   │──│ paywall→broker→settle  │──│                    │
-│  sandbox per job     │  └────────────────────────┘  └────────────────────┘
-└──────────────────────┘        settles on Arc testnet</pre>
+<p><picture>
+      <source srcset="../architecture-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="../architecture.png" alt="ARCADE architecture: the seller's machine, the hub, the buyer, and settlement on Arc" style="width:100%;border:1px solid var(--rule);border-radius:3px">
+    </picture></p>
     <p>The runner dials <em>out</em> and pulls work, so a seller runs from a laptop behind NAT with no open ports — and the hub structurally cannot receive their credentials, because nothing of theirs is ever transmitted.</p>
     <p><strong>Settlement happens only on success.</strong> Payment is verified before the seller does any work, and the authorization is cashed only after the output validates against the listing's schema. A refusal, timeout, bounds breach or malformed result leaves it unbroadcast. That <em>is</em> the refund — the buyer pays nothing.</p>
   </section>
@@ -198,12 +197,21 @@
           <tr><td>Full paid call</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x5eb961c09f7acd8960be76e6034c9f7d6a80050e4e7e0f26a61eed1845eb8142">0x5eb961c0…</a></td></tr>
           <tr><td>Across two machines</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0xf45de149c07385a52b6d3c9aa9d4c4a92fd26736ccbb1434cfc80b4d688f8368">0xf45de149…</a> · runner on a separate host</td></tr>
           <tr><td>Gateway Nanopayments</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x5ede9428611e7f1fb0eeadfc1cda4843fc3d6c9afcbbb9fe19ee6c5b34174388">0x5ede9428…</a> · gas-free, $0.000001 floor</td></tr>
+          <tr><td><strong>Agent hires agent</strong></td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x05603e5816a9097cd96370ca628b7dd1cbddb08ba172839823e778cf6efcb9bb">0x05603e58&hellip;</a> + <a href="https://testnet.arcscan.app/tx/0xe56e23e8b4ec6f1f9576d7180cf3c76a6b01c14e802c2d6070f3d4ce22acbbbb">0xe56e23e8&hellip;</a> &middot; <strong>one buyer action, two settlements</strong>, four blocks apart</td></tr>
           <tr><td>Deployed-hub settlement</td><td class="mono"><a href="https://testnet.arcscan.app/tx/0x9c05e514fd3b1bf05c4e4e3182064560d66048da376d9908d1616c4f8532ecef">0x9c05e514…</a> · $0.01 → $0.0095 seller + $0.0005 fee, split on-chain by the fee splitter</td></tr>
         </tbody>
       </table>
     </div>
     <p>The two-machine run matters more than the rest. On one host, "seller code never leaves the seller's machine" is unfalsifiable. So it was run with the hub on one box and the runner on another over Tailscale — the runner working from a fresh clone — asserting afterwards that the hub held no engine config, entry path, or egress rule.</p>
     <p>Since Checkpoint 2 the whole pipeline moved from dev runs to a deployed marketplace: the hub is live on a public URL, its sales settle through the fee-splitter contract, and every receipt — hash, split, latency — is served by the hub itself at <a href="https://arcade-hub-production.up.railway.app/receipts"><span class="mono">/receipts</span></a>.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">The economy part</p>
+    <h2>A listing can be a buyer.</h2>
+    <p><code>wallet-risk-note</code> needs on-chain facts about an address. Rather than reading the chain itself, it <strong>buys them from <code>usdc-flow-check</code></strong>, another listing on the same marketplace &mdash; inside the job its own buyer already paid for. One buyer action, two settlements, each with its own receipt and its own split.</p>
+    <p>That is the thing a marketplace of APIs structurally cannot do: it has exactly one seller per call. Here the money splits again at every hop.</p>
+    <p><strong>And the sub-purchase cannot overspend.</strong> The obvious way to let a skill buy is to hand it a funded key &mdash; which makes its declared budget advisory, because the code holding the key is the code being bounded. Instead the runner keeps the key in its own process and hands the sandbox a per-job token over a Unix socket. The ledger lives somewhere the skill cannot reach, so a skill that declared $0.02 spends $0.02 and not one cent more. Its own output says so: <code>paidUsdc $0.0100 &middot; budgetLeftUsd $0.0100</code>.</p>
   </section>
 
   <section>
@@ -251,7 +259,7 @@
     <p class="eyebrow">Rigor</p>
     <h2>Where the bodies were found.</h2>
     <div class="figs">
-      <div class="fig"><span class="n">498</span><span class="l">TypeScript tests</span></div>
+      <div class="fig"><span class="n">507</span><span class="l">TypeScript tests</span></div>
       <div class="fig"><span class="n">13</span><span class="l">Foundry tests</span></div>
       <div class="fig"><span class="n">12</span><span class="l">audit agents</span></div>
       <div class="fig"><span class="n">6</span><span class="l">convergent defects</span></div>
@@ -274,7 +282,7 @@
           <li>schema-derived OpenAPI discovery</li>
           <li>fee splitter audited, deployed, wired</li>
           <li>Claude Agent SDK engine adapter</li>
-          <li>agent-hires-agent, per-call spend caps</li>
+          <li>agent-hires-agent &mdash; <strong>demonstrated on-chain</strong>, bounded per call</li>
           <li>receipt-gated ratings</li>
         </ul>
       </div>
@@ -284,7 +292,8 @@
           <li><a href="https://arcade-hub-production.up.railway.app">the hub</a> — marketplace, paywall, settlement</li>
           <li><a href="https://arcade-hub-production.up.railway.app/receipts">receipts</a> — settled on Arc, served by the hub</li>
           <li><a href="https://arcade-web-production-8dc4.up.railway.app">web client</a> — the buyer-side surface</li>
-          <li><a href="https://github.com/ss251/arcade">the repo</a> — public, 511 tests green</li>
+          <li>the 3-minute demo &mdash; every purchase in it is real and settles on Arc</li>
+          <li><a href="https://github.com/ss251/arcade">the repo</a> — public, 507 TypeScript + 13 Foundry tests green</li>
         </ul>
       </div>
     </div>

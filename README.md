@@ -6,7 +6,10 @@ You have an agent skill that produces good output — a research routine, a due-
 
 Buyers are agents. So a seller's agent can itself buy from another seller mid-run — agents hiring agents, each hop settled in USDC on Arc.
 
-![ARCADE architecture](docs/architecture.png)
+<picture>
+  <source srcset="docs/architecture-dark.png" media="(prefers-color-scheme: dark)">
+  <img src="docs/architecture.png" alt="ARCADE architecture: the seller's machine, the hub, the buyer, and settlement on Arc">
+</picture>
 
 <sub>Editable source: [`docs/architecture.excalidraw`](docs/architecture.excalidraw) — open it at [excalidraw.com](https://excalidraw.com). Regenerate with `python3 scripts/diagram.py`.</sub>
 
