@@ -1,0 +1,98 @@
+{
+  "id": "wallet-risk-note",
+  "version": "0.1.0",
+  "serviceName": "Wallet Risk Note",
+  "description": "A short counterparty note on an Arc address: is it a contract, has it ever moved funds, does it hold enough to settle. Buys its on-chain facts from another seller rather than reading the chain itself.",
+  "tags": [
+    "arc",
+    "risk",
+    "diligence",
+    "compose"
+  ],
+  "price": "$0.05",
+  "replaces": "$99/mo screening seat",
+  "bounds": {
+    "timeoutSec": 60,
+    "maxSubSpendUsd": 0.02
+  },
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "address"
+    ],
+    "properties": {
+      "address": {
+        "type": "string",
+        "pattern": "^0x[a-fA-F0-9]{40}$",
+        "description": "EVM address to assess on Arc testnet"
+      },
+      "minUsdc": {
+        "type": "number",
+        "description": "Balance the counterparty must hold to be considered settle-capable. Defaults to 1.",
+        "default": 1
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "address",
+      "verdict",
+      "findings",
+      "sourcedFrom"
+    ],
+    "properties": {
+      "address": {
+        "type": "string"
+      },
+      "verdict": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "caution",
+          "unfunded"
+        ]
+      },
+      "findings": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "balanceUsdc": {
+        "type": "string"
+      },
+      "isContract": {
+        "type": "boolean"
+      },
+      "everTransacted": {
+        "type": "boolean"
+      },
+      "sourcedFrom": {
+        "type": "object",
+        "description": "The skill this note bought its facts from, and what that cost.",
+        "properties": {
+          "skillId": {
+            "type": "string"
+          },
+          "paidUsdc": {
+            "type": "string"
+          },
+          "subJobId": {
+            "type": "string"
+          },
+          "budgetLeftUsd": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "engine": {
+    "adapter": "script",
+    "entry": "run.ts",
+    "capabilities": [
+      "hire-skills"
+    ]
+  }
+}
