@@ -24,10 +24,19 @@ drawn straight. Both are needed; changing only the font leaves wobbling boxes.
 """
 
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "docs" / "architecture.excalidraw"
+
+# Two palettes, one geometry.
+#
+# The README wants light — GitHub renders it on white and a dark plate would float. The
+# VIDEO wants dark, because every other frame in it is #161513 and cutting to a white card
+# is a flash in the face. Same spec, same coordinates, different colours: keeping one
+# geometry means the two cannot drift into different diagrams.
+DARK = "--dark" in sys.argv
+OUT = ROOT / "docs" / ("architecture-dark.excalidraw" if DARK else "architecture.excalidraw")
 
 # Real rendered widths, measured once in a browser with canvas measureText against the same
 # font stacks Excalidraw uses, and baked in here.
@@ -44,12 +53,26 @@ OUT = ROOT / "docs" / "architecture.excalidraw"
 MEASURED: dict[str, int] = json.loads((ROOT / "docs" / ".text-widths.json").read_text())
 
 SANS, MONO = 2, 3
-INK, MUTED = "#1e1e1e", "#757575"
-GREEN, GREEN_D = "#22c55e", "#15803d"
-PURPLE, PURPLE_D = "#8b5cf6", "#6d28d9"
-BLUE, BLUE_D = "#4a9eed", "#2563eb"
-USDC = "#0b53bf"
-AMBER = "#f59e0b"
+
+if DARK:
+    # Fills are dark and strokes/text are the bright variants — on #161513 the light-mode
+    # "dark" text colours (#15803d, #6d28d9) are unreadable, so they invert rather than
+    # being reused.
+    PAPER = "#161513"
+    INK, MUTED = "#e8e6e1", "#9b968b"
+    GREEN, GREEN_D, FILL_G, ZONE_G = "#2ca96c", "#4ade80", "#1a4d2e", "#12281c"
+    PURPLE, PURPLE_D, FILL_P, ZONE_P = "#a78bfa", "#c4b5fd", "#2d1b69", "#1d1435"
+    BLUE, BLUE_D, FILL_B, ZONE_B = "#4e94dc", "#93c5fd", "#1e3a5f", "#152838"
+    USDC, FILL_ARC = "#4e94dc", "#1e3a5f"
+    AMBER, FILL_LAW = "#f59e0b", "#3a2c10"
+else:
+    PAPER = "#ffffff"
+    INK, MUTED = "#1e1e1e", "#757575"
+    GREEN, GREEN_D, FILL_G, ZONE_G = "#22c55e", "#15803d", "#b2f2bb", "#d3f9d8"
+    PURPLE, PURPLE_D, FILL_P, ZONE_P = "#8b5cf6", "#6d28d9", "#d0bfff", "#e5dbff"
+    BLUE, BLUE_D, FILL_B, ZONE_B = "#4a9eed", "#2563eb", "#a5d8ff", "#dbe4ff"
+    USDC, FILL_ARC = "#0b53bf", "#a5d8ff"
+    AMBER, FILL_LAW = "#f59e0b", "#fff3bf"
 
 # type, id, x, y, w, h, and per-type extras. Labels are expanded below.
 SPEC: list[dict] = [
@@ -58,43 +81,43 @@ SPEC: list[dict] = [
      "text": "Publish a skill as a paid endpoint on Arc. Agents hire agents, per call, in USDC."},
 
     # ── seller ────────────────────────────────────────────────────────────
-    {"t": "rect", "id": "zs", "x": 20, "y": 110, "w": 270, "h": 300, "bg": "#d3f9d8",
+    {"t": "rect", "id": "zs", "x": 20, "y": 110, "w": 270, "h": 300, "bg": ZONE_G,
      "stroke": GREEN, "sw": 1, "opacity": 30},
     {"t": "text", "id": "zsl", "x": 40, "y": 122, "text": "SELLER  ·  own machine",
      "size": 15, "color": GREEN_D},
-    {"t": "rect", "id": "sk", "x": 45, "y": 155, "w": 220, "h": 78, "bg": "#b2f2bb",
+    {"t": "rect", "id": "sk", "x": 45, "y": 155, "w": 220, "h": 78, "bg": FILL_G,
      "stroke": GREEN, "label": "skill/\nprompts · code · secrets", "size": 16},
     {"t": "text", "id": "nl", "x": 52, "y": 246, "text": "never leaves this machine",
      "size": 16, "color": GREEN_D},
-    {"t": "rect", "id": "rn", "x": 45, "y": 285, "w": 220, "h": 72, "bg": "#b2f2bb",
+    {"t": "rect", "id": "rn", "x": 45, "y": 285, "w": 220, "h": 72, "bg": FILL_G,
      "stroke": GREEN, "label": "runner (daemon)", "size": 16},
     {"t": "text", "id": "rnl", "x": 52, "y": 368, "text": "dials out · no open ports",
      "size": 15, "color": MUTED},
 
     # ── hub ───────────────────────────────────────────────────────────────
-    {"t": "rect", "id": "zh", "x": 410, "y": 110, "w": 280, "h": 300, "bg": "#e5dbff",
+    {"t": "rect", "id": "zh", "x": 410, "y": 110, "w": 280, "h": 300, "bg": ZONE_P,
      "stroke": PURPLE, "sw": 1, "opacity": 30},
     {"t": "text", "id": "zhl", "x": 430, "y": 122, "text": "ARCADE HUB", "size": 15,
      "color": PURPLE_D},
-    {"t": "rect", "id": "h1", "x": 432, "y": 152, "w": 236, "h": 52, "bg": "#d0bfff",
+    {"t": "rect", "id": "h1", "x": 432, "y": 152, "w": 236, "h": 52, "bg": FILL_P,
      "stroke": PURPLE, "label": "registry — listings, prices", "size": 15},
-    {"t": "rect", "id": "h2", "x": 432, "y": 216, "w": 236, "h": 52, "bg": "#d0bfff",
+    {"t": "rect", "id": "h2", "x": 432, "y": 216, "w": 236, "h": 52, "bg": FILL_P,
      "stroke": PURPLE, "label": "paywall — x402", "size": 15},
-    {"t": "rect", "id": "h3", "x": 432, "y": 280, "w": 236, "h": 52, "bg": "#d0bfff",
+    {"t": "rect", "id": "h3", "x": 432, "y": 280, "w": 236, "h": 52, "bg": FILL_P,
      "stroke": PURPLE, "label": "broker — dispatch, bounded", "size": 15},
-    {"t": "rect", "id": "h4", "x": 432, "y": 344, "w": 236, "h": 52, "bg": "#d0bfff",
+    {"t": "rect", "id": "h4", "x": 432, "y": 344, "w": 236, "h": 52, "bg": FILL_P,
      "stroke": PURPLE, "label": "settle — on success only", "size": 15},
 
     # ── buyer ─────────────────────────────────────────────────────────────
-    {"t": "rect", "id": "zb", "x": 810, "y": 110, "w": 270, "h": 300, "bg": "#dbe4ff",
+    {"t": "rect", "id": "zb", "x": 810, "y": 110, "w": 270, "h": 300, "bg": ZONE_B,
      "stroke": BLUE, "sw": 1, "opacity": 30},
     {"t": "text", "id": "zbl", "x": 830, "y": 122, "text": "BUYER  ·  any agent",
      "size": 15, "color": BLUE_D},
-    {"t": "rect", "id": "b1", "x": 835, "y": 155, "w": 220, "h": 78, "bg": "#a5d8ff",
+    {"t": "rect", "id": "b1", "x": 835, "y": 155, "w": 220, "h": 78, "bg": FILL_B,
      "stroke": BLUE, "label": "wallet\nin the browser", "size": 16},
     {"t": "text", "id": "b1l", "x": 842, "y": 246, "text": "signs EIP-3009 · no gas",
      "size": 16, "color": BLUE_D},
-    {"t": "rect", "id": "b2", "x": 835, "y": 285, "w": 220, "h": 72, "bg": "#a5d8ff",
+    {"t": "rect", "id": "b2", "x": 835, "y": 285, "w": 220, "h": 72, "bg": FILL_B,
      "stroke": BLUE, "label": "x402 client", "size": 16},
     {"t": "text", "id": "b2l", "x": 842, "y": 368, "text": "probe · sign · retry",
      "size": 15, "color": MUTED},
@@ -117,13 +140,13 @@ SPEC: list[dict] = [
      "label": "6 settle", "size": 14},
 
     # ── chain ─────────────────────────────────────────────────────────────
-    {"t": "rect", "id": "arc", "x": 390, "y": 474, "w": 320, "h": 76, "bg": "#a5d8ff",
+    {"t": "rect", "id": "arc", "x": 390, "y": 474, "w": 320, "h": 76, "bg": FILL_ARC,
      "stroke": USDC, "label": "Arc testnet  ·  eip155:5042002", "size": 16},
     {"t": "text", "id": "arcl", "x": 330, "y": 562, "size": 14, "color": MUTED, "mono": True,
      "text": "USDC 0x3600...0000  —  native gas token AND the ERC-20 prices use"},
 
     # ── the law ───────────────────────────────────────────────────────────
-    {"t": "rect", "id": "law", "x": 170, "y": 606, "w": 760, "h": 46, "bg": "#fff3bf",
+    {"t": "rect", "id": "law", "x": 170, "y": 606, "w": 760, "h": 46, "bg": FILL_LAW,
      "stroke": AMBER, "sw": 1, "opacity": 45, "size": 16,
      "label": "verify payment  →  execute in sandbox  →  validate output  →  settle"},
     {"t": "text", "id": "lawl", "x": 236, "y": 664, "size": 15, "color": MUTED,
@@ -222,7 +245,7 @@ def main() -> None:
         "version": 2,
         "source": "https://github.com/ss251/arcade",
         "elements": build(),
-        "appState": {"gridSize": None, "viewBackgroundColor": "#ffffff"},
+        "appState": {"gridSize": None, "viewBackgroundColor": PAPER},
         "files": {},
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)

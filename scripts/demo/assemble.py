@@ -74,7 +74,14 @@ CUT = [
     # 1.0, not 1.2: this line runs 20.85s against a 22s take, so the tail is what is left
     # rather than what is preferred. The assembler refuses to stretch, which is the right
     # trade — a shorter pause beats a frozen frame.
-    ("beat4-guarantee", 0.0, "beat-4", 1.0),
+    # ONE narration line, TWO shots. The last sentence — "the runner dials out, so a seller
+    # can sell from a laptop behind NAT, with no open ports" — is the architecture, so the
+    # picture cuts to the diagram while the voice keeps going. No new voice-over, no change
+    # to the running time; only what is on screen changes.
+    #
+    # A list means "fill this beat from these takes in order"; the last entry takes whatever
+    # time is left, so the split point is the only number to tune.
+    ([("beat4-guarantee", 0.0, 11.0), ("beat4b-architecture", 0.0, None)], None, "beat-4", 1.0),
     ("beat5-stack", 0.0, "beat-5", 1.2),
     ("beat6-close", 0.0, "beat-6", 1.6),
 ]
@@ -171,40 +178,73 @@ def wrap_two(text: str) -> str:
     return "\n".join(best)
 
 
+def encode(pieces: list[tuple[str, float, float]], seg: float, dst: Path) -> None:
+    """
+    Build one segment's video from one or more takes, cut back to back.
+
+    Most beats are a single piece. A beat that needs the picture to change while the voice
+    keeps going — the guarantee line cutting to the architecture diagram — supplies several,
+    and they are encoded to identical parameters then concatenated, so the join is a clean
+    frame boundary rather than a re-encode seam.
+    """
+    parts: list[Path] = []
+    for n, (name, st, want) in enumerate(pieces):
+        out = dst.with_name(f"{dst.stem}_{n}.mp4")
+        run([
+            "ffmpeg", "-y", "-v", "error",
+            "-ss", f"{st}", "-i", str(TAKES / f"{name}.mp4"),
+            "-t", f"{want:.3f}",
+            "-vf", f"scale={W}:{H},fps={FPS},format=yuv420p",
+            "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+            str(out),
+        ])
+        parts.append(out)
+
+    if len(parts) == 1:
+        parts[0].replace(dst)
+        return
+
+    lst = dst.with_suffix(".txt")
+    lst.write_text("".join(f"file '{p}'\n" for p in parts))
+    run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
+         "-i", str(lst), "-c", "copy", str(dst)])
+
+
 def main() -> None:
     WORK.mkdir(parents=True, exist_ok=True)
     segments, subs, clock = [], [], 0.0
 
     for i, (take, start, beat, tail) in enumerate(CUT):
-        src = TAKES / f"{take}.mp4"
         voice = VO / f"{beat}.mp3"
         words = (TEXT / f"{beat}.txt").read_text().strip()
-        if not src.exists():
-            sys.exit(f"missing take: {src}")
         if not voice.exists():
             sys.exit(f"missing narration: {voice}")
 
         vlen = duration(voice)
         seg = vlen + tail
-        have = duration(src) - start
 
-        # A take shorter than its narration would mean holding a frozen frame — say so rather
-        # than silently producing it.
-        if have < seg - 0.05:
-            sys.exit(
-                f"{take} has only {have:.1f}s after {start:.1f}s but {beat} needs {seg:.1f}s — "
-                "reshoot the take or shorten the line"
-            )
+        # A beat is either one take, or a list of (take, start, seconds) filling it in order
+        # with the last entry taking the remainder. Normalising here means everything below
+        # only ever sees the list form.
+        pieces = take if isinstance(take, list) else [(take, start, None)]
+        used = sum(d for _, _, d in pieces if d is not None)
+        pieces = [(n, st, (seg - used) if d is None else d) for n, st, d in pieces]
+
+        for name, st, want in pieces:
+            src = TAKES / f"{name}.mp4"
+            if not src.exists():
+                sys.exit(f"missing take: {src}")
+            have = duration(src) - st
+            # A take shorter than the time it must fill would mean holding a frozen frame —
+            # say so rather than silently producing it.
+            if have < want - 0.05:
+                sys.exit(
+                    f"{name} has only {have:.1f}s after {st:.1f}s but {beat} needs {want:.1f}s "
+                    "from it — reshoot the take or shorten the line"
+                )
 
         dst = WORK / f"seg{i:02}.mp4"
-        run([
-            "ffmpeg", "-y", "-v", "error",
-            "-ss", f"{start}", "-i", str(src),
-            "-t", f"{seg:.3f}",
-            "-vf", f"scale={W}:{H},fps={FPS},format=yuv420p",
-            "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
-            str(dst),
-        ])
+        encode(pieces, seg, dst)
         segments.append(dst)
 
         subs.append((clock, clock + vlen, words))
@@ -296,7 +336,9 @@ def main() -> None:
     print(f"\n{OUT}")
     print(f"  {int(total // 60)}:{total % 60:04.1f}   {W}x{H} @ {FPS}fps")
     for i, (take, start, beat, _) in enumerate(CUT):
-        print(f"  {i:>2}. {beat:<10} {take}@{start:g}s")
+        shots = take if isinstance(take, list) else [(take, start, None)]
+        where = " + ".join(f"{n}@{st:g}s" for n, st, _ in shots)
+        print(f"  {i:>2}. {beat:<10} {where}")
 
 
 if __name__ == "__main__":
