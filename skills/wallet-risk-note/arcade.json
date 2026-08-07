@@ -2,7 +2,7 @@
   "id": "wallet-risk-note",
   "version": "0.1.0",
   "serviceName": "Wallet Risk Note",
-  "description": "A short counterparty note on an Arc address: is it a contract, has it ever moved funds, does it hold enough to settle. Buys its on-chain facts from another seller rather than reading the chain itself.",
+  "description": "A short counterparty note on an Arc address: is it a contract, has it ever moved funds, does it hold enough to settle. Buys its on-chain facts from another listing on this marketplace rather than reading the chain itself, so each call settles twice.",
   "tags": [
     "arc",
     "risk",

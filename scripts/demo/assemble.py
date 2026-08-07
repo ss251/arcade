@@ -71,6 +71,12 @@ CUT = [
     ("take-purchase", 41.0, "beat-3b", 1.0),   # card at 42, held to ~56, wallet 58+
     ("take-purchase", 72.0, "beat-3c-a", 0.4),  # settled result on screen
     ("take-arcscan", 2.0, "beat-3c-b", 1.4),
+    # The hop — one buyer action, two settlements. The shot is the hub's own receipt tape
+    # rather than the chat, because the tape is the stronger evidence: both hops appear as
+    # adjacent rows with separate transactions and separate fee splits, and an unsettled
+    # "$0 charged" row sits underneath them, which demonstrates settle-on-success on the
+    # same screen as the successes.
+    ("take-hop", 1.0, "beat-3d", 1.4),
     # 1.0, not 1.2: this line runs 20.85s against a 22s take, so the tail is what is left
     # rather than what is preferred. The assembler refuses to stretch, which is the right
     # trade — a shorter pause beats a frozen frame.
