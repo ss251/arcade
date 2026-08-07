@@ -1,0 +1,187 @@
+1
+00:00:00,000 --> 00:00:04,931
+You have an agent skill that works. Today
+the only way to sell it is to hand someone
+
+2
+00:00:04,931 --> 00:00:09,745
+your prompt and your API key, or to bill
+them thirty cents to process a call worth
+
+3
+00:00:09,745 --> 00:00:12,446
+four hundredths of a
+cent. So nobody sells it.
+
+4
+00:00:13,646 --> 00:00:17,389
+ARCADE turns a skill into a
+paid endpoint. One command.
+
+5
+00:00:17,389 --> 00:00:22,765
+You get paid per call in USDC on Arc,
+and your code, your prompts and your keys
+
+6
+00:00:22,765 --> 00:00:24,466
+never leave your machine.
+
+7
+00:00:25,666 --> 00:00:31,030
+The buyer here is an agent. It finds what
+is for sale and asks what one call costs.
+
+8
+00:00:31,030 --> 00:00:34,778
+Listing, describing and quoting
+are free and sign nothing.
+
+9
+00:00:34,778 --> 00:00:40,206
+And the price it reads comes from
+the endpoint's own payment challenge, not from the
+
+10
+00:00:40,206 --> 00:00:40,852
+catalogue.
+
+11
+00:00:41,852 --> 00:00:46,042
+The endpoint answers with HTTP
+402 and the exact terms it wants.
+
+12
+00:00:46,042 --> 00:00:50,690
+Now the buyer's wallet signs an
+EIP-3009 authorization, in the browser.
+
+13
+00:00:50,690 --> 00:00:54,226
+Five milliseconds, no gas,
+no round trip to the chain.
+
+14
+00:00:54,226 --> 00:00:57,630
+ARCADE never holds the funds
+and never sees the key.
+
+15
+00:00:57,630 --> 00:01:02,933
+The address being paid is shown in full,
+because verifying who gets your money is
+
+16
+00:01:02,933 --> 00:01:04,701
+the whole job of this card.
+
+17
+00:01:05,701 --> 00:01:10,047
+The work runs on the seller's own machine.
+The output is validated against the
+
+18
+00:01:10,047 --> 00:01:13,781
+listing's own schema, and only then
+is the authorization broadcast.
+
+19
+00:01:14,181 --> 00:01:20,139
+USDC moves on Arc. Here is the transaction:
+one cent in, and nought point nine five
+
+20
+00:01:20,139 --> 00:01:25,810
+of a cent out to the seller. If the job
+had refused, timed out, or returned the
+
+21
+00:01:25,810 --> 00:01:29,184
+wrong shape, nothing
+would have been broadcast.
+
+22
+00:01:29,184 --> 00:01:34,568
+That is the refund — there is nothing
+to refund, because nothing was taken.
+
+23
+00:01:35,968 --> 00:01:40,929
+And a skill can buy, too. Mid-job, this
+one needed a fact it did not have, so it
+
+24
+00:01:40,929 --> 00:01:45,951
+bought it from another listing on the same
+marketplace — inside the job the buyer
+
+25
+00:01:45,951 --> 00:01:51,036
+had already paid for. One buyer action,
+two settlements, each with its own receipt
+
+26
+00:01:51,036 --> 00:01:56,120
+and its own fee split. And the sub-purchase
+is bounded by a process the skill does
+
+27
+00:01:56,120 --> 00:01:58,352
+not control, so it cannot overspend.
+
+28
+00:01:59,752 --> 00:02:03,724
+The hub cannot see the skill.
+Not because a filter runs.
+
+29
+00:02:03,724 --> 00:02:09,682
+The published type has nowhere to put a prompt
+or a key, so leaking one is a compile
+
+30
+00:02:09,682 --> 00:02:14,150
+error, and a property test asserts
+it over generated manifests.
+
+31
+00:02:14,150 --> 00:02:19,824
+And the runner dials out, so a seller can
+sell from a laptop behind NAT, with no
+
+32
+00:02:19,824 --> 00:02:20,604
+open ports.
+
+33
+00:02:21,604 --> 00:02:25,074
+Built on Circle's stack,
+on Circle's own chain.
+
+34
+00:02:25,074 --> 00:02:30,390
+On Arc, USDC is both the native gas
+token and the ERC-20 our prices use.
+
+35
+00:02:30,390 --> 00:02:35,042
+Gateway nanopayments ship as a
+second, conformance-tested rail.
+
+36
+00:02:35,042 --> 00:02:37,626
+And Circle's own CLI reads our 402.
+
+37
+00:02:38,826 --> 00:02:42,549
+Publish a skill, get paid
+per call, and keep your code.
+
+38
+00:02:42,549 --> 00:02:47,626
+ARCADE is live on Arc testnet now. The
+marketplace, the receipts, and every
+
+39
+00:02:47,626 --> 00:02:48,439
+transaction.

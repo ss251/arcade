@@ -69,4 +69,11 @@ skills/*/.config/
 # scripts/narrate.sh regenerates every clip from it — so these are derived bytes, and the
 # same reasoning that keeps a second copy of a money field out of this codebase keeps
 # regenerable media out of its history.
-design/
+# `design/*` and not `design/` — git cannot re-include a file whose PARENT DIRECTORY is
+# excluded, so the trailing-slash form makes the negations below silently dead.
+design/*
+# The finished cut and its captions ARE the submission, not build waste. 6.6MB is well
+# inside git's comfort, and a judge following the repo link should find the video beside the
+# code rather than behind a link that can rot.
+!design/arcade-cp3.mp4
+!design/arcade-cp3.srt
