@@ -78,9 +78,6 @@
           "paidUsdc": {
             "type": "string"
           },
-          "subJobId": {
-            "type": "string"
-          },
           "budgetLeftUsd": {
             "type": "string"
           }

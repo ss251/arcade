@@ -9,11 +9,13 @@
  *
  * Every other listing is a leaf: it does its own work and returns. This one is a composite —
  * it needs on-chain facts about an address and, rather than reading the chain itself, it
- * BUYS them from `usdc-flow-check`, a different listing owned by a different seller. One
- * buyer action therefore produces two settlements on Arc.
+ * BUYS them from `usdc-flow-check`, a different listing on the same marketplace. One buyer
+ * action therefore produces two settlements on Arc, each with its own receipt and fee split.
  *
  * That is the thing an ordinary API marketplace cannot do. A marketplace of APIs has one
- * seller per call; here a seller is also a buyer, and the money splits again at each hop.
+ * seller per call; here a listing is also a buyer, and the money splits again at each hop.
+ * (Both listings happen to share a seller address today, which is why nothing here claims
+ * two sellers — the mechanism is seller-agnostic, but the demo is not proof of that.)
  *
  * ## It never holds a key
  *
@@ -148,7 +150,9 @@ const main = async () => {
     sourcedFrom: {
       skillId: "usdc-flow-check",
       paidUsdc: `$${Number(bought["costUsd"] ?? 0).toFixed(4)}`,
-      subJobId: String(bought["jobId"] ?? ""),
+      // No sub-job id. The broker returns one, but it arrived empty and an id the buyer
+      // cannot look up anywhere is noise — the hub's receipt feed is the record of both
+      // hops, and publishing an empty string is the failure this repo keeps deleting.
       budgetLeftUsd: `$${Number(bought["remainingUsd"] ?? 0).toFixed(4)}`
     }
   }

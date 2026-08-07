@@ -76,7 +76,7 @@ CUT = [
     # adjacent rows with separate transactions and separate fee splits, and an unsettled
     # "$0 charged" row sits underneath them, which demonstrates settle-on-success on the
     # same screen as the successes.
-    ("take-hop", 1.0, "beat-3d", 1.4),
+    ([("hop-result", 0.0, 9.5), ("hop-tape", 0.0, None)], None, "beat-3d", 1.4),
     # 1.0, not 1.2: this line runs 20.85s against a 22s take, so the tail is what is left
     # rather than what is preferred. The assembler refuses to stretch, which is the right
     # trade — a shorter pause beats a frozen frame.
