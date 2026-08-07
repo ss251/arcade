@@ -95,4 +95,4 @@ docs/
 !README.md
 
 # Generated video assets — regenerable from docs/narration + scripts/narrate.sh.
-design/
+design/*
