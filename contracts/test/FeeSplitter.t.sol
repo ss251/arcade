@@ -20,6 +20,42 @@ contract MockUSDC {
     error Blocked();
     error AuthorizationUsed();
 
+    /// @dev Real EIP-3009 typehash/domain so `transferDigest` below produces a genuine
+    ///      signable digest. NOTE: `transferWithAuthorization` below does NOT call ecrecover
+    ///      against it — like the real mock it stood in for, this stand-in trusts `from` as
+    ///      given and only enforces the timestamp window and nonce-reuse guard. The digest
+    ///      exists so callers (e.g. FeeSplitterV2's test) can exercise `vm.sign` the way a
+    ///      real client would, without this mock silently becoming a signature oracle.
+    bytes32 public constant TRANSFER_WITH_AUTHORIZATION_TYPEHASH = keccak256(
+        "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
+    );
+
+    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("USD Coin")),
+                keccak256(bytes("2")),
+                block.chainid,
+                address(this)
+            )
+        );
+    }
+
+    function transferDigest(
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce
+    ) external view returns (bytes32) {
+        bytes32 structHash = keccak256(
+            abi.encode(TRANSFER_WITH_AUTHORIZATION_TYPEHASH, from, to, value, validAfter, validBefore, nonce)
+        );
+        return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
+    }
+
     function mint(address to, uint256 amount) external {
         balanceOf[to] += amount;
     }

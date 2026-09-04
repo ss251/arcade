@@ -46,6 +46,14 @@ export interface ListingRecord {
    * SERVES — the listing still sells, the unbacked claim is simply withheld.
    */
   readonly splitterVerified?: boolean | undefined
+  /**
+   * The announced splitter's contract version, read at handshake via `version()` (added in
+   * v2). `1` covers both "genuinely v1" and "reverted" — v1 has no `version()` selector at
+   * all, so a revert IS the v1 signal, not a distinct unknown. Absent when the read never
+   * ran (no splitter announced, or the RPC was unreachable — the same fail-open posture as
+   * `splitterVerified`).
+   */
+  readonly splitterVersion?: 1 | 2 | undefined
   readonly runnerId: string
   readonly publishedAtMs: number
 }

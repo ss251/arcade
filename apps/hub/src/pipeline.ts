@@ -12,7 +12,7 @@ import {
   type Lineage,
   type PublicListing
 } from "@arcade/core"
-import { RailTag, type VerifiedPayment } from "@arcade/payments"
+import { RailTag, type SettleTree, type VerifiedPayment } from "@arcade/payments"
 import { BrokerTag } from "./broker.ts"
 import { ceilingAtomicFor } from "./lineage.ts"
 import { StoreTag } from "./store.ts"
@@ -218,7 +218,17 @@ export const runJob = (args: RunJobArgs) => {
     }
 
     // ---- settle -------------------------------------------------------------
-    const settled = yield* rail.settle(args.verified).pipe(
+    // A tree commitment is only meaningful once there is a tree to commit. Every ordinary
+    // root today carries `children: []` and `treeHashOf` of the empty set, and committing
+    // that hash on-chain for every plain call would be noise, not a receipt — flagged as a
+    // minor in Task 6's review. Guarding on `children.length > 0` reserves
+    // `settleWithTree` for jobs that actually hired.
+    const settleTree: SettleTree | undefined =
+      tree !== undefined && tree.children.length > 0
+        ? { treeHash: tree.treeHash, childCount: tree.children.length, childTotalAtomic: tree.committed }
+        : undefined
+
+    const settled = yield* rail.settle(args.verified, settleTree).pipe(
       Effect.map((s) => ({ ok: true as const, txHash: s.txHash })),
       Effect.catchAll((e) => Effect.succeed({ ok: false as const, reason: e._tag }))
     )

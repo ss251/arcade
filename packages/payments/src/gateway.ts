@@ -14,7 +14,7 @@ import {
   USDC_ADDRESS
 } from "@arcade/core"
 import { PaymentRequirements, type PaymentPayload, type SettledPayment, type VerifiedPayment } from "./types.ts"
-import type { ChallengeInput, Rail } from "./rail.ts"
+import type { ChallengeInput, Rail, SettleTree } from "./rail.ts"
 import { RailTag } from "./rail.ts"
 
 /**
@@ -144,7 +144,9 @@ export const makeGatewayRail = (config: GatewayConfig = {}): Rail => {
       } satisfies VerifiedPayment
     })
 
-  const settle = (verified: VerifiedPayment) =>
+  // `tree` is accepted and ignored: Gateway's facilitator has no notion of FeeSplitterV2's
+  // on-chain commitment, and the tree itself is still published in the receipt regardless.
+  const settle = (verified: VerifiedPayment, _tree?: SettleTree) =>
     Effect.gen(function* () {
       // Circle's docs are explicit: call settle() directly in production rather than
       // verify-then-settle. We verified earlier only to gate the seller's work (D2).

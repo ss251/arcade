@@ -11,6 +11,9 @@
  *
  * usage:
  *   DEPLOYER_KEY=0x… SELLER=0x… TREASURY=0x… [FEE_BPS=500] bun run scripts/deploy-splitter.ts
+ *
+ * Pass --v2 to deploy FeeSplitterV2 (adds `settleWithTree`, see contracts/FeeSplitterV2.sol)
+ * instead of v1. Same immutable constructor args either way.
  */
 
 import { createPublicClient, createWalletClient, http, formatEther, type Hex } from "viem"
@@ -57,9 +60,26 @@ if (seller.toLowerCase() === treasury.toLowerCase()) {
 // deployment is a burst.
 const rpcUrl = process.env["ARCADE_RPC_URL"] ?? "http://localhost:8899"
 
-const artifact = JSON.parse(
-  readFileSync("contracts/out/FeeSplitter.sol/FeeSplitter.json", "utf8")
-) as { abi: unknown[]; bytecode: { object: Hex } }
+const useV2 = process.argv.includes("--v2")
+const contractName = useV2 ? "FeeSplitterV2" : "FeeSplitter"
+const artifactPath = `contracts/out/${contractName}.sol/${contractName}.json`
+
+// Unlike v1 (whose artifact is almost always already fresh from `forge test`), a first
+// `--v2` deploy may run before anyone has built it in this checkout — so build rather than
+// fail on a missing/stale artifact. v1's existing behavior (read whatever is already in
+// `out/`) is left alone.
+if (useV2) {
+  const build = Bun.spawnSync(["forge", "build"], { stdout: "inherit", stderr: "inherit" })
+  if (build.exitCode !== 0) {
+    console.error("forge build failed")
+    process.exit(build.exitCode ?? 1)
+  }
+}
+
+const artifact = JSON.parse(readFileSync(artifactPath, "utf8")) as {
+  abi: unknown[]
+  bytecode: { object: Hex }
+}
 
 const account = privateKeyToAccount(key as Hex)
 const transport = http(rpcUrl, { retryCount: 5, retryDelay: 1500 })
@@ -100,7 +120,7 @@ for (let i = 0; i < 60; i++) {
 }
 if (!address) throw new Error("no contract address in receipt")
 
-console.log(`\nFeeSplitter ${address}`)
+console.log(`\n${contractName} ${address}`)
 console.log(`            ${explorerAddressUrl(address)}`)
 
 // Read the deployed state back — proving the immutables are what we intended is the whole
@@ -109,7 +129,7 @@ const read = (functionName: string) =>
   pub.readContract({ address, abi: artifact.abi as never, functionName })
 
 console.log(`\nverified on-chain:`)
-for (const fn of ["seller", "treasury", "feeBps", "usdc"]) {
+for (const fn of useV2 ? ["seller", "treasury", "feeBps", "usdc", "version"] : ["seller", "treasury", "feeBps", "usdc"]) {
   console.log(`  ${fn.padEnd(9)} ${await read(fn)}`)
 }
 

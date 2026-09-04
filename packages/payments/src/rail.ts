@@ -26,6 +26,26 @@ export interface ChallengeInput {
    * call instead of the deployment.
    */
   readonly feeSplitter?: string | undefined
+  /**
+   * The announced splitter's on-chain version, read at handshake. Copied into the
+   * challenge's `extra` (which the buyer signs against) so the routing decision — whether
+   * `settle` calls `settleWithTree` — is visible in what was signed, not re-derived from
+   * process config after the fact.
+   */
+  readonly feeSplitterVersion?: 1 | 2 | undefined
+}
+
+/**
+ * A commitment to the receipt tree a root job settled under, passed to `Rail.settle` so
+ * `FeeSplitterV2.settleWithTree` can record it on chain. `undefined` (the common case: a
+ * job with no children) means "settle plainly" — a v2 splitter accepts both, but committing
+ * a hash of the empty set on every ordinary call is meaningless, called out as a minor in
+ * Task 6's review.
+ */
+export interface SettleTree {
+  readonly treeHash: `0x${string}`
+  readonly childCount: number
+  readonly childTotalAtomic: bigint
 }
 
 export type VerifyError =
@@ -62,8 +82,15 @@ export interface Rail {
     requirements: PaymentRequirements
   ) => Effect.Effect<VerifiedPayment, VerifyError>
 
-  /** Cash the authorization. Called only after settle-on-success says yes. */
-  readonly settle: (verified: VerifiedPayment) => Effect.Effect<SettledPayment, SettleError>
+  /**
+   * Cash the authorization. Called only after settle-on-success says yes.
+   *
+   * `tree` is present only for a root job that actually hired — see `SettleTree`. A rail
+   * whose splitter cannot commit one (v1, no splitter, or a non-EIP3009 rail) accepts and
+   * ignores it, since the tree is still published in the receipt regardless of whether the
+   * chain also holds a hash of it.
+   */
+  readonly settle: (verified: VerifiedPayment, tree?: SettleTree) => Effect.Effect<SettledPayment, SettleError>
 }
 
 export class RailTag extends Context.Tag("@arcade/payments/Rail")<RailTag, Rail>() {}

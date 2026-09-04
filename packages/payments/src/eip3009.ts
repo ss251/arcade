@@ -28,7 +28,7 @@ import {
   ARC_CHAIN_ID
 } from "@arcade/core"
 import { PaymentRequirements, type PaymentPayload, type SettledPayment, type VerifiedPayment } from "./types.ts"
-import type { ChallengeInput, Rail } from "./rail.ts"
+import type { ChallengeInput, Rail, SettleTree } from "./rail.ts"
 import { RailTag } from "./rail.ts"
 
 /**
@@ -130,6 +130,13 @@ export interface Eip3009Config {
    * exercised against it.
    */
   readonly publicClient?: { readContract: (args: never) => Promise<unknown> }
+  /**
+   * Override the broadcasting client, for the same reason as `publicClient`: it lets
+   * `settle` — the sendTransaction/receipt path — be exercised in the conformance suite
+   * without a chain, rather than leaving it the one rail method no test can reach a real
+   * success on.
+   */
+  readonly walletClient?: { sendTransaction: (args: never) => Promise<string> }
 }
 
 /** `settle(address,uint256,uint256,uint256,bytes32,uint8,bytes32,bytes32)` */
@@ -152,11 +159,52 @@ export const FEE_SPLITTER_ABI = [
   }
 ] as const
 
+/**
+ * FeeSplitterV2's surface: `settle` (inherited, same as v1) plus `settleWithTree`, which
+ * additionally commits the receipt tree's hash, and `version()` so a caller can tell v1 and
+ * v2 apart without guessing from behavior.
+ */
+export const FEE_SPLITTER_V2_ABI = [
+  ...FEE_SPLITTER_ABI,
+  {
+    type: "function",
+    name: "settleWithTree",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "from", type: "address" },
+      { name: "value", type: "uint256" },
+      { name: "validAfter", type: "uint256" },
+      { name: "validBefore", type: "uint256" },
+      { name: "nonce", type: "bytes32" },
+      { name: "v", type: "uint8" },
+      { name: "r", type: "bytes32" },
+      { name: "s", type: "bytes32" },
+      { name: "treeHash", type: "bytes32" },
+      { name: "childCount", type: "uint32" },
+      { name: "childTotalAtomic", type: "uint256" }
+    ],
+    outputs: []
+  },
+  {
+    type: "function",
+    name: "version",
+    stateMutability: "pure",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }]
+  }
+] as const
+
 export const makeEip3009Rail = (config: Eip3009Config): Rail => {
   const transport = http(config.rpcUrl ?? ARC_RPC_URL, { retryCount: 3, retryDelay: 1000 })
   const pub = (config.publicClient ??
     createPublicClient({ chain: arcTestnet, transport })) as ReturnType<typeof createPublicClient>
-  const wallet = createWalletClient({ account: config.facilitator, chain: arcTestnet, transport })
+  // Typed off a helper (rather than a bare `ReturnType<typeof createWalletClient>`) so the
+  // account bound at construction narrows the type the same way the un-overridden call
+  // always did — otherwise `sendTransaction` below would demand an `account` argument the
+  // real client already carries.
+  const realWallet = () => createWalletClient({ account: config.facilitator, chain: arcTestnet, transport })
+  const wallet: ReturnType<typeof realWallet> =
+    config.walletClient === undefined ? realWallet() : (config.walletClient as unknown as ReturnType<typeof realWallet>)
 
   const call = <A>(method: string, f: () => Promise<A>) =>
     Effect.tryPromise({
@@ -208,7 +256,11 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
         extra: {
           name: USDC_EIP712_NAME,
           version: USDC_EIP712_VERSION,
-          ...(splitterFor === undefined ? {} : { feeSplitter: splitterFor })
+          ...(splitterFor === undefined ? {} : { feeSplitter: splitterFor }),
+          // Carries the routing decision into what the buyer signs, so `settle` can decide
+          // between `settle` and `settleWithTree` from a fact of the challenge rather than
+          // re-reading the splitter's version out-of-band at settlement time.
+          ...(input.feeSplitterVersion === undefined ? {} : { feeSplitterVersion: input.feeSplitterVersion })
         }
       })
     )
@@ -309,7 +361,7 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
       } satisfies VerifiedPayment
     })
 
-  const settle = (verified: VerifiedPayment) =>
+  const settle = (verified: VerifiedPayment, tree?: SettleTree) =>
     Effect.gen(function* () {
       const p = verified.payload.payload.authorization
       const sig = verified.payload.payload.signature as Hex
@@ -332,10 +384,15 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
       // authorised, or miss one they did.
       const target = p.to
       const useSplitter = verified.requirements.extra?.["feeSplitter"] === target
-      const data = useSplitter
+      // Likewise for the splitter's version: it is a fact of the challenge the buyer signed
+      // (`extra.feeSplitterVersion`), not something re-derived here by calling `version()`
+      // again at settlement time — the same reasoning as `useSplitter` above.
+      const useTree =
+        useSplitter && tree !== undefined && verified.requirements.extra?.["feeSplitterVersion"] === 2
+      const data = useTree
         ? encodeFunctionData({
-            abi: FEE_SPLITTER_ABI,
-            functionName: "settle",
+            abi: FEE_SPLITTER_V2_ABI,
+            functionName: "settleWithTree",
             args: [
               p.from as Hex,
               BigInt(p.value),
@@ -344,24 +401,42 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
               p.nonce as Hex,
               v,
               r,
-              s
+              s,
+              tree.treeHash,
+              tree.childCount,
+              tree.childTotalAtomic
             ]
           })
-        : encodeFunctionData({
-            abi: TRANSFER_WITH_AUTHORIZATION_ABI,
-            functionName: "transferWithAuthorization",
-            args: [
-              p.from as Hex,
-              p.to as Hex,
-              BigInt(p.value),
-              BigInt(p.validAfter),
-              BigInt(p.validBefore),
-              p.nonce as Hex,
-              v,
-              r,
-              s
-            ]
-          })
+        : useSplitter
+          ? encodeFunctionData({
+              abi: FEE_SPLITTER_ABI,
+              functionName: "settle",
+              args: [
+                p.from as Hex,
+                BigInt(p.value),
+                BigInt(p.validAfter),
+                BigInt(p.validBefore),
+                p.nonce as Hex,
+                v,
+                r,
+                s
+              ]
+            })
+          : encodeFunctionData({
+              abi: TRANSFER_WITH_AUTHORIZATION_ABI,
+              functionName: "transferWithAuthorization",
+              args: [
+                p.from as Hex,
+                p.to as Hex,
+                BigInt(p.value),
+                BigInt(p.validAfter),
+                BigInt(p.validBefore),
+                p.nonce as Hex,
+                v,
+                r,
+                s
+              ]
+            })
 
       const hash = yield* call("sendTransaction", () =>
         wallet.sendTransaction({

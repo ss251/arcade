@@ -234,7 +234,8 @@ const newJobId = () => `job_${crypto.randomUUID().replaceAll("-", "").slice(0, 2
 const SPLITTER_ABI = [
   { type: "function", name: "feeBps", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint16" }] },
   { type: "function", name: "seller", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] },
-  { type: "function", name: "treasury", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] }
+  { type: "function", name: "treasury", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] },
+  { type: "function", name: "version", stateMutability: "pure", inputs: [], outputs: [{ name: "", type: "uint8" }] }
 ] as const
 
 export interface SplitterFacts {
@@ -243,19 +244,27 @@ export interface SplitterFacts {
   readonly treasury: string
   /** Whether the fee ultimately returns to the seller — read, never configured. */
   readonly treasuryIsSeller: boolean
+  /**
+   * `1` or `2`, read via `version()`. v1 has no such selector, so a call that reverts IS
+   * the v1 signal — there is nothing further to distinguish "genuinely v1" from "reverted
+   * for some other reason" without a second contract to compare against, and treating both
+   * as v1 is the conservative direction: it only ever under-selects `settleWithTree`, never
+   * calls a selector a v1 contract cannot serve.
+   */
+  readonly version: 1 | 2
 }
 
 const splitterFacts = async (address: string): Promise<SplitterFacts | undefined> => {
   try {
     const client = createPublicClient({ transport: http(ARC_RPC_URL) })
-    const read = <T>(fn: "feeBps" | "seller" | "treasury") =>
+    const read = <T>(fn: "feeBps" | "seller" | "treasury" | "version") =>
       client.readContract({ address: address as `0x${string}`, abi: SPLITTER_ABI, functionName: fn }) as Promise<T>
 
     // Sequential, spaced, and retried on -32011. Arc's public RPC answers
     // `request limit reached` to a burst, and a runner reconnect storm turns three reads
     // per handshake into exactly that — at which point every seller with a splitter would
     // be admitted unverified, since the read failing is the fail-open branch.
-    const paced = async <T>(fn: "feeBps" | "seller" | "treasury"): Promise<T> => {
+    const paced = async <T>(fn: "feeBps" | "seller" | "treasury" | "version"): Promise<T> => {
       for (let attempt = 0; ; attempt++) {
         try {
           return await read<T>(fn)
@@ -274,11 +283,24 @@ const splitterFacts = async (address: string): Promise<SplitterFacts | undefined
     await Bun.sleep(250)
     const treasury = String(await paced<string>("treasury"))
 
+    // A separate try/catch from the block above: a revert here means "this is a v1
+    // contract, which has no `version()` selector" — a fact about the contract, not an RPC
+    // outage — and must not be conflated with the outer catch, which would otherwise throw
+    // away the feeBps/seller/treasury reads that already succeeded.
+    let version: 1 | 2 = 1
+    try {
+      await Bun.sleep(250)
+      version = Number(await paced<bigint | number>("version")) === 2 ? 2 : 1
+    } catch {
+      version = 1
+    }
+
     return {
       feeBps,
       seller,
       treasury,
-      treasuryIsSeller: seller.toLowerCase() === treasury.toLowerCase()
+      treasuryIsSeller: seller.toLowerCase() === treasury.toLowerCase(),
+      version
     }
   } catch {
     return undefined
@@ -506,7 +528,11 @@ const main = Effect.gen(function* () {
                     ...(msg.feeSplitter === undefined ? {} : { feeSplitter: msg.feeSplitter }),
                     ...(splitterInfo === undefined
                       ? { splitterVerified: msg.feeSplitter === undefined }
-                      : { treasuryIsSeller: splitterInfo.treasuryIsSeller, splitterVerified: true }),
+                      : {
+                          treasuryIsSeller: splitterInfo.treasuryIsSeller,
+                          splitterVerified: true,
+                          splitterVersion: splitterInfo.version
+                        }),
                     runnerId: msg.runnerId,
                     publishedAtMs: Date.now()
                   })
@@ -812,7 +838,7 @@ const main = Effect.gen(function* () {
         const lineage0 = lineageE.right
 
         if (header === null) {
-          const requirements = await run(rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description, ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }) }))
+          const requirements = await run(rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description, ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }), ...(found.right.splitterVersion === undefined ? {} : { feeSplitterVersion: found.right.splitterVersion }) }))
           return json(
             { x402Version: 2, error: "payment required", accepts: [requirements] },
             402
@@ -828,7 +854,7 @@ const main = Effect.gen(function* () {
         if (decoded._tag === "Left") return json({ error: "malformed payment header" }, 400)
 
         const requirements = await run(
-          rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description, ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }) })
+          rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description, ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }), ...(found.right.splitterVersion === undefined ? {} : { feeSplitterVersion: found.right.splitterVersion }) })
         )
         const verifiedE = await run(rail.verify(decoded.right, requirements).pipe(Effect.either))
         if (verifiedE._tag === "Left") {

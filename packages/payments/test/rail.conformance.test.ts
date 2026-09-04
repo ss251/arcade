@@ -16,7 +16,9 @@ import {
   makeGatewayRail,
   signAuthorization,
   type Rail,
-  type TestRailState
+  type SettleTree,
+  type TestRailState,
+  type VerifiedPayment
 } from "../src/index.ts"
 
 /**
@@ -36,6 +38,11 @@ const SELLER = "0x3b2Bbb840A9570223aDbF2172a33BB77fE8D21AF"
 const PRICE = parsePrice("$0.25")
 
 const facilitator = privateKeyToAccount(generatePrivateKey())
+
+/** A representative tree commitment — the exact shape Task 6 hands `rail.settle` for a root
+ *  job that hired. Every rail must accept a `tree` argument on `settle`, even the two that
+ *  have no on-chain splitter (RailTest) or no v2 splitter selected (a plain settle). */
+const A_TREE: SettleTree = { treeHash: `0x${"11".repeat(32)}`, childCount: 0, childTotalAtomic: 0n }
 
 interface Candidate {
   readonly label: string
@@ -200,6 +207,181 @@ describe("RailTest semantics (used by the hub pipeline tests)", () => {
     const payload = await makePayload()
     const exit = await Effect.runPromiseExit(rail.verify(payload, req))
     expect(exit._tag).toBe("Failure")
+  })
+
+  it("accepts a tree argument on settle (Task 7) and still succeeds", async () => {
+    const ref = Effect.runSync(Ref.make(makeTestState({ [buyer.address]: 10_000_000n })))
+    const rail = makeTestRail(ref)
+    const req = await Effect.runPromise(
+      rail.challenge({ priceAtomic: PRICE, resource: "/x/ss251/demo", payTo: SELLER })
+    )
+    const payload = await makePayload()
+    const verified = await Effect.runPromise(rail.verify(payload, req))
+    const settled = await Effect.runPromise(rail.settle(verified, A_TREE))
+    expect(settled.txHash).toMatch(/^0xtest/)
+  })
+})
+
+describe("settle(verified, tree) — the arg is accepted by every rail", () => {
+  /**
+   * TASK 7. `Rail.settle` widened to `(verified, tree?)` so a root job with children can
+   * commit its receipt tree's hash on chain via FeeSplitterV2's `settleWithTree`. Every
+   * rail must accept the argument — RailTest and a plain (non-v2) EIP-3009 settle simply
+   * ignore it; only a v2 splitter selected via `extra.feeSplitterVersion === 2` acts on it.
+   * Genuinely exercising GatewayLive's and EIP3009Live's success path means stubbing the
+   * network boundary each depends on (the facilitator HTTP call; the broadcasting wallet
+   * client), the same way `publicClient` already does for `verify` above — real chain and
+   * facilitator calls stay out of this offline, deterministic suite by design.
+   */
+
+  it("GatewayLive: settle still succeeds with a tree argument, which it ignores", async () => {
+    const rail = makeGatewayRail()
+    const req = await Effect.runPromise(
+      rail.challenge({ priceAtomic: PRICE, resource: "/x/ss251/demo", payTo: SELLER })
+    )
+    const payload = await makePayload(undefined, req)
+    const verified: VerifiedPayment = {
+      payer: buyer.address,
+      payTo: SELLER,
+      amountAtomic: PRICE,
+      network: ARC_CAIP2,
+      payload,
+      requirements: req
+    }
+
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith("/v1/x402/settle")) {
+        return new Response(
+          JSON.stringify({ success: true, transaction: "0xgatewaysettletx", payer: buyer.address }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        )
+      }
+      throw new Error(`unexpected fetch in test: ${url}`)
+    }) as typeof fetch
+
+    try {
+      const settled = await Effect.runPromise(rail.settle(verified, A_TREE))
+      expect(settled.txHash).toBe("0xgatewaysettletx")
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it("EIP3009Live: a v1/plain settle ignores a tree argument and calls settle(), not settleWithTree()", async () => {
+    let calledFn: string | undefined
+    const rail = makeEip3009Rail({
+      facilitator,
+      publicClient: { readContract: async () => false, getTransactionReceipt: async () => ({ status: "success" }) } as never,
+      walletClient: {
+        sendTransaction: async (args: { to: string; data: string }) => {
+          // First 4 bytes of the calldata identify which function was targeted.
+          calledFn = args.data.slice(0, 10)
+          return "0xplainsettletx"
+        }
+      } as never
+    })
+    const splitter = "0x000000000000000000000000000000000FEE51"
+    const req = await Effect.runPromise(
+      rail.challenge({
+        priceAtomic: PRICE,
+        resource: "/x/ss251/demo",
+        payTo: SELLER,
+        feeSplitter: splitter
+        // No feeSplitterVersion: 2 here — this splitter is v1, so `settle` must be called
+        // even though a `tree` argument is supplied, exactly as a v1 splitter cannot accept
+        // `settleWithTree` (it has no such selector).
+      })
+    )
+    const payload = await makePayload({ to: splitter }, req)
+    const verified: VerifiedPayment = {
+      payer: buyer.address,
+      payTo: splitter,
+      amountAtomic: PRICE,
+      network: ARC_CAIP2,
+      payload,
+      requirements: req
+    }
+
+    const settled = await Effect.runPromise(rail.settle(verified, A_TREE))
+    expect(settled.txHash).toBe("0xplainsettletx")
+    const { toFunctionSelector } = await import("viem")
+    expect(calledFn).toBe(
+      toFunctionSelector("settle(address,uint256,uint256,uint256,bytes32,uint8,bytes32,bytes32)")
+    )
+  })
+
+  it("EIP3009Live: a v2 splitter + tree calls settleWithTree() and commits the hash", async () => {
+    let sentTo: string | undefined
+    let sentData: string | undefined
+    const rail = makeEip3009Rail({
+      facilitator,
+      publicClient: { readContract: async () => false, getTransactionReceipt: async () => ({ status: "success" }) } as never,
+      walletClient: {
+        sendTransaction: async (args: { to: string; data: string }) => {
+          sentTo = args.to
+          sentData = args.data
+          return "0xtreesettletx"
+        }
+      } as never
+    })
+    const splitter = "0x000000000000000000000000000000000FEE52"
+    const req = await Effect.runPromise(
+      rail.challenge({
+        priceAtomic: PRICE,
+        resource: "/x/ss251/demo",
+        payTo: SELLER,
+        feeSplitter: splitter,
+        feeSplitterVersion: 2
+      })
+    )
+    const payload = await makePayload({ to: splitter }, req)
+    const verified: VerifiedPayment = {
+      payer: buyer.address,
+      payTo: splitter,
+      amountAtomic: PRICE,
+      network: ARC_CAIP2,
+      payload,
+      requirements: req
+    }
+
+    const tree: SettleTree = { treeHash: `0x${"22".repeat(32)}`, childCount: 3, childTotalAtomic: 750_000n }
+    const settled = await Effect.runPromise(rail.settle(verified, tree))
+
+    expect(settled.txHash).toBe("0xtreesettletx")
+    expect(sentTo?.toLowerCase()).toBe(splitter.toLowerCase())
+    // `settleWithTree`'s own 4-byte selector — distinct from `settle`'s — proves the branch
+    // actually taken was the tree-committing one, not a plain settle that merely ignored
+    // the extra arguments.
+    const { toFunctionSelector } = await import("viem")
+    expect(sentData?.slice(0, 10)).toBe(
+      toFunctionSelector(
+        "settleWithTree(address,uint256,uint256,uint256,bytes32,uint8,bytes32,bytes32,bytes32,uint32,uint256)"
+      )
+    )
+  })
+
+  it("a plain settle (no splitter) still accepts and ignores a tree argument", async () => {
+    const rail = makeEip3009Rail({
+      facilitator,
+      publicClient: { readContract: async () => false, getTransactionReceipt: async () => ({ status: "success" }) } as never,
+      walletClient: { sendTransaction: async () => "0xnosplittertx" } as never
+    })
+    const req = await Effect.runPromise(
+      rail.challenge({ priceAtomic: PRICE, resource: "/x/ss251/demo", payTo: SELLER })
+    )
+    const payload = await makePayload(undefined, req)
+    const verified: VerifiedPayment = {
+      payer: buyer.address,
+      payTo: SELLER,
+      amountAtomic: PRICE,
+      network: ARC_CAIP2,
+      payload,
+      requirements: req
+    }
+    const settled = await Effect.runPromise(rail.settle(verified, A_TREE))
+    expect(settled.txHash).toBe("0xnosplittertx")
   })
 })
 

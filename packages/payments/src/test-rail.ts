@@ -12,7 +12,7 @@ import {
   USDC_EIP712_VERSION
 } from "@arcade/core"
 import { PaymentRequirements, type PaymentPayload, type SettledPayment, type VerifiedPayment } from "./types.ts"
-import type { ChallengeInput, Rail } from "./rail.ts"
+import type { ChallengeInput, Rail, SettleTree } from "./rail.ts"
 import { RailTag } from "./rail.ts"
 
 /**
@@ -109,7 +109,9 @@ export const makeTestRail = (
       } satisfies VerifiedPayment
     })
 
-  const settle = (verified: VerifiedPayment) =>
+  // `tree` is accepted and ignored: this in-memory rail has no on-chain splitter to commit
+  // a hash into, and the tree itself is still published in the receipt regardless.
+  const settle = (verified: VerifiedPayment, _tree?: SettleTree) =>
     Effect.gen(function* () {
       const state = yield* Ref.get(stateRef)
       if (state.failSettlement) {
