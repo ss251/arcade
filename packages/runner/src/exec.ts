@@ -9,7 +9,7 @@ import {
   type SkillManifest
 } from "@arcade/core"
 import { ENGINES } from "./engines/harness.ts"
-import type { SkillAgent } from "./engines/types.ts"
+import type { EngineConfig, SkillAgent } from "./engines/types.ts"
 
 /**
  * Sandboxed skill execution.
@@ -133,6 +133,21 @@ export const buildEnv = (
   return env
 }
 
+/** The private engine config, excluding entry and args already carried by argv. */
+export const engineConfigOf = (e: SkillManifest["engine"]): EngineConfig => ({
+  adapter: e.adapter,
+  ...(e.credential === undefined ? {} : { credential: e.credential }),
+  capabilities: e.capabilities,
+  ...(e.model === undefined ? {} : { model: e.model }),
+  ...(e.systemPrompt === undefined ? {} : { systemPrompt: e.systemPrompt }),
+  ...(e.command === undefined ? {} : { command: e.command }),
+  ...(e.url === undefined ? {} : { url: e.url }),
+  ...(e.tool === undefined ? {} : { tool: e.tool }),
+  ...(e.spec === undefined ? {} : { spec: e.spec }),
+  ...(e.operationId === undefined ? {} : { operationId: e.operationId }),
+  ...(e.auth === undefined ? {} : { auth: { in: e.auth.in, name: e.auth.name, env: e.auth.env } })
+})
+
 const spawnScoped = (
   cmd: ReadonlyArray<string>,
   env: Record<string, string>,
@@ -197,9 +212,9 @@ export const execSkill = (args: ExecArgs) =>
 
     const proc = yield* spawnScoped(cmd, env, skillDir)
 
-    // The envelope carries only the PUBLIC half of the manifest. Bounds and outputSchema
-    // are already published in the listing, so an engine harness can enforce and satisfy
-    // them without the sandbox ever being handed anything a buyer couldn't already read.
+    // Bounds/outputSchema are public; engineConfig is private adapter configuration.
+    // It travels only parent-to-child on this machine because entryless adapters have
+    // no seller module to read it from. The public listing never receives this envelope.
     proc.stdin.write(
       JSON.stringify({
         jobId: args.jobId,
@@ -207,7 +222,8 @@ export const execSkill = (args: ExecArgs) =>
         skillDir: resolve(skillDir),
         adapter: manifest.engine.adapter,
         bounds: manifest.bounds,
-        outputSchema: manifest.outputSchema
+        outputSchema: manifest.outputSchema,
+        engineConfig: engineConfigOf(manifest.engine)
       })
     )
     proc.stdin.end()

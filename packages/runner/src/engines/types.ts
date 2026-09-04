@@ -87,6 +87,30 @@ export interface JobBounds {
   readonly timeoutSec: number
 }
 
+export interface EngineAuth {
+  readonly in: "header" | "query"
+  readonly name: string
+  readonly env: string
+}
+
+/**
+ * Private adapter configuration for engines with no seller agent module to import.
+ * Travels only over the runner's local parent-to-child pipe, never to the hub.
+ */
+export interface EngineConfig {
+  readonly adapter: EngineAdapter
+  readonly credential?: CredentialSource
+  readonly capabilities?: ReadonlyArray<Capability>
+  readonly model?: string
+  readonly systemPrompt?: string
+  readonly command?: ReadonlyArray<string>
+  readonly url?: string
+  readonly tool?: string
+  readonly spec?: string
+  readonly operationId?: string
+  readonly auth?: EngineAuth
+}
+
 export interface HarnessJob {
   readonly jobId: string
   /** The buyer's input. Untrusted: it reaches the model only inside a fence. */
@@ -95,6 +119,8 @@ export interface HarnessJob {
   readonly skillDir: string
   readonly bounds: JobBounds
   readonly outputSchema: unknown
+  /** Private adapter configuration for engines without a seller module. Local-only. */
+  readonly engineConfig?: EngineConfig
 }
 
 export interface JobUsage {

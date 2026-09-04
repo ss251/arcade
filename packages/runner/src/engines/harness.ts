@@ -14,7 +14,7 @@
  * `script` is deliberately not here: it has no model, no prompt and no fence, and
  * `exec.ts` runs the seller's executable directly.
  *
- * protocol — stdin:  {jobId, input, skillDir, bounds, outputSchema, adapter}
+ * protocol — stdin:  {jobId, input, skillDir, bounds, outputSchema, adapter, engineConfig?}
  *            stdout: {output, stopReason, usage, costUsd, error?} — always valid JSON
  *            stderr: job logs, relayed to the hub; never secrets
  */
@@ -114,22 +114,37 @@ export const runJob = async (
 
 // ── entry point ─────────────────────────────────────────────────────────────
 
-const main = async () => {
-  const arg = process.argv[2]
-  if (arg === undefined) throw new Error("usage: harness.ts <entry-module>")
+/** Resolve an agent only for adapters that have one; entryless adapters read their config. */
+const agentFor = async (request: HarnessRequest, entryArg: string): Promise<SkillAgent> => {
+  const config = request.engineConfig
+  if (request.adapter === "mcp" || request.adapter === "openapi") {
+    return {
+      systemPrompt: "",
+      ...(config?.credential === undefined ? {} : { credential: config.credential }),
+      capabilities: config?.capabilities ?? []
+    }
+  }
+
   // `import()` resolves a bare relative path against THIS module, not the working
   // directory, which would look for the seller's agent inside the runner package.
-  const entry = resolve(process.cwd(), arg)
-
-  const raw = await new Response(Bun.stdin.stream()).text()
-  const request = JSON.parse(raw) as HarnessRequest
-
+  const entry = resolve(process.cwd(), entryArg)
+  if (request.adapter === "skill") {
+    throw new Error("the skill adapter is not registered yet")
+  }
   const mod = (await import(entry)) as { default?: SkillAgent }
   const agent = mod.default
   if (agent === undefined || typeof agent.systemPrompt !== "string") {
     throw new Error(`${entry} must default-export an agent with a systemPrompt (see defineAgent)`)
   }
+  return agent
+}
 
+const main = async () => {
+  const arg = process.argv[2]
+  if (arg === undefined) throw new Error("usage: harness.ts <entry-module|->")
+  const raw = await new Response(Bun.stdin.stream()).text()
+  const request = JSON.parse(raw) as HarnessRequest
+  const agent = await agentFor(request, arg)
   const envelope = await runJob(agent, request)
   process.stdout.write(JSON.stringify(envelope))
 }

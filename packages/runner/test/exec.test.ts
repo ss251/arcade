@@ -44,28 +44,39 @@ const POLLUTANTS = {
 
 describe("entryless adapter spawning", () => {
   it.each([
-    { adapter: "mcp", url: "https://tools.example/mcp", tool: "read" },
-    { adapter: "openapi", spec: "openapi.json", operationId: "read" }
-  ])("passes the harness sentinel for $adapter without resolving an absent path", async (engine) => {
-    const skill = Schema.decodeUnknownSync(SkillManifest)({ ...manifest(), engine })
+    { adapter: "mcp", url: "https://tools.example/mcp", tool: "read",
+      auth: { in: "header", name: "X-Key", env: "UPSTREAM_KEY" } },
+    { adapter: "mcp", command: ["bun", "server.ts", "--value", ""], tool: "read" },
+    { adapter: "openapi", spec: "openapi.json", operationId: "read",
+      auth: { in: "query", name: "api_key", env: "UPSTREAM_KEY" } }
+  ])("passes the sentinel and private $adapter configuration to the local harness", async (engine) => {
+    const skill = Schema.decodeUnknownSync(SkillManifest)({ ...manifest(), engine, secrets: ["UPSTREAM_KEY"] })
+    const write = vi.fn()
     const spawn = vi.fn(() => ({
-      stdin: { write: vi.fn(), end: vi.fn() },
+      stdin: { write, end: vi.fn() },
       stdout: new Response(JSON.stringify({ output: { ok: true }, stopReason: "end_turn" })).body,
       stderr: new Response("").body,
       exited: Promise.resolve(0),
       kill: vi.fn()
     }))
     vi.stubGlobal("Bun", { spawn })
+    vi.stubEnv("UPSTREAM_KEY", "upstream-secret-marker")
     try {
       await Effect.runPromise(Effect.scoped(execSkill({
         manifest: skill, skillDir: "/tmp/skill", jobId: "entryless", input: {}
       })))
       expect(spawn).toHaveBeenCalledWith(
         ["bun", "run", expect.stringContaining("/engines/harness.ts"), "-"],
-        expect.objectContaining({ cwd: "/tmp/skill" })
+        expect.objectContaining({ cwd: "/tmp/skill", env: expect.objectContaining({ UPSTREAM_KEY: "upstream-secret-marker" }) })
       )
+      expect(write).toHaveBeenCalledOnce()
+      const payload = JSON.parse(write.mock.calls[0]![0] as string) as Record<string, unknown>
+      expect(payload["engineConfig"]).toEqual({ ...engine, capabilities: [] })
+      expect(payload["engineConfig"]).not.toHaveProperty("entry")
+      expect(JSON.stringify(payload)).not.toContain("upstream-secret-marker")
     } finally {
       vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
     }
   })
 })
