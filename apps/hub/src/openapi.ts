@@ -39,6 +39,7 @@ export interface ListingRecord {
    * tells a stranger to sign a payment that will be refused.
    */
   readonly feeSplitter?: string | undefined
+  readonly delisted?: boolean | undefined
 }
 
 export interface OpenApiParams {
@@ -58,6 +59,10 @@ export interface OpenApiParams {
 const operationId = (prefix: string, skillId: string): string =>
   `${prefix}_${skillId.replace(/-/g, "_")}`
 
+/** Keep the source records intact while excluding listings hidden by failed pay-tests. */
+export const liveListings = (listings: ReadonlyArray<ListingRecord>): ReadonlyArray<ListingRecord> =>
+  listings.filter((rec) => rec.delisted !== true)
+
 const jsonContent = (schema: unknown) => ({ "application/json": { schema } })
 
 /**
@@ -72,7 +77,8 @@ const asSchemaObject = (schema: unknown): Record<string, unknown> =>
     : { description: "seller-declared schema" }
 
 export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => {
-  const { listings, origin, rail, network, asset } = params
+  const { listings: allListings, origin, rail, network, asset } = params
+  const listings = liveListings(allListings)
 
   const paths: Record<string, unknown> = {}
   const schemas: Record<string, unknown> = {
@@ -375,7 +381,8 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
  * when needed.
  */
 export const buildAgentSkill = (params: OpenApiParams): string => {
-  const { listings, origin } = params
+  const { listings: allListings, origin } = params
+  const listings = liveListings(allListings)
 
   const catalogue =
     listings.length === 0
@@ -432,7 +439,7 @@ phrased. The MCP server fences results for exactly this reason.
  */
 export const buildWellKnownX402 = (params: OpenApiParams): Record<string, unknown> => ({
   x402Version: 2,
-  resources: params.listings.map(({ listing, seller, feeSplitter }) => ({
+  resources: liveListings(params.listings).map(({ listing, seller, feeSplitter }) => ({
     resource: `${params.origin}/x/${seller}/${listing.id}`,
     method: "POST",
     description: listing.description,

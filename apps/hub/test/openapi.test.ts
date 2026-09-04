@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
 import { SkillManifest, parsePrice, toPublicListing, ARC_CAIP2, USDC_ADDRESS } from "@arcade/core"
-import { buildAgentSkill, buildOpenApi, buildWellKnownX402, type ListingRecord } from "../src/openapi.ts"
+import { buildAgentSkill, buildOpenApi, buildWellKnownX402, liveListings, type ListingRecord } from "../src/openapi.ts"
 
 /**
  * OpenAPI is a NEW surface for the secrecy boundary to hold across.
@@ -60,6 +60,53 @@ const params = (listings: ReadonlyArray<ListingRecord>) => ({
   rail: "eip3009",
   network: ARC_CAIP2,
   asset: USDC_ADDRESS
+})
+
+describe("delisted discovery", () => {
+  const first = Object.freeze({ ...record({ id: "first-live" }), delisted: false, feeSplitter: "0x2222222222222222222222222222222222222222",
+    payTested: { status: "pass" }, futureField: "preserved" })
+  const hidden = Object.freeze({ ...record({ id: "hidden-listing", description: "HIDDEN_LISTING_DESCRIPTION" }), delisted: true })
+  const last = Object.freeze(record({ id: "last-live" }))
+  const mixed = Object.freeze([first, hidden, last])
+
+  it("filters only true while preserving record identity, extra fields and order", () => {
+    const before = JSON.stringify(mixed)
+    const result = liveListings(mixed)
+    expect(result).toEqual([first, last])
+    expect(result[0]).toBe(first)
+    expect(result[1]).toBe(last)
+    expect(result[0]).toMatchObject({ futureField: "preserved", payTested: { status: "pass" }, feeSplitter: first.feeSplitter })
+    expect(JSON.stringify(mixed)).toBe(before)
+  })
+  it("does not publish hidden paths or schemas in OpenAPI", () => {
+    const doc = buildOpenApi(params(mixed))
+    expect(Object.keys(doc["paths"] as Record<string, unknown>).filter((path) => path.startsWith("/x/")))
+      .toEqual([`/x/${SELLER}/first-live`, `/x/${SELLER}/last-live`])
+    expect(JSON.stringify(doc)).not.toMatch(/hidden-listing|hidden_listing|HIDDEN_LISTING_DESCRIPTION/)
+  })
+  it("does not advertise hidden listings in the Markdown catalogue", () => {
+    const text = buildAgentSkill(params(mixed))
+    expect(text.indexOf("first-live")).toBeLessThan(text.indexOf("last-live"))
+    expect(text).toContain("last-live")
+    expect(text).not.toMatch(/hidden-listing|HIDDEN_LISTING_DESCRIPTION/)
+  })
+  it("keeps only live x402 resources and preserves their splitter payee", () => {
+    const doc = buildWellKnownX402(params(mixed))
+    const resources = doc["resources"] as Array<{ resource: string; accepts: Array<{ payTo: string }> }>
+    expect(resources.map((entry) => entry.resource)).toEqual([
+      `https://hub.example/x/${SELLER}/first-live`, `https://hub.example/x/${SELLER}/last-live`
+    ])
+    expect(resources[0]!.accepts[0]!.payTo).toBe(first.feeSplitter)
+    expect(JSON.stringify(doc)).not.toMatch(/hidden-listing|HIDDEN_LISTING_DESCRIPTION/)
+  })
+  it("handles an entirely delisted catalogue without changing the caller's array", () => {
+    const original = Object.freeze([hidden])
+    expect(liveListings(original)).toEqual([])
+    expect(Object.keys(buildOpenApi(params(original))["paths"] as object).some((path) => path.startsWith("/x/"))).toBe(false)
+    expect(buildAgentSkill(params(original))).toContain("No skills are listed right now")
+    expect(buildWellKnownX402(params(original))["resources"]).toEqual([])
+    expect(original).toEqual([hidden])
+  })
 })
 
 describe("openapi document", () => {

@@ -38,6 +38,8 @@ import { StoreTag } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
 import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
+import { claimedPayerOf, delistRefusal } from "./delisted.ts"
+export { claimedPayerOf, delistRefusal } from "./delisted.ts"
 import { ceilingAtomicFor, maxHopFromEnv, resolveLineage } from "./lineage.ts"
 import { publicReceipt } from "./receipts-feed.ts"
 import { chainCheck, chainMetadataCheck, chainStartupRefusal } from "./chain-check.ts"
@@ -353,6 +355,17 @@ const main = Effect.gen(function* () {
   const broker = yield* BrokerTag
   const rail = yield* RailTag
 
+  // Only an address is used by request gates. Never echo malformed private-key input.
+  const canaryAddress = (() => {
+    const key = process.env["ARCADE_CANARY_KEY"]
+    if (key === undefined || key === "") return undefined
+    try { return privateKeyToAccount(key as `0x${string}`).address }
+    catch {
+      console.error("[hub] refusing to start: ARCADE_CANARY_KEY is invalid")
+      process.exit(2)
+    }
+  })()
+
   /**
    * Job access tokens, derived rather than stored.
    *
@@ -644,7 +657,7 @@ const main = Effect.gen(function* () {
         const records = await run(store.allListings)
         const receipts = await run(store.allReceipts)
         const listings = await Promise.all(
-          records.map(async ({ listing, seller, treasuryIsSeller, splitterVerified, feeSplitter }) => {
+          records.map(async ({ listing, seller, treasuryIsSeller, splitterVerified, feeSplitter, payTested, delisted }) => {
             const stats = await run(store.statsFor(listing.id))
             const ratings = await run(store.ratingsFor(listing.id))
             return {
@@ -653,6 +666,8 @@ const main = Effect.gen(function* () {
               treasuryIsSeller,
               splitterVerified,
               feeSplitter,
+              ...(payTested === undefined ? {} : { payTested }),
+              delisted: delisted === true,
               stats,
               ratingCount: ratings.length,
               ratingAverage:
@@ -674,7 +689,8 @@ const main = Effect.gen(function* () {
       }
 
       if (path === "/") {
-        return new Response(renderIndex(await pageData()), {
+        const d = await pageData()
+        return new Response(renderIndex({ ...d, listings: d.listings.filter((listing) => !listing.delisted) }), {
           headers: { "content-type": "text/html; charset=utf-8" }
         })
       }
@@ -683,10 +699,11 @@ const main = Effect.gen(function* () {
       // markup in one place — the client swaps innerHTML and never re-implements a row.
       if (path === "/_feed") {
         const d = await pageData()
+        const visible = d.listings.filter((listing) => !listing.delisted)
         return json({
-          listings: renderListingRows(d.listings),
+          listings: renderListingRows(visible),
           receipts: renderReceiptRows(d.receipts),
-          meta: renderMeta(d),
+          meta: renderMeta({ ...d, listings: visible }),
           total: d.receipts.length
         })
       }
@@ -731,7 +748,7 @@ const main = Effect.gen(function* () {
       }
 
       if (path === "/listings" && req.method === "GET") {
-        const all = await run(store.allListings)
+        const all = (await run(store.allListings)).filter((record) => record.delisted !== true)
         return json(all.map((r) => ({ ...r.listing, seller: r.seller })))
       }
 
@@ -743,7 +760,9 @@ const main = Effect.gen(function* () {
         const ratings = await run(store.ratingsFor(listingMatch[1]!))
         const avg =
           ratings.length === 0 ? null : ratings.reduce((a, r) => a + r.stars, 0) / ratings.length
-        return json({ ...res.right.listing, seller: res.right.seller, stats, ratings: { count: ratings.length, average: avg } })
+        return json({ ...res.right.listing, seller: res.right.seller, stats, ratings: { count: ratings.length, average: avg },
+          delisted: res.right.delisted === true, payTested: res.right.payTested ?? null,
+          payTestHistory: await run(store.payTestHistory(res.right.listing.id, res.right.seller)) })
       }
 
       if (path === "/runners" && req.method === "GET") {
@@ -842,11 +861,19 @@ const main = Effect.gen(function* () {
         const gate = inputGate(listing, input)
         if (gate !== null) return json(gate, 400)
 
-        const priceAtomic = parsePrice(listing.price)
-        const resource = `${publicOrigin(url)}${path}`
-
         const header =
           req.headers.get(HEADER_PAYMENT_SIGNATURE) ?? req.headers.get(HEADER_PAYMENT_LEGACY)
+        // Canonical position 2: no signed stranger proceeds to lineage or verification.
+        // A genuinely headerless probe may ONLY get a challenge when a canary exists;
+        // the standard buyer needs that 402 before it can prove its identity. It never
+        // creates a reservation or job. Claims are rechecked against verified.payer below.
+        if (!(header === null && canaryAddress !== undefined)) {
+          const refusal = delistRefusal(found.right, claimedPayerOf(req), canaryAddress)
+          if (refusal !== null) return json(refusal, 403)
+        }
+
+        const priceAtomic = parsePrice(listing.price)
+        const resource = `${publicOrigin(url)}${path}`
 
         // Lineage is verified before the payment challenge: a probe carrying a forged or
         // expired capability is refused here, before it costs the caller a 402 round trip
@@ -900,6 +927,12 @@ const main = Effect.gen(function* () {
           return json({ error: "payment_invalid", detail: verifiedE.left._tag }, 402)
         }
         const verified = verifiedE.right
+
+        // A claimed canary address grants no execution authority. Only the payer proved
+        // by the rail may buy a delisted listing, before any job or budget side effect.
+        const refusal = delistRefusal(found.right, verified.payer, canaryAddress)
+        if (refusal !== null) return json(refusal, 403)
+        const isCanary = canaryAddress !== undefined && verified.payer.toLowerCase() === canaryAddress.toLowerCase()
 
         const jobId = newJobId()
 
@@ -966,6 +999,7 @@ const main = Effect.gen(function* () {
             feeBps: FEE_BPS,
             accrualId,
             lineage,
+            ...(isCanary ? { canary: true } : {}),
             ...(hireCapability === undefined ? {} : { hireCapability })
           }).pipe(
             Effect.tap(({ outcome, receipt }) =>
