@@ -1,4 +1,4 @@
-import { explorerTxUrl, formatPrice, type ObjectiveStats, type PublicListing, type Receipt } from "@arcade/core"
+import { explorerTxUrl, formatPrice, type ObjectiveStats, type PublicListing, type Receipt, type ReceiptChild } from "@arcade/core"
 import type { ListingRecord } from "./store.ts"
 
 /**
@@ -137,6 +137,18 @@ export const renderListingRows = (listings: ReadonlyArray<ListingView>): string 
     .join("")
 }
 
+/** A sub-hire under a root receipt — indented under its parent, in the same 7-column row. */
+const renderChildRow = (c: ReceiptChild): string => `
+      <tr class="child">
+        <td colspan="7">↳ ${esc(c.skillId)} · ${esc(formatPrice(c.priceAtomic))} · ${
+          c.settled
+            ? c.settleTx === undefined
+              ? `<span class="settled">settled</span>`
+              : `<a href="${esc(explorerTxUrl(c.settleTx))}" target="_blank" rel="noreferrer">${esc(c.settleTx.slice(0, 10))}…</a>`
+            : `<span class="unsettled">not settled</span>`
+        }</td>
+      </tr>`
+
 export const renderReceiptRows = (receipts: ReadonlyArray<Receipt>, limit = 12): string => {
   if (receipts.length === 0) {
     return `<tr class="none"><td colspan="7">No calls yet.</td></tr>`
@@ -162,7 +174,7 @@ export const renderReceiptRows = (receipts: ReadonlyArray<Receipt>, limit = 12):
             ? "—"
             : `<a href="${esc(explorerTxUrl(r.settleTx))}" target="_blank" rel="noreferrer">${esc(r.settleTx.slice(0, 10))}…</a>`
         }</td>
-      </tr>`
+      </tr>${(r.children ?? []).map(renderChildRow).join("")}`
     )
     .join("")
 }
@@ -299,6 +311,9 @@ td.skill{color:var(--ink)}
 .settled{color:var(--stamp)}
 .unsettled{color:var(--refuse)}
 .free{color:var(--slate)}
+/* A sub-hire under a root receipt: same row grammar, indented and quieter — it is evidence
+   FOR the parent row, not a call of its own. */
+tr.child td{padding-top:0;padding-left:22px;color:var(--slate);font-size:12px}
 
 /* Brand marks. Self-contained objects, not semantic colour — carrying one does not license
    a third hue anywhere else on the page. The plate is dark-only and sits BEHIND the mark. */

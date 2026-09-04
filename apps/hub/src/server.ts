@@ -977,7 +977,14 @@ const main = Effect.gen(function* () {
                 price: formatPrice(receipt.priceAtomic),
                 sellerShare: formatPrice(receipt.sellerAtomic),
                 fee: formatPrice(receipt.feeAtomic),
-                explorer: receipt.settleTx === undefined ? null : explorerTxUrl(receipt.settleTx)
+                explorer: receipt.settleTx === undefined ? null : explorerTxUrl(receipt.settleTx),
+                treeCeilingAtomic: receipt.treeCeilingAtomic?.toString(),
+                treeCommittedAtomic: receipt.treeCommittedAtomic?.toString(),
+                children: receipt.children?.map((c) => ({
+                  ...c,
+                  priceAtomic: c.priceAtomic.toString(),
+                  explorer: c.settleTx === undefined ? null : explorerTxUrl(c.settleTx)
+                }))
               }
             })
           }

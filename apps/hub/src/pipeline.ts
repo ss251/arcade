@@ -4,14 +4,17 @@ import {
   Job,
   JobOutcome,
   Receipt,
+  ReceiptChild,
   parsePrice,
   shouldSettle,
   splitFee,
+  treeHashOf,
   type Lineage,
   type PublicListing
 } from "@arcade/core"
 import { RailTag, type VerifiedPayment } from "@arcade/payments"
 import { BrokerTag } from "./broker.ts"
+import { ceilingAtomicFor } from "./lineage.ts"
 import { StoreTag } from "./store.ts"
 import { validateOutput } from "./validate.ts"
 
@@ -57,6 +60,15 @@ export const runJob = (args: RunJobArgs) =>
       settleTx?: string
     ) =>
       Effect.gen(function* () {
+        // Ledger: a child's outcome commits or releases its reservation against the root's
+        // ceiling. `finish` is the ONLY place that holds a receipt (server.ts's
+        // `catchAllCause` around `runJob` means every crash lands here too), and every
+        // branch above reaches it — settled, unsettled, timeout, runner lost — so no
+        // reservation is ever left held.
+        if (args.lineage.hop > 0) {
+          yield* settled ? store.commitTree(args.jobId) : store.releaseTree(args.jobId)
+        }
+
         // Persist the job with its outcome so /jobs/:id/result can return the actual output.
         yield* store.putJob(
           Job.make({
@@ -98,7 +110,16 @@ export const runJob = (args: RunJobArgs) =>
           rootJobId: args.lineage.rootJobId,
           ...(args.lineage.parentJobId === undefined ? {} : { parentJobId: args.lineage.parentJobId }),
           hop: args.lineage.hop,
-          ancestors: args.lineage.ancestors
+          ancestors: args.lineage.ancestors,
+          ...(tree === undefined
+            ? {}
+            : {
+                children: tree.children,
+                treeHash: tree.treeHash,
+                treeCeilingAtomic: tree.ceiling,
+                treeCommittedAtomic: tree.committed
+              }),
+          authorizationNonce: args.verified.payload.payload.authorization.nonce
         })
         yield* store.putReceipt(receipt)
         return { outcome, receipt }
@@ -141,6 +162,34 @@ export const runJob = (args: RunJobArgs) =>
           )
         )
       )
+
+    // ---- tree (roots only) ----------------------------------------------------
+    // A root's children are terminal by now — the parent's sandbox awaited each hire before
+    // the broker returned this outcome — so the tree can be closed and hashed before the
+    // settle decision. Computed here, not inside `finish`, so Task 7's `rail.settle` can
+    // carry `tree.treeHash` into the on-chain commitment; nothing after this point may
+    // change what it committed to.
+    let tree:
+      | { readonly children: ReadonlyArray<ReceiptChild>; readonly treeHash: `0x${string}`; readonly ceiling: bigint; readonly committed: bigint }
+      | undefined
+    if (args.lineage.hop === 0) {
+      const st = yield* store.treeState(args.jobId)
+      const receipts = yield* store.allReceipts
+      const children = st.children
+        .filter((c) => c.state !== "released")
+        .map((c) => {
+          const cr = receipts.find((r) => r.jobId === c.childJobId)
+          return ReceiptChild.make({
+            jobId: c.childJobId,
+            skillId: cr?.skillId ?? "",
+            priceAtomic: c.amountAtomic,
+            settled: cr?.settled ?? false,
+            ...(cr?.settleTx === undefined ? {} : { settleTx: cr.settleTx })
+          })
+        })
+      const ceiling = ceilingAtomicFor(args.listing.bounds.maxSubSpendUsd)
+      tree = { children, treeHash: treeHashOf(args.jobId, children), ceiling, committed: st.committedAtomic }
+    }
 
     // ---- validate -----------------------------------------------------------
     const schemaValid = validateOutput(outcome.output, args.listing.outputSchema)
