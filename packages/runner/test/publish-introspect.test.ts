@@ -7,8 +7,10 @@ import { SERVICE_NAME_MAX, decodeManifest, toPublicListing } from "@arcade/core"
 import { Effect } from "effect"
 import {
   listMcpTools, manifestFromMcpTool, parseMcpTarget, publishableTools, toSkillId,
-  writeGeneratedSkills, type McpTool, type McpSource
+  writeGeneratedSkills, inputSchemaFor, outputSchemaFor, operationsOf, parseAuthFlag,
+  manifestFromOperation, type McpTool, type McpSource
 } from "../src/publish-introspect.ts"
+import { findOperation } from "../src/engines/openapi.ts"
 
 const sdk = vi.hoisted(() => ({ connect: vi.fn(), listTools: vi.fn(), close: vi.fn(),
   transport: vi.fn(), transportClose: vi.fn() }))
@@ -307,5 +309,184 @@ describe("writeGeneratedSkills", () => {
     expect((error as Error).message).not.toContain("PRIVATE_DISK_PATH")
     expect(await readFile(path, "utf8")).toBe("seller edits")
     expect(await readdir(dir)).toEqual(["arcade.json"])
+  })
+})
+
+type Json = Record<string, unknown>
+const fx = JSON.parse(readFileSync(new URL("./fixtures/frankfurter.json", import.meta.url), "utf8")) as Json
+const jsonResponse = (schema: unknown = { type: "object", properties: { ok: { type: "boolean" } } }) =>
+  ({ description: "Success", content: { "application/json": { schema } } })
+const apiSpec = (op: Json = {}, item: Json = {}, path = "/items") => ({
+  openapi: "3.0.3", servers: [{ url: "https://root.example/v1" }],
+  paths: { [path]: { ...item, post: { operationId: "createItem", responses: { "200": jsonResponse() }, ...op } } }
+})
+const apiRef = (spec: Json) => findOperation(spec, "createItem")!
+const apiManifest = (spec: Json, opts: Parameters<typeof manifestFromOperation>[2] = { specFile: "openapi.json", price: "$0.01" }) =>
+  manifestFromOperation(spec, { ...apiRef(spec), operationId: "createItem" }, opts)
+const bodyFor = (schema: unknown) => ({ content: { "application/json": { schema } } })
+
+describe("parseAuthFlag", () => {
+  it.each([["header:X-Api-Key=UPSTREAM_KEY", "header", "X-Api-Key"], ["query:apikey=UPSTREAM_KEY", "query", "apikey"]])(
+    "parses %s as a seller environment binding", (flag, location, name) => {
+      expect(parseAuthFlag(flag)).toEqual({ in: location, name, env: "UPSTREAM_KEY" })
+    })
+  it.each(["X-Api-Key", "header:X-Key=HOME", "query:key=ARCADE_TOKEN", "header:X-Key=abc-def",
+    "query:key=1TOKEN", "header:Bad Header=KEY", "header:Host=KEY", "header:X-Key=KEY=VALUE", "query: =KEY"])(
+    "refuses invalid or reserved auth flag %s without echoing credentials", (flag) => {
+      expect(() => parseAuthFlag(flag)).toThrow(/header:|query:/)
+    })
+})
+
+describe("operationsOf", () => {
+  it("lists named operations, skips unnamed operations, and resolves local path items", () => {
+    expect(operationsOf(fx).map((op) => op.operationId)).toEqual(["fxRate"])
+    const spec = { ...apiSpec(), paths: { "/items": { $ref: "#/components/pathItems/Items" } },
+      components: { pathItems: { Items: { get: { operationId: "getItems" }, post: {} } } } }
+    expect(operationsOf(spec)).toEqual([{ path: "/items", method: "get", op: { operationId: "getItems" }, operationId: "getItems" }])
+  })
+  it("rejects duplicate identifiers before any operation can be selected", () => {
+    const spec = apiSpec({}, { get: { operationId: "duplicate" }, delete: { operationId: "duplicate" } })
+    expect(() => operationsOf(spec)).toThrow(/duplicat|ambiguous/i)
+    expect(() => apiManifest(spec)).toThrow(/duplicat|ambiguous/i)
+  })
+  it.each([["fooBar", "foo-bar"], ["x".repeat(65), "x".repeat(66)]])("refuses operation ids that normalize to the same listing id", (first, second) => {
+    const spec = apiSpec({}, { get: { operationId: first }, delete: { operationId: second } })
+    expect(() => operationsOf(spec)).toThrow(/duplicat|collid|collision/i)
+  })
+  it.each(["2.0", "3.2.0", "3.0", "wrong"])("refuses unsupported version %s", (openapi) => {
+    expect(() => operationsOf({ ...apiSpec(), openapi })).toThrow(/version|OpenAPI/i)
+  })
+  it.each([{ $ref: "https://private.example/path.json" }, { $ref: "#/missing" }, []])(
+    "refuses unresolved or invalid path items", (item) => {
+      expect(() => operationsOf({ ...apiSpec(), paths: { "/items": item } })).toThrow()
+    })
+})
+
+describe("inputSchemaFor", () => {
+  it("generates the fixture's described and required scalar inputs", () => {
+    expect(inputSchemaFor(fx, findOperation(fx, "fxRate")!)).toEqual({ type: "object", required: ["base", "symbols"],
+      properties: { base: { type: "string", description: "ISO 4217 base currency, e.g. USD" },
+        symbols: { type: "string", description: "Comma-separated target currencies, e.g. EUR,GBP" } } })
+  })
+  it("inherits parameters, applies operation overrides, and always requires path values", () => {
+    const spec = apiSpec({ parameters: [{ name: "limit", in: "query", schema: { type: "integer" } }] }, {
+      parameters: [{ name: "id", in: "path", schema: { type: "string" } },
+        { name: "limit", in: "query", required: true, schema: { type: "number" } }]
+    }, "/items/{id}")
+    expect(inputSchemaFor(spec, apiRef(spec))).toEqual({ type: "object", required: ["id"],
+      properties: { id: { type: "string" }, limit: { type: "integer" } } })
+  })
+  it("matches auth by location and header case without removing unrelated buyer fields", () => {
+    const spec = apiSpec({ parameters: [{ name: "x-key", in: "header", required: true, schema: { type: "string" } },
+      { name: "X-Key", in: "query", required: true, schema: { type: "string" } }] })
+    expect(inputSchemaFor(spec, apiRef(spec), { in: "header", name: "X-Key", env: "KEY" })).toEqual({
+      type: "object", required: ["X-Key"], properties: { "X-Key": { type: "string" } }
+    })
+  })
+  it("resolves whole request bodies and schema refs, retaining own prototype-named fields", () => {
+    const properties = JSON.parse('{"__proto__":{"type":"string"},"constructor":{"type":"number"}}') as Json
+    const spec = { ...apiSpec({ requestBody: { $ref: "#/components/requestBodies/Item" } }), components: {
+      requestBodies: { Item: bodyFor({ $ref: "#/components/schemas/Item" }) },
+      schemas: { Item: { type: "object", required: ["__proto__", "__proto__"], properties } }
+    } }
+    const generated = inputSchemaFor(spec, apiRef(spec))
+    expect(generated).toEqual({ type: "object", required: ["__proto__"], properties })
+    expect(Object.hasOwn(generated.properties as Json, "__proto__")).toBe(true)
+  })
+  it.each([
+    [{ name: "id", in: "query", schema: { type: "string" } }, "id", undefined],
+    [{ name: "token", in: "query", schema: { type: "string" } }, "token", { in: "query", name: "token", env: "KEY" }],
+    [undefined, "x-key", { in: "header", name: "X-Key", env: "KEY" }]
+  ] as const)("refuses body fields the runtime would remove as parameters or credentials", (parameter, name, auth) => {
+    const spec = apiSpec({ parameters: parameter ? [parameter] : [],
+      requestBody: bodyFor({ type: "object", properties: { [name]: { type: "string" } } }) })
+    expect(() => inputSchemaFor(spec, apiRef(spec), auth)).toThrow(/collid|collision/i)
+  })
+  it("refuses different parameter locations that cannot share a flat buyer field", () => {
+    const spec = apiSpec({ parameters: ["query", "header"].map((location) => ({ name: "id", in: location, schema: { type: "string" } })) })
+    expect(() => inputSchemaFor(spec, apiRef(spec))).toThrow(/collid|collision/i)
+  })
+  it.each([{ type: "array", items: { type: "string" } }, { type: "object" }, { $ref: "https://private.example/schema" },
+    true, null, { type: ["string"] }, { oneOf: [{ type: "string" }, { type: "number" }] }])("refuses unsupported parameter schema %j", (schema) => {
+    const spec = apiSpec({ parameters: [{ name: "value", in: "query", schema }] })
+    expect(() => inputSchemaFor(spec, apiRef(spec))).toThrow(/schema|reference|scalar/i)
+  })
+  it.each([{ content: { "multipart/form-data": {} } }, bodyFor(null), bodyFor({ type: "array" }), bodyFor({ $ref: "https://private.example/body" })])(
+    "refuses unsupported body encodings and schemas", (requestBody) => {
+      const spec = apiSpec({ requestBody })
+      expect(() => inputSchemaFor(spec, apiRef(spec))).toThrow(/body|schema|reference/i)
+    })
+})
+
+describe("outputSchemaFor", () => {
+  it("takes the fixture's successful JSON schema", () => {
+    expect(outputSchemaFor(fx, findOperation(fx, "fxRate")!)).toMatchObject({ required: ["base", "date", "rates"] })
+  })
+  it.each(["202", "206", "2XX"])("resolves whole response refs at status %s", (code) => {
+    const schema = { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } }
+    const spec = { ...apiSpec({ responses: { [code]: { $ref: "#/components/responses/Success" } } }),
+      components: { responses: { Success: jsonResponse(schema) } } }
+    expect(outputSchemaFor(spec, apiRef(spec))).toEqual(schema)
+  })
+  it("accepts matching success contracts even when property ordering differs", () => {
+    const spec = apiSpec({ responses: { "200": jsonResponse({ type: "object", properties: { ok: { type: "boolean" } } }),
+      "201": jsonResponse({ properties: { ok: { type: "boolean" } }, type: "object" }) } })
+    expect(outputSchemaFor(spec, apiRef(spec))).toMatchObject({ type: "object" })
+  })
+  it.each([{ default: jsonResponse() }, { "204": { description: "No body" } },
+    { "200": { content: { "text/plain": { schema: { type: "string" } } } } },
+    { "200": jsonResponse({ type: "string" }), "201": jsonResponse({ type: "object" }) },
+    { "200": jsonResponse({ oneOf: [{ type: "string" }, { type: "object" }] }) },
+    { "200": jsonResponse(null) },
+    { "200": jsonResponse({ enum: [null] }) },
+    { "200": jsonResponse({ type: "object", $defs: { nested: { $ref: "https://private.example/output" } } }) },
+    { "200": jsonResponse({ $ref: "https://private.example/output" }) }])("refuses unsupported or ambiguous success contracts", (responses) => {
+    const spec = apiSpec({ responses })
+    expect(() => outputSchemaFor(spec, apiRef(spec))).toThrow(/success|JSON|schema|reference/i)
+  })
+})
+
+describe("manifestFromOperation", () => {
+  it("generates a decoded private fixture manifest", async () => {
+    const generated = manifestFromOperation(fx, { ...findOperation(fx, "fxRate")!, operationId: "fxRate" }, {
+      specFile: "openapi.json", price: "$0.01", auth: { in: "header", name: "X-Key", env: "UPSTREAM_KEY" }
+    })
+    const decoded = await Effect.runPromise(decodeManifest(generated))
+    expect(decoded).toMatchObject({ id: "fx-rate", serviceName: "FX reference rates", egress: ["api.frankfurter.dev"],
+      secrets: ["UPSTREAM_KEY"], engine: { adapter: "openapi", credential: "none", spec: "openapi.json", operationId: "fxRate" } })
+    expect(JSON.stringify(toPublicListing(decoded))).not.toMatch(/api\.frankfurter|UPSTREAM_KEY|openapi\.json|fxRate/)
+  })
+  it("follows operation then path then root server precedence with hostname-only egress", () => {
+    expect(apiManifest(apiSpec()).egress).toEqual(["root.example"])
+    expect(apiManifest(apiSpec({}, { servers: [{ url: "https://path.example:8443/v2" }] })).egress).toEqual(["path.example"])
+    expect(apiManifest(apiSpec({ servers: [{ url: "https://operation.example:9443/v3" }] },
+      { servers: [{ url: "https://path.example/v2" }] })).egress).toEqual(["operation.example"])
+  })
+  it.each(["http://private.example", "https://user:PRIVATE_TOKEN@private.example", "https://private.example/{version}",
+    "https://private.example?key=PRIVATE_TOKEN", "https://private.example#fragment", "wrong"])("refuses unusable server %s", (url) => {
+    expect(() => apiManifest(apiSpec({ servers: [{ url }] }))).toThrow(/server|HTTPS/i)
+  })
+  it.each(["head", "trace"])("refuses JSON-impossible %s operations", (method) => {
+    const spec = { ...apiSpec(), paths: { "/items": { [method]: { operationId: "createItem", responses: { "200": jsonResponse() } } } } }
+    expect(() => apiManifest(spec)).toThrow(/method|JSON|HEAD|TRACE/i)
+  })
+  it.each(["☃ private title", "x".repeat(80), "", "line\nbreak"])("uses a valid service name for %s", async (summary) => {
+    const generated = apiManifest(apiSpec({ summary }))
+    expect(generated.serviceName).toBe("create-item")
+    await Effect.runPromise(decodeManifest(generated))
+  })
+  it.each([{ price: "wrong" }, { price: "$0.01", timeoutSec: 0 }, { price: "$0.01", timeoutSec: 901 },
+    { price: "$0.01", auth: { in: "header", name: "X-Key", env: "HOME" } } ] as const)("validates every manifest before returning", (opts) => {
+    expect(() => apiManifest(apiSpec(), { specFile: "openapi.json", ...opts })).toThrow()
+  })
+  it.each(["/tmp/private.json", "../private.json", "nested/../../private.json", "https://private.example/spec.json", "", "private\0.json"])(
+    "refuses a spec file that cannot be loaded inside a listing: %s", (specFile) => {
+      expect(() => apiManifest(apiSpec(), { specFile, price: "$0.01" })).toThrow(/spec|document|directory/i)
+    })
+  it("projects auth fields and cannot let opaque options override the adapter", () => {
+    const generated = apiManifest(apiSpec(), { specFile: "openapi.json", price: "$0.01",
+      auth: { in: "header", name: "X-Key", env: "KEY", adapter: "script", credential: "subscription" } } as Parameters<typeof manifestFromOperation>[2])
+    expect(generated.engine).toEqual({ adapter: "openapi", credential: "none", spec: "openapi.json", operationId: "createItem",
+      auth: { in: "header", name: "X-Key", env: "KEY" } })
   })
 })
