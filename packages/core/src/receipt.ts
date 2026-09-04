@@ -88,7 +88,9 @@ export class Receipt extends Schema.Class<Receipt>("Receipt")({
   treeCeilingAtomic: Schema.optional(Schema.BigIntFromSelf),
   treeCommittedAtomic: Schema.optional(Schema.BigIntFromSelf),
   /** EIP-191 signature by the hub attester over the canonical receipt JSON. */
-  receiptSignature: Schema.optional(Schema.String)
+  receiptSignature: Schema.optional(Schema.String),
+  /** A real hub-owned pay-test, not customer demand. Older receipts omit this marker. */
+  canary: Schema.optional(Schema.Boolean)
 }) {}
 
 /** A rating can only be created by presenting a settled receipt — fake reviews cost real USDC. */

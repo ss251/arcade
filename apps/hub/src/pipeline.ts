@@ -40,6 +40,8 @@ export interface RunJobArgs {
   readonly accrualId?: string
   readonly lineage: Lineage
   readonly hireCapability?: string
+  /** Set by the server from the verified payer, never from buyer input or seller output. */
+  readonly canary?: boolean
 }
 
 export const runJob = (args: RunJobArgs) => {
@@ -113,6 +115,7 @@ export const runJob = (args: RunJobArgs) => {
           feeBps,
           ...(settleTx === undefined ? {} : { settleTx }),
           ...(args.accrualId === undefined || !settled ? {} : { feeAccrualId: args.accrualId }),
+          ...(args.canary === true ? { canary: true } : {}),
           rail: rail.name,
           network: args.verified.network,
           latencyMs: Date.now() - startedAtMs,

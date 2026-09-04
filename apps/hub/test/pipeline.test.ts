@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { Effect, Layer, Ref } from "effect"
+import { Effect, Layer, Ref, Schema } from "effect"
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import {
   ARC_CAIP2,
   Bounds,
   JobOutcome,
   PublicListing,
+  Receipt,
   ROOT_LINEAGE,
   parsePrice
 } from "@arcade/core"
@@ -55,7 +56,7 @@ const stubBroker = (outcome: JobOutcome): Broker => ({
   runnerFor: () => Effect.succeed("rnr_test")
 })
 
-const setup = async (outcome: JobOutcome) => {
+const setup = async (outcome: JobOutcome, canary?: boolean) => {
   const stateRef = Effect.runSync(Ref.make(makeTestState({ [buyer.address]: START })))
   const rail = makeTestRail(stateRef)
 
@@ -87,7 +88,8 @@ const setup = async (outcome: JobOutcome) => {
         seller: SELLER,
         input: {},
         verified,
-        lineage: ROOT_LINEAGE("job_testtesttesttest01")
+        lineage: ROOT_LINEAGE("job_testtesttesttest01"),
+        ...(canary === undefined ? {} : { canary })
       })
       const store = yield* StoreTag
       const receipts = yield* store.allReceipts
@@ -109,6 +111,29 @@ const outcome = (over: Partial<Parameters<typeof JobOutcome.make>[0]>) =>
   } as Parameters<typeof JobOutcome.make>[0])
 
 describe("hub settle pipeline", () => {
+  it.each([true, false])("marks canary evidence without changing settlement (success: %s)", async (success) => {
+    const { out, state, receipts } = await setup(outcome(success ? {} : { stopReason: "refusal" }), true)
+    expect(out.receipt.canary).toBe(true)
+    expect(receipts[0]?.canary).toBe(true)
+    expect(out.receipt.settled).toBe(success)
+    expect(state.settlements).toHaveLength(success ? 1 : 0)
+    expect(state.balances.get(buyer.address.toLowerCase())).toBe(success ? START - PRICE : START)
+    expect(out.receipt.rootJobId).toBe("job_testtesttesttest01")
+    expect(out.receipt.hop).toBe(0)
+    expect(Schema.decodeUnknownSync(Receipt)(Schema.encodeSync(Receipt)(out.receipt)).canary).toBe(true)
+  })
+
+  it.each([undefined, false])("does not add a canary marker for ordinary purchases (%s)", async (canary) => {
+    const { out } = await setup(outcome({}), canary)
+    expect(out.receipt).not.toHaveProperty("canary")
+    expect(Schema.decodeUnknownSync(Receipt)(Schema.encodeSync(Receipt)(out.receipt))).not.toHaveProperty("canary")
+  })
+
+  it("does not accept a canary claim from the seller's output", async () => {
+    const { out } = await setup(outcome({ output: { ok: true, canary: true } }))
+    expect(out.receipt).not.toHaveProperty("canary")
+  })
+
   it("settles a clean success and moves exactly the price", async () => {
     const { out, state } = await setup(outcome({}))
     expect(out.receipt.settled).toBe(true)
