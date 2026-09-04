@@ -1,0 +1,11 @@
+# ARCADE repo scope (2026-09-04, from Explore agent)
+- 112 commits 2026-07-25..08-07; main==origin/main; internal/ gitignored.
+- Tests: vitest 475/480 pass (5 failures = preflight spawn timeouts, not logic), bun 25/27 (timeouts). README says 366 tests (stale; 507 real).
+- Rail interface packages/payments/src/rail.ts:56-68 {challenge, verify, settle}; EIP3009Live, GatewayLive (code-complete, not proven live), RailTest. Add rail: implement + Layer + case in apps/hub/src/server.ts:180 + conformance row rail.conformance.test.ts:51-53.
+- Engines: claude-api, claude-agent (Agent SDK), script. Sandbox = env scrub + scoped process (no container). hire_skill via hire-broker.ts with maxSubSpendUsd.
+- Hub routes server.ts: /ws, /healthz, /, /_feed, /skill/:id, /openapi.json, /.well-known/x402, /skill.md, /listings, /runners, /receipts, /jobs/:id, POST /ratings, POST /x/:seller/:skill, /jobs/:id/result.
+- Fee: FEE_BPS 500; FeeSplitter.sol deployed Arc testnet 0xf95c8afefae677fdcfc7bd5b8aaaf3702db99206; backfillFeeSweep has no production caller.
+- Web: one page (chat+sidebar) TanStack Start; real hub tools; browser EIP-3009 signing.
+- Identity: seller = EIP-191 signed Hello address; buyer = payer address. Ratings endpoint exists (signed over settled receipt). No ERC-8004, no names.
+- Gaps: T-SPEND-003 budgets don't compose across hops (no lineage); Gateway round-trip unproven; no container sandbox; ratings UI; fee sweep backfill dead code.
+- Live hub: https://arcade-hub-production.up.railway.app (Railway, volume /data).

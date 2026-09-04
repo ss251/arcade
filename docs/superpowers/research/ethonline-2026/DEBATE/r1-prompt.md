@@ -1,0 +1,5 @@
+You are one of three debaters (Claude Fable 5.1, Grok 4.6, GPT/Codex) in a research debate about a hackathon plan. Read `docs/superpowers/research/ethonline-2026/DEBATE/00-dossier.md` in full first, then any repo file you need (read-only; do not create or modify files). Use web search / X search / GitHub / docs.arc.io / thegraph docs / ens docs / ethglobal.com freely.
+
+ROUND 1 — your independent position. Answer every question in dossier §5 from the builder, user and market perspectives. Then give YOUR ranked 8-day plan for a solo builder (P0/P1/P2 with day counts), what the 2–4 minute video shows beat by beat, and the minimum that wins each of the three partner prizes.
+
+Hard rules: every factual claim carries a reference (URL, repo file:line, post URL). Mark opinion as opinion. Never invent references. Attack the conductor's plan in §4 where it is wrong; agree where it is right and say why. Be specific: file paths, contract calls, package names, header/field names. Length: 1,200–2,500 words. Output markdown only, starting with a one-line title naming yourself.
