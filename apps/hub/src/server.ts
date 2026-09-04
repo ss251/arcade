@@ -13,6 +13,7 @@ import {
   helloDigest,
   HELLO_MAX_AGE_MS,
   decodeRunnerMessage,
+  docBytes,
   explorerTxUrl,
   formatPrice,
   loadChainConfig,
@@ -36,6 +37,8 @@ import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
 import { StoreTag } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
+import { Erc8004FromEnv, Erc8004Tag } from "./erc8004.ts"
+import { agentRegistrationFor } from "./agent-registration.ts"
 import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
 import { payTestSkipReason } from "./canary-input.ts"
@@ -266,7 +269,7 @@ if (RAIL !== "test" && process.env["ARCADE_CHAIN_CHECK"] !== "0") {
   }
 }
 
-const AppLive = Layer.mergeAll(StoreFromEnv(), BrokerLive, railLayer())
+const AppLive = Layer.mergeAll(StoreFromEnv(), BrokerLive, railLayer(), Erc8004FromEnv(chainConfig.erc8004))
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2), {
@@ -358,11 +361,12 @@ const splitterFacts = async (address: string): Promise<SplitterFacts | undefined
 }
 
 const main = Effect.gen(function* () {
-  const runtime = yield* Effect.runtime<StoreTag | BrokerTag | RailTag>()
+  const runtime = yield* Effect.runtime<StoreTag | BrokerTag | RailTag | Erc8004Tag>()
   const run = Runtime.runPromise(runtime)
   const store = yield* StoreTag
   const broker = yield* BrokerTag
   const rail = yield* RailTag
+  const erc8004 = yield* Erc8004Tag
 
   const canaryMaxPrice = (() => {
     try { return parsePrice(process.env["ARCADE_CANARY_MAX_PRICE"] ?? "$0.25") }
@@ -771,6 +775,41 @@ const main = Effect.gen(function* () {
       if (path === "/listings" && req.method === "GET") {
         const all = (await run(store.allListings)).filter((record) => record.delisted !== true)
         return json(all.map((r) => ({ ...r.listing, seller: r.seller })))
+      }
+
+      // Explicit public projection: no signing keys, provider configuration, or clients.
+      if (path === "/erc8004" && req.method === "GET") {
+        return json(erc8004.armed ? {
+          armed: true,
+          chainId: chainConfig.chainId,
+          caip2: chainConfig.caip2,
+          registries: {
+            identity: erc8004.registries.identity,
+            reputation: erc8004.registries.reputation,
+            validation: erc8004.registries.validation
+          },
+          operator: erc8004.addresses.operator,
+          validator: erc8004.addresses.validator,
+          attester: erc8004.addresses.attester
+        } : { armed: false, chainId: chainConfig.chainId, caip2: chainConfig.caip2 })
+      }
+
+      const registrationMatch = /^\/listings\/([a-z0-9-]+)\/agent-registration\.json$/.exec(path)
+      if (registrationMatch !== null && req.method === "GET") {
+        const result = await run(store.getListing(registrationMatch[1]!).pipe(Effect.either))
+        if (result._tag === "Left" || chainConfig.erc8004 === undefined) return json({ error: "not_found" }, 404)
+        const doc = agentRegistrationFor({
+          rec: result.right,
+          runner: await run(store.getRunner(result.right.runnerId)),
+          origin: publicOrigin(url),
+          chainId: chainConfig.chainId,
+          identityRegistry: chainConfig.erc8004.identity,
+          nowMs: Date.now()
+        })
+        // The compact served bytes are exactly the bytes committed by docHash.
+        return new Response(docBytes(doc), {
+          headers: { "content-type": "application/json", "cache-control": "public, max-age=30" }
+        })
       }
 
       const listingMatch = /^\/listings\/([a-z0-9-]+)$/.exec(path)

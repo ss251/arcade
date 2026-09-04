@@ -106,6 +106,13 @@ export interface ListingRecord {
   readonly payTested?: PayTest | undefined
   /** Derived from three trailing failed pay-tests, never stored as a mutable flag. */
   readonly delisted?: boolean | undefined
+  /** Announced identity; listing/runner bindings are re-established on each connection. */
+  readonly agentId?: string | undefined
+  readonly registrationTx?: string | undefined
+  /** True only after IdentityRegistry.ownerOf(agentId) was read and matched the seller. */
+  readonly agentVerified?: boolean | undefined
+  /** Optional future ENS binding; exposed as ens in the registration document. */
+  readonly ensName?: string | undefined
   readonly runnerId: string
   readonly publishedAtMs: number
 }
