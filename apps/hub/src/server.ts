@@ -3,7 +3,6 @@ import {
   ARC_CAIP2,
   ARC_RPC_URL,
   USDC_ADDRESS,
-  DEFAULT_MAX_HOP,
   HIRE_CAPABILITY_HEADER,
   Job,
   JobOutcome,
@@ -38,7 +37,7 @@ import { StoreTag } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
 import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
-import { resolveLineage } from "./lineage.ts"
+import { ceilingAtomicFor, maxHopFromEnv, resolveLineage } from "./lineage.ts"
 import {
   renderIndex,
   renderListingPage,
@@ -799,7 +798,7 @@ const main = Effect.gen(function* () {
         // Lineage is verified before the payment challenge: a probe carrying a forged or
         // expired capability is refused here, before it costs the caller a 402 round trip
         // it could never complete honestly.
-        const maxHop = Number(process.env["ARCADE_MAX_HOP"] ?? DEFAULT_MAX_HOP)
+        const maxHop = maxHopFromEnv(process.env["ARCADE_MAX_HOP"])
         const lineageE = await run(
           resolveLineage(store, hubSecret, req.headers.get(HIRE_CAPABILITY_HEADER), listing, Date.now(), maxHop).pipe(
             Effect.either
@@ -860,10 +859,8 @@ const main = Effect.gen(function* () {
           const rootListing =
             root === undefined ? undefined : await run(store.getListing(root.skillId).pipe(Effect.either))
           const ceiling =
-            rootListing !== undefined &&
-            rootListing._tag === "Right" &&
-            rootListing.right.listing.bounds.maxSubSpendUsd !== undefined
-              ? parsePrice(String(rootListing.right.listing.bounds.maxSubSpendUsd))
+            rootListing !== undefined && rootListing._tag === "Right"
+              ? ceilingAtomicFor(rootListing.right.listing.bounds.maxSubSpendUsd)
               : 0n
           const ok = await run(store.reserveTree(lineage.rootJobId, jobId, priceAtomic, ceiling))
           if (!ok) {
