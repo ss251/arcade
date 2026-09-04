@@ -510,3 +510,42 @@ Two things that only show up at runtime, both found by running it:
 ## Plan A: mainnet migration runbook
 
 Use [How to move ARCADE to Arc mainnet](mainnet-runbook.md) for the future OWNER-confirmed migration: published parameters, chain checks, per-seller FeeSplitterV2, facilitator funding, failure/success canaries, rollback and evidence. Mainnet remains pending today; writing that procedure does not authorize a mainnet transaction. Network changes require rebuilding the web bundle and verifying each skill's private RPC/egress settings, not just changing the hub environment.
+
+## Plan C — Evidence: automatic delisting and recovery
+
+`bun run e2e:canary` prepares an isolated loopback hub, one real `usdc-flow-check`
+runner and a fresh sqlite database. It uses the ordinary scheduled buyer and EIP-3009
+settlement on Arc testnet. The dedicated canary key must be distinct from both seller
+and facilitator; creating and funding it is an **OWNER** action. No existing key is a
+substitute. Once that prerequisite is complete:
+
+```bash
+ARCADE_NETWORK=arc-testnet \
+ARCADE_CANARY_KEY="$(security find-generic-password -s arcade-canary-key -w)" \
+ARCADE_FACILITATOR_KEY="$(security find-generic-password -s arcade-deployer-key -w)" \
+ARCADE_SELLER_KEY="$(security find-generic-password -s arcade-deployer-key -w)" \
+ARCADE_FEE_SPLITTER=0x9e304ec13dd862c81ee8caa8fd262dac426fbedf \
+bun run e2e:canary
+```
+
+The command requires two $0.01 purchases plus facilitator gas. It never initializes or
+overwrites saved runner configuration, fetches keys itself, funds accounts, or accepts
+terms. It rejects other chains, simulated rails, alternative RPCs and reused canary keys.
+The copied skill retains its actual chain-reading implementation; a temporary local
+execution gate holds recovery until the script verifies that reconnecting alone did not
+clear the delist. The production scheduler, buyer, runner and settlement path are unchanged.
+
+Offline runners correctly return **404** from both detail routes. That alone does not
+prove delisting: the script also checks three new durable failed pay-tests for the exact
+seller/listing and omission from all four catalogues. After reconnect it verifies the
+delisted explanation, releases execution, and requires a distinct passing transaction
+before claiming recovery. It then stops its owned services and independently checks both
+durable marked receipts, ERC-20 transfers and FeeSplitterV2 tree events using bounded RPC
+reads. An extra paid receipt, missing evidence or failed cleanup makes the command fail.
+The printed temporary evidence directory is retained with public proof and local sqlite
+history, never keys. All child environments are allowlisted.
+
+**Live status, 2026-09-05:** pending the owner-provisioned funded `arcade-canary-key`.
+Nineteen offline script tests and a separate real-loopback scheduled recovery test on the
+simulated rail pass; neither is represented as live on-chain evidence. Append the two
+verified Arcscan links only after the live command succeeds.

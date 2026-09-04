@@ -8,6 +8,7 @@
     "test": "vitest run && bun test .bun.test",
     "test:vitest": "vitest run",
     "test:bun": "bun test .bun.test",
+    "e2e:canary": "bash scripts/e2e-canary.sh",
     "test:watch": "vitest",
     "hub": "bun run --cwd apps/hub start",
     "web": "bun run --cwd apps/web dev",
