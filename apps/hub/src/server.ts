@@ -38,6 +38,7 @@ import { StoreTag } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
 import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
+import { payTestSkipReason } from "./canary-input.ts"
 import { claimedPayerOf, delistRefusal } from "./delisted.ts"
 export { claimedPayerOf, delistRefusal } from "./delisted.ts"
 import { ceilingAtomicFor, maxHopFromEnv, resolveLineage } from "./lineage.ts"
@@ -355,6 +356,14 @@ const main = Effect.gen(function* () {
   const broker = yield* BrokerTag
   const rail = yield* RailTag
 
+  const canaryMaxPrice = (() => {
+    try { return parsePrice(process.env["ARCADE_CANARY_MAX_PRICE"] ?? "$0.25") }
+    catch {
+      console.error("[hub] refusing to start: ARCADE_CANARY_MAX_PRICE is invalid")
+      process.exit(2)
+    }
+  })()
+
   // Only an address is used by request gates. Never echo malformed private-key input.
   const canaryAddress = (() => {
     const key = process.env["ARCADE_CANARY_KEY"]
@@ -668,6 +677,10 @@ const main = Effect.gen(function* () {
               feeSplitter,
               ...(payTested === undefined ? {} : { payTested }),
               delisted: delisted === true,
+              ...(() => {
+                const skip = payTestSkipReason(listing, canaryMaxPrice)
+                return skip === null ? {} : { payTestSkip: skip }
+              })(),
               stats,
               ratingCount: ratings.length,
               ratingAverage:

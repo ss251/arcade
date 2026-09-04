@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { Receipt } from "@arcade/core"
 import { Schema } from "effect"
 import { PublicListing } from "@arcade/core"
-import { renderIndex, renderListingPage, type ListingView, type PageData } from "../src/ui.ts"
+import { agoText, payTestText, renderIndex, renderListingPage, renderListingRows, renderReceiptRows, type ListingView, type PageData } from "../src/ui.ts"
 
 /**
  * The page's argument is that its figures are EVIDENCE, not claims — "every statistic is
@@ -52,6 +52,79 @@ const page = (over: Partial<PageData> = {}): PageData => ({
 /** The exact sentences that assert on-chain provenance. */
 const EVIDENCE_CLAIM = "computed from settled on-chain"
 const ONCHAIN_ROW_CLAIM = "every row is a real transaction on Arc"
+
+const view = (over: Partial<ListingView> = {}): ListingView => ({
+  listing: Schema.decodeUnknownSync(PublicListing)({ id: "usdc-flow-check", version: "1.0.0",
+    serviceName: "USDC Flow Check", description: "Checks a flow.", tags: [], price: "$0.01",
+    bounds: { timeoutSec: 30 }, inputSchema: { type: "object" }, outputSchema: { type: "object" } }),
+  seller: "0x2222222222222222222222222222222222222222",
+  stats: { skillId: "usdc-flow-check", calls: 1, settled: 1, successRate: 1,
+    p50LatencyMs: 1, p95LatencyMs: 1, availability: 1 }, ratingCount: 0, ratingAverage: null, ...over
+})
+
+describe("pay-test evidence", () => {
+  const meta = { rail: "eip3009", network: "eip155:5042002", feeBps: 500 }
+  const passed = { atMs: Date.now() - 45_000, jobId: "job_canary", ok: true, settleTx: `0x${"a".repeat(64)}` }
+  it("shows the same successful evidence on the row and detail, with a transaction link", () => {
+    for (const html of [renderListingRows([view({ payTested: passed })]), renderListingPage(view({ payTested: passed }), [], meta)]) {
+      expect(html).toContain("pay-tested")
+      expect(html).toContain(`https://testnet.arcscan.app/tx/${passed.settleTx}`)
+      expect(html).toContain('rel="noreferrer"')
+    }
+  })
+  it("never nests a transaction link inside the listing navigation link", () => {
+    const html = renderListingRows([view({ payTested: passed })])
+    expect(html).toContain('href="/skill/usdc-flow-check"')
+    expect(html).not.toMatch(/<a\b[^>]*>(?:(?!<\/a>)[\s\S])*<a\b/)
+    expect(html).toContain('class="paytest"')
+  })
+  it("gives delisting priority over even a stale successful pay-test", () => {
+    const html = renderListingPage(view({ delisted: true, payTested: passed }), [], meta)
+    expect(html).toContain("delisted: failed pay-test")
+    expect(html).not.toContain(`https://testnet.arcscan.app/tx/${passed.settleTx}`)
+    expect(html).toContain("ordinary paid calls are refused")
+  })
+  it("shows an individual failed attempt without inventing a delist or settlement link", () => {
+    const html = payTestText(view({ payTested: { ...passed, ok: false } }))
+    expect(html).toContain("pay-test failed")
+    expect(html).not.toContain("delisted")
+    expect(html).not.toContain("href=")
+  })
+  it("states missing evidence and the reason for a skip", () => {
+    expect(payTestText(view())).toContain("not pay-tested yet")
+    const html = renderListingPage(view({ payTestSkip: "not pay-tested — priced above this hub's canary cap" }), [], meta)
+    expect(html).toContain("not pay-tested")
+    expect(html).toContain("canary cap")
+  })
+  it("escapes seller-derived skip reasons and transaction text", () => {
+    expect(payTestText(view({ payTestSkip: '<img src=x onerror="alert(1)">' }))).not.toContain("<img")
+    const html = payTestText(view({ payTested: { ...passed, settleTx: '\"><script>alert(1)</script>' } }))
+    expect(html).not.toContain("<script>")
+    expect(html).not.toContain('href="javascript:')
+  })
+  it("does not fabricate a transaction for a pass with no hash", () => {
+    const { settleTx: _tx, ...withoutTx } = passed
+    expect(payTestText(view({ payTested: withoutTx }))).not.toContain("href=")
+  })
+  it("marks only actual canary receipts without hiding their settlement arithmetic", () => {
+    const html = renderReceiptRows([receipt({ canary: true })])
+    expect(html).toContain("canary")
+    expect(html).toContain("$0.01")
+    expect(html).toContain("0xabc")
+    expect(renderReceiptRows([receipt()])).not.toContain("canary")
+    expect(renderReceiptRows([receipt({ canary: false })])).not.toContain("canary")
+  })
+})
+
+describe("agoText", () => {
+  const now = 1_700_000_000_000
+  it.each([[45_000, "45s ago"], [240_000, "4m ago"], [10_800_000, "3h ago"], [180_000_000, "2d ago"],
+    [-1_000, "0s ago"]])("formats elapsed time %s", (elapsed, text) => expect(agoText(now - Number(elapsed), now)).toBe(text))
+  it("does not present malformed times as evidence", () => {
+    expect(agoText(Number.NaN, now)).toBe("at an unknown time")
+    expect(agoText(now, Infinity)).toBe("at an unknown time")
+  })
+})
 
 describe("marketplace page — evidence claims", () => {
   it("asserts on-chain provenance on a real rail", () => {

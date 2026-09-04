@@ -1,5 +1,5 @@
 import { explorerTxUrl, formatPrice, type ObjectiveStats, type PublicListing, type Receipt, type ReceiptChild } from "@arcade/core"
-import type { ListingRecord } from "./store.ts"
+import type { ListingRecord, PayTest } from "./store.ts"
 
 /**
  * The public marketplace page — "settlement paper".
@@ -61,6 +61,10 @@ export interface ListingView {
    * argument is "every statistic is computed" cannot print one that isn't.
    */
   readonly splitterVerified?: boolean | undefined
+  readonly payTested?: PayTest | undefined
+  readonly delisted?: boolean | undefined
+  /** Why this listing has no pay-test evidence; never presented as a successful test. */
+  readonly payTestSkip?: string | undefined
   readonly stats: ObjectiveStats
   readonly ratingCount: number
   readonly ratingAverage: number | null
@@ -85,6 +89,25 @@ export interface PageData {
 }
 
 const secs = (ms: number): string => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`)
+
+export const agoText = (atMs: number, nowMs: number = Date.now()): string => {
+  if (!Number.isFinite(atMs) || !Number.isFinite(nowMs)) return "at an unknown time"
+  const elapsed = Math.max(0, nowMs - atMs)
+  if (elapsed < 90_000) return `${Math.round(elapsed / 1_000)}s ago`
+  if (elapsed < 90 * 60_000) return `${Math.round(elapsed / 60_000)}m ago`
+  if (elapsed < 36 * 3_600_000) return `${Math.round(elapsed / 3_600_000)}h ago`
+  return `${Math.round(elapsed / 86_400_000)}d ago`
+}
+
+/** The row and detail share one evidence line, including its explicit absence. */
+export const payTestText = (view: ListingView): string => {
+  if (view.delisted === true) return '<span class="unsettled">delisted: failed pay-test</span>'
+  if (view.payTested === undefined) return `<span class="unrated">${esc(view.payTestSkip ?? "not pay-tested yet")}</span>`
+  const { atMs, ok, settleTx } = view.payTested
+  if (!ok) return `<span class="unsettled">pay-test failed ${esc(agoText(atMs))}</span>`
+  const tx = settleTx === undefined ? "" : ` · <a href="${esc(explorerTxUrl(settleTx))}" target="_blank" rel="noreferrer">${esc(settleTx.slice(0, 10))}…</a>`
+  return `<span class="settled">pay-tested ${esc(agoText(atMs))}</span>${tx}`
+}
 
 /**
  * A success rate that cannot overstate itself.
@@ -121,19 +144,22 @@ export const renderListingRows = (listings: ReadonlyArray<ListingView>): string 
   // and is the whole difference.
   return [...listings]
     .sort((a, b) => b.stats.settled - a.stats.settled)
-    .map(
-      ({ listing, seller, stats, ratingCount, ratingAverage }) => `
-    <a class="row" href="/skill/${esc(listing.id)}">
+    .map((view) => {
+      const { listing, stats, ratingCount, ratingAverage } = view
+      // Navigation and transaction evidence are sibling links, never nested anchors.
+      return `
+    <div class="row">
       <span class="live${stats.availability > 0 ? " on" : ""}" title="${
         stats.availability > 0 ? "a runner is connected" : "no runner connected"
       }">${stats.availability > 0 ? "●" : "○"}</span>
-      <span class="name">${esc(listing.serviceName)}</span>
+      <a class="name" href="/skill/${esc(listing.id)}">${esc(listing.serviceName)}</a>
       <span class="desc">${esc(listing.description)}</span>
       <span class="stat">${esc(successText(stats))}${latencyText(stats)}</span>
+      <span class="paytest">${payTestText(view)}</span>
       <span class="rating">${ratingText(ratingCount, ratingAverage)}</span>
       <span class="price">${esc(listing.price)}</span>
-    </a>`
-    )
+    </div>`
+    })
     .join("")
 }
 
@@ -159,7 +185,7 @@ export const renderReceiptRows = (receipts: ReadonlyArray<Receipt>, limit = 12):
     .map(
       (r) => `
       <tr>
-        <td class="skill">${esc(r.skillId)}</td>
+        <td class="skill">${esc(r.skillId)}${r.canary === true ? ' <span class="unrated">canary</span>' : ""}</td>
         <td class="num">${r.settled ? esc(formatPrice(r.priceAtomic)) : `<span class="free">$0 charged</span>`}</td>
         <td class="num">${r.settled ? esc(formatPrice(r.sellerAtomic)) : "—"}</td>
         <td class="num">${r.settled ? esc(formatPrice(r.feeAtomic)) : "—"}</td>
@@ -252,6 +278,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 var(--sans
   -webkit-font-smoothing:antialiased}
 .wrap{max-width:920px;margin:0 auto;padding:40px 24px 88px}
 a{color:inherit}
+a:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 
 /* Header: wordmark left, computed meta right. Every figure in the meta is measured. */
 .top{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
@@ -285,7 +312,7 @@ h2{font:600 11px/1 var(--sans);text-transform:uppercase;letter-spacing:.08em;
    differ in weight, not just glyph, or the dot carries no information at a glance. */
 .live{font:11px/1 var(--mono);color:var(--slate)}
 .live.on{color:var(--ink)}
-.name{font-weight:600}
+.name{font-weight:600;min-width:0;overflow-wrap:anywhere;text-underline-offset:3px}
 .desc{color:var(--slate);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Pinned to the first row: the price is the headline fact and belongs beside the name,
    not below the metadata where the auto-flow was putting it. */
@@ -293,7 +320,8 @@ h2{font:600 11px/1 var(--sans);text-transform:uppercase;letter-spacing:.08em;
    glyph. Larger than the row text because the price is the headline fact of each row. */
 .price{grid-column:4;grid-row:1;font:600 19px/1 var(--sans);font-variant-numeric:tabular-nums;
   letter-spacing:-.01em;color:var(--usdc);text-align:right}
-.stat,.rating{grid-column:2/4;font:12px/1.5 var(--mono);color:var(--ink)}
+.stat,.rating,.paytest{grid-column:2/4;font:12px/1.5 var(--mono);color:var(--ink)}
+.paytest{overflow-wrap:anywhere}
 .rating{color:var(--slate)}
 .unrated{color:var(--slate)}
 .empty{color:var(--slate);padding:20px 0;border-top:1px solid var(--line)}
@@ -364,6 +392,7 @@ footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);
 }
 @media (max-width:640px){
   .row{grid-template-columns:14px 1fr auto}
+  .row .price{grid-column:3}
   .desc{grid-column:2/4;white-space:normal}
   .stat,.rating{grid-column:2/4}
   th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4){display:none}
@@ -503,6 +532,8 @@ export const renderListingPage = (
     <span class="price" style="color:var(--usdc)">${esc(listing.price)}</span>
   </div>
   <p class="claim">${esc(listing.description)}</p>
+  <p class="claim"><span class="claimlabel">pay-test</span><br>${payTestText(view)}</p>
+  <p class="note">when enabled, the hub buys this listing itself at the listed price on the same paid path a stranger uses — three consecutive failures hide it until a pay-test passes</p>
   ${
     listing.replaces === undefined
       ? ""
@@ -560,8 +591,10 @@ export const renderListingPage = (
     <tbody>${renderReceiptRows(receipts, 25)}</tbody>
   </table>
 
-  <footer>Call it: <code>POST /x/${esc(seller)}/${esc(listing.id)}</code> — you will receive a
-    402 with payment requirements. Machine-readable at <a href="/openapi.json">/openapi.json</a>.</footer>`
+  <footer>${view.delisted === true
+    ? "This listing is hidden and ordinary paid calls are refused. Only the hub's canary may buy it to prove recovery."
+    : `Call it: <code>POST /x/${esc(seller)}/${esc(listing.id)}</code> — you will receive a 402 with payment requirements.`}
+    Machine-readable at <a href="/openapi.json">/openapi.json</a>.</footer>`
 
   return shell(`${listing.serviceName} — ARCADE`, body)
 }
