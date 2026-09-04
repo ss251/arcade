@@ -42,8 +42,14 @@ export interface RunJobArgs {
   readonly hireCapability?: string
 }
 
-export const runJob = (args: RunJobArgs) =>
-  Effect.gen(function* () {
+export const runJob = (args: RunJobArgs) => {
+  // Whether THIS job's tree reservation has already been resolved (committed or released).
+  // Starts `true` for a root — it never held one — and is flipped by `finish` the instant
+  // its commit/release call succeeds, so the crash net below knows not to touch a
+  // reservation a second time.
+  let ledgerResolved = args.lineage.hop <= 0
+
+  const job = Effect.gen(function* () {
     const rail = yield* RailTag
     const broker = yield* BrokerTag
     const store = yield* StoreTag
@@ -61,12 +67,18 @@ export const runJob = (args: RunJobArgs) =>
     ) =>
       Effect.gen(function* () {
         // Ledger: a child's outcome commits or releases its reservation against the root's
-        // ceiling. `finish` is the ONLY place that holds a receipt (server.ts's
-        // `catchAllCause` around `runJob` means every crash lands here too), and every
-        // branch above reaches it — settled, unsettled, timeout, runner lost — so no
-        // reservation is ever left held.
+        // ceiling. This covers every ORDINARY terminal branch below — settled, unsettled,
+        // timeout, runner lost — because every one of them calls `finish`. It does NOT, by
+        // itself, cover a defect raised before this line ever runs (a schema throw building
+        // the receipt below, a store defect, `validateOutput` throwing): server.ts's
+        // `catchAllCause` around `runJob` only logs such a crash, it does not touch the
+        // ledger. That gap is closed by the `Effect.onError` net wrapped around the whole
+        // job at the bottom of this function, which releases on escape UNLESS this line has
+        // already run — hence flipping `ledgerResolved` right here, before anything below
+        // that could still throw.
         if (args.lineage.hop > 0) {
           yield* settled ? store.commitTree(args.jobId) : store.releaseTree(args.jobId)
+          ledgerResolved = true
         }
 
         // Persist the job with its outcome so /jobs/:id/result can return the actual output.
@@ -164,11 +176,14 @@ export const runJob = (args: RunJobArgs) =>
       )
 
     // ---- tree (roots only) ----------------------------------------------------
-    // A root's children are terminal by now — the parent's sandbox awaited each hire before
-    // the broker returned this outcome — so the tree can be closed and hashed before the
-    // settle decision. Computed here, not inside `finish`, so Task 7's `rail.settle` can
-    // carry `tree.treeHash` into the on-chain commitment; nothing after this point may
-    // change what it committed to.
+    // A root's children are terminal BY CONSTRUCTION at this point: a child call only ever
+    // reaches its own `broker.dispatch` from inside the parent's sandboxed run, which the
+    // parent's own `broker.dispatch` awaits — so every hire the parent made has already
+    // committed or released before this outcome could come back. That is what makes
+    // `treeHash` and `treeCommittedAtomic` a stable pair: nothing can commit or release a
+    // child of THIS root after they are computed here. Computed before the settle decision,
+    // not inside `finish`, so Task 7's `rail.settle` can carry `tree.treeHash` into the
+    // on-chain commitment; nothing after this point may change what it committed to.
     let tree:
       | { readonly children: ReadonlyArray<ReceiptChild>; readonly treeHash: `0x${string}`; readonly ceiling: bigint; readonly committed: bigint }
       | undefined
@@ -179,9 +194,11 @@ export const runJob = (args: RunJobArgs) =>
         .filter((c) => c.state !== "released")
         .map((c) => {
           const cr = receipts.find((r) => r.jobId === c.childJobId)
+          // Falling back to the child's OWN job id (rather than "") keeps a receipt whose
+          // child hasn't landed yet identifiable in the tree instead of blank.
           return ReceiptChild.make({
             jobId: c.childJobId,
-            skillId: cr?.skillId ?? "",
+            skillId: cr?.skillId ?? c.childJobId,
             priceAtomic: c.amountAtomic,
             settled: cr?.settled ?? false,
             ...(cr?.settleTx === undefined ? {} : { settleTx: cr.settleTx })
@@ -212,3 +229,19 @@ export const runJob = (args: RunJobArgs) =>
 
     return yield* finish(outcome, true, "ok", settled.txHash)
   })
+
+  // Crash net. `finish` above resolves the ledger for every ORDINARY terminal branch, but a
+  // defect that escapes before `finish` ever runs — a broker/store defect, a schema throw —
+  // would otherwise leave a child's reservation held forever: server.ts wraps `runJob` in
+  // `catchAllCause` only to log it. `Effect.onError` fires on a typed failure, a defect, OR
+  // an interruption, so this is the one place that has to be right; `ledgerResolved` (set by
+  // `finish`, above) is what keeps it from double-releasing a reservation `finish` already
+  // resolved. A no-op for a root, which never held a reservation to begin with.
+  return job.pipe(
+    Effect.onError(() =>
+      ledgerResolved
+        ? Effect.void
+        : Effect.flatMap(StoreTag, (store) => store.releaseTree(args.jobId))
+    )
+  )
+}

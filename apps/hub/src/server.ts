@@ -38,6 +38,7 @@ import { StoreFromEnv } from "./store-sqlite.ts"
 import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
 import { ceilingAtomicFor, maxHopFromEnv, resolveLineage } from "./lineage.ts"
+import { publicReceipt } from "./receipts-feed.ts"
 import {
   renderIndex,
   renderListingPage,
@@ -692,22 +693,9 @@ const main = Effect.gen(function* () {
 
       if (path === "/receipts" && req.method === "GET") {
         const receipts = await run(store.allReceipts)
-        // The public feed is evidence that settlement happens, not a directory of who
-        // bought what. `jobId` is omitted because it was the capability to read a
-        // stranger's input and output; `buyer` because a wallet address plus a skill id is
-        // a purchase history.
-        return json(
-          receipts.map(({ jobId: _jobId, buyer: _buyer, ...r }) => ({
-            ...r,
-            priceAtomic: r.priceAtomic.toString(),
-            sellerAtomic: r.sellerAtomic.toString(),
-            feeAtomic: r.feeAtomic.toString(),
-            price: formatPrice(r.priceAtomic),
-            sellerShare: formatPrice(r.sellerAtomic),
-            fee: formatPrice(r.feeAtomic),
-            explorer: r.settleTx === undefined ? null : explorerTxUrl(r.settleTx)
-          }))
-        )
+        // See `publicReceipt` for exactly what this withholds and why (job ids at any
+        // depth, buyer address, the settlement's authorization nonce).
+        return json(receipts.map(publicReceipt))
       }
 
       const jobMatch = /^\/jobs\/([A-Za-z0-9_]+)$/.exec(path)
