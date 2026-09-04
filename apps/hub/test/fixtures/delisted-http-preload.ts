@@ -5,6 +5,13 @@ import { InvalidSignature } from "@arcade/core"
 import { recoverTypedDataAddress } from "viem"
 const payments = { ...await import("@arcade/payments") }
 
+// C6 drives purchases manually; C9 opts into the real scheduled fiber in its own test.
+// A long interval alone would not disable the loop's immediate initial tick.
+if (process.env["TEST_AUTO_CANARY"] !== "1") {
+  const canary = { ...await import("../../src/canary.ts") }
+  mock.module("../../src/canary.ts", () => ({ ...canary, canaryLoop: () => Effect.never }))
+}
+
 // RailTest intentionally does not recover signers. Add real offline recovery for this
 // HTTP security test, while keeping balances/settlement entirely in memory.
 mock.module("@arcade/payments", () => ({

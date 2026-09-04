@@ -112,3 +112,35 @@ describe("preflight — the other public-deployment requirements", () => {
     expect(out).not.toContain("refusing to start")
   })
 })
+
+describe("preflight — the canary", () => {
+  it("warns, but does not refuse, when a public hub has no canary key", () => {
+    const result = boot(PUBLIC_OK)
+    expect(result.refused).toBe(false)
+    expect(result.out).toContain("ARCADE_CANARY_KEY is not set")
+    expect(result.out).toContain("no automatic pay-tests")
+  })
+  it("does not warn about a missing key when one is set", () => {
+    const result = boot({ ...PUBLIC_OK, ARCADE_CANARY_KEY: `0x${"1".repeat(64)}` })
+    expect(result.refused).toBe(false)
+    expect(result.out).not.toContain("ARCADE_CANARY_KEY is not set")
+  })
+  it("starts the opted-in scoped canary on the offline test rail", () => {
+    const result = boot({ ARCADE_RAIL: "test", PORT: "0", ARCADE_CANARY_KEY: `0x${"1".repeat(64)}`,
+      ARCADE_CANARY_INTERVAL: "5s" })
+    expect(result.refused).toBe(false)
+    expect(result.out).toContain("[canary] on — buyer")
+    expect(result.out).toContain("every 5000ms per listing")
+    expect(result.out).toContain("ARCADE listening")
+    expect(result.out).not.toContain("[canary] FAIL")
+  })
+  it.each(["ARCADE_CANARY_INTERVAL", "ARCADE_CANARY_TICK", "ARCADE_CANARY_MAX_PRICE", "ARCADE_CANARY_KEY"])(
+    "refuses invalid %s without exposing its contents", (name) => {
+      const result = boot({ ARCADE_RAIL: "test", PORT: "0", ARCADE_CANARY_KEY: `0x${"1".repeat(64)}`,
+        [name]: "PRIVATE_CANARY_CONFIG" })
+      expect(result.refused).toBe(true)
+      expect(result.out).toContain(name)
+      expect(result.out).not.toContain("PRIVATE_CANARY_CONFIG")
+    }
+  )
+})

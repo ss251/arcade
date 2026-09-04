@@ -81,7 +81,7 @@ complete Plan A's owner-blocked descendant-lineage demonstration.
 
 ---
 
-## The six environment variables that matter
+## The environment variables that matter
 
 `bun run hub` works on a laptop with no configuration at all. Every one of those defaults is
 wrong on a host anyone can reach, and each fails **quietly** — which is why the hub now
@@ -94,6 +94,20 @@ refuses to start when `ARCADE_PUBLIC_URL` is set and the load-bearing ones are m
 | `ARCADE_HUB_SECRET` | hub | Job tokens are `HMAC(secret, jobId)`. Unset, a fresh secret is minted **every boot**, so every buyer holding a 202 loses access to work they already paid for. Harmless while the store was in RAM (the receipt died too); with `ARCADE_DB` set, this is what strands paying buyers. Pin it. |
 | `ARCADE_FACILITATOR_KEY` | hub | The key that broadcasts settlements. Unset, the hub generates an ephemeral one with no gas and **every settlement fails after the work is already done** — the seller has burned inference and nobody gets paid. |
 | `ARCADE_DB` | hub | Path to the sqlite file, **which must be inside a mounted volume**. Container filesystems are ephemeral: point it anywhere else and sqlite writes into the container, receipts persist across a process restart *inside* it, and durability fails only on redeploys — which nobody thinks of as restarts, and which happen on every push. Provision and mount the volume **before the first deploy**, because the first thing you do after one is push a fix. DoD "a receipt survives a restart" is only true on a host with a volume; the sqlite Layer alone does not get you there. **Now enforced** — see below. |
+| `ARCADE_CANARY_KEY` | hub | Dedicated funded Arc-testnet key used to buy listings through the ordinary paid HTTP path. Read it from Keychain only in the consuming command. Unset disables automatic purchases; existing dated evidence remains visible, and untested listings say so. Key creation/funding is an OWNER action. |
+| `ARCADE_CANARY_INTERVAL` | hub | Minimum time between attempts for each seller/listing. Default `24h`; use `10m` for an explicitly funded demo. Accepts `45s`, `10m`, `24h`, `1d`, or bare seconds; explicit `ms` values are also supported. Zero, negative, fractional, and overflowing timers are refused. |
+| `ARCADE_CANARY_MAX_PRICE` | hub | Maximum price per automatic purchase, not a total spending budget. Default `$0.25`. Dearer listings say "not pay-tested — priced above this hub's canary cap". Use a dedicated limited-balance key; shortening the interval or adding listings increases spending. |
+| `ARCADE_CANARY_TICK` | hub | How often the loop checks due listings. Default `30s`; clamped to at least `1s` unless the interval is explicitly shorter, and never longer than the interval. The first check runs immediately after startup. |
+
+The canary needs the same durable `ARCADE_DB` as receipts: three consecutive failed
+pay-tests hide a listing from discovery and refuse ordinary signed purchases. Reconnecting
+alone does not clear that verdict; only a successful canary purchase does. Its receipts
+are marked `canary`, so automated testing is not presented as independent buyer demand.
+Absent delisted runners are not repeatedly probed until they reconnect. Unsupported input
+schemas and listings above the cap are skipped, while a declared input that demonstrably
+violates its own schema is a failed test. All purchases are sequential, and the loop is
+scoped to the hub process. On `ARCADE_RAIL=test`, the same mechanism runs with explicitly
+simulated settlement and moves no funds.
 
 ### `ARCADE_DB` is checked, and so is where it points
 

@@ -39,6 +39,7 @@ import { StoreFromEnv } from "./store-sqlite.ts"
 import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
 import { payTestSkipReason } from "./canary-input.ts"
+import { canaryFromEnv, canaryLoop } from "./canary.ts"
 import { claimedPayerOf, delistRefusal } from "./delisted.ts"
 export { claimedPayerOf, delistRefusal } from "./delisted.ts"
 import { ceilingAtomicFor, maxHopFromEnv, resolveLineage } from "./lineage.ts"
@@ -169,6 +170,13 @@ const preflight = (): void => {
         "per SELLER — its `seller` is immutable, so one hub-wide address would route every " +
         "other seller's revenue into the first seller's contract. Set it on the RUNNER; it " +
         "travels in the signed handshake."
+    )
+  }
+  if (!process.env["ARCADE_CANARY_KEY"]) {
+    console.warn(
+      "[hub] NOTE: ARCADE_CANARY_KEY is not set, so no automatic pay-tests will run. " +
+      "Existing dated evidence remains visible; untested listings say so. Set a dedicated " +
+      "funded Arc testnet key to opt into purchases once per ARCADE_CANARY_INTERVAL."
     )
   }
   if (missing.length > 0) {
@@ -1108,7 +1116,20 @@ const main = Effect.gen(function* () {
     }
   })
 
-  console.log(`[hub] ARCADE listening on :${PORT}  rail=${rail.name}  network=${ARC_CAIP2}  fee=${FEE_BPS}bps`)
+  yield* Effect.addFinalizer(() => Effect.sync(() => server.stop(true)))
+  // Use the actual bound port, including PORT=0, unless the operator advertises a public
+  // origin. The buyer uses ordinary HTTP and remains within this application's scope.
+  const canary = (() => {
+    try { return canaryFromEnv(process.env["ARCADE_PUBLIC_URL"] ?? `http://127.0.0.1:${server.port}`) }
+    catch (error) {
+      // canaryFromEnv errors contain only fixed field-specific diagnostics, never values.
+      console.error(`[hub] refusing to start: ${error instanceof Error ? error.message : "invalid canary configuration"}`)
+      process.exit(2)
+    }
+  })()
+  if (canary !== undefined) yield* Effect.forkScoped(canaryLoop(canary))
+
+  console.log(`[hub] ARCADE listening on :${server.port}  rail=${rail.name}  network=${ARC_CAIP2}  fee=${FEE_BPS}bps`)
   yield* Effect.never
 })
 

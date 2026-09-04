@@ -84,7 +84,10 @@ const verdictOf = (out: SkillResult): BuyResult => {
   const tx = typeof receipt?.["settleTx"] === "string" && receipt["settleTx"].length > 0 ? receipt["settleTx"] : undefined
   const ok = receipt?.["settled"] === true && tx !== undefined
   return {
-    ok, jobId: typeof out.jobId === "string" ? out.jobId : "",
+    // The real poll endpoint currently uses job_id at the envelope boundary, whereas
+    // SkillResult calls it jobId. Its authenticated receipt retains the canonical id.
+    ok, jobId: typeof out.jobId === "string" && out.jobId.length > 0 ? out.jobId
+      : typeof receipt?.["jobId"] === "string" ? receipt["jobId"] : "",
     ...(ok ? { settleTx: tx } : {}), reason: ok ? "ok" : "not settled"
   }
 }
