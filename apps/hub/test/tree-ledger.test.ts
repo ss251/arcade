@@ -36,4 +36,15 @@ describe("tree reservation ledger", () => {
     const ok = await run(Effect.flatMap(StoreTag, (s) => s.reserveTree("job_r", "job_c", 1n, 0n)))
     expect(ok).toBe(false)
   })
+  it("a duplicate childJobId is refused", async () => {
+    const out = await run(Effect.gen(function* () {
+      const s = yield* StoreTag
+      const a = yield* s.reserveTree("job_root", "job_c1", 10_000n, 100_000n)
+      const b = yield* s.reserveTree("job_root", "job_c1", 10_000n, 100_000n)
+      return { a, b, st: yield* s.treeState("job_root") }
+    }))
+    expect(out.a).toBe(true)
+    expect(out.b).toBe(false)
+    expect(out.st.children).toHaveLength(1)
+  })
 })

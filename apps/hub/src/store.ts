@@ -229,6 +229,14 @@ export const makeStore = (ref: Ref.Ref<StoreState>): Store => ({
 
   reserveTree: (rootJobId, childJobId, amountAtomic, ceilingAtomic) =>
     Ref.modify(ref, (s) => {
+      // A child job id is unique hub-wide. A caller asking to reserve the same one twice is
+      // a bug upstream — refusing is the safe direction, because silently accepting it would
+      // collapse to one sqlite row on the next restart (child_job_id is the PRIMARY KEY) and
+      // `held` would under-report what is actually committed against the ceiling.
+      if (amountAtomic <= 0n) return [false, s]
+      for (const rows of s.trees.values()) {
+        if (rows.some((r) => r.childJobId === childJobId)) return [false, s]
+      }
       const rows = s.trees.get(rootJobId) ?? []
       const held = rows.filter((r) => r.state !== "released").reduce((n, r) => n + r.amountAtomic, 0n)
       if (held + amountAtomic > ceilingAtomic) return [false, s]
