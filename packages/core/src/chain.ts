@@ -1,19 +1,23 @@
+import { loadChainConfig } from "./chain-config.ts"
+
+const cfg = loadChainConfig()
+
 /**
- * Arc testnet constants.
+ * Compatibility exports for the selected Arc network (testnet by default).
  *
  * All values verified live on 2026-07-24/25 (see internal/research/G1-RAIL-VERIFICATION.md):
  * chain id via eth_chainId, USDC capabilities via eth_call probes against a negative control,
  * and a real EIP-3009 settlement (tx 0xc9b77c1e…, block 53480033).
  */
 
-/** Arc testnet chain id. */
-export const ARC_CHAIN_ID = 5042002 as const
+/** Selected Arc chain id. */
+export const ARC_CHAIN_ID = cfg.chainId
 
 /** CAIP-2 identifier — the form Circle's x402/Nanopayments requirements use on the wire. */
-export const ARC_CAIP2 = `eip155:${ARC_CHAIN_ID}` as const
+export const ARC_CAIP2 = cfg.caip2
 
-export const ARC_RPC_URL = "https://rpc.testnet.arc.network" as const
-export const ARC_EXPLORER = "https://testnet.arcscan.app" as const
+export const ARC_RPC_URL = cfg.rpcHttp[0] ?? ""
+export const ARC_EXPLORER = cfg.explorerBaseUrl
 
 /**
  * USDC on Arc.
@@ -25,26 +29,26 @@ export const ARC_EXPLORER = "https://testnet.arcscan.app" as const
  * Prices, payments and receipts are ALWAYS 6-decimal atomic units. Gas costs are 18-decimal.
  * Never mix them; see `money.ts`, which only speaks 6-decimal atomic units.
  */
-export const USDC_ADDRESS = "0x3600000000000000000000000000000000000000" as const
+export const USDC_ADDRESS = cfg.usdc.address
 
 /** ERC-20 interface decimals. Payments/prices/receipts use this. */
-export const USDC_DECIMALS = 6 as const
+export const USDC_DECIMALS = cfg.usdc.decimals
 
 /** Native gas-token decimals for the same address. Gas math only. */
-export const USDC_NATIVE_DECIMALS = 18 as const
+export const USDC_NATIVE_DECIMALS = cfg.usdc.nativeDecimals
 
 /** EIP-712 domain values for the USDC contract (probed live: name "USDC", version "2"). */
-export const USDC_EIP712_NAME = "USDC" as const
-export const USDC_EIP712_VERSION = "2" as const
+export const USDC_EIP712_NAME = cfg.usdc.eip712Name
+export const USDC_EIP712_VERSION = cfg.usdc.eip712Version
 
-/** Circle Gateway Wallet — same address across all EVM testnets. */
-export const GATEWAY_WALLET = "0x0077777d7EBA4688BDeF3E311b846F25870A19B9" as const
+/** Circle Gateway Wallet; zero sentinel when unavailable, checked before hub boot. */
+export const GATEWAY_WALLET = cfg.gateway?.wallet ?? "0x0000000000000000000000000000000000000000"
 
 /** Circle Gateway/CCTP domain id for Arc testnet. */
-export const GATEWAY_DOMAIN = 26 as const
+export const GATEWAY_DOMAIN = cfg.gateway?.domain ?? -1
 
 /** Circle's hosted Nanopayments facilitator (testnet). We do NOT run our own. */
-export const GATEWAY_FACILITATOR_URL = "https://gateway-api-testnet.circle.com" as const
+export const GATEWAY_FACILITATOR_URL = cfg.gateway?.facilitatorUrl ?? ""
 
 /** Nanopayments scheme marker that distinguishes a Gateway 402 from a vanilla `exact` one. */
 export const GATEWAY_BATCHING_NAME = "GatewayWalletBatched" as const
@@ -54,7 +58,7 @@ export const GATEWAY_BATCHING_VERSION = "1" as const
  * Gateway rejects authorizations valid for less than 7 days.
  * 604800s (7d) + 100s buffer, matching the SDK's own `maxTimeoutSeconds`.
  */
-export const GATEWAY_MIN_VALIDITY_SECONDS = 604900 as const
+export const GATEWAY_MIN_VALIDITY_SECONDS = cfg.gateway?.minValiditySeconds ?? 604900
 
 /**
  * Measured block cadence (~0.5s) with single-block deterministic finality (Malachite BFT).

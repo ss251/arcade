@@ -5,6 +5,7 @@ import {
   ARC_CAIP2,
   GATEWAY_MIN_VALIDITY_SECONDS,
   USDC_ADDRESS,
+  loadChainConfig,
   parsePrice
 } from "@arcade/core"
 import {
@@ -38,6 +39,7 @@ const SELLER = "0x3b2Bbb840A9570223aDbF2172a33BB77fE8D21AF"
 const PRICE = parsePrice("$0.25")
 
 const facilitator = privateKeyToAccount(generatePrivateKey())
+const chain = loadChainConfig("arc-testnet")
 
 /** A representative tree commitment — the exact shape Task 6 hands `rail.settle` for a root
  *  job that hired. Every rail must accept a `tree` argument on `settle`, even the two that
@@ -55,7 +57,7 @@ const testState = Effect.runSync(
 )
 
 const candidates: Array<Candidate> = [
-  { label: "EIP3009Live", rail: makeEip3009Rail({ facilitator }) },
+  { label: "EIP3009Live", rail: makeEip3009Rail({ facilitator, chain }) },
   { label: "GatewayLive", rail: makeGatewayRail() },
   { label: "RailTest", rail: makeTestRail(testState), state: testState }
 ]
@@ -272,6 +274,7 @@ describe("settle(verified, tree) — the arg is accepted by every rail", () => {
   it("EIP3009Live: a v1/plain settle ignores a tree argument and calls settle(), not settleWithTree()", async () => {
     let calledFn: string | undefined
     const rail = makeEip3009Rail({
+      chain,
       facilitator,
       publicClient: { readContract: async () => false, getTransactionReceipt: async () => ({ status: "success" }) } as never,
       walletClient: {
@@ -316,6 +319,7 @@ describe("settle(verified, tree) — the arg is accepted by every rail", () => {
     let sentTo: string | undefined
     let sentData: string | undefined
     const rail = makeEip3009Rail({
+      chain,
       facilitator,
       publicClient: { readContract: async () => false, getTransactionReceipt: async () => ({ status: "success" }) } as never,
       walletClient: {
@@ -364,6 +368,7 @@ describe("settle(verified, tree) — the arg is accepted by every rail", () => {
 
   it("a plain settle (no splitter) still accepts and ignores a tree argument", async () => {
     const rail = makeEip3009Rail({
+      chain,
       facilitator,
       publicClient: { readContract: async () => false, getTransactionReceipt: async () => ({ status: "success" }) } as never,
       walletClient: { sendTransaction: async () => "0xnosplittertx" } as never
@@ -409,6 +414,7 @@ describe("EIP3009Live verify — the on-chain checks", () => {
 
   const liveRail = (over?: Partial<Record<string, unknown>>) =>
     makeEip3009Rail({
+      chain,
       facilitator: privateKeyToAccount(generatePrivateKey()),
       publicClient: stubClient(over) as never
     })

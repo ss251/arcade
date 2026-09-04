@@ -15,6 +15,7 @@ import {
   decodeRunnerMessage,
   explorerTxUrl,
   formatPrice,
+  loadChainConfig,
   mintHireCapability,
   parsePrice,
   type HubMessage
@@ -61,6 +62,7 @@ import { splitterRefusal } from "./splitter.ts"
 const PORT = Number(process.env["PORT"] ?? 8787)
 const FEE_BPS = Number(process.env["ARCADE_FEE_BPS"] ?? 500)
 const RAIL = process.env["ARCADE_RAIL"] ?? "eip3009"
+const chainConfig = loadChainConfig()
 
 /**
  * Preflight for a public deployment.
@@ -205,6 +207,8 @@ const railLayer = () => {
       // authorizations paying the first seller's contract. It now travels per seller in
       // the signed handshake; see `Hello.feeSplitter`.
       return Eip3009Live({
+        chain: chainConfig,
+        ...(process.env["ARCADE_RPC_URL"] === undefined ? {} : { rpcUrl: process.env["ARCADE_RPC_URL"] }),
         facilitator: privateKeyToAccount((pk ?? generatePrivateKey()) as `0x${string}`)
       })
     }
@@ -256,7 +260,7 @@ export interface SplitterFacts {
 
 const splitterFacts = async (address: string): Promise<SplitterFacts | undefined> => {
   try {
-    const client = createPublicClient({ transport: http(ARC_RPC_URL) })
+    const client = createPublicClient({ transport: http(process.env["ARCADE_RPC_URL"] ?? ARC_RPC_URL) })
     const read = <T>(fn: "feeBps" | "seller" | "treasury" | "version") =>
       client.readContract({ address: address as `0x${string}`, abi: SPLITTER_ABI, functionName: fn }) as Promise<T>
 

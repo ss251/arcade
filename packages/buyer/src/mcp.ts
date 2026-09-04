@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 import { Effect, JSONSchema, Schema } from "effect"
 import { TreeFormatter } from "effect/ParseResult"
-import { createPublicClient, http } from "viem"
+import { createPublicClient, defineChain, http } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import {
-  ARC_RPC_URL,
-  USDC_ADDRESS,
+  loadChainConfig,
+  toViemChain,
   explorerTxUrl,
   fenceListing,
   fenceListings,
@@ -174,9 +174,12 @@ const BALANCE_OF_ABI = [
 
 /** `balanceOf`, not `getBalance` — on Arc the same address is also the 18-decimal gas token. */
 const balanceAtomic = async (address: string): Promise<bigint> => {
-  const client = createPublicClient({ transport: http(ARC_RPC_URL) })
+  const cfg = loadChainConfig()
+  const rpc = cfg.rpcHttp[0]
+  if (cfg.status !== "ready" || rpc === undefined) throw new Error(`${cfg.id} configuration is pending`)
+  const client = createPublicClient({ chain: defineChain(toViemChain(cfg)), transport: http(rpc) })
   return client.readContract({
-    address: USDC_ADDRESS,
+    address: cfg.usdc.address,
     abi: BALANCE_OF_ABI,
     functionName: "balanceOf",
     args: [address as `0x${string}`]

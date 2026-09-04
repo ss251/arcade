@@ -1,0 +1,17 @@
+{
+  "id": "arc-mainnet",
+  "status": "pending",
+  "chainId": 0,
+  "caip2": "eip155:0",
+  "rpcHttp": [],
+  "explorerBaseUrl": "",
+  "usdc": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "decimals": 6,
+    "nativeDecimals": 18,
+    "eip712Name": "USDC",
+    "eip712Version": "2"
+  },
+  "gateway": null,
+  "note": "Fill from https://docs.arc.io after the Sept 16, 2026 public mainnet launch; see docs/mainnet-runbook.md"
+}

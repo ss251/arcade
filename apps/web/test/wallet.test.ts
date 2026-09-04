@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { ARC_CHAIN_ID, USDC_DECIMALS, USDC_NATIVE_DECIMALS } from "@arcade/core"
+import { ARC_CHAIN_ID, loadChainConfig, USDC_DECIMALS, USDC_NATIVE_DECIMALS } from "@arcade/core"
 import {
   ARC_ADD_CHAIN_PARAMS,
   connect,
@@ -68,8 +68,9 @@ describe("adding Arc — the parameters", () => {
   })
 
   it("takes every value from chain.ts rather than restating one", () => {
-    expect(ARC_ADD_CHAIN_PARAMS.rpcUrls[0]).toContain("rpc.testnet.arc.network")
-    expect(ARC_ADD_CHAIN_PARAMS.blockExplorerUrls[0]).toContain("testnet.arcscan.app")
+    const cfg = loadChainConfig()
+    expect(ARC_ADD_CHAIN_PARAMS.rpcUrls).toEqual(cfg.rpcHttp)
+    expect(ARC_ADD_CHAIN_PARAMS.blockExplorerUrls).toEqual([cfg.explorerBaseUrl])
   })
 })
 

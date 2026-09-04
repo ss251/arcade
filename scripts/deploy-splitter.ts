@@ -1,5 +1,5 @@
 /**
- * Deploy a FeeSplitter for one seller on Arc testnet.
+ * Deploy a FeeSplitter for one seller on the selected ready Arc network.
  *
  * One splitter per seller is the security design, not a convenience — `seller` is immutable,
  * which is what makes payment misdirection unrepresentable rather than merely guarded. See
@@ -10,17 +10,28 @@
  * rather than merely reported. Choose them carefully — they can never be changed.
  *
  * usage:
- *   DEPLOYER_KEY=0x… SELLER=0x… TREASURY=0x… [FEE_BPS=500] bun run scripts/deploy-splitter.ts
+ *   DEPLOYER_KEY=0x… SELLER=0x… TREASURY=0x… [FEE_BPS=500] bun run scripts/deploy-splitter.ts [--v2] [--network arc-testnet]
+ * Network precedence: --network, ARCADE_NETWORK, then arc-testnet. Pending networks refuse
+ * before credentials, build or RPC access. ARCADE_RPC_URL can select a local pacing proxy.
  *
  * Pass --v2 to deploy FeeSplitterV2 (adds `settleWithTree`, see contracts/FeeSplitterV2.sol)
  * instead of v1. Same immutable constructor args either way.
  */
 
 import { createPublicClient, createWalletClient, http, formatEther, type Hex } from "viem"
-import { arcTestnet } from "viem/chains"
 import { privateKeyToAccount } from "viem/accounts"
 import { readFileSync } from "node:fs"
-import { ARC_CHAIN_ID, USDC_ADDRESS, explorerAddressUrl, explorerTxUrl } from "@arcade/core"
+import { loadDeploymentConfig, withCheckedDeploymentChain } from "./deploy-config.ts"
+
+const deployment = (() => {
+  try {
+    return loadDeploymentConfig(process.argv.slice(2))
+  } catch (error) {
+    console.error(String((error as Error).message))
+    process.exit(2)
+  }
+})()
+const { config, chain, rpcUrl, useV2, explorerAddressUrl, explorerTxUrl } = deployment
 
 const key = process.env["DEPLOYER_KEY"]
 const seller = process.env["SELLER"]
@@ -56,11 +67,6 @@ if (seller.toLowerCase() === treasury.toLowerCase()) {
   )
 }
 
-// Pace through the local proxy by default: Arc's public RPC rate-limits bursts, and a
-// deployment is a burst.
-const rpcUrl = process.env["ARCADE_RPC_URL"] ?? "http://localhost:8899"
-
-const useV2 = process.argv.includes("--v2")
 const contractName = useV2 ? "FeeSplitterV2" : "FeeSplitter"
 const artifactPath = `contracts/out/${contractName}.sol/${contractName}.json`
 
@@ -83,23 +89,23 @@ const artifact = JSON.parse(readFileSync(artifactPath, "utf8")) as {
 
 const account = privateKeyToAccount(key as Hex)
 const transport = http(rpcUrl, { retryCount: 5, retryDelay: 1500 })
-const pub = createPublicClient({ chain: arcTestnet, transport })
-const wallet = createWalletClient({ account, chain: arcTestnet, transport })
+const pub = createPublicClient({ chain, transport })
+const wallet = createWalletClient({ account, chain, transport })
 
-console.log(`chain     ${ARC_CHAIN_ID}  (rpc ${rpcUrl})`)
+console.log(`chain     ${config.chainId} (${config.id})  (rpc ${rpcUrl})`)
 console.log(`deployer  ${account.address}`)
 console.log(`  balance ${formatEther(await pub.getBalance({ address: account.address }))} USDC`)
 console.log(`\nimmutable constructor args — these can NEVER be changed:`)
-console.log(`  usdc      ${USDC_ADDRESS}`)
+console.log(`  usdc      ${config.usdc.address}`)
 console.log(`  seller    ${seller}`)
 console.log(`  treasury  ${treasury}`)
 console.log(`  feeBps    ${feeBps}  (${feeBps / 100}%)`)
 
-const hash = await wallet.deployContract({
+const hash = await withCheckedDeploymentChain(config, pub, () => wallet.deployContract({
   abi: artifact.abi as never,
   bytecode: artifact.bytecode.object,
-  args: [USDC_ADDRESS, seller as Hex, treasury as Hex, feeBps]
-})
+  args: [config.usdc.address, seller as Hex, treasury as Hex, feeBps]
+}))
 console.log(`\ndeploy tx ${explorerTxUrl(hash)}`)
 
 // One receipt read per tick — never waitForTransactionReceipt against Arc's public RPC.
@@ -141,4 +147,4 @@ const [sellerAmt, feeAmt] = (await pub.readContract({
 })) as [bigint, bigint]
 console.log(`\n  quote($0.01) -> seller ${Number(sellerAmt) / 1e6} + fee ${Number(feeAmt) / 1e6}`)
 
-console.log(`\nSet ARCADE_FEE_SPLITTER=${address} on the hub to route payments through it.`)
+console.log(`\nSet ARCADE_NETWORK=${config.id} and ARCADE_FEE_SPLITTER=${address} on the RUNNER to route payments through it.`)

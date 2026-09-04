@@ -1,4 +1,5 @@
 export * from "./chain.ts"
+export * from "./chain-config.ts"
 export * from "./engine.ts"
 export * from "./untrusted.ts"
 export * from "./errors.ts"

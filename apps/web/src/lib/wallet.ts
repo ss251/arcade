@@ -1,9 +1,7 @@
-import {
-  ARC_CHAIN_ID,
-  ARC_EXPLORER,
-  ARC_RPC_URL,
-  USDC_NATIVE_DECIMALS
-} from "@arcade/core"
+import { loadChainConfig } from "@arcade/core"
+
+const cfg = loadChainConfig()
+const chainName = cfg.id === "arc-testnet" ? "Arc Testnet" : "Arc Mainnet"
 
 /**
  * The visitor's wallet. No new dependency — viem is already in the tree, and its custom
@@ -32,10 +30,10 @@ export interface Eip1193Provider {
 }
 
 export const ARC_ADD_CHAIN_PARAMS = {
-  chainId: `0x${ARC_CHAIN_ID.toString(16)}`,
-  chainName: "Arc Testnet",
-  rpcUrls: [ARC_RPC_URL],
-  blockExplorerUrls: [ARC_EXPLORER],
+  chainId: `0x${cfg.chainId.toString(16)}`,
+  chainName,
+  rpcUrls: cfg.rpcHttp,
+  blockExplorerUrls: [cfg.explorerBaseUrl],
   nativeCurrency: {
     name: "USDC",
     symbol: "USDC",
@@ -51,7 +49,7 @@ export const ARC_ADD_CHAIN_PARAMS = {
      * app otherwise speaks — and it would show every visitor a wallet balance wrong by a
      * factor of 10^12, on the screen where they are deciding whether to trust us with money.
      */
-    decimals: USDC_NATIVE_DECIMALS
+    decimals: cfg.usdc.nativeDecimals
   }
 } as const
 
@@ -64,7 +62,7 @@ export const currentChainId = async (p: Eip1193Provider): Promise<number> =>
   Number(await p.request({ method: "eth_chainId" }))
 
 export const onArc = async (p: Eip1193Provider): Promise<boolean> =>
-  (await currentChainId(p)) === ARC_CHAIN_ID
+  cfg.status === "ready" && (await currentChainId(p)) === cfg.chainId
 
 /**
  * Put the wallet on Arc, adding the network if it does not have it.
@@ -75,6 +73,7 @@ export const onArc = async (p: Eip1193Provider): Promise<boolean> =>
  * identical and guessing wrong would strand someone at the network prompt.
  */
 export const ensureArc = async (p: Eip1193Provider): Promise<void> => {
+  if (cfg.status !== "ready") throw new Error(`${chainName} configuration is pending`)
   if (await onArc(p)) return
   try {
     await p.request({
@@ -119,11 +118,12 @@ export const walletBlocker = (
       "this page works without one."
     )
   }
+  if (cfg.status !== "ready") return `${chainName} configuration is pending; purchases are unavailable.`
   if (chainId === undefined) return undefined
-  if (chainId === ARC_CHAIN_ID) return undefined
+  if (chainId === cfg.chainId) return undefined
   return (
-    `Your wallet is on chain ${chainId}. Payments here are signed for Arc testnet ` +
-    `(${ARC_CHAIN_ID}) and the signature is bound to that chain, so it cannot be produced ` +
+    `Your wallet is on chain ${chainId}. Payments here are signed for ${chainName} ` +
+    `(${cfg.chainId}) and the signature is bound to that chain, so it cannot be produced ` +
     `on another. Connecting will offer to add and switch to it in one step.`
   )
 }

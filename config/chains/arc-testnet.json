@@ -1,0 +1,26 @@
+{
+  "id": "arc-testnet",
+  "status": "ready",
+  "chainId": 5042002,
+  "caip2": "eip155:5042002",
+  "rpcHttp": ["https://rpc.testnet.arc.io", "https://rpc.testnet.arc.network"],
+  "explorerBaseUrl": "https://testnet.arcscan.app",
+  "usdc": {
+    "address": "0x3600000000000000000000000000000000000000",
+    "decimals": 6,
+    "nativeDecimals": 18,
+    "eip712Name": "USDC",
+    "eip712Version": "2"
+  },
+  "erc8004": {
+    "identity": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "reputation": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+    "validation": "0x8004Cb1BF31DAf7788923b405b754f57acEB4272"
+  },
+  "gateway": {
+    "wallet": "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
+    "domain": 26,
+    "facilitatorUrl": "https://gateway-api-testnet.circle.com",
+    "minValiditySeconds": 604900
+  }
+}

@@ -2,6 +2,7 @@ import { Effect, Schedule, Layer } from "effect"
 import {
   createPublicClient,
   createWalletClient,
+  defineChain,
   encodeFunctionData,
   http,
   keccak256,
@@ -9,10 +10,7 @@ import {
   type Account,
   type Hex
 } from "viem"
-import { arcTestnet } from "viem/chains"
 import {
-  ARC_CAIP2,
-  ARC_RPC_URL,
   AuthorizationExpired,
   GATEWAY_MIN_VALIDITY_SECONDS,
   InsufficientFunds,
@@ -22,10 +20,9 @@ import {
   RpcFailure,
   RpcRateLimited,
   SettlementFailed,
-  USDC_ADDRESS,
-  USDC_EIP712_NAME,
-  USDC_EIP712_VERSION,
-  ARC_CHAIN_ID
+  loadChainConfig,
+  toViemChain,
+  type ChainConfig
 } from "@arcade/core"
 import { PaymentRequirements, type PaymentPayload, type SettledPayment, type VerifiedPayment } from "./types.ts"
 import type { ChallengeInput, Rail, SettleTree } from "./rail.ts"
@@ -77,12 +74,18 @@ export const TRANSFER_WITH_AUTHORIZATION_ABI = [
   }
 ] as const
 
-export const EIP712_DOMAIN = {
-  name: USDC_EIP712_NAME,
-  version: USDC_EIP712_VERSION,
-  chainId: ARC_CHAIN_ID,
-  verifyingContract: USDC_ADDRESS as Hex
-} as const
+const eip712DomainFor = (chain: ChainConfig) => ({
+  name: chain.usdc.eip712Name,
+  version: chain.usdc.eip712Version,
+  chainId: chain.chainId,
+  verifyingContract: chain.usdc.address
+})
+
+/** Compatibility export for callers using the process-selected network. */
+export const EIP712_DOMAIN = eip712DomainFor(loadChainConfig())
+
+const authorizationValidityFor = (chain: ChainConfig): number =>
+  chain.gateway?.minValiditySeconds ?? GATEWAY_MIN_VALIDITY_SECONDS
 
 export const TRANSFER_TYPES = {
   TransferWithAuthorization: [
@@ -111,6 +114,8 @@ const rpcRetry = Schedule.exponential("750 millis").pipe(
 )
 
 export interface Eip3009Config {
+  /** The network, token and EIP-712 domain used by this rail instance. */
+  readonly chain: ChainConfig
   /** Account that broadcasts settlements and pays gas (the facilitator role). */
   readonly facilitator: Account
   readonly rpcUrl?: string
@@ -195,14 +200,17 @@ export const FEE_SPLITTER_V2_ABI = [
 ] as const
 
 export const makeEip3009Rail = (config: Eip3009Config): Rail => {
-  const transport = http(config.rpcUrl ?? ARC_RPC_URL, { retryCount: 3, retryDelay: 1000 })
+  const chain = defineChain(toViemChain(config.chain))
+  const domain = eip712DomainFor(config.chain)
+  const token = config.chain.usdc.address
+  const transport = http(config.rpcUrl ?? config.chain.rpcHttp[0], { retryCount: 3, retryDelay: 1000 })
   const pub = (config.publicClient ??
-    createPublicClient({ chain: arcTestnet, transport })) as ReturnType<typeof createPublicClient>
+    createPublicClient({ chain, transport })) as ReturnType<typeof createPublicClient>
   // Typed off a helper (rather than a bare `ReturnType<typeof createWalletClient>`) so the
   // account bound at construction narrows the type the same way the un-overridden call
   // always did — otherwise `sendTransaction` below would demand an `account` argument the
   // real client already carries.
-  const realWallet = () => createWalletClient({ account: config.facilitator, chain: arcTestnet, transport })
+  const realWallet = () => createWalletClient({ account: config.facilitator, chain, transport })
   const wallet: ReturnType<typeof realWallet> =
     config.walletClient === undefined ? realWallet() : (config.walletClient as unknown as ReturnType<typeof realWallet>)
 
@@ -229,9 +237,9 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
     return Effect.succeed(
       PaymentRequirements.make({
         scheme: "exact",
-        network: ARC_CAIP2,
+        network: config.chain.caip2,
         amount: input.priceAtomic.toString(),
-        asset: USDC_ADDRESS,
+        asset: token,
         // When a splitter is deployed, the buyer pays IT, not the seller — that is what makes
         // the fee collectable on-chain. The buyer signs one ordinary authorization either way,
         // so this is invisible to any standards-compliant x402 client.
@@ -240,7 +248,7 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
         ...(input.description === undefined ? {} : { description: input.description }),
         mimeType: "application/json",
         // Match Gateway's window so a buyer can pay either rail with one signature shape.
-        maxTimeoutSeconds: GATEWAY_MIN_VALIDITY_SECONDS,
+        maxTimeoutSeconds: authorizationValidityFor(config.chain),
         /**
          * The token's EIP-712 domain. REQUIRED by the x402 `exact` EVM scheme: without it a
          * client cannot construct the TransferWithAuthorization signature and has to guess.
@@ -254,8 +262,8 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
         // token. It is part of the challenge the buyer signs against, so the routing
         // decision is visible to them and cannot be changed afterwards by configuration.
         extra: {
-          name: USDC_EIP712_NAME,
-          version: USDC_EIP712_VERSION,
+          name: domain.name,
+          version: domain.version,
           ...(splitterFor === undefined ? {} : { feeSplitter: splitterFor }),
           // Carries the routing decision into what the buyer signs, so `settle` can decide
           // between `settle` and `settleWithTree` from a fact of the challenge rather than
@@ -298,7 +306,7 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
         try: () =>
           verifyTypedData({
             address: p.from as Hex,
-            domain: EIP712_DOMAIN,
+            domain,
             types: TRANSFER_TYPES,
             primaryType: "TransferWithAuthorization",
             message: {
@@ -324,7 +332,7 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
       // claimed this check existed; the ABI entry sat unused directly above.
       const used = yield* call("authorizationState", () =>
         pub.readContract({
-          address: USDC_ADDRESS as Hex,
+          address: token,
           abi: TRANSFER_WITH_AUTHORIZATION_ABI,
           functionName: "authorizationState",
           args: [p.from as Hex, p.nonce as Hex]
@@ -337,7 +345,7 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
       // Balance check — a valid signature over funds that aren't there still can't settle.
       const balance = yield* call("balanceOf", () =>
         pub.readContract({
-          address: USDC_ADDRESS as Hex,
+          address: token,
           abi: TRANSFER_WITH_AUTHORIZATION_ABI,
           functionName: "balanceOf",
           args: [p.from as Hex]
@@ -440,7 +448,7 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
 
       const hash = yield* call("sendTransaction", () =>
         wallet.sendTransaction({
-          to: (useSplitter ? target : USDC_ADDRESS) as Hex,
+          to: (useSplitter ? target : token) as Hex,
           data
         })
       )
@@ -474,6 +482,8 @@ export const Eip3009Live = (config: Eip3009Config): Layer.Layer<RailTag> =>
 
 export interface SignInput {
   readonly account: Account
+  /** Defaults to the process-selected chain, matching the compatibility domain export. */
+  readonly chain?: ChainConfig
   readonly to: string
   readonly valueAtomic: bigint
   readonly validForSeconds?: number
@@ -485,8 +495,9 @@ export interface SignInput {
  */
 export const signAuthorization = (input: SignInput) =>
   Effect.gen(function* () {
+    const chain = input.chain ?? loadChainConfig()
     const now = Math.floor(Date.now() / 1000)
-    const validBefore = BigInt(now + (input.validForSeconds ?? GATEWAY_MIN_VALIDITY_SECONDS))
+    const validBefore = BigInt(now + (input.validForSeconds ?? authorizationValidityFor(chain)))
     const nonce = keccak256(toHex(`arcade-${now}-${Math.trunc(performance.now() * 1e6)}`))
 
     if (input.account.signTypedData === undefined) {
@@ -496,7 +507,7 @@ export const signAuthorization = (input: SignInput) =>
     const signature = yield* Effect.tryPromise({
       try: () =>
         input.account.signTypedData!({
-          domain: EIP712_DOMAIN,
+          domain: eip712DomainFor(chain),
           types: TRANSFER_TYPES,
           primaryType: "TransferWithAuthorization",
           message: {

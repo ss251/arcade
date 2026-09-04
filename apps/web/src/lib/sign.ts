@@ -1,5 +1,5 @@
 import { EIP712_DOMAIN, TRANSFER_TYPES } from "@arcade/payments"
-import { GATEWAY_MIN_VALIDITY_SECONDS } from "@arcade/core"
+import { GATEWAY_MIN_VALIDITY_SECONDS, loadChainConfig } from "@arcade/core"
 import type { Eip1193Provider } from "./wallet.ts"
 
 /**
@@ -59,6 +59,7 @@ export const signPayment = async (
   provider: Eip1193Provider,
   args: { readonly from: string; readonly payTo: string; readonly amountAtomic: string }
 ): Promise<SignedAuthorization> => {
+  if (loadChainConfig().status !== "ready") throw new Error("Network configuration is pending; nothing was signed")
   const now = Math.floor(Date.now() / 1000)
   /*
    * Seven days. Gateway REJECTS anything shorter (`docs` and `GATEWAY_MIN_VALIDITY_SECONDS`

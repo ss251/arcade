@@ -3,6 +3,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite"
 import viteReact from "@vitejs/plugin-react"
 
 export default defineConfig({
+  define: { __ARCADE_NETWORK__: JSON.stringify(process.env["ARCADE_NETWORK"] ?? "arc-testnet") },
   server: { port: 3000 },
   resolve: { tsconfigPaths: true },
   plugins: [
