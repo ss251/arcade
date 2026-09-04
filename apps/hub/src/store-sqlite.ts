@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite"
 import { Effect, Layer, Ref, Schema } from "effect"
 import { Job, Rating, Receipt } from "@arcade/core"
-import { StoreTag, makeStore, type Store, type StoreState, type TreeRow } from "./store.ts"
+import { StoreTag, makeStore, payTestKey, PAY_TEST_HISTORY, type PayTestRow, type Store, type StoreState, type TreeRow } from "./store.ts"
 
 /**
  * Durable hub state.
@@ -16,6 +16,10 @@ import { StoreTag, makeStore, type Store, type StoreState, type TreeRow } from "
  * property `/openapi.json`, `/.well-known/x402` and `/skill.md` are built to guarantee.
  * Runners dial out with backoff and re-announce within seconds of the hub returning, so
  * the live set rebuilds itself from the only source that can be right about it.
+ *
+ * Canary history does persist. A restart must not erase three failed pay-tests and
+ * silently relist a dead skill when its runner reconnects. History belongs to the skill
+ * and seller, independently of any live listing or runner record.
  *
  * **Write-through over the in-memory store, not a SQL reimplementation.** Reads keep the
  * existing implementation — including the percentile and stats logic that is already
@@ -63,8 +67,18 @@ CREATE TABLE IF NOT EXISTS tree_reservations (
   amount_atomic TEXT NOT NULL,
   state TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pay_tests (
+  skill_id TEXT NOT NULL,
+  seller TEXT NOT NULL,
+  at_ms INTEGER NOT NULL,
+  job_id TEXT NOT NULL,
+  settle_tx TEXT,
+  ok INTEGER NOT NULL,
+  reason TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS tree_root ON tree_reservations(root_job_id);
+CREATE INDEX IF NOT EXISTS pay_tests_key ON pay_tests(skill_id, seller COLLATE NOCASE, at_ms);
 `
 
 /**
@@ -148,6 +162,21 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     trees.set(row.root_job_id, rows)
   }
 
+  const payTests = new Map<string, Array<PayTestRow>>()
+  for (const row of db.query<{
+    skill_id: string; seller: string; at_ms: number; job_id: string;
+    settle_tx: string | null; ok: number; reason: string
+  }, []>(`SELECT skill_id, seller, at_ms, job_id, settle_tx, ok, reason
+          FROM pay_tests ORDER BY at_ms ASC, rowid ASC`).all()) {
+    const key = payTestKey(row.skill_id, row.seller)
+    const entry: PayTestRow = {
+      skillId: row.skill_id, seller: row.seller.toLowerCase(), atMs: row.at_ms,
+      jobId: row.job_id, ok: row.ok === 1, reason: row.reason,
+      ...(row.settle_tx === null ? {} : { settleTx: row.settle_tx })
+    }
+    payTests.set(key, [...(payTests.get(key) ?? []), entry].slice(-PAY_TEST_HISTORY))
+  }
+
   // Listings and runners start EMPTY by design — see the note above.
   const initial: StoreState = {
     listings: new Map(),
@@ -156,7 +185,7 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     receipts,
     ratings,
     trees,
-    payTests: new Map()
+    payTests
   }
 
   const ref = Effect.runSync(Ref.make(initial))
@@ -179,6 +208,22 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
      ON CONFLICT(child_job_id) DO UPDATE SET state = excluded.state`
   )
   const setTreeStateStmt = db.query(`UPDATE tree_reservations SET state = ? WHERE child_job_id = ?`)
+  const putPayTestStmt = db.query(
+    `INSERT INTO pay_tests (skill_id, seller, at_ms, job_id, settle_tx, ok, reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  )
+  // Keep 100 operator rows on disk, and only the newest 20 in memory. NOCASE also
+  // groups pre-existing mixed-case rows; rowid preserves insertion order for ties.
+  const prunePayTestStmt = db.query(
+    `DELETE FROM pay_tests WHERE skill_id = ?1 AND seller = ?2 COLLATE NOCASE AND rowid NOT IN
+       (SELECT rowid FROM pay_tests WHERE skill_id = ?1 AND seller = ?2 COLLATE NOCASE
+        ORDER BY at_ms DESC, rowid DESC LIMIT 100)`
+  )
+  const persistPayTest = db.transaction((row: PayTestRow) => {
+    putPayTestStmt.run(row.skillId, row.seller, row.atMs, row.jobId, row.settleTx ?? null,
+      row.ok ? 1 : 0, row.reason)
+    prunePayTestStmt.run(row.skillId, row.seller)
+  })
 
   const store: Store = {
     ...inner,
@@ -203,6 +248,19 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
       Effect.tap(inner.putRating(r), () =>
         Effect.sync(() => putRatingStmt.run(r.receiptJobId, toJson(r)))
       ),
+    recordPayTest: (row) =>
+      Effect.uninterruptible(Effect.sync(() => {
+        const owned: PayTestRow = {
+          skillId: row.skillId, seller: row.seller.toLowerCase(), atMs: row.atMs,
+          jobId: row.jobId, ok: row.ok, reason: row.reason,
+          ...(row.settleTx === undefined ? {} : { settleTx: row.settleTx })
+        }
+        // Commit both SQL changes before publishing the verdict. One synchronous,
+        // uninterruptible boundary prevents a yield between commit and the pure Ref
+        // update. A failed insert, prune or commit leaves memory unchanged.
+        persistPayTest(owned)
+        Effect.runSync(inner.recordPayTest(owned))
+      })),
     reserveTree: (root, child, amount, ceiling) =>
       Effect.tap(inner.reserveTree(root, child, amount, ceiling), (ok) =>
         Effect.sync(() => { if (ok) upsertTree.run(child, root, amount.toString(), "reserved") })
