@@ -7,6 +7,7 @@ import {
   parsePrice,
   shouldSettle,
   splitFee,
+  type Lineage,
   type PublicListing
 } from "@arcade/core"
 import { RailTag, type VerifiedPayment } from "@arcade/payments"
@@ -34,6 +35,8 @@ export interface RunJobArgs {
   readonly verified: VerifiedPayment
   readonly feeBps?: number
   readonly accrualId?: string
+  readonly lineage: Lineage
+  readonly hireCapability?: string
 }
 
 export const runJob = (args: RunJobArgs) =>
@@ -65,7 +68,11 @@ export const runJob = (args: RunJobArgs) =>
             input: args.input,
             status: outcome.status,
             createdAtMs: startedAtMs,
-            outcome
+            outcome,
+            rootJobId: args.lineage.rootJobId,
+            ...(args.lineage.parentJobId === undefined ? {} : { parentJobId: args.lineage.parentJobId }),
+            hop: args.lineage.hop,
+            ancestors: args.lineage.ancestors
           })
         )
 
@@ -87,7 +94,11 @@ export const runJob = (args: RunJobArgs) =>
           latencyMs: Date.now() - startedAtMs,
           settled,
           reason,
-          createdAtMs: Date.now()
+          createdAtMs: Date.now(),
+          rootJobId: args.lineage.rootJobId,
+          ...(args.lineage.parentJobId === undefined ? {} : { parentJobId: args.lineage.parentJobId }),
+          hop: args.lineage.hop,
+          ancestors: args.lineage.ancestors
         })
         yield* store.putReceipt(receipt)
         return { outcome, receipt }
@@ -100,7 +111,9 @@ export const runJob = (args: RunJobArgs) =>
         skillId: args.listing.id,
         skillVersion: args.listing.version,
         input: args.input,
-        timeoutSec: args.listing.bounds.timeoutSec
+        timeoutSec: args.listing.bounds.timeoutSec,
+        ...(args.lineage.parentJobId === undefined ? {} : { parentJobId: args.lineage.parentJobId }),
+        ...(args.hireCapability === undefined ? {} : { hireCapability: args.hireCapability })
       })
       .pipe(
         // Belt and braces: the runner enforces its own timeout, and so do we. A runner that

@@ -6,6 +6,7 @@ import {
   Bounds,
   JobOutcome,
   PublicListing,
+  ROOT_LINEAGE,
   parsePrice
 } from "@arcade/core"
 import {
@@ -85,7 +86,8 @@ const setup = async (outcome: JobOutcome) => {
         listing,
         seller: SELLER,
         input: {},
-        verified
+        verified,
+        lineage: ROOT_LINEAGE("job_testtesttesttest01")
       })
       const store = yield* StoreTag
       const receipts = yield* store.allReceipts

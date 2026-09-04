@@ -41,6 +41,8 @@ export interface Broker {
     readonly skillVersion: string
     readonly input: unknown
     readonly timeoutSec: number
+    readonly parentJobId?: string
+    readonly hireCapability?: string
   }) => Effect.Effect<JobOutcome, NoRunnerAvailable | RunnerDisconnected>
   readonly complete: (jobId: string, outcome: JobOutcome) => Effect.Effect<void>
   /** Routing: which connected runner can serve this SKILL. */
@@ -143,7 +145,9 @@ export const makeBroker = (ref: Ref.Ref<BrokerState>): Broker => {
         skillId: args.skillId,
         skillVersion: args.skillVersion,
         input: args.input,
-        timeoutSec: args.timeoutSec
+        timeoutSec: args.timeoutSec,
+        ...(args.parentJobId === undefined ? {} : { parentJobId: args.parentJobId }),
+        ...(args.hireCapability === undefined ? {} : { hireCapability: args.hireCapability })
       } as HubMessage)
 
       return yield* Deferred.await(waiter)

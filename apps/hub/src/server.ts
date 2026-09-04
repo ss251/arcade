@@ -3,16 +3,20 @@ import {
   ARC_CAIP2,
   ARC_RPC_URL,
   USDC_ADDRESS,
+  DEFAULT_MAX_HOP,
+  HIRE_CAPABILITY_HEADER,
   Job,
   JobOutcome,
   PublicListing,
   Rating,
+  ROOT_LINEAGE,
   ratingDigest,
   helloDigest,
   HELLO_MAX_AGE_MS,
   decodeRunnerMessage,
   explorerTxUrl,
   formatPrice,
+  mintHireCapability,
   parsePrice,
   type HubMessage
 } from "@arcade/core"
@@ -34,6 +38,7 @@ import { StoreTag } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
 import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
+import { resolveLineage } from "./lineage.ts"
 import {
   renderIndex,
   renderListingPage,
@@ -791,6 +796,34 @@ const main = Effect.gen(function* () {
         const header =
           req.headers.get(HEADER_PAYMENT_SIGNATURE) ?? req.headers.get(HEADER_PAYMENT_LEGACY)
 
+        // Lineage is verified before the payment challenge: a probe carrying a forged or
+        // expired capability is refused here, before it costs the caller a 402 round trip
+        // it could never complete honestly.
+        const maxHop = Number(process.env["ARCADE_MAX_HOP"] ?? DEFAULT_MAX_HOP)
+        const lineageE = await run(
+          resolveLineage(store, hubSecret, req.headers.get(HIRE_CAPABILITY_HEADER), listing, Date.now(), maxHop).pipe(
+            Effect.either
+          )
+        )
+        if (lineageE._tag === "Left") {
+          const e = lineageE.left
+          const code =
+            e._tag === "LineageCycle" ? "lineage_cycle" : e._tag === "LineageDepth" ? "lineage_depth" : "lineage_invalid"
+          return json(
+            {
+              error: code,
+              detail:
+                e._tag === "LineageInvalid"
+                  ? e.reason
+                  : e._tag === "LineageCycle"
+                    ? `${e.skillId} is already in this call tree`
+                    : `hop ${e.hop} exceeds max ${e.max}`
+            },
+            402
+          )
+        }
+        const lineage0 = lineageE.right
+
         if (header === null) {
           const requirements = await run(rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description, ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }) }))
           return json(
@@ -818,6 +851,26 @@ const main = Effect.gen(function* () {
 
         const jobId = newJobId()
 
+        // The probe (no payment header) returned above and never reaches here — the tree
+        // reservation happens only on the paid retry, after `rail.verify`, so a refusal
+        // never broadcasts and a probe never holds budget.
+        const lineage = lineage0.hop === 0 ? ROOT_LINEAGE(jobId) : lineage0
+        if (lineage.hop > 0) {
+          const root = await run(store.getJob(lineage.rootJobId))
+          const rootListing =
+            root === undefined ? undefined : await run(store.getListing(root.skillId).pipe(Effect.either))
+          const ceiling =
+            rootListing !== undefined &&
+            rootListing._tag === "Right" &&
+            rootListing.right.listing.bounds.maxSubSpendUsd !== undefined
+              ? parsePrice(String(rootListing.right.listing.bounds.maxSubSpendUsd))
+              : 0n
+          const ok = await run(store.reserveTree(lineage.rootJobId, jobId, priceAtomic, ceiling))
+          if (!ok) {
+            return json({ error: "tree_budget_exceeded", detail: `this call tree's ceiling is ${formatPrice(ceiling)}` }, 402)
+          }
+        }
+
         // Record the job BEFORE answering, so the 202 is backed by state that survives this
         // process. `pipeline.ts` writes the row once, already terminal, which meant an
         // interrupted job left no row at all — and the poll endpoint answers "pending" when
@@ -834,15 +887,37 @@ const main = Effect.gen(function* () {
               priceAtomic,
               input,
               status: "queued",
-              createdAtMs: Date.now()
+              createdAtMs: Date.now(),
+              rootJobId: lineage.rootJobId,
+              ...(lineage.parentJobId === undefined ? {} : { parentJobId: lineage.parentJobId }),
+              hop: lineage.hop,
+              ancestors: lineage.ancestors
             })
           )
         )
 
+        // Minted only when this listing may hire sub-skills — a proxy check the runner still
+        // gates for real behind the private `hire-skills` capability. Expiry gives a child
+        // job's own timeout budget plus slack for dispatch latency.
+        const mayHire = (listing.bounds.maxSubSpendUsd ?? 0) > 0
+        const hireCapability = mayHire
+          ? mintHireCapability(hubSecret, jobId, Date.now() + (listing.bounds.timeoutSec + 60) * 1000)
+          : undefined
+
         // 202 immediately: real skills take seconds to minutes, so the request cannot block.
         const accrualId = `acc_${new Date().toISOString().slice(0, 10)}`
         void run(
-          runJob({ jobId, listing, seller, input, verified, feeBps: FEE_BPS, accrualId }).pipe(
+          runJob({
+            jobId,
+            listing,
+            seller,
+            input,
+            verified,
+            feeBps: FEE_BPS,
+            accrualId,
+            lineage,
+            ...(hireCapability === undefined ? {} : { hireCapability })
+          }).pipe(
             Effect.tap(({ outcome, receipt }) =>
               Effect.sync(() =>
                 console.log(
