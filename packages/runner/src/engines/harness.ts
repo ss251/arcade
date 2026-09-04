@@ -32,12 +32,14 @@ import {
 import { claudeApiEngine } from "./claude-api.js"
 import { claudeAgentEngine } from "./claude-agent.js"
 import { loadSkillAgent, skillEngine } from "./skill.js"
+import { mcpEngine } from "./mcp.js"
 import type { Engine, HarnessJob, JobEnvelope, SkillAgent } from "./types.js"
 
 export const ENGINES: Partial<Record<EngineAdapter, Engine>> = {
   "claude-api": claudeApiEngine,
   "claude-agent": claudeAgentEngine,
-  skill: skillEngine
+  skill: skillEngine,
+  mcp: mcpEngine
 }
 
 export const engineFor = (adapter: EngineAdapter): Engine => {
