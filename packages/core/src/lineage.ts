@@ -1,6 +1,6 @@
 import { hmac } from "@noble/hashes/hmac"
 import { sha256 } from "@noble/hashes/sha2"
-import { bytesToUtf8, utf8ToBytes } from "@noble/hashes/utils"
+import { bytesToHex, bytesToUtf8, utf8ToBytes } from "@noble/hashes/utils"
 import { Data, Schema } from "effect"
 
 /**
@@ -66,9 +66,14 @@ interface CapabilityPayload {
 const canonical = (p: CapabilityPayload): string =>
   JSON.stringify({ v: p.v, aud: p.aud, parentJobId: p.parentJobId, expiresAtMs: p.expiresAtMs })
 
-/** Raw HMAC-SHA256 digest bytes over the canonical payload, domain-separated. */
+/**
+ * HMAC-SHA256 over the canonical payload, domain-separated, then hex-encoded — per the
+ * pinned wire spec (`base64url(payloadJSON) + "." + base64url(hmacHex)`) the second token
+ * segment is the base64url encoding of the digest's HEX STRING, not of the raw digest
+ * bytes. Returned here as the UTF-8 bytes of that hex string, ready for `base64UrlEncode`.
+ */
 const mac = (secret: string, payloadJson: string): Uint8Array =>
-  hmac(sha256, utf8ToBytes(secret), utf8ToBytes(`arcade-hire-v1:${payloadJson}`))
+  utf8ToBytes(bytesToHex(hmac(sha256, utf8ToBytes(secret), utf8ToBytes(`arcade-hire-v1:${payloadJson}`))))
 
 /**
  * URL-safe base64, unpadded — RFC 4648 §5, written by hand because `Buffer` (Node-only) and

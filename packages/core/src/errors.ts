@@ -1,4 +1,5 @@
 import { Data } from "effect"
+import { LineageCycle, LineageDepth, LineageInvalid, TreeBudgetExceeded } from "./lineage.ts"
 
 /**
  * The shared failure vocabulary. Every one of these is a value in an Effect error channel,
@@ -159,3 +160,7 @@ export type ArcadeError =
   | ListingNotFound
   | ManifestInvalid
   | SecrecyViolation
+  | LineageInvalid
+  | LineageCycle
+  | LineageDepth
+  | TreeBudgetExceeded

@@ -31,6 +31,12 @@ describe("hire capability", () => {
   it("exports the header name", () => {
     expect(HIRE_CAPABILITY_HEADER).toBe("x-arcade-hire-capability")
   })
+  it("encodes the MAC as a 64-char lowercase hex string, base64url-encoded", () => {
+    const tok = mintHireCapability(SECRET, "job_parent0000000000", Date.now() + 60_000)
+    const [, m] = tok.split(".")
+    const hex = Buffer.from(m!, "base64url").toString("utf8")
+    expect(hex).toMatch(/^[0-9a-f]{64}$/)
+  })
 })
 
 describe("lineage derivation", () => {
