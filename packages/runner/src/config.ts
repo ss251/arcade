@@ -1,5 +1,7 @@
 import { Effect, Schema } from "effect"
 import { TreeFormatter } from "effect/ParseResult"
+import { mkdir, open, rename, rmdir, unlink } from "node:fs/promises"
+import { dirname } from "node:path"
 
 /**
  * Runner config lives at ~/.arcade/config.json — outside the repo, so a seller's identity
@@ -25,14 +27,40 @@ import { TreeFormatter } from "effect/ParseResult"
  * because silently changing where a runner announces itself is the failure this prevents.
  */
 
-/** What is actually on disk. */
+const Address = Schema.String.pipe(Schema.pattern(/^0x[0-9a-fA-F]{40}$/))
+const TxHash = Schema.String.pipe(Schema.pattern(/^0x[0-9a-fA-F]{64}$/))
+const SkillKey = Schema.String.pipe(Schema.filter(s => /^[a-z0-9][a-z0-9-]{0,127}$/.test(s) && s !== "constructor"))
+const AgentId = Schema.String.pipe(Schema.filter(s => /^(0|[1-9][0-9]{0,77})$/.test(s) && BigInt(s) < 2n ** 256n))
+const Timestamp = Schema.Int.pipe(Schema.nonNegative())
+const AgentIdentitySchema = Schema.Struct({
+  agentId: AgentId,
+  agentURI: Schema.String.pipe(Schema.minLength(1)),
+  registrationTx: TxHash,
+  registeredAtMs: Timestamp,
+  operator: Schema.optional(Address),
+  approvalTx: Schema.optional(TxHash),
+  /** Optional for old records; new CLI registrations save their chain provenance. */
+  registry: Schema.optional(Address),
+  chainId: Schema.optional(Schema.Int.pipe(Schema.positive()))
+})
+export type AgentIdentity = Schema.Schema.Type<typeof AgentIdentitySchema>
+const PendingAgentSchema = Schema.Struct({
+  /** Missing hash means an attempt began but its broadcast outcome must be reconciled. */
+  txHash: Schema.optional(TxHash), agentURI: Schema.String.pipe(Schema.minLength(1)), registry: Address,
+  chainId: Schema.Int.pipe(Schema.positive()), submittedAtMs: Timestamp
+})
+export type PendingAgentRegistration = Schema.Schema.Type<typeof PendingAgentSchema>
+
+/** What is actually on disk. No key, provider config or derived socket field is written. */
 const StoredConfig = Schema.Struct({
   runnerId: Schema.String.pipe(Schema.minLength(1)),
   sellerAddress: Schema.String.pipe(Schema.pattern(/^0x[0-9a-fA-F]{40}$/)),
   hubUrl: Schema.String.pipe(Schema.pattern(/^https?:\/\//)),
   maxConcurrency: Schema.Int.pipe(Schema.between(1, 64)),
   /** Accepted from older configs so an upgrade does not error. Ignored. */
-  hubWsUrl: Schema.optional(Schema.String)
+  hubWsUrl: Schema.optional(Schema.String),
+  agents: Schema.optional(Schema.Record({ key: SkillKey, value: AgentIdentitySchema })),
+  pendingAgents: Schema.optional(Schema.Record({ key: SkillKey, value: PendingAgentSchema }))
 })
 
 export type StoredConfig = Schema.Schema.Type<typeof StoredConfig>
@@ -44,19 +72,24 @@ export interface RunnerConfig {
   readonly hubUrl: string
   readonly hubWsUrl: string
   readonly maxConcurrency: number
+  readonly agents: Readonly<Record<string, AgentIdentity>>
+  readonly pendingAgents?: Readonly<Record<string, PendingAgentRegistration>>
 }
 
 /** `https` → `wss`, `http` → `ws`. The single definition of where the runner announces. */
 export const wsUrlFor = (hubUrl: string): string => `${hubUrl.replace(/^http/, "ws")}/ws`
 
-export const configPath = (): string => `${process.env["HOME"] ?? "."}/.arcade/config.json`
+/** Explicit override supports isolated CLI jobs/tests without changing the user's home. */
+export const configPath = (): string => process.env["ARCADE_CONFIG_PATH"] ?? `${process.env["HOME"] ?? "."}/.arcade/config.json`
 
 const hydrate = (stored: StoredConfig): RunnerConfig => ({
   runnerId: stored.runnerId,
   sellerAddress: stored.sellerAddress,
   hubUrl: stored.hubUrl,
   hubWsUrl: wsUrlFor(stored.hubUrl),
-  maxConcurrency: stored.maxConcurrency
+  maxConcurrency: stored.maxConcurrency,
+  agents: stored.agents ?? {},
+  pendingAgents: stored.pendingAgents ?? {}
 })
 
 /**
@@ -103,22 +136,90 @@ export const readConfig = Effect.tryPromise({
   catch: (e) => new Error(String((e as Error)?.message ?? e))
 })
 
-export const writeConfig = (cfg: RunnerConfig) =>
-  Effect.tryPromise({
-    try: async () => {
-      // Only the stored shape is persisted — writing `hubWsUrl` back would recreate the
-      // field this design removed.
-      const stored: StoredConfig = {
-        runnerId: cfg.runnerId,
-        sellerAddress: cfg.sellerAddress,
-        hubUrl: cfg.hubUrl,
-        maxConcurrency: cfg.maxConcurrency
+/** A per-file exclusive directory also serializes separate CLI processes. Never steal a
+ * stale lock: if its owner died, refuse clearly so an operator can inspect it first. */
+const locked = <A>(action: (path: string) => Promise<A>): Effect.Effect<A, Error> => Effect.tryPromise({
+  try: async () => {
+    const path = configPath(), lock = `${path}.lock`
+    await mkdir(dirname(path), { recursive: true })
+    const deadline = Date.now() + 5000
+    for (;;) {
+      try { await mkdir(lock); break } catch (error) {
+        if ((error as { code?: string }).code !== "EEXIST") throw error
+        if (Date.now() >= deadline) throw new Error("runner config is locked by another writer; inspect its .lock directory before retrying")
+        await new Promise(resolve => setTimeout(resolve, 20))
       }
-      await Bun.write(configPath(), `${JSON.stringify(stored, null, 2)}\n`)
-      return cfg
-    },
-    catch: (e) => new Error(String((e as Error)?.message ?? e))
+    }
+    try { return await action(path) } finally { await rmdir(lock) }
+  },
+  catch: () => new Error("could not update runner config; check its validity, permissions and .lock directory")
+})
+const writeAt = async (path: string, cfg: RunnerConfig): Promise<RunnerConfig> => {
+  const stored = Schema.decodeUnknownSync(StoredConfig)({
+    runnerId: cfg.runnerId, sellerAddress: cfg.sellerAddress, hubUrl: cfg.hubUrl, maxConcurrency: cfg.maxConcurrency,
+    ...(Object.keys(cfg.agents ?? {}).length === 0 ? {} : { agents: cfg.agents }),
+    ...(Object.keys(cfg.pendingAgents ?? {}).length === 0 ? {} : { pendingAgents: cfg.pendingAgents })
   })
+  const temporary = `${path}.${crypto.randomUUID()}.tmp`
+  try {
+    const file = await open(temporary, "wx", 0o600)
+    try {
+      await file.writeFile(`${JSON.stringify(stored, null, 2)}\n`)
+      await file.sync()
+    } finally { await file.close() }
+    await rename(temporary, path)
+    // Rename is atomic visibility, not durability. A broadcast may begin only after
+    // both the checkpoint bytes and their directory entry have reached storage.
+    const directory = await open(dirname(path), "r")
+    try { await directory.sync() } finally { await directory.close() }
+  } finally { await unlink(temporary).catch(error => { if ((error as { code?: string }).code !== "ENOENT") throw error }) }
+  return hydrate(stored)
+}
+export const writeConfig = (cfg: RunnerConfig): Effect.Effect<RunnerConfig, Error> => locked(path => writeAt(path, cfg))
+
+/** Read current state under the same lock used for the atomic replacement. */
+export const recordAgent = (skillId: string, identity: AgentIdentity): Effect.Effect<RunnerConfig, Error> => locked(async path => {
+  Schema.decodeUnknownSync(SkillKey)(skillId)
+  const decoded = Schema.decodeUnknownSync(AgentIdentitySchema)(identity)
+  const current = await Effect.runPromise(readConfig)
+  const sameHex = (a: string | undefined, b: string | undefined) => a?.toLowerCase() === b?.toLowerCase()
+  const pending = current.pendingAgents?.[skillId]
+  if (pending && (!pending.txHash || !sameHex(pending.txHash, decoded.registrationTx) ||
+    pending.agentURI !== decoded.agentURI || !sameHex(pending.registry, decoded.registry) || pending.chainId !== decoded.chainId)) {
+    throw new Error("confirmation does not match the journaled registration")
+  }
+  const existing = current.agents[skillId]
+  if (existing && (existing.agentId !== decoded.agentId || !sameHex(existing.registrationTx, decoded.registrationTx) ||
+    existing.agentURI !== decoded.agentURI || existing.registeredAtMs !== decoded.registeredAtMs ||
+    !sameHex(existing.registry, decoded.registry) || existing.chainId !== decoded.chainId)) {
+    throw new Error("a confirmed identity cannot be replaced")
+  }
+  const pendingAgents = { ...current.pendingAgents }
+  delete pendingAgents[skillId]
+  return writeAt(path, { ...current, agents: { ...current.agents, [skillId]: decoded }, pendingAgents })
+})
+
+/** A known broadcast hash is saved before receipt polling, so a rerun can resume it. */
+export const recordPendingAgent = (skillId: string, pending: PendingAgentRegistration): Effect.Effect<RunnerConfig, Error> => locked(async path => {
+  Schema.decodeUnknownSync(SkillKey)(skillId)
+  const decoded = Schema.decodeUnknownSync(PendingAgentSchema)(pending)
+  const current = await Effect.runPromise(readConfig)
+  const existing = current.pendingAgents?.[skillId]
+  if (!decoded.txHash || current.agents[skillId] || (existing && (existing.agentURI !== decoded.agentURI ||
+    existing.chainId !== decoded.chainId || existing.registry.toLowerCase() !== decoded.registry.toLowerCase() ||
+    (existing.txHash && existing.txHash.toLowerCase() !== decoded.txHash.toLowerCase())))) throw new Error("registration already recorded or provenance changed")
+  return writeAt(path, { ...current, pendingAgents: { ...current.pendingAgents, [skillId]: decoded } })
+})
+
+/** Reserve the attempt BEFORE the send. An unknown broadcast leaves this checkpoint in
+ * place and prevents a later process from silently minting another identity. */
+export const beginAgentRegistration = (skillId: string, intent: Omit<PendingAgentRegistration, "txHash">): Effect.Effect<RunnerConfig, Error> => locked(async path => {
+  Schema.decodeUnknownSync(SkillKey)(skillId)
+  const decoded = Schema.decodeUnknownSync(PendingAgentSchema)({ ...intent, txHash: undefined })
+  const current = await Effect.runPromise(readConfig)
+  if (current.agents[skillId] || current.pendingAgents?.[skillId]) throw new Error("registration already recorded or pending")
+  return writeAt(path, { ...current, pendingAgents: { ...current.pendingAgents, [skillId]: decoded } })
+})
 
 export const defaultConfig = (over: Partial<RunnerConfig> = {}): RunnerConfig => {
   const hubUrl = over.hubUrl ?? process.env["ARCADE_HUB"] ?? "http://localhost:8787"
@@ -127,6 +228,8 @@ export const defaultConfig = (over: Partial<RunnerConfig> = {}): RunnerConfig =>
     sellerAddress: over.sellerAddress ?? process.env["ARCADE_SELLER"] ?? "",
     hubUrl,
     hubWsUrl: wsUrlFor(hubUrl),
-    maxConcurrency: over.maxConcurrency ?? 2
+    maxConcurrency: over.maxConcurrency ?? 2,
+    agents: over.agents ?? {},
+    pendingAgents: over.pendingAgents ?? {}
   }
 }

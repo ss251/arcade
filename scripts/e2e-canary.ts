@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { decodeEventLog, parseAbi } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
+import type { RunnerConfig } from "../packages/runner/src/config.ts"
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url))
 const SKILL = "usdc-flow-check"
@@ -303,11 +304,12 @@ export const runLiveEvidence = async (cfg: EvidenceConfig): Promise<void> => {
         wellKnown: await responses[4]!.json(), skillMd: await responses[5]!.text() }
     }
     const runnerFile = join(directory, "runner.ts")
+    const runnerConfig: RunnerConfig = { runnerId: `rnr_evidence_${crypto.randomUUID().replaceAll("-", "")}`, sellerAddress: cfg.seller,
+      hubUrl: base, hubWsUrl: base.replace("http:", "ws:") + "/ws", maxConcurrency: 1, agents: {} }
     await writeFile(runnerFile, `${parentGuard}
 import { Effect } from ${JSON.stringify(pathToFileURL(join(ROOT, "packages/runner/node_modules/effect/dist/esm/index.js")).href)};
 import { startDaemon } from ${JSON.stringify(pathToFileURL(join(ROOT, "packages/runner/src/daemon.ts")).href)};
-const config = ${JSON.stringify({ runnerId: `rnr_evidence_${crypto.randomUUID().replaceAll("-", "")}`, sellerAddress: cfg.seller,
-      hubUrl: base, hubWsUrl: base.replace("http:", "ws:") + "/ws", maxConcurrency: 1 })};
+const config = ${JSON.stringify(runnerConfig)};
 Effect.runPromise(startDaemon({ config, skillsDir: ${JSON.stringify(skillsDir)} })).catch(() => process.exit(2));\n`)
     const gateFile = join(skillDir, "evidence-allow")
     let disconnectedAt = 0, lastPass: EvidenceRow | undefined, offlineRows: EvidenceRow[] = []
