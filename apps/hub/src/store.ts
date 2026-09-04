@@ -19,6 +19,54 @@ export interface RunnerRecord {
   activeJobs: number
 }
 
+/** Public evidence from a hub-owned purchase, not a customer-demand claim. */
+export interface PayTest {
+  readonly atMs: number
+  /** Empty when the hub served no job (for example, the runner was offline). */
+  readonly jobId: string
+  readonly settleTx?: string | undefined
+  readonly ok: boolean
+}
+
+export interface PayTestRow extends PayTest {
+  readonly skillId: string
+  readonly seller: string
+  /** Operator diagnostic, excluded from public history and marketplace rows. */
+  readonly reason: string
+}
+
+export interface PayTestState {
+  readonly last?: PayTest | undefined
+  readonly consecutiveFailures: number
+  readonly delisted: boolean
+}
+
+export const DELIST_AFTER = 3
+export const PAY_TEST_HISTORY = 20
+export const payTestKey = (skillId: string, seller: string): string => `${skillId}\u0000${seller.toLowerCase()}`
+const chronological = (rows: ReadonlyArray<PayTestRow>): Array<PayTestRow> =>
+  [...rows].sort((a, b) => a.atMs - b.atMs)
+const publicPayTest = (r: PayTest): PayTest => ({
+  atMs: r.atMs, jobId: r.jobId, ok: r.ok,
+  ...(r.settleTx === undefined ? {} : { settleTx: r.settleTx })
+})
+
+/** Reconnects cannot erase history: only a newer passing purchase clears the verdict. */
+export const payTestStateOf = (history: ReadonlyArray<PayTestRow>, threshold = DELIST_AFTER): PayTestState => {
+  const sorted = chronological(history)
+  let consecutiveFailures = 0
+  for (let index = sorted.length - 1; index >= 0; index--) {
+    if (sorted[index]!.ok) break
+    consecutiveFailures++
+  }
+  const last = sorted[sorted.length - 1]
+  return {
+    ...(last === undefined ? {} : { last: publicPayTest(last) }),
+    consecutiveFailures,
+    delisted: consecutiveFailures >= threshold
+  }
+}
+
 export interface ListingRecord {
   readonly listing: PublicListing
   readonly seller: string
@@ -54,8 +102,17 @@ export interface ListingRecord {
    * `splitterVerified`).
    */
   readonly splitterVersion?: 1 | 2 | undefined
+  /** Filled from persisted history by the store, never trusted from a caller. */
+  readonly payTested?: PayTest | undefined
+  /** Derived from three trailing failed pay-tests, never stored as a mutable flag. */
+  readonly delisted?: boolean | undefined
   readonly runnerId: string
   readonly publishedAtMs: number
+}
+
+const decorate = (rec: ListingRecord, state: PayTestState): ListingRecord => {
+  const { payTested: _claimedEvidence, delisted: _claimedVerdict, ...listing } = rec
+  return { ...listing, ...(state.last === undefined ? {} : { payTested: state.last }), delisted: state.delisted }
 }
 
 export interface TreeRow {
@@ -71,6 +128,7 @@ export interface StoreState {
   readonly receipts: Array<Receipt>
   readonly ratings: Array<Rating>
   readonly trees: Map<string, Array<TreeRow>>
+  readonly payTests: Map<string, Array<PayTestRow>>
 }
 
 const empty = (): StoreState => ({
@@ -79,13 +137,20 @@ const empty = (): StoreState => ({
   jobs: new Map(),
   receipts: [],
   ratings: [],
-  trees: new Map()
+  trees: new Map(),
+  payTests: new Map()
 })
 
 export interface Store {
   readonly putListing: (rec: ListingRecord) => Effect.Effect<void>
   readonly getListing: (skillId: string) => Effect.Effect<ListingRecord, ListingNotFound>
   readonly allListings: Effect.Effect<ReadonlyArray<ListingRecord>>
+  readonly recordPayTest: (row: PayTestRow) => Effect.Effect<void>
+  readonly payTestState: (skillId: string, seller: string) => Effect.Effect<PayTestState>
+  readonly payTestHistory: (skillId: string, seller: string) => Effect.Effect<ReadonlyArray<PayTest>>
+  readonly allPayTested: Effect.Effect<ReadonlyArray<{
+    readonly skillId: string; readonly seller: string; readonly state: PayTestState
+  }>>
   readonly removeListingsForRunner: (runnerId: string) => Effect.Effect<void>
 
   readonly putRunner: (rec: RunnerRecord) => Effect.Effect<void>
@@ -142,9 +207,36 @@ export const makeStore = (ref: Ref.Ref<StoreState>): Store => ({
   putListing: (rec) =>
     Ref.update(ref, (s) => {
       const listings = new Map(s.listings)
-      listings.set(rec.listing.id, rec)
+      const history = s.payTests.get(payTestKey(rec.listing.id, rec.seller)) ?? []
+      listings.set(rec.listing.id, decorate(rec, payTestStateOf(history)))
       return { ...s, listings }
     }),
+
+  recordPayTest: (row) =>
+    Ref.update(ref, (s) => {
+      const key = payTestKey(row.skillId, row.seller)
+      const payTests = new Map(s.payTests)
+      const owned: PayTestRow = { ...publicPayTest(row), skillId: row.skillId,
+        seller: row.seller.toLowerCase(), reason: row.reason }
+      const history = chronological([...(payTests.get(key) ?? []), owned]).slice(-PAY_TEST_HISTORY)
+      payTests.set(key, history)
+      const listings = new Map(s.listings)
+      const rec = listings.get(row.skillId)
+      if (rec !== undefined && rec.seller.toLowerCase() === row.seller.toLowerCase()) {
+        listings.set(row.skillId, decorate(rec, payTestStateOf(history)))
+      }
+      return { ...s, payTests, listings }
+    }),
+
+  payTestState: (skillId, seller) =>
+    Effect.map(Ref.get(ref), (s) => payTestStateOf(s.payTests.get(payTestKey(skillId, seller)) ?? [])),
+
+  payTestHistory: (skillId, seller) =>
+    Effect.map(Ref.get(ref), (s) => (s.payTests.get(payTestKey(skillId, seller)) ?? []).map(publicPayTest)),
+
+  allPayTested: Effect.map(Ref.get(ref), (s) => [...s.payTests.values()]
+    .filter((history) => history.length > 0)
+    .map((history) => ({ skillId: history[0]!.skillId, seller: history[0]!.seller, state: payTestStateOf(history) }))),
 
   getListing: (skillId) =>
     Effect.flatMap(Ref.get(ref), (s) => {

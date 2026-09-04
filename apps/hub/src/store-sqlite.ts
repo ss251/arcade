@@ -155,7 +155,8 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     jobs,
     receipts,
     ratings,
-    trees
+    trees,
+    payTests: new Map()
   }
 
   const ref = Effect.runSync(Ref.make(initial))
@@ -260,5 +261,6 @@ const emptyState = (): StoreState => ({
   jobs: new Map(),
   receipts: [],
   ratings: [],
-  trees: new Map()
+  trees: new Map(),
+  payTests: new Map()
 })
