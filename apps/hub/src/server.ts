@@ -40,6 +40,8 @@ import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
 import { ceilingAtomicFor, maxHopFromEnv, resolveLineage } from "./lineage.ts"
 import { publicReceipt } from "./receipts-feed.ts"
+import { chainCheck, chainMetadataCheck, chainStartupRefusal } from "./chain-check.ts"
+import { createChainRpc } from "./chain-rpc.ts"
 import {
   renderIndex,
   renderListingPage,
@@ -63,6 +65,9 @@ const PORT = Number(process.env["PORT"] ?? 8787)
 const FEE_BPS = Number(process.env["ARCADE_FEE_BPS"] ?? 500)
 const RAIL = process.env["ARCADE_RAIL"] ?? "eip3009"
 const chainConfig = loadChainConfig()
+const onHostingPlatform = (): boolean => Object.keys(process.env).some(
+  (key) => key.startsWith("RAILWAY_") || key.startsWith("FLY_") || key.startsWith("RENDER_")
+)
 
 /**
  * Preflight for a public deployment.
@@ -78,15 +83,18 @@ const chainConfig = loadChainConfig()
  * than run misconfigured somewhere a judge is looking.
  */
 const preflight = (): void => {
+  const unavailable = chainStartupRefusal(chainConfig, RAIL)
+  if (unavailable !== undefined) {
+    console.error(`[hub] refusing to start: ${unavailable}`)
+    process.exit(2)
+  }
   // Arming this on `ARCADE_PUBLIC_URL` alone made the guard depend on remembering the one
   // variable whose absence it cannot detect: forget it, and the hub boots with every
   // insecure default and no refusal at all. So the deployment detects ITSELF — Railway
   // injects `RAILWAY_*` into every container, and their presence is evidence this is not a
   // laptop. Same move as deriving the treasury disclosure from the contract, one level up:
   // read the fact that this is public, do not configure it.
-  const onPlatform = Object.keys(process.env).some(
-    (k) => k.startsWith("RAILWAY_") || k.startsWith("FLY_") || k.startsWith("RENDER_")
-  )
+  const onPlatform = onHostingPlatform()
   const publicUrl = process.env["ARCADE_PUBLIC_URL"]
   if (publicUrl === undefined && !onPlatform) return
 
@@ -185,6 +193,18 @@ const preflight = (): void => {
  */
 const publicOrigin = (url: URL): string => process.env["ARCADE_PUBLIC_URL"] ?? url.origin
 
+let facilitatorAccount: ReturnType<typeof privateKeyToAccount> | undefined
+const facilitator = (): ReturnType<typeof privateKeyToAccount> => {
+  if (facilitatorAccount === undefined) {
+    const key = process.env["ARCADE_FACILITATOR_KEY"]
+    if (key === undefined) {
+      console.warn("[hub] ARCADE_FACILITATOR_KEY not set — generating an ephemeral facilitator key. Settlement requires funded USDC for gas.")
+    }
+    facilitatorAccount = privateKeyToAccount((key ?? generatePrivateKey()) as `0x${string}`)
+  }
+  return facilitatorAccount
+}
+
 const railLayer = () => {
   switch (RAIL) {
     case "gateway":
@@ -194,13 +214,6 @@ const railLayer = () => {
       // it is what makes the marketplace page demonstrable without a funded chain.
       return RailTest({}, parsePrice(process.env["ARCADE_TEST_BALANCE"] ?? "$1000"))
     default: {
-      const pk = process.env["ARCADE_FACILITATOR_KEY"]
-      if (pk === undefined) {
-        console.warn(
-          "[hub] ARCADE_FACILITATOR_KEY not set — generating an ephemeral facilitator key.\n" +
-            "      Settlement will fail without gas. Set it to a funded Arc testnet key."
-        )
-      }
       // No `feeSplitter` here, deliberately. It used to be a hub-wide setting substituted
       // for every listing's payout, which is correct with one seller and loses money with
       // two — `FeeSplitter.seller` is immutable, so a second seller's buyers would sign
@@ -209,7 +222,7 @@ const railLayer = () => {
       return Eip3009Live({
         chain: chainConfig,
         ...(process.env["ARCADE_RPC_URL"] === undefined ? {} : { rpcUrl: process.env["ARCADE_RPC_URL"] }),
-        facilitator: privateKeyToAccount((pk ?? generatePrivateKey()) as `0x${string}`)
+        facilitator: facilitator()
       })
     }
   }
@@ -219,6 +232,28 @@ const railLayer = () => {
 // should be the first thing in the log rather than buried under warnings about the
 // configuration it is refusing.
 preflight()
+
+// The test rail moves no funds and stays offline. Static availability refusals above
+// remain mandatory even when an operator opts out of the live RPC check.
+if (RAIL !== "test" && process.env["ARCADE_CHAIN_CHECK"] !== "0") {
+  let result: { ok: boolean; findings: string[] }
+  try {
+    const rpc = createChainRpc(chainConfig, process.env["ARCADE_RPC_URL"])
+    result = RAIL === "gateway"
+      ? await chainMetadataCheck(chainConfig, rpc)
+      : await chainCheck(chainConfig, rpc, facilitator().address)
+  } catch {
+    result = { ok: false, findings: ["chain check could not initialize; check the RPC and facilitator configuration"] }
+  }
+  if (result.ok) console.log(`[hub] chain check ok (${chainConfig.id})${RAIL === "gateway" ? "; Gateway gas is handled by Circle's hosted facilitator" : ""}`)
+  else {
+    console.warn(`[hub] chain check: ${result.findings.join("; ")}`)
+    if (process.env["ARCADE_PUBLIC_URL"] !== undefined || onHostingPlatform()) {
+      console.error("[hub] refusing to start: chain check failed")
+      process.exit(2)
+    }
+  }
+}
 
 const AppLive = Layer.mergeAll(StoreFromEnv(), BrokerLive, railLayer())
 

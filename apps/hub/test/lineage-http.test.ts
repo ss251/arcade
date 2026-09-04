@@ -141,6 +141,7 @@ beforeAll(async () => {
       HOME: process.env["HOME"] ?? "",
       PORT: String(PORT),
       ARCADE_RAIL: "test",
+      ARCADE_CHAIN_CHECK: "0",
       ARCADE_HUB_SECRET: HUB_SECRET,
       ARCADE_TEST_BALANCE: "$1000"
       // No RAILWAY_*/ARCADE_PUBLIC_URL — this is deliberately the laptop case, so

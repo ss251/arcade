@@ -42,7 +42,7 @@ const boot = (env: Record<string, string>): { out: string; refused: boolean } =>
     // A refusal exits immediately, so this only bounds the cases that boot successfully
     // and would otherwise serve forever. Those are asserted on their startup output.
     timeout: 3_500,
-    env: { PATH: process.env["PATH"] ?? "", HOME: process.env["HOME"] ?? "", ...env }
+    env: { PATH: process.env["PATH"] ?? "", HOME: process.env["HOME"] ?? "", ARCADE_CHAIN_CHECK: "0", ...env }
   })
   return { out: `${r.stdout ?? ""}${r.stderr ?? ""}`, refused: r.status === 2 }
 }
