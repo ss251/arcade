@@ -33,7 +33,10 @@ export const EngineAdapter = Schema.Literal(
   "claude-api", // Claude API tool runner
   "claude-agent", // Claude Agent SDK
   "codex", // OpenAI Codex
-  "grok" // xAI Grok
+  "grok", // xAI Grok
+  "skill", // a Claude Code SKILL.md directory, run through claude-agent
+  "mcp", // one tool on a local or remote MCP server
+  "openapi" // one operation of an OpenAPI document
 )
 export type EngineAdapter = typeof EngineAdapter.Type
 
@@ -111,7 +114,16 @@ export const ENGINE_TERMS: Record<EngineAdapter, ReadonlyArray<CredentialSource>
   "claude-api": ["api-key"],
   "claude-agent": ["api-key", "subscription"],
   codex: ["api-key", "subscription"],
-  grok: ["api-key", "subscription"]
+  grok: ["api-key", "subscription"],
+  // `skill` is `claude-agent` with the system prompt read off disk, so it authenticates
+  // the same two ways and inherits the same refusal on a seat.
+  skill: ["api-key", "subscription"],
+  // No model runs here, so no provider's terms are engaged: an MCP tool call and an HTTP
+  // operation are the seller's own upstream, paid for however they already pay for it.
+  // `api-key` stays available because an upstream credential still arrives through
+  // `secrets` and a seller may want to say so.
+  mcp: ["none", "api-key"],
+  openapi: ["none", "api-key"]
 }
 
 export const termsFor = (
@@ -135,7 +147,7 @@ export const advisoryFor = (
 
 /** The credential an engine uses when the seller does not say. Never `subscription`. */
 export const defaultCredential = (adapter: EngineAdapter): CredentialSource =>
-  adapter === "script" ? "none" : "api-key"
+  adapter === "script" || adapter === "mcp" || adapter === "openapi" ? "none" : "api-key"
 
 export class NotPublishable extends Schema.TaggedError<NotPublishable>()("NotPublishable", {
   skillId: Schema.String,

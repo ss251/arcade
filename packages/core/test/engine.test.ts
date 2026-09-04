@@ -7,6 +7,7 @@ import {
   credentialOf,
   assertManifestPublishable,
   defaultCredential,
+  ENGINE_TERMS,
   NotPublishable,
   SkillManifest,
   termsFor,
@@ -163,5 +164,39 @@ describe("sellability is a total function", () => {
         }
       )
     )
+  })
+})
+
+describe("the publish adapters (M1)", () => {
+  it("carries skill, mcp and openapi as engine adapters", () => {
+    for (const a of ["skill", "mcp", "openapi"] as const) {
+      expect(ENGINE_TERMS[a]).toBeDefined()
+    }
+  })
+
+  it("sells all three on an api key, and the model-free two on no credential at all", () => {
+    // The spec's rule: "all three sellable with `api-key` or `none`". A tool call to an MCP
+    // server or an HTTP operation involves no provider terms, so `none` is the honest
+    // default there — there is no model whose licence could forbid the resale.
+    expect(termsFor("mcp", "none").sellable).toBe(true)
+    expect(termsFor("openapi", "none").sellable).toBe(true)
+    for (const a of ["skill", "mcp", "openapi"] as const) {
+      expect(termsFor(a, "api-key").sellable).toBe(true)
+      expect(termsFor(a, "api-key").advisory).toBeUndefined()
+    }
+  })
+
+  it("refuses a seat-backed skill directory, exactly as claude-agent is refused", () => {
+    // `skill` IS claude-agent underneath, so it inherits the seat lane and the refusal.
+    // Losing the refusal here would be a hole in the gate, not a new adapter.
+    const terms = termsFor("skill", "subscription")
+    expect(terms.sellable).toBe(false)
+    expect(terms.reason).toContain("personal subscription seat")
+  })
+
+  it("defaults the model-free adapters to no credential and the skill dir to an api key", () => {
+    expect(defaultCredential("skill")).toBe("api-key")
+    expect(defaultCredential("mcp")).toBe("none")
+    expect(defaultCredential("openapi")).toBe("none")
   })
 })
