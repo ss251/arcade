@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite"
 import { Effect, Layer, Ref, Schema } from "effect"
 import { Job, Rating, Receipt } from "@arcade/core"
-import { StoreTag, makeStore, type Store, type StoreState } from "./store.ts"
+import { StoreTag, makeStore, type Store, type StoreState, type TreeRow } from "./store.ts"
 
 /**
  * Durable hub state.
@@ -57,7 +57,14 @@ CREATE TABLE IF NOT EXISTS ratings (
   receipt_job_id TEXT PRIMARY KEY,
   json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tree_reservations (
+  child_job_id TEXT PRIMARY KEY,
+  root_job_id TEXT NOT NULL,
+  amount_atomic TEXT NOT NULL,
+  state TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS tree_root ON tree_reservations(root_job_id);
 `
 
 /**
@@ -134,13 +141,21 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     .all()
     .map((r) => decodeRating(fromJson(r.json)) as Rating)
 
+  const trees = new Map<string, Array<TreeRow>>()
+  for (const row of db.query<{ child_job_id: string; root_job_id: string; amount_atomic: string; state: TreeRow["state"] }, []>(`SELECT * FROM tree_reservations`).all()) {
+    const rows = trees.get(row.root_job_id) ?? []
+    rows.push({ childJobId: row.child_job_id, amountAtomic: BigInt(row.amount_atomic), state: row.state })
+    trees.set(row.root_job_id, rows)
+  }
+
   // Listings and runners start EMPTY by design — see the note above.
   const initial: StoreState = {
     listings: new Map(),
     runners: new Map(),
     jobs,
     receipts,
-    ratings
+    ratings,
+    trees
   }
 
   const ref = Effect.runSync(Ref.make(initial))
@@ -158,6 +173,11 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     `INSERT INTO ratings (receipt_job_id, json) VALUES (?, ?)
      ON CONFLICT(receipt_job_id) DO NOTHING`
   )
+  const upsertTree = db.query(
+    `INSERT INTO tree_reservations (child_job_id, root_job_id, amount_atomic, state) VALUES (?, ?, ?, ?)
+     ON CONFLICT(child_job_id) DO UPDATE SET state = excluded.state`
+  )
+  const setTreeStateStmt = db.query(`UPDATE tree_reservations SET state = ? WHERE child_job_id = ?`)
 
   const store: Store = {
     ...inner,
@@ -182,6 +202,12 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
       Effect.tap(inner.putRating(r), () =>
         Effect.sync(() => putRatingStmt.run(r.receiptJobId, toJson(r)))
       ),
+    reserveTree: (root, child, amount, ceiling) =>
+      Effect.tap(inner.reserveTree(root, child, amount, ceiling), (ok) =>
+        Effect.sync(() => { if (ok) upsertTree.run(child, root, amount.toString(), "reserved") })
+      ),
+    commitTree: (child) => Effect.tap(inner.commitTree(child), () => Effect.sync(() => setTreeStateStmt.run("committed", child))),
+    releaseTree: (child) => Effect.tap(inner.releaseTree(child), () => Effect.sync(() => setTreeStateStmt.run("released", child))),
     // The sweep rewrites many receipts at once; re-persisting the whole set afterwards is
     // simpler than tracking which rows the in-memory update touched, and a sweep is rare.
     backfillFeeSweep: (accrualId, txHash) =>
@@ -233,5 +259,6 @@ const emptyState = (): StoreState => ({
   runners: new Map(),
   jobs: new Map(),
   receipts: [],
-  ratings: []
+  ratings: [],
+  trees: new Map()
 })

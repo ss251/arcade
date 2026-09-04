@@ -50,12 +50,19 @@ export interface ListingRecord {
   readonly publishedAtMs: number
 }
 
+export interface TreeRow {
+  readonly childJobId: string
+  readonly amountAtomic: bigint
+  state: "reserved" | "committed" | "released"
+}
+
 export interface StoreState {
   readonly listings: Map<string, ListingRecord>
   readonly runners: Map<string, RunnerRecord>
   readonly jobs: Map<string, Job>
   readonly receipts: Array<Receipt>
   readonly ratings: Array<Rating>
+  readonly trees: Map<string, Array<TreeRow>>
 }
 
 const empty = (): StoreState => ({
@@ -63,7 +70,8 @@ const empty = (): StoreState => ({
   runners: new Map(),
   jobs: new Map(),
   receipts: [],
-  ratings: []
+  ratings: [],
+  trees: new Map()
 })
 
 export interface Store {
@@ -88,6 +96,20 @@ export interface Store {
   readonly putRating: (r: Rating) => Effect.Effect<void>
   readonly ratingsFor: (skillId: string) => Effect.Effect<ReadonlyArray<Rating>>
   readonly statsFor: (skillId: string) => Effect.Effect<ObjectiveStats>
+
+  readonly reserveTree: (
+    rootJobId: string,
+    childJobId: string,
+    amountAtomic: bigint,
+    ceilingAtomic: bigint
+  ) => Effect.Effect<boolean>
+  readonly commitTree: (childJobId: string) => Effect.Effect<void>
+  readonly releaseTree: (childJobId: string) => Effect.Effect<void>
+  readonly treeState: (rootJobId: string) => Effect.Effect<{
+    readonly reservedAtomic: bigint
+    readonly committedAtomic: bigint
+    readonly children: ReadonlyArray<TreeRow>
+  }>
 }
 
 export class StoreTag extends Context.Tag("@arcade/hub/Store")<StoreTag, Store>() {}
@@ -96,6 +118,16 @@ const percentile = (sorted: ReadonlyArray<number>, p: number): number => {
   if (sorted.length === 0) return 0
   const idx = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))
   return sorted[idx] ?? 0
+}
+
+const setTreeState = (s: StoreState, childJobId: string, state: TreeRow["state"]): StoreState => {
+  const trees = new Map(s.trees)
+  for (const [root, rows] of trees) {
+    if (rows.some((r) => r.childJobId === childJobId)) {
+      trees.set(root, rows.map((r) => (r.childJobId === childJobId ? { ...r, state } : r)))
+    }
+  }
+  return { ...s, trees }
 }
 
 export const makeStore = (ref: Ref.Ref<StoreState>): Store => ({
@@ -193,6 +225,26 @@ export const makeStore = (ref: Ref.Ref<StoreState>): Store => ({
         p95LatencyMs: percentile(lat, 95),
         availability: runners.length > 0 ? 1 : 0
       } as ObjectiveStats
+    }),
+
+  reserveTree: (rootJobId, childJobId, amountAtomic, ceilingAtomic) =>
+    Ref.modify(ref, (s) => {
+      const rows = s.trees.get(rootJobId) ?? []
+      const held = rows.filter((r) => r.state !== "released").reduce((n, r) => n + r.amountAtomic, 0n)
+      if (held + amountAtomic > ceilingAtomic) return [false, s]
+      const trees = new Map(s.trees)
+      trees.set(rootJobId, [...rows, { childJobId, amountAtomic, state: "reserved" }])
+      return [true, { ...s, trees }]
+    }),
+
+  commitTree: (childJobId) => Ref.update(ref, (s) => setTreeState(s, childJobId, "committed")),
+  releaseTree: (childJobId) => Ref.update(ref, (s) => setTreeState(s, childJobId, "released")),
+
+  treeState: (rootJobId) =>
+    Effect.map(Ref.get(ref), (s) => {
+      const rows = s.trees.get(rootJobId) ?? []
+      const sum = (st: TreeRow["state"]) => rows.filter((r) => r.state === st).reduce((n, r) => n + r.amountAtomic, 0n)
+      return { reservedAtomic: sum("reserved"), committedAtomic: sum("committed"), children: rows }
     })
 })
 

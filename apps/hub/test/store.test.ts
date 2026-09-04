@@ -14,7 +14,8 @@ const emptyState = () => ({
   runners: new Map(),
   jobs: new Map(),
   receipts: [],
-  ratings: []
+  ratings: [],
+  trees: new Map()
 })
 
 const store = () => makeStore(Effect.runSync(Ref.make(emptyState())))
