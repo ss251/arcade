@@ -96,3 +96,5 @@ docs/
 
 # Generated video assets — regenerable from docs/narration + scripts/narrate.sh.
 design/*
+
+.claude/worktrees/

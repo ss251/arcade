@@ -77,3 +77,6 @@ design/*
 # code rather than behind a link that can rot.
 !design/arcade-cp3.mp4
 !design/arcade-cp3.srt
+
+# Claude Code worktrees (linked checkouts, never committed)
+.claude/worktrees/
