@@ -442,3 +442,7 @@ Two things that only show up at runtime, both found by running it:
 5. `GET /` and `GET /openapi.json` both serve.
 6. One paid call round-trips end to end, and the receipt carries a real tx hash.
 7. Restart the host and confirm the receipt is still on the page and the listings came back.
+
+## Plan A: mainnet migration runbook
+
+Use [How to move ARCADE to Arc mainnet](mainnet-runbook.md) for the future OWNER-confirmed migration: published parameters, chain checks, per-seller FeeSplitterV2, facilitator funding, failure/success canaries, rollback and evidence. Mainnet remains pending today; writing that procedure does not authorize a mainnet transaction. Network changes require rebuilding the web bundle and verifying each skill's private RPC/egress settings, not just changing the hub environment.

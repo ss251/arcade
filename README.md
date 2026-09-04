@@ -168,12 +168,12 @@ Both payment rails are complete, conformance-tested `Layer`s of one `Rail` servi
 
 | shipped | next |
 |---|---|
-| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · MCP server + skill file · agents hiring agents · 366 tests | Gateway round-trip on Arc · web UI · container sandbox · ratings |
+| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · MCP server + skill file · agents hiring agents · 633 tests | Gateway round-trip on Arc · web UI · container sandbox · ratings |
 
 ## Verify
 
 ```bash
-bun test                                                  # 366 tests
+bun run test                                              # 633 tests (604 Vitest + 29 Bun)
 bun test packages/core/test/secrecy.property.test.ts      # the thesis
 bun test packages/payments/test/rail.conformance.test.ts  # all three rails agree
 bunx tsc --noEmit
@@ -182,3 +182,9 @@ curl -s localhost:8787/openapi.json | jq '.paths | keys'               # one pat
 ```
 
 Built for the [Encode × Circle Programmable Money hackathon](https://www.encodeclub.com/programmes/arc-hackathon). Author: ss251.
+
+## Plan A: settlement core and network selection
+
+The earlier lineage limitation is now addressed by hub-signed hire capabilities, cycle/depth checks, a root tree budget and FeeSplitterV2 tree commitments. [The operations runbook](docs/runbook.md) records the testnet deployment and the still-pending live lineage proof; code coverage is not a substitute for that proof.
+
+`ARCADE_NETWORK` selects `arc-testnet` by default. `arc-mainnet` deliberately remains `pending` and refuses startup until published parameters are verified. Changing networks also requires rebuilding the web bundle and checking each skill's own RPC configuration. Follow the OWNER-only [mainnet runbook](docs/mainnet-runbook.md); do not reuse testnet keys on mainnet.

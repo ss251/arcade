@@ -19,7 +19,7 @@ Idiom: `Effect.gen`, `Effect.tryPromise`, `Effect.retry`/`Schedule`, `Scope`, `L
 
 ## Chain facts (Arc testnet)
 
-- Chain id **5042002**, CAIP-2 `eip155:5042002`, RPC `https://rpc.testnet.arc.network`, explorer `https://testnet.arcscan.app`
+- Chain id **5042002**, CAIP-2 `eip155:5042002`, RPC `https://rpc.testnet.arc.io` (primary), `https://rpc.testnet.arc.network` (alternate), explorer `https://testnet.arcscan.app`
 - **USDC `0x3600000000000000000000000000000000000000`** — the same address is the *native gas token* (18 dec) **and** the ERC-20 interface (**6 dec**). This dual nature is the #1 source of bugs here.
 - Gateway Wallet `0x0077777d7EBA4688BDeF3E311b846F25870A19B9`, Gateway domain **26**, facilitator `https://gateway-api-testnet.circle.com`
 - Nanopayments `validBefore` must be **≥7 days** out (SDK sets `maxTimeoutSeconds: 604900`).
