@@ -1,0 +1,75 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Frankfurter",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.frankfurter.dev/v1"
+    }
+  ],
+  "paths": {
+    "/latest": {
+      "get": {
+        "operationId": "fxRate",
+        "summary": "FX reference rates",
+        "description": "Latest European Central Bank reference rates for one base currency against a list of symbols. Sourced from the ECB, updated on publication days around 16:00 CET.",
+        "parameters": [
+          {
+            "name": "base",
+            "in": "query",
+            "required": true,
+            "description": "ISO 4217 base currency, e.g. USD",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbols",
+            "in": "query",
+            "required": true,
+            "description": "Comma-separated target currencies, e.g. EUR,GBP",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "reference rates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "base",
+                    "date",
+                    "rates"
+                  ],
+                  "properties": {
+                    "amount": {
+                      "type": "number"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "date": {
+                      "type": "string"
+                    },
+                    "rates": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

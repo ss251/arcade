@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url"
 import { existsSync, readFileSync } from "node:fs"
 import { decodeManifest, toPublicListing } from "@arcade/core"
 import { loadSkillAgent } from "../src/engines/skill.ts"
-import { manifestFromMcpTool, type McpTool } from "../src/publish-introspect.ts"
+import { manifestFromMcpTool, manifestFromOperation, operationsOf, type McpTool } from "../src/publish-introspect.ts"
 
 const SKILLS = fileURLToPath(new URL("../../../skills/", import.meta.url))
 // Vitest runs under Node; decode the on-disk listing without the Bun-only directory loader.
@@ -38,6 +38,36 @@ describe("diff-triage, as a skill directory", () => {
   it("keeps the model choice private", () => {
     expect(skill.manifest.engine.model).toBe("claude-sonnet-5")
     expect(JSON.stringify(toPublicListing(skill.manifest))).not.toContain("sonnet")
+  })
+})
+
+describe("the OpenAPI demo listing", () => {
+  it("copies the same OpenAPI document used by the offline generator fixture", () => {
+    const spec = JSON.parse(readFileSync(join(SKILLS, "fx-rate", "openapi.json"), "utf8"))
+    const fixture = JSON.parse(readFileSync(new URL("./fixtures/frankfurter.json", import.meta.url), "utf8"))
+    expect(spec).toEqual(fixture)
+  })
+
+  it("is exactly the manifest generated from the committed spec", async () => {
+    const spec = JSON.parse(readFileSync(join(SKILLS, "fx-rate", "openapi.json"), "utf8"))
+    const ref = operationsOf(spec).find((operation) => operation.operationId === "fxRate")!
+    const generated = manifestFromOperation(spec, ref, { specFile: "openapi.json", price: "$0.01" })
+    const listing = await readBySlug("fx-rate")
+    expect(listing).toBeDefined()
+    expect(listing!.raw).toEqual(generated)
+  })
+
+  it("keeps the upstream and operation binding out of the public listing", async () => {
+    const listing = await readBySlug("fx-rate")
+    expect(listing).toBeDefined()
+    const manifest = listing!.manifest
+    expect(manifest.engine).toEqual({ adapter: "openapi", credential: "none", capabilities: [], spec: "openapi.json", operationId: "fxRate" })
+    expect(manifest.egress).toEqual(["api.frankfurter.dev"])
+    expect(manifest.secrets).toEqual([])
+    const projected = toPublicListing(manifest)
+    expect(projected).toMatchObject({ id: "fx-rate", price: "$0.01", inputSchema: { required: ["base", "symbols"] }, outputSchema: { required: ["base", "date", "rates"] } })
+    expect(JSON.stringify(projected)).not.toMatch(/frankfurter|fxRate|openapi\.json/)
+    expect(projected).not.toHaveProperty("engine")
   })
 })
 

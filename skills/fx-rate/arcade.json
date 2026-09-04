@@ -1,0 +1,64 @@
+{
+  "id": "fx-rate",
+  "version": "0.1.0",
+  "serviceName": "FX reference rates",
+  "description": "Latest European Central Bank reference rates for one base currency against a list of symbols. Sourced from the ECB, updated on publication days around 16:00 CET.",
+  "tags": [
+    "openapi"
+  ],
+  "price": "$0.01",
+  "bounds": {
+    "timeoutSec": 60
+  },
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "base",
+      "symbols"
+    ],
+    "properties": {
+      "base": {
+        "type": "string",
+        "description": "ISO 4217 base currency, e.g. USD"
+      },
+      "symbols": {
+        "type": "string",
+        "description": "Comma-separated target currencies, e.g. EUR,GBP"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "base",
+      "date",
+      "rates"
+    ],
+    "properties": {
+      "amount": {
+        "type": "number"
+      },
+      "base": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "rates": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "number"
+        }
+      }
+    }
+  },
+  "engine": {
+    "adapter": "openapi",
+    "credential": "none",
+    "spec": "openapi.json",
+    "operationId": "fxRate"
+  },
+  "egress": [
+    "api.frankfurter.dev"
+  ]
+}
