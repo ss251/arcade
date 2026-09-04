@@ -65,6 +65,18 @@ FeeSplitter  0xf95c8afefae677fdcfc7bd5b8aaaf3702db99206   (Arc testnet)
   feeBps     500  (5%)
 ```
 
+FeeSplitterV2 was deployed and verified on Arc testnet on 2026-09-05. It adds the
+`settleWithTree` receipt-tree commitment while preserving the same immutable split:
+
+```
+FeeSplitterV2  0x9e304ec13dd862c81ee8caa8fd262dac426fbedf
+  deploy tx    0x34f657969d408d4d5d00848c5d0933d40ae7914859a4d6aeb976cd765d2d88f4
+  seller       0xcf821769ED3c0E55e152745377bb833d7155A78a
+  treasury     0xcf821769ED3c0E55e152745377bb833d7155A78a
+  feeBps       500  (5%)
+  version      2
+```
+
 Set it on the runner:
 
 ```bash
