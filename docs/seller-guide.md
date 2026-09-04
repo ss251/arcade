@@ -17,6 +17,60 @@ bun run arcade publish skills/<your-skill>
 
 It prints two blocks: what goes to the hub, and what stays on your machine.
 
+## Publishing without writing a manifest
+
+Generate listings from an existing MCP server or OpenAPI JSON document:
+
+```bash
+arcade publish mcp://docs.arc.io/mcp --price '$0.02' --yes
+arcade publish mcp:// --price '$0.05' --yes -- bunx -y my-mcp-server
+arcade publish ./openapi.json --price '$0.01' --auth header:X-Api-Key=UPSTREAM_KEY --yes
+```
+
+All ARCADE options go **before `--`**; everything after it is literal server argv.
+Without `--yes`, the command validates and previews but writes nothing. `--out DIR`
+selects the destination; `--force` explicitly replaces generated files. Select a subset
+with repeatable `--tool NAME` or `--operation ID`. Unknown selections and invalid
+manifests fail before a partial preview or write. Prices must be at least $0.000001.
+
+MCP publishes only tools marked read-only by default. `--include-writes` is an explicit
+seller choice: a failed job cannot undo an upstream side effect. A listing sells one
+tool, not unrestricted access to a server. The source's public titles, descriptions and
+schemas become listing metadata; review them before serving. The private transport and
+tool-binding fields are not part of the public projection.
+
+OpenAPI publishing supports version 3.0/3.1 JSON documents, HTTPS servers, local references,
+scalar path/query/header parameters, and JSON-object request bodies. Each generated
+directory gets its own spec copy. YAML, remote references and unsupported or ambiguous
+contracts are refused. Schemas are copied/projected within this supported subset; the
+hub's small JSON Schema validator does not enforce every upstream keyword. Test the
+generated listing before offering it to buyers.
+
+The credential binding names an environment variable, **never its value**. The runner
+passes only declared secrets and adapter grants into the job; buyer input cannot override
+the bound seller credential. A configured API or MCP transport still accesses its
+upstream when model capabilities are empty—those capabilities describe model tools,
+not an operating-system network firewall.
+
+A SKILL.md directory needs a manifest pointing at its Markdown entry:
+
+```json
+"engine": { "adapter": "skill", "credential": "api-key", "entry": "SKILL.md", "model": "claude-sonnet-5" }
+```
+
+Its body is the system prompt; the manifest controls model, credential and capabilities.
+The included `diff-triage` listing is a complete example. For a machine-readable preview,
+run `arcade publish skills/diff-triage --json`; this singular JSON mode accepts generated
+or hand-written **directories**, not multi-listing discovery targets.
+
+Run `bash scripts/e2e-publish-adapters.sh` for the default three-adapter local evidence.
+It needs `ANTHROPIC_API_KEY` for `diff-triage`. Without that credential, an explicitly
+partial free run is `bash scripts/e2e-publish-adapters.sh --only search-arc-docs --only fx-rate`.
+Partial runs name excluded cases; missing, failed, refused, incomplete or empty results
+produce a nonzero exit. Local execution evidence does not itself prove hub schema
+validation or payment settlement; the separately verified testnet purchase is recorded
+in the [runbook](./runbook.md#plan-b--evidence-publish-adapters).
+
 ## Setup
 
 ```bash
@@ -148,9 +202,12 @@ Set `timeoutSec` on every skill. It is the one bound that is always enforced.
 | `script` | your executable | none — no model, no provider terms |
 | `claude-api` | Claude API tool runner | `api-key` |
 | `claude-agent` | Claude Agent SDK | `api-key`, or `subscription` for local use |
+| `skill` | SKILL.md through the Claude Agent SDK | `api-key`, or `subscription` for local use |
+| `mcp` | One MCP tool over HTTPS or stdio | `none`, with explicit secret bindings when needed |
+| `openapi` | One operation in a local OpenAPI JSON document | `none`, with explicit secret bindings when needed |
 | `codex` / `grok` | OpenAI / xAI | `api-key` (not yet implemented — issues #1, #2) |
 
-**Publishable skills use an API key.** Anthropic's Commercial Terms §A.1 and OpenAI's Services Agreement §2.2 both explicitly permit using the API to power products you make available to your own end users — which is what a paid skill is, since your buyer receives a work product and never model access.
+**Publishable model-backed skills use an API key.** Anthropic's Commercial Terms §A.1 and OpenAI's Services Agreement §2.2 both explicitly permit using the API to power products you make available to your own end users — which is what a paid skill is, since your buyer receives a work product and never model access.
 
 Consumer subscription terms say the opposite, at all three providers, though the wording differs. So `credential: "subscription"` runs locally for your own agents, and `arcade publish` refuses to list it. Switching costs one field — the engine and your agent code are untouched.
 
@@ -158,15 +215,15 @@ Consumer subscription terms say the opposite, at all three providers, though the
 
 ### Capabilities — the most security-relevant line you write
 
-A skill declares what it may *do* in portable terms, and each engine maps that to its own tool names through a closed table:
+A model-backed skill declares its model tools in portable terms, and each model engine maps them through a closed table:
 
 ```ts
-capabilities: []                  // no network, no filesystem. The default.
+capabilities: []                  // no model tools. The default.
 capabilities: ["web-search"]      // read the public web
 capabilities: ["read-workdir"]    // read files in your skill directory
 ```
 
-Empty means empty: the job gets no tools at all. That is what makes a prompt-injection attempt in a buyer's payload inert rather than merely discouraged — there is nothing for it to reach.
+With an empty model capability list, buyer input cannot induce a model tool call. This does not disable the configured provider, MCP or OpenAPI transport, nor does it create an operating-system firewall for seller executables.
 
 Two things worth knowing:
 

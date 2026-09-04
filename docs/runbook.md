@@ -29,6 +29,54 @@ Live lineage evidence is pending as of 2026-09-05: the distinct funded sub-buy k
 owner prerequisite. The unit and script checks do not count as live settlement evidence;
 append the verified root and descendant transaction hashes here after the live run.
 
+## Plan B — Evidence: publish adapters
+
+Verified on **2026-09-05 IST**. The CLI generated the two read-only Arc Docs MCP
+listings and the Frankfurter OpenAPI listing; fixture-equality tests verify the
+committed manifests are generator output, not hand-edited demos.
+
+```bash
+bash scripts/e2e-publish-adapters.sh --only search-arc-docs --only fx-rate
+```
+
+This explicitly **partial** live run returned `succeeded / end_turn` for both selected
+adapters (MCP output 42,790 bytes; FX output 69 bytes) and exited 0. It named `diff-triage`
+as excluded. The default command runs all three, but that live run remains pending an
+owner-provided Anthropic API key. Local adapter execution does not itself validate
+output schemas at the hub or prove a payment.
+
+A separate **paid FX purchase** through a real loopback-only hub and FX-only runner
+did exercise the hub's validation and EIP-3009 settlement on Arc testnet:
+
+- Network: `eip155:5042002`; only Arc-testnet faucet USDC was used.
+- Buyer: `0xdaACA688cE93d6EA0BDf4cdA9925C5526f3cA5e1`.
+- Seller/facilitator: the existing testnet-only demo identity
+  `0xcf821769ED3c0E55e152745377bb833d7155A78a` (see the burned-demo-key warning below).
+- FeeSplitterV2: `0x9e304ec13dd862c81ee8caa8fd262dac426fbedf`.
+- Price 10,000 atomic ($0.01); seller 9,500 atomic ($0.0095); platform fee 500 atomic
+  ($0.0005), accrued in the splitter. No fee withdrawal was performed.
+- Receipt: `settled: true`, `reason: ok`, rail `eip3009`, no descendant purchases.
+- Transaction: [0xb0cbe2a5…c1aca613](https://testnet.arcscan.app/tx/0xb0cbe2a50de1c4daa1f56d2a33acadfb9ac32649bc33e2f99b7ec6e3c1aca613).
+
+The buyer command used a $0.01 ceiling and the verified local seller:
+
+```bash
+ARCADE_BUYER_KEY="$(security find-generic-password -s arcade-buyer-key -w)" \
+  ARCADE_NETWORK=arc-testnet bun run arcade-buy fx-rate \
+  --hub http://127.0.0.1:28787 \
+  --seller 0xcf821769ED3c0E55e152745377bb833d7155A78a \
+  --input '{"base":"USD","symbols":"EUR"}' --max-amount 0.01
+```
+
+The result was base `USD`, date `2026-09-04`, rates.EUR `0.86044`, upstream cost $0.
+One independent `eth_getTransactionReceipt` call to `https://rpc.testnet.arc.io`
+confirmed status `0x1`, the expected splitter destination, and ERC-20 transfers of
+10,000 atomic into the splitter and 9,500 atomic to the seller (6 decimals, distinct from
+Arc's parallel native 18-decimal transfer logs). No `waitForTransactionReceipt` loop
+was used. The temporary services were stopped afterward; saved runner configuration,
+Keychain items and mainnet were not changed. This paid single-call proof does not
+complete Plan A's owner-blocked descendant-lineage demonstration.
+
 ---
 
 ## The six environment variables that matter
