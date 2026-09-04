@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest"
+import { spawnSync } from "node:child_process"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { MAX_OUTPUT_CHARS, MAX_UNTRUSTED_CHARS } from "@arcade/core"
 import { buildPrompt, engineFor, runJob, type HarnessRequest } from "../src/engines/harness.js"
 import type { Engine, JobEnvelope, SkillAgent } from "../src/engines/types.js"
@@ -20,6 +25,137 @@ const request = (over: Partial<HarnessRequest> = {}): HarnessRequest => ({
 })
 
 const agent: SkillAgent = { systemPrompt: "do the thing" }
+
+describe("skill harness integration", () => {
+  const fakeProvider = (dir: string): string => {
+    const preload = join(dir, "provider-mock.ts")
+    const sdk = createRequire(import.meta.url).resolve("@anthropic-ai/claude-agent-sdk")
+    writeFileSync(preload, `import { mock } from "bun:test";
+mock.module(${JSON.stringify(sdk)}, () => ({
+  query: async function* ({ options }) {
+    yield { type: "result", subtype: "success", stop_reason: "end_turn", num_turns: 1,
+      total_cost_usd: 0, structured_output: { cwd: options.cwd, tools: options.allowedTools,
+        settings: options.settingSources, hasReference: options.systemPrompt.includes("references/check.md") } };
+  }
+}));`)
+    return preload
+  }
+
+  it("registers the skill engine with the same environment grants as claude-agent", () => {
+    const skill = engineFor("skill")
+    const claude = engineFor("claude-agent")
+    expect(skill.adapter).toBe("skill")
+    for (const credential of ["api-key", "subscription"] as const) {
+      const definition = { systemPrompt: "", credential }
+      expect(skill.envGrants(definition)).toEqual(claude.envGrants(definition))
+    }
+  })
+
+  it("loads a real SKILL.md and refuses oversized input before any model call", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arcade-skill-harness-"))
+    try {
+      const entry = join(dir, "SKILL.md")
+      writeFileSync(entry, "---\nname: local-test\ndescription: A local fixture\n---\nPRIVATE_PROMPT_CANARY\n")
+      const run = spawnSync("bun", ["run", "packages/runner/src/engines/harness.ts", entry], {
+        cwd: new URL("../../..", import.meta.url),
+        env: { PATH: process.env["PATH"] ?? "", HOME: dir },
+        input: JSON.stringify({
+          jobId: "local-skill", input: "x".repeat(MAX_UNTRUSTED_CHARS + 1),
+          skillDir: dir, adapter: "skill", bounds: { timeoutSec: 3 },
+          outputSchema: {}, engineConfig: { adapter: "skill", credential: "api-key", capabilities: [] }
+        }),
+        encoding: "utf8", timeout: 5_000
+      })
+      expect(run.status).toBe(0)
+      const envelope = JSON.parse(run.stdout) as JobEnvelope
+      expect(envelope.stopReason).toBe("rejected")
+      expect(envelope.usage).toEqual({ turns: 0, tokens: 0, toolCalls: 0 })
+      expect(envelope.costUsd).toBe(0)
+      expect(run.stdout + run.stderr).not.toContain("PRIVATE_PROMPT_CANARY")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it.each(["missing", "invalid"])("keeps private skill paths out of %s-file diagnostics", (kind) => {
+    const dir = mkdtempSync(join(tmpdir(), "PRIVATE_SKILL_LOCATION_"))
+    try {
+      const entry = join(dir, "SKILL.md")
+      if (kind === "invalid") writeFileSync(entry, "PRIVATE_PROMPT_CANARY without frontmatter")
+      const run = spawnSync("bun", ["run", "packages/runner/src/engines/harness.ts", entry], {
+        cwd: new URL("../../..", import.meta.url),
+        env: { PATH: process.env["PATH"] ?? "", HOME: dir },
+        input: JSON.stringify({
+          jobId: "local-skill", input: {}, skillDir: dir, adapter: "skill",
+          bounds: { timeoutSec: 3 }, outputSchema: {}, engineConfig: { adapter: "skill" }
+        }),
+        encoding: "utf8", timeout: 5_000
+      })
+      expect(run.status).toBe(1)
+      const envelope = JSON.parse(run.stdout) as JobEnvelope
+      expect(envelope.stopReason).toBe("error")
+      expect(envelope.error).toMatch(/SKILL\.md/)
+      expect(run.stdout + run.stderr).not.toContain("PRIVATE_SKILL_LOCATION_")
+      expect(run.stdout + run.stderr).not.toContain("PRIVATE_PROMPT_CANARY")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it("runs nested skills beside their references without taking permissions from frontmatter", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arcade-nested-skill-"))
+    try {
+      const nested = join(dir, "nested")
+      mkdirSync(join(nested, "references"), { recursive: true })
+      writeFileSync(join(nested, "references", "check.md"), "local reference")
+      const entry = join(nested, "SKILL.md")
+      writeFileSync(entry, "---\nname: nested\ndescription: Local test\ncapabilities: run-code\ncredential: subscription\n---\nUse the reference.\n")
+      const run = spawnSync("bun", ["run", `--preload=${fakeProvider(dir)}`, "packages/runner/src/engines/harness.ts", entry], {
+        cwd: new URL("../../..", import.meta.url),
+        env: { PATH: process.env["PATH"] ?? "", HOME: dir },
+        input: JSON.stringify({
+          jobId: "nested-skill", input: {}, skillDir: dir, adapter: "skill",
+          bounds: { timeoutSec: 3 }, outputSchema: {},
+          engineConfig: { adapter: "skill", credential: "api-key", capabilities: ["read-workdir"] }
+        }),
+        encoding: "utf8", timeout: 5_000
+      })
+      expect(run.status, run.stderr).toBe(0)
+      const envelope = JSON.parse(run.stdout) as JobEnvelope & { output: { cwd: string; tools: string[]; settings: string[]; hasReference: boolean } }
+      expect(envelope.stopReason).toBe("end_turn")
+      expect(realpathSync(envelope.output.cwd)).toBe(realpathSync(nested))
+      expect(envelope.output.tools).toEqual(["Read", "Glob", "Grep"])
+      expect(envelope.output.settings).toEqual([])
+      expect(envelope.output.hasReference).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it.each(["absolute", "symlink"])("rejects a %s entry outside the skill directory", (kind) => {
+    const dir = mkdtempSync(join(tmpdir(), "arcade-contained-skill-"))
+    const outside = mkdtempSync(join(tmpdir(), "PRIVATE_OUTSIDE_SKILL_"))
+    try {
+      writeFileSync(join(outside, "SKILL.md"), "---\nname: outside\ndescription: Outside fixture\n---\nPrivate prompt.\n")
+      if (kind === "symlink") symlinkSync(outside, join(dir, "escape"), "dir")
+      const entry = kind === "absolute" ? join(outside, "SKILL.md") : join(dir, "escape", "SKILL.md")
+      const run = spawnSync("bun", ["run", `--preload=${fakeProvider(dir)}`, "packages/runner/src/engines/harness.ts", entry], {
+        cwd: new URL("../../..", import.meta.url),
+        env: { PATH: process.env["PATH"] ?? "", HOME: dir },
+        input: JSON.stringify({ jobId: "outside-skill", input: {}, skillDir: dir, adapter: "skill", bounds: { timeoutSec: 3 }, outputSchema: {} }),
+        encoding: "utf8", timeout: 5_000
+      })
+      expect(run.status).toBe(1)
+      const envelope = JSON.parse(run.stdout) as JobEnvelope
+      expect(envelope.stopReason).toBe("error")
+      expect(envelope.error).toMatch(/inside.*skill directory/)
+      expect(run.stdout + run.stderr).not.toContain("PRIVATE_OUTSIDE_SKILL_")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+      rmSync(outside, { recursive: true, force: true })
+    }
+  })
+})
 
 const stubEngine = (
   envelope: Partial<JobEnvelope> = {},

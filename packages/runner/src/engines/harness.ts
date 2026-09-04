@@ -19,7 +19,8 @@
  *            stderr: job logs, relayed to the hub; never secrets
  */
 
-import { resolve } from "node:path"
+import { realpath } from "node:fs/promises"
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path"
 import {
   assertOutputSize,
   fence,
@@ -30,11 +31,13 @@ import {
 } from "@arcade/core"
 import { claudeApiEngine } from "./claude-api.js"
 import { claudeAgentEngine } from "./claude-agent.js"
+import { loadSkillAgent, skillEngine } from "./skill.js"
 import type { Engine, HarnessJob, JobEnvelope, SkillAgent } from "./types.js"
 
 export const ENGINES: Partial<Record<EngineAdapter, Engine>> = {
   "claude-api": claudeApiEngine,
-  "claude-agent": claudeAgentEngine
+  "claude-agent": claudeAgentEngine,
+  skill: skillEngine
 }
 
 export const engineFor = (adapter: EngineAdapter): Engine => {
@@ -129,7 +132,19 @@ const agentFor = async (request: HarnessRequest, entryArg: string): Promise<Skil
   // directory, which would look for the seller's agent inside the runner package.
   const entry = resolve(process.cwd(), entryArg)
   if (request.adapter === "skill") {
-    throw new Error("the skill adapter is not registered yet")
+    let rootPath: string
+    let entryPath: string
+    try {
+      ;[rootPath, entryPath] = await Promise.all([realpath(request.skillDir), realpath(entry)])
+    } catch {
+      throw new Error("SKILL.md could not be read. Check engine.entry and file permissions.")
+    }
+    const workdir = relative(rootPath, dirname(entryPath))
+    if (workdir === ".." || workdir.startsWith(`..${sep}`) || isAbsolute(workdir)) {
+      throw new Error("SKILL.md must stay inside the skill directory.")
+    }
+    // Reference paths in the prompt are relative to SKILL.md, including nested skills.
+    return { ...await loadSkillAgent(entryPath, config), workdir: workdir || "." }
   }
   const mod = (await import(entry)) as { default?: SkillAgent }
   const agent = mod.default
