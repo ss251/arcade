@@ -64,7 +64,12 @@ export class Job extends Schema.Class<Job>("Job")({
   input: Schema.Unknown,
   status: JobStatus,
   createdAtMs: Schema.Number,
-  outcome: Schema.optional(JobOutcome)
+  outcome: Schema.optional(JobOutcome),
+  /** Lineage, derived by the hub. Absent on rows written before lineage existed → root. */
+  rootJobId: Schema.optional(Schema.String),
+  parentJobId: Schema.optional(Schema.String),
+  hop: Schema.optional(Schema.Int),
+  ancestors: Schema.optional(Schema.Array(Schema.String))
 }) {}
 
 /** Stop reasons that mean "the engine declined", regardless of exit status. */

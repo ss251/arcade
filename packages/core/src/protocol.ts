@@ -116,7 +116,10 @@ export class JobAssignment extends Schema.TaggedClass<JobAssignment>()("JobAssig
   skillVersion: Schema.String,
   input: Schema.Unknown,
   /** Hard ceiling echoed from the listing so the runner enforces it locally too. */
-  timeoutSec: Schema.Int
+  timeoutSec: Schema.Int,
+  parentJobId: Schema.optional(Schema.String),
+  /** Present only when the listing declares `hire-skills`; the runner forwards it on child purchases. */
+  hireCapability: Schema.optional(Schema.String)
 }) {}
 
 export class Ack extends Schema.TaggedClass<Ack>()("Ack", {
