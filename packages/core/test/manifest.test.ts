@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
 import {
   MAX_TAGS,
+  PublicListing,
   SERVICE_NAME_MAX,
   SkillManifest,
   decodeManifest,
@@ -259,6 +260,47 @@ describe("manifest validation", () => {
     const { Effect } = await import("effect")
     const exit = await Effect.runPromiseExit(decodeManifest({ ...base, id: "BAD" }))
     expect(exit._tag).toBe("Failure")
+  })
+})
+
+describe("canaryInput — deliberate public input for paid checks", () => {
+  it.each([
+    { label: "object", value: { address: "0x3600000000000000000000000000000000000000" } },
+    { label: "null", value: null },
+    { label: "false", value: false },
+    { label: "zero", value: 0 },
+    { label: "string", value: "representative input" },
+    { label: "array", value: ["one", "two"] }
+  ])("preserves a declared $label through both schemas and the public wire", ({ value: canaryInput }) => {
+    const manifest = Schema.decodeUnknownSync(SkillManifest)({ ...base, canaryInput })
+    expect(manifest.canaryInput).toEqual(canaryInput)
+    const pub = toPublicListing(manifest)
+    expect(pub.canaryInput).toEqual(canaryInput)
+    const encoded = Schema.encodeSync(PublicListing)(pub)
+    const decoded = Schema.decodeUnknownSync(PublicListing)(JSON.parse(JSON.stringify(encoded)))
+    expect(decoded.canaryInput).toEqual(canaryInput)
+  })
+
+  it("remains optional and does not add an absent input to the public wire", () => {
+    for (const raw of [base, { ...base, canaryInput: undefined }]) {
+      const manifest = Schema.decodeUnknownSync(SkillManifest)(raw)
+      expect(manifest.canaryInput).toBeUndefined()
+      expect(toPublicListing(manifest)).not.toHaveProperty("canaryInput")
+      expect(Schema.encodeSync(PublicListing)(toPublicListing(manifest))).not.toHaveProperty("canaryInput")
+    }
+  })
+
+  it("every shipped manifest declares a public canaryInput", async () => {
+    const { readdir, readFile } = await import("node:fs/promises")
+    const skillsDir = new URL("../../../skills/", import.meta.url)
+    const dirs = (await readdir(skillsDir, { withFileTypes: true })).filter((entry) => entry.isDirectory())
+    expect(dirs.length).toBeGreaterThan(0)
+    for (const dir of dirs) {
+      const raw = JSON.parse(await readFile(new URL(`${dir.name}/arcade.json`, skillsDir), "utf8")) as Record<string, unknown>
+      expect(raw.canaryInput, `${dir.name} has no canaryInput`).toBeDefined()
+      const manifest = Schema.decodeUnknownSync(SkillManifest)(raw)
+      expect(toPublicListing(manifest).canaryInput, `${dir.name} must publish its canaryInput`).toEqual(raw.canaryInput)
+    }
   })
 })
 

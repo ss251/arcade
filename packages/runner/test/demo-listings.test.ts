@@ -48,13 +48,13 @@ describe("the OpenAPI demo listing", () => {
     expect(spec).toEqual(fixture)
   })
 
-  it("is exactly the manifest generated from the committed spec", async () => {
+  it("preserves the exact generated manifest plus its explicit public pay-test input", async () => {
     const spec = JSON.parse(readFileSync(join(SKILLS, "fx-rate", "openapi.json"), "utf8"))
     const ref = operationsOf(spec).find((operation) => operation.operationId === "fxRate")!
     const generated = manifestFromOperation(spec, ref, { specFile: "openapi.json", price: "$0.01" })
     const listing = await readBySlug("fx-rate")
     expect(listing).toBeDefined()
-    expect(listing!.raw).toEqual(generated)
+    expect(listing!.raw).toEqual({ ...generated, canaryInput: { base: "USD", symbols: "EUR" } })
   })
 
   it("keeps the upstream and operation binding out of the public listing", async () => {
@@ -74,18 +74,19 @@ describe("the OpenAPI demo listing", () => {
 describe("the MCP demo listings", () => {
   const tools = JSON.parse(readFileSync(new URL("./fixtures/arc-docs-tools.json", import.meta.url), "utf8")) as ReadonlyArray<McpTool>
   const listings = [
-    { id: "search-arc-docs", tool: "search_arc_docs" },
-    { id: "query-docs-filesystem-arc-docs", tool: "query_docs_filesystem_arc_docs" }
+    { id: "search-arc-docs", tool: "search_arc_docs", canaryInput: { query: "Arc USDC native gas token and ERC-20 decimals" } },
+    { id: "query-docs-filesystem-arc-docs", tool: "query_docs_filesystem_arc_docs", canaryInput: { command: "tree / -L 2" } }
   ] as const
 
-  it("are exactly the two read-only manifests generated from the captured server fixture", async () => {
+  it("preserve exactly the two generated read-only manifests plus explicit public pay-test inputs", async () => {
     const readOnly = tools.filter((tool) => tool.annotations?.readOnlyHint === true)
     expect(readOnly.map((tool) => tool.name)).toEqual(listings.map((listing) => listing.tool))
     for (const tool of readOnly) {
       const generated = manifestFromMcpTool({ url: "https://docs.arc.io/mcp" }, tool, { price: "$0.02" })
       const committed = await readBySlug(String(generated["id"]))
       expect(committed, `missing generated listing ${generated["id"]}`).toBeDefined()
-      expect(committed!.raw).toEqual(generated)
+      const enrichment = listings.find((listing) => listing.tool === tool.name)!
+      expect(committed!.raw).toEqual({ ...generated, canaryInput: enrichment.canaryInput })
     }
   })
 

@@ -34,6 +34,7 @@
       "checkedAt": { "type": "string" }
     }
   },
+  "canaryInput": { "address": "0x3600000000000000000000000000000000000000" },
   "engine": {
     "adapter": "script",
     "entry": "run.ts"

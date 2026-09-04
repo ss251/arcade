@@ -34,6 +34,8 @@ append the verified root and descendant transaction hashes here after the live r
 Verified on **2026-09-05 IST**. The CLI generated the two read-only Arc Docs MCP
 listings and the Frankfurter OpenAPI listing; fixture-equality tests verify the
 committed manifests are generator output, not hand-edited demos.
+Plan C subsequently adds public `canaryInput` samples; tests still compare every generated
+field exactly and permit only that explicitly asserted enrichment.
 
 ```bash
 bash scripts/e2e-publish-adapters.sh --only search-arc-docs --only fx-rate

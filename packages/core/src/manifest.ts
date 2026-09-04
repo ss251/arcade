@@ -173,7 +173,12 @@ export class PublicListing extends Schema.Class<PublicListing>("PublicListing")(
   /** JSON Schema describing accepted input. */
   inputSchema: Schema.Unknown,
   /** JSON Schema the output MUST satisfy — this is what settle-on-success validates against. */
-  outputSchema: Schema.Unknown
+  outputSchema: Schema.Unknown,
+  /**
+   * Representative input for the hub's paid canary checks. Deliberately public: sellers
+   * must not put secrets here. Omit it to let the hub derive an input from inputSchema.
+   */
+  canaryInput: Schema.optional(Schema.Unknown)
 }) {}
 
 // ── PRIVATE half ────────────────────────────────────────────────────────────
@@ -315,6 +320,8 @@ export class SkillManifest extends Schema.Class<SkillManifest>("SkillManifest")(
   bounds: Bounds,
   inputSchema: Schema.Unknown,
   outputSchema: Schema.Unknown,
+  /** Public: see PublicListing.canaryInput. */
+  canaryInput: Schema.optional(Schema.Unknown),
 
   // ---- private below this line: never leaves the seller's machine ----
   engine: EngineSpec,
@@ -345,7 +352,8 @@ export const toPublicListing = (m: SkillManifest): PublicListing =>
     ...(m.replaces === undefined ? {} : { replaces: m.replaces }),
     bounds: m.bounds,
     inputSchema: m.inputSchema,
-    outputSchema: m.outputSchema
+    outputSchema: m.outputSchema,
+    ...(m.canaryInput === undefined ? {} : { canaryInput: m.canaryInput })
   })
 
 /** The credential a manifest's engine will actually use. */

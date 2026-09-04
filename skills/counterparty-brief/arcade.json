@@ -135,6 +135,10 @@
       }
     }
   },
+  "canaryInput": {
+    "company": "Circle (circle.com)",
+    "focus": "general"
+  },
   "engine": {
     "adapter": "claude-api",
     "credential": "api-key",

@@ -34,6 +34,9 @@
       }
     }
   },
+  "canaryInput": {
+    "query": "Arc USDC native gas token and ERC-20 decimals"
+  },
   "egress": [
     "docs.arc.io"
   ],

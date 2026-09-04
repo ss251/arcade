@@ -100,6 +100,10 @@
       }
     }
   },
+  "canaryInput": {
+    "diff": "--- a/retry.ts\n+++ b/retry.ts\n@@ -1 +1 @@\n-export const maxRetries = 3;\n+export const maxRetries = 4;\n",
+    "context": "Allow one more retry for a transient network failure."
+  },
   "engine": {
     "adapter": "skill",
     "credential": "api-key",

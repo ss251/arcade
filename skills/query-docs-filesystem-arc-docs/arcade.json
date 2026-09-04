@@ -34,6 +34,9 @@
       }
     }
   },
+  "canaryInput": {
+    "command": "tree / -L 2"
+  },
   "egress": [
     "docs.arc.io"
   ],

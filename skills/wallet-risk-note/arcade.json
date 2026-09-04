@@ -85,6 +85,10 @@
       }
     }
   },
+  "canaryInput": {
+    "address": "0x3600000000000000000000000000000000000000",
+    "minUsdc": 1
+  },
   "engine": {
     "adapter": "script",
     "entry": "run.ts",
