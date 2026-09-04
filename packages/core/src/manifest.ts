@@ -178,10 +178,21 @@ export class PublicListing extends Schema.Class<PublicListing>("PublicListing")(
 
 // ── PRIVATE half ────────────────────────────────────────────────────────────
 
+/**
+ * An upstream credential binding. `env` is a secret NAME, never its value, and uses
+ * the same reserved-name guard as `secrets` so it cannot reopen the sandbox's HOME
+ * or request credentials that are reserved for the runner.
+ */
+export class EngineAuth extends Schema.Class<EngineAuth>("EngineAuth")({
+  in: Schema.Literal("header", "query"),
+  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128)),
+  env: SecretName.pipe(Schema.pattern(/^[A-Za-z_][A-Za-z0-9_]*$/))
+}) {}
+
 export class Engine extends Schema.Class<Engine>("Engine")({
   adapter: EngineAdapter,
   /**
-   * Where model access comes from. Defaults to `"api-key"`.
+   * Where model access comes from. Defaults per adapter — see `defaultCredential`.
    *
    * `"subscription"` runs on a personal seat, which consumer terms limit to the holder's
    * own interactive use. Such a skill still runs locally but `assertPublishable` refuses
@@ -192,10 +203,13 @@ export class Engine extends Schema.Class<Engine>("Engine")({
    * Path to the executable/entry module, relative to the skill directory.
    *
    * For `claude-api` this is the seller's agent module — a default-exported
-   * `AgentDefinition` carrying the system prompt, model, and any client-side tools. It is
-   * loaded by the harness inside the sandbox and never transmitted.
+   * `AgentDefinition` carrying the system prompt, model, and any client-side tools. For
+   * `skill` this is the SKILL.md whose body becomes the system prompt. Both stay private.
+   *
+   * Optional here because MCP and OpenAPI have no entry module. `EngineSpec` requires it
+   * for every adapter that runs seller code, so missing entry points still fail at decode.
    */
-  entry: Schema.String,
+  entry: Schema.optional(Schema.String),
   /**
    * What the skill may do, in portable terms. Empty means the job reaches neither the
    * network nor the filesystem.
@@ -207,9 +221,83 @@ export class Engine extends Schema.Class<Engine>("Engine")({
   capabilities: Schema.optionalWith(Schema.Array(Capability), { default: () => [] }),
   /** Optional system prompt for LLM adapters. Never transmitted. */
   systemPrompt: Schema.optional(Schema.String),
+  /** Provider model id for adapters without an agent module; private seller cost choice. */
+  model: Schema.optional(Schema.String),
   /** Extra argv passed to the entry. */
-  args: Schema.optional(Schema.Array(Schema.String))
+  args: Schema.optional(Schema.Array(Schema.String)),
+
+  /** Stdio MCP server as argv, mutually exclusive with `url`. */
+  command: Schema.optional(Schema.Array(Schema.String)),
+  /** HTTPS streamable-HTTP MCP endpoint, mutually exclusive with `command`. */
+  url: Schema.optional(Schema.String),
+  /** The ONE MCP tool sold by this listing. */
+  tool: Schema.optional(Schema.String),
+
+  /** OpenAPI document path, relative to the skill directory. */
+  spec: Schema.optional(Schema.String),
+  /** The ONE OpenAPI operation sold by this listing. */
+  operationId: Schema.optional(Schema.String),
+  /** Private upstream credential binding for MCP or OpenAPI. */
+  auth: Schema.optional(EngineAuth)
 }) {}
+
+/** Per-adapter required fields, expressed as a useful decode-time refusal. */
+export const engineShapeIssue = (e: Engine): string | undefined => {
+  if (e.auth?.in === "header" && !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(e.auth.name)) {
+    return "engine.auth.name must be an HTTP token for a header binding"
+  }
+  switch (e.adapter) {
+    case "mcp": {
+      if (e.tool === undefined || e.tool.trim() === "") {
+        return 'engine.adapter "mcp" needs `tool` — a listing sells exactly one tool, so ' +
+          "that a settled receipt names what the buyer actually bought"
+      }
+      if (e.command === undefined && e.url === undefined) {
+        return 'engine.adapter "mcp" needs `command` (a stdio server, as argv) or `url` ' +
+          "(a streamable-HTTP endpoint)"
+      }
+      if (e.command !== undefined && e.url !== undefined) {
+        return 'engine.adapter "mcp" cannot have both `command` and `url` — pick the ' +
+          "transport this listing actually uses"
+      }
+      if (e.command !== undefined && !e.command[0]?.trim()) {
+        return "engine.command needs a non-empty executable as its first argv item"
+      }
+      if (e.url !== undefined) {
+        try {
+          if (new URL(e.url).protocol !== "https:") {
+            return "engine.url must be https — a paid call and any upstream credential in its " +
+              "headers must not cross the network in the clear"
+          }
+        } catch {
+          return "engine.url must be a valid https URL"
+        }
+      }
+      return undefined
+    }
+    case "openapi": {
+      if (e.spec === undefined || e.spec.trim() === "") {
+        return 'engine.adapter "openapi" needs `spec` — the path to the OpenAPI document, ' +
+          "relative to the skill directory. It stays on this machine"
+      }
+      if (e.operationId === undefined || e.operationId.trim() === "") {
+        return 'engine.adapter "openapi" needs `operationId` — a listing sells exactly one ' +
+          "operation"
+      }
+      return undefined
+    }
+    default: {
+      if (e.entry === undefined || e.entry.trim() === "") {
+        return `engine.adapter "${e.adapter}" needs \`entry\` — the module (or SKILL.md) ` +
+          "this listing runs"
+      }
+      return undefined
+    }
+  }
+}
+
+/** Engine schema with its adapter-specific requirements enforced. */
+export const EngineSpec = Engine.pipe(Schema.filter((e: Engine) => engineShapeIssue(e)))
 
 /**
  * The complete on-disk manifest. `Engine`, `secrets` and `egress` exist ONLY in this type;
@@ -229,7 +317,7 @@ export class SkillManifest extends Schema.Class<SkillManifest>("SkillManifest")(
   outputSchema: Schema.Unknown,
 
   // ---- private below this line: never leaves the seller's machine ----
-  engine: Engine,
+  engine: EngineSpec,
   /** Environment variable NAMES the sandbox may pass through. Never values. */
   secrets: Schema.optionalWith(Schema.Array(SecretName), { default: () => [] }),
   /** Hostnames the sandbox may reach. Empty means no network. */
@@ -284,7 +372,14 @@ export const PRIVATE_FIELDS = [
   "systemPrompt",
   "entry",
   "capabilities",
-  "credential"
+  "credential",
+  "model",
+  "command",
+  "url",
+  "tool",
+  "spec",
+  "operationId",
+  "auth"
 ] as const
 
 export const decodeManifest = Schema.decodeUnknown(SkillManifest)

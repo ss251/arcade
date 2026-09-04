@@ -123,18 +123,102 @@ describe("manifest validation", () => {
 
   describe("engine", () => {
     it("rejects an unknown adapter", () => {
-      expect(decode({ engine: { adapter: "wat", entry: "run.ts" } }).ok).toBe(false)
+      expect(decode({ engine: { adapter: "telepathy", entry: "run.ts" } }).ok).toBe(false)
     })
 
-    it.each(["script", "claude-api", "claude-agent", "codex", "grok"])(
-      "accepts adapter %s",
+    it.each(["script", "claude-api", "claude-agent", "codex", "grok", "skill"])(
+      "requires an entry point for the %s adapter that runs seller code",
       (adapter) => {
+        expect(decode({ engine: { adapter } }).ok).toBe(false)
         expect(decode({ engine: { adapter, entry: "run.ts" } }).ok).toBe(true)
       }
     )
 
-    it("requires an entry point", () => {
-      expect(decode({ engine: { adapter: "script" } }).ok).toBe(false)
+    it("needs a transport and a tool for mcp, without requiring an entry module", () => {
+      expect(decode({ engine: { adapter: "mcp", url: "https://docs.arc.io/mcp" } }).ok).toBe(false)
+      expect(decode({ engine: { adapter: "mcp", tool: "search" } }).ok).toBe(false)
+      expect(decode({ engine: { adapter: "mcp", url: "https://docs.arc.io/mcp", tool: "search" } }).ok).toBe(true)
+      expect(decode({ engine: { adapter: "mcp", command: ["bunx", "some-server"], tool: "search" } }).ok).toBe(true)
+    })
+
+    it("refuses an mcp listing that declares both a command and a url", () => {
+      expect(decode({ engine: {
+        adapter: "mcp", command: ["bunx", "s"], url: "https://x.example/mcp", tool: "t"
+      } }).ok).toBe(false)
+    })
+
+    it("refuses a plaintext mcp url carrying paid results or upstream credentials", () => {
+      expect(decode({ engine: { adapter: "mcp", url: "http://x.example/mcp", tool: "t" } }).ok).toBe(false)
+    })
+
+    it.each(["https://", "https:// bad.example/mcp", "https://[invalid/mcp", "https://x.example:bad/mcp"])(
+      "refuses malformed HTTPS endpoint %s",
+      (url) => expect(decode({ engine: { adapter: "mcp", url, tool: "search" } }).ok).toBe(false)
+    )
+
+    it("refuses empty required entry, tool, spec and operation names", () => {
+      for (const empty of ["", "   "]) {
+        for (const adapter of ["script", "claude-api", "claude-agent", "codex", "grok", "skill"]) {
+          expect(decode({ engine: { adapter, entry: empty } }).ok).toBe(false)
+        }
+        expect(decode({ engine: { adapter: "mcp", command: ["bunx", "server"], tool: empty } }).ok).toBe(false)
+        expect(decode({ engine: { adapter: "openapi", spec: empty, operationId: "fxRate" } }).ok).toBe(false)
+        expect(decode({ engine: { adapter: "openapi", spec: "openapi.json", operationId: empty } }).ok).toBe(false)
+      }
+    })
+
+    it("requires a non-empty MCP executable while preserving valid empty command arguments", () => {
+      for (const command of [[], [""], ["   "]]) {
+        expect(decode({ engine: { adapter: "mcp", command, tool: "search" } }).ok).toBe(false)
+      }
+      expect(decode({ engine: { adapter: "mcp", command: ["bunx", "server", "--value", ""], tool: "search" } }).ok).toBe(true)
+    })
+
+    it("needs a spec and one operationId for openapi", () => {
+      expect(decode({ engine: { adapter: "openapi", spec: "openapi.json" } }).ok).toBe(false)
+      expect(decode({ engine: { adapter: "openapi", operationId: "fxRate" } }).ok).toBe(false)
+      expect(decode({ engine: { adapter: "openapi", spec: "openapi.json", operationId: "fxRate" } }).ok).toBe(true)
+    })
+
+    it("refuses reserved environment names in upstream auth bindings", () => {
+      for (const env of ["HOME", "PATH", "CLAUDE_CODE_OAUTH_TOKEN", "ARCADE_SUBBUY_KEY"]) {
+        expect(decode({ engine: {
+          adapter: "openapi", spec: "openapi.json", operationId: "fxRate",
+          auth: { in: "header", name: "Authorization", env }
+        } }).ok).toBe(false)
+      }
+      expect(decode({ engine: {
+        adapter: "openapi", spec: "openapi.json", operationId: "fxRate",
+        auth: { in: "header", name: "X-Api-Key", env: "UPSTREAM_KEY" }
+      } }).ok).toBe(true)
+    })
+
+    it("validates auth binding placement and name", () => {
+      const engine = { adapter: "mcp", url: "https://x.example/mcp", tool: "search" }
+      expect(decode({ engine: { ...engine, auth: { in: "query", name: "key", env: "UPSTREAM_KEY" } } }).ok).toBe(true)
+      for (const auth of [
+        { in: "body", name: "key", env: "UPSTREAM_KEY" },
+        { in: "header", name: "", env: "UPSTREAM_KEY" },
+        { in: "header", name: "x".repeat(129), env: "UPSTREAM_KEY" }
+      ]) {
+        expect(decode({ engine: { ...engine, auth } }).ok).toBe(false)
+      }
+    })
+
+    it("requires HTTP-token header names without imposing that syntax on query names", () => {
+      const engine = { adapter: "mcp", url: "https://x.example/mcp", tool: "search" }
+      for (const name of ["X-Api-Key\r\nInjected", "X:Api-Key", "X Api Key", "X-Key\n"]) {
+        expect(decode({ engine: { ...engine, auth: { in: "header", name, env: "UPSTREAM_KEY" } } }).ok).toBe(false)
+      }
+      expect(decode({ engine: { ...engine, auth: { in: "query", name: "api.key[0]", env: "UPSTREAM_KEY" } } }).ok).toBe(true)
+    })
+
+    it("requires a usable environment variable name for an auth binding", () => {
+      const engine = { adapter: "openapi", spec: "openapi.json", operationId: "fxRate" }
+      for (const env of ["", "   ", "BAD-NAME", "=VALUE", "1KEY", "KEY\nVALUE", "UPSTREAM_KEY\n"]) {
+        expect(decode({ engine: { ...engine, auth: { in: "header", name: "X-Key", env } } }).ok).toBe(false)
+      }
+      expect(decode({ engine: { ...engine, auth: { in: "header", name: "X-Key", env: "service_key2" } } }).ok).toBe(true)
     })
   })
 

@@ -149,7 +149,10 @@ describe("sellability is a total function", () => {
       "claude-api",
       "claude-agent",
       "codex",
-      "grok"
+      "grok",
+      "skill",
+      "mcp",
+      "openapi"
     ]
     fc.assert(
       fc.property(
@@ -169,9 +172,9 @@ describe("sellability is a total function", () => {
 
 describe("the publish adapters (M1)", () => {
   it("carries skill, mcp and openapi as engine adapters", () => {
-    for (const a of ["skill", "mcp", "openapi"] as const) {
-      expect(ENGINE_TERMS[a]).toBeDefined()
-    }
+    expect(ENGINE_TERMS.skill).toEqual(["api-key", "subscription"])
+    expect(ENGINE_TERMS.mcp).toEqual(["none", "api-key"])
+    expect(ENGINE_TERMS.openapi).toEqual(["none", "api-key"])
   })
 
   it("sells all three on an api key, and the model-free two on no credential at all", () => {

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest"
-import { Schema } from "effect"
+import { describe, expect, it, vi } from "vitest"
+import { Effect, Schema } from "effect"
 import { SkillManifest } from "@arcade/core"
-import { buildEnv } from "../src/exec.ts"
+import { buildEnv, execSkill } from "../src/exec.ts"
 
 /**
  * THE ENV SCRUB IS A SECURITY BOUNDARY.
@@ -41,6 +41,34 @@ const POLLUTANTS = {
   ARCADE_FACILITATOR_KEY: "0xREALPRIVATEKEY",
   ARCADE_BUYER_KEY: "0xREALPRIVATEKEY"
 }
+
+describe("entryless adapter spawning", () => {
+  it.each([
+    { adapter: "mcp", url: "https://tools.example/mcp", tool: "read" },
+    { adapter: "openapi", spec: "openapi.json", operationId: "read" }
+  ])("passes the harness sentinel for $adapter without resolving an absent path", async (engine) => {
+    const skill = Schema.decodeUnknownSync(SkillManifest)({ ...manifest(), engine })
+    const spawn = vi.fn(() => ({
+      stdin: { write: vi.fn(), end: vi.fn() },
+      stdout: new Response(JSON.stringify({ output: { ok: true }, stopReason: "end_turn" })).body,
+      stderr: new Response("").body,
+      exited: Promise.resolve(0),
+      kill: vi.fn()
+    }))
+    vi.stubGlobal("Bun", { spawn })
+    try {
+      await Effect.runPromise(Effect.scoped(execSkill({
+        manifest: skill, skillDir: "/tmp/skill", jobId: "entryless", input: {}
+      })))
+      expect(spawn).toHaveBeenCalledWith(
+        ["bun", "run", expect.stringContaining("/engines/harness.ts"), "-"],
+        expect.objectContaining({ cwd: "/tmp/skill" })
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
 
 const withPollutedEnv = <T>(fn: () => T): T => {
   const saved: Record<string, string | undefined> = {}

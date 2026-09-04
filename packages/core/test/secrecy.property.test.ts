@@ -31,9 +31,16 @@ const arbManifest = fc.record({
 
   // The private half — deliberately filled with recognisable canary values.
   engine: fc.record({
-    adapter: fc.constantFrom("script", "claude-api", "claude-agent"),
+    adapter: fc.constantFrom("script", "claude-api", "claude-agent", "skill"),
     entry: fc.constant("CANARY_ENTRY_run.ts"),
-    systemPrompt: fc.constant("CANARY_PROMPT you are a secret specialist agent")
+    model: fc.constant("CANARY_MODEL_claude-sonnet-5"),
+    systemPrompt: fc.constant("CANARY_PROMPT you are a secret specialist agent"),
+    command: fc.constant(["CANARY_COMMAND_bunx", "CANARY_COMMAND_server"]),
+    url: fc.constant("https://CANARY_URL.example/mcp"),
+    tool: fc.constant("CANARY_TOOL_search"),
+    spec: fc.constant("CANARY_SPEC_openapi.json"),
+    operationId: fc.constant("CANARY_OPERATION_fxRate"),
+    auth: fc.constant({ in: "header", name: "CANARY_AUTH_X-Api-Key", env: "CANARY_AUTH_ENV" })
   }),
   secrets: fc.array(fc.constant("CANARY_SECRET_ANTHROPIC_API_KEY"), { maxLength: 3 }),
   egress: fc.array(fc.constant("CANARY_EGRESS_api.anthropic.com"), { maxLength: 3 }),
@@ -42,10 +49,17 @@ const arbManifest = fc.record({
 
 const CANARIES = [
   "CANARY_ENTRY",
+  "CANARY_MODEL",
   "CANARY_PROMPT",
   "CANARY_SECRET",
   "CANARY_EGRESS",
-  "CANARY_WORKDIR"
+  "CANARY_WORKDIR",
+  "CANARY_COMMAND",
+  "CANARY_URL",
+  "CANARY_TOOL",
+  "CANARY_SPEC",
+  "CANARY_OPERATION",
+  "CANARY_AUTH"
 ]
 
 describe("secrecy boundary", () => {
@@ -67,6 +81,9 @@ describe("secrecy boundary", () => {
     fc.assert(
       fc.property(arbManifest, (raw) => {
         const manifest = Schema.decodeUnknownSync(SkillManifest)(raw)
+        // Prove the private fields actually survived decode: dropping unknown fields
+        // before projection must not make a secrecy regression test pass vacuously.
+        expect(manifest.engine).toMatchObject(raw.engine)
         const wire = JSON.stringify(Schema.encodeSync(PublicListing)(toPublicListing(manifest)))
         // The canaries are the only place these strings exist. If any appears on the wire,
         // some field is carrying private data through a path we did not intend.

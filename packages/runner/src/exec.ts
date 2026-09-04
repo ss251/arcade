@@ -169,11 +169,17 @@ const HARNESS = new URL("./engines/harness.ts", import.meta.url).pathname
  * the plumbing.
  */
 const commandFor = (manifest: SkillManifest, skillDir: string): ReadonlyArray<string> => {
+  const extra = manifest.engine.args ?? []
+  // Entryless adapters still use the harness. Reserve its entry argv slot without
+  // resolving an absent entry into the skill directory itself.
+  if (manifest.engine.adapter === "mcp" || manifest.engine.adapter === "openapi") {
+    return ["bun", "run", HARNESS, "-", ...extra]
+  }
   // Absolute, because the child is spawned with `cwd: skillDir`. A relative skills
   // directory would otherwise be applied twice — once as the cwd and again inside the
   // path — and the entry would resolve to a directory that does not exist.
-  const entry = resolve(skillDir, manifest.engine.entry)
-  const extra = manifest.engine.args ?? []
+  // The manifest's per-adapter shape rule requires entry for all remaining adapters.
+  const entry = resolve(skillDir, manifest.engine.entry ?? "")
   if (manifest.engine.adapter === "script") {
     return entry.endsWith(".ts") || entry.endsWith(".js")
       ? ["bun", "run", entry, ...extra]
