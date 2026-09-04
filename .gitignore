@@ -80,3 +80,7 @@ design/*
 
 # Claude Code worktrees (linked checkouts, never committed)
 .claude/worktrees/
+
+# Local executor handoff/status files; may contain operational state and owner-only actions.
+handoff/
+.claude/handoff/

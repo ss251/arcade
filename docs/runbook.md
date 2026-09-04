@@ -4,6 +4,31 @@ Everything here was learned by doing it. Where something failed quietly, that is
 down as the reason rather than the rule, because the rule alone is forgettable and the
 failure is not.
 
+## Plan A — Evidence: lineage
+
+`skills/loop-probe` buys `wallet-risk-note` (which buys `usdc-flow-check`), then attempts
+to hire itself. A successful demo reports `lineage_cycle` for the refused self-hire and
+settles the useful work. The root costs $0.30 and permits $0.25 of descendant purchases.
+The root receipt lists all descendants; individual child receipts carry their hop and
+ancestor skill ids. The refused cycle creates no job or payment.
+
+With the hub and runner already running on Arc testnet and the three listings published:
+
+```bash
+ARCADE_BUYER_KEY=$(security find-generic-password -s arcade-buyer-key -w) \
+  bash scripts/e2e-lineage.sh
+```
+
+Set `ARCADE_HUB` to select the running hub. The runner needs a funded `ARCADE_SUBBUY_KEY`
+distinct from its payout key. The script buys with a $0.35 ceiling, waits for the private
+result through the buyer CLI, then verifies the public receipt tree using settlement
+transaction hashes. It exits nonzero for a missing cycle refusal, unsuccessful output,
+unsettled work, a stale receipt, or descendants that do not belong to this purchase.
+
+Live lineage evidence is pending as of 2026-09-05: the distinct funded sub-buy key is an
+owner prerequisite. The unit and script checks do not count as live settlement evidence;
+append the verified root and descendant transaction hashes here after the live run.
+
 ---
 
 ## The six environment variables that matter

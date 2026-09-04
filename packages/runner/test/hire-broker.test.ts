@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { request } from "node:http"
-import { hire, subSpendUsd, __resetSubSpend } from "@arcade/buyer/hire"
+import { hire, HireRefused, subSpendUsd, __resetSubSpend } from "@arcade/buyer/hire"
+import { ARC_CAIP2, HIRE_CAPABILITY_HEADER, USDC_ADDRESS } from "@arcade/core"
+import { HEADER_PAYMENT_SIGNATURE } from "@arcade/payments"
 import { startHireBroker, type HireBroker, type PurchaseFn } from "../src/hire-broker.ts"
 
 /**
@@ -103,6 +105,7 @@ afterEach(() => {
   broker?.stop()
   broker = undefined
   globalThis.fetch = originalFetch
+  vi.unstubAllEnvs()
 })
 
 describe("hire broker", () => {
@@ -253,5 +256,53 @@ describe("hire broker", () => {
     )
     expect(res.status).toBe(200)
     expect(seen).toBe("cap.abc")
+  })
+
+  it("keeps the capability and cycle refusal through the real buyer purchase and hire socket", async () => {
+    const seller = "0x3b2Bbb840A9570223aDbF2172a33BB77fE8D21AF"
+    const requests: Request[] = []
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init)
+      const url = new URL(req.url)
+      if (url.pathname.startsWith("/listings/")) return json({ seller })
+      if (url.pathname === "/jobs/child") {
+        return json({ jobId: "job_child", status: "settled", result: { ok: true }, receipt: { settled: true, price: "$0.05" } })
+      }
+      requests.push(req)
+      if (url.pathname === `/x/${seller}/loop-probe`) {
+        return json({ error: "lineage_cycle", detail: "loop-probe is already an ancestor" }, 402)
+      }
+      if (url.pathname !== `/x/${seller}/wallet-risk-note`) throw new Error(`unexpected request: ${url.pathname}`)
+      if (req.headers.has(HEADER_PAYMENT_SIGNATURE)) {
+        return json({ job_id: "job_child", poll_url: "http://hub.test/jobs/child" }, 202)
+      }
+      return json({
+        x402Version: 2,
+        accepts: [{ scheme: "exact", network: ARC_CAIP2, amount: "50000", asset: USDC_ADDRESS,
+          payTo: seller, resource: req.url, mimeType: "application/json", maxTimeoutSeconds: 60, extra: {} }]
+      }, 402)
+    }) as typeof globalThis.fetch
+    SOCK = `${process.env["TMPDIR"] ?? "/tmp"}/arcade-hire-${process.pid}-${seq++}.sock`
+    broker = startHireBroker({ hubUrl: "http://hub.test", subBuyKey: KEY, socketPath: SOCK })
+    const token = broker.openJob("job_parent", 0.25, "cap.real-parent")
+    vi.stubEnv("ARCADE_HIRE_SOCKET", SOCK)
+    vi.stubEnv("ARCADE_JOB_ID", "job_parent")
+    vi.stubEnv("ARCADE_JOB_TOKEN", token)
+    __resetSubSpend()
+
+    const child = await hire("wallet-risk-note", {})
+    expect(child).toMatchObject({ jobId: "job_child", settled: true, costUsd: 0.05 })
+    const refusal = await hire("loop-probe", {}).catch((error: unknown) => error)
+    expect(refusal).toBeInstanceOf(HireRefused)
+    expect((refusal as Error).message).toContain("lineage_cycle: loop-probe is already an ancestor")
+    expect(requests).toHaveLength(3)
+    for (const req of requests) expect(req.headers.get(HIRE_CAPABILITY_HEADER)).toBe("cap.real-parent")
+    expect(requests[0]?.headers.has(HEADER_PAYMENT_SIGNATURE)).toBe(false)
+    expect(requests[1]?.headers.has(HEADER_PAYMENT_SIGNATURE)).toBe(true)
+    expect(requests[2]?.headers.has(HEADER_PAYMENT_SIGNATURE)).toBe(false)
+    expect(broker.spentUsd("job_parent")).toBeCloseTo(0.05, 6)
+    expect(subSpendUsd()).toBeCloseTo(0.05, 6)
   })
 })

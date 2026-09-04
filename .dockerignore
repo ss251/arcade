@@ -98,3 +98,5 @@ docs/
 design/*
 
 .claude/worktrees/
+handoff/
+.claude/handoff/

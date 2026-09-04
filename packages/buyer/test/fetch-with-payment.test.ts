@@ -152,6 +152,23 @@ describe("fetchWithPayment", () => {
     expect(exit._tag).toBe("Failure")
   })
 
+  it("preserves a hub refusal without trying to sign it as a payment challenge", async () => {
+    const { fetch, calls } = recordingFetch(() =>
+      json({ error: "lineage_cycle", detail: "loop-probe is already an ancestor" }, 402)
+    )
+    const failure = await Effect.runPromise(
+      fetchWithPayment("https://hub.test/x/s/loop-probe", { method: "POST" }, { account, fetch })
+        .pipe(Effect.flip)
+    )
+    expect(failure).toMatchObject({
+      _tag: "RpcFailure",
+      method: "402",
+      reason: "lineage_cycle: loop-probe is already an ancestor"
+    })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.headers.get(HEADER_PAYMENT_SIGNATURE)).toBeNull()
+  })
+
   it("preserves the caller's body and headers across the retry", async () => {
     const { fetch, calls } = recordingFetch((n) =>
       n === 1 ? json(challenge(10_000n), 402) : json({ ok: true }, 202)

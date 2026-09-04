@@ -73,6 +73,13 @@ export const fetchWithPayment = (
       try: () => probe.json() as Promise<unknown>,
       catch: (e) => new RpcFailure({ method: "402 body", reason: String((e as Error)?.message ?? e) })
     })
+    // The hub also uses 402 for policy refusals (for example a lineage cycle). These
+    // have no payment requirements: preserve the reason and never sign a retry.
+    if (typeof body === "object" && body !== null && !("accepts" in body) &&
+        "error" in body && typeof body.error === "string") {
+      const detail = "detail" in body && typeof body.detail === "string" ? `: ${body.detail}` : ""
+      return yield* new RpcFailure({ method: "402", reason: `${body.error}${detail}` })
+    }
     const challenge = yield* decode402(body).pipe(
       Effect.mapError((e) => new RpcFailure({ method: "402 decode", reason: String(e) }))
     )
