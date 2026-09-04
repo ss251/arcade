@@ -221,7 +221,11 @@ export const startDaemon = (args: DaemonArgs) =>
                 ? {
                     socketPath: broker!.socketPath,
                     jobId: msg.jobId,
-                    token: broker!.openJob(msg.jobId, skill.manifest.bounds.maxSubSpendUsd)
+                    token: broker!.openJob(
+                      msg.jobId,
+                      skill.manifest.bounds.maxSubSpendUsd,
+                      msg.hireCapability
+                    )
                   }
                 : undefined
 

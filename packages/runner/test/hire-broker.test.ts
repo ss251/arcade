@@ -231,4 +231,27 @@ describe("hire broker", () => {
     expect(b.spentUsd("job_real")).toBeCloseTo(0.04, 6)
     expect(subSpendUsd()).toBeCloseTo(0.04, 6)
   })
+
+  it("forwards the hub capability to the purchase", async () => {
+    let seen: string | undefined
+    const purchase: PurchaseFn = async (args) => {
+      seen = args.lineage
+      return {
+        jobId: "job_sub",
+        settled: true,
+        result: {},
+        fenced: "",
+        paidAtomic: 0n
+      }
+    }
+    const b = start(purchase)
+    const token = b.openJob("job_p", 1, "cap.abc")
+    const res = await call(
+      "/hire",
+      { "x-job-id": "job_p", "x-job-token": token },
+      { skillId: "child", input: {} }
+    )
+    expect(res.status).toBe(200)
+    expect(seen).toBe("cap.abc")
+  })
 })

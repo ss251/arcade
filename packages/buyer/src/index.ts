@@ -21,6 +21,7 @@ export interface CallSkillArgs {
   readonly input: unknown
   readonly account: Account
   readonly maxAmountAtomic?: bigint
+  readonly lineage?: string
   readonly pollIntervalMs?: number
   readonly maxWaitMs?: number
 }
@@ -59,7 +60,8 @@ export const callSkill = (args: CallSkillArgs) =>
       },
       {
         account: args.account,
-        ...(args.maxAmountAtomic === undefined ? {} : { maxAmountAtomic: args.maxAmountAtomic })
+        ...(args.maxAmountAtomic === undefined ? {} : { maxAmountAtomic: args.maxAmountAtomic }),
+        ...(args.lineage === undefined ? {} : { lineage: args.lineage })
       }
     )
 

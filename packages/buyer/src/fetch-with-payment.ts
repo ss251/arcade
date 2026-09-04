@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect"
 import type { Account } from "viem"
-import { PaymentAlreadyAttempted, RpcFailure } from "@arcade/core"
+import { HIRE_CAPABILITY_HEADER, PaymentAlreadyAttempted, RpcFailure } from "@arcade/core"
 import {
   HEADER_PAYMENT_LEGACY,
   HEADER_PAYMENT_SIGNATURE,
@@ -25,6 +25,8 @@ export interface PayFetchOptions {
   readonly account: Account
   /** Refuse to sign anything above this, in atomic units. The buyer-side spend cap. */
   readonly maxAmountAtomic?: bigint
+  /** Hub-issued opaque capability proving this purchase is a child of a running job. */
+  readonly lineage?: string
   readonly fetch?: typeof globalThis.fetch
 }
 
@@ -53,6 +55,7 @@ export const fetchWithPayment = (
     const doFetch = options.fetch ?? globalThis.fetch
 
     const headers = new Headers(init.headers ?? {})
+    if (options.lineage !== undefined) headers.set(HIRE_CAPABILITY_HEADER, options.lineage)
     if (headers.has(HEADER_PAYMENT_SIGNATURE) || headers.has(HEADER_PAYMENT_LEGACY)) {
       return yield* new PaymentAlreadyAttempted({ resource: String(input) })
     }
@@ -105,6 +108,7 @@ export const fetchWithPayment = (
     })
 
     const retryHeaders = new Headers(init.headers ?? {})
+    if (options.lineage !== undefined) retryHeaders.set(HIRE_CAPABILITY_HEADER, options.lineage)
     retryHeaders.set(HEADER_PAYMENT_SIGNATURE, encodeHeader(payload))
 
     const paidRes = yield* Effect.tryPromise({

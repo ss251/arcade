@@ -171,4 +171,36 @@ describe("fetchWithPayment", () => {
     expect(retry.headers.get("x-trace")).toBe("abc")
     expect(await retry.text()).toBe(JSON.stringify({ address: "0xdead" }))
   })
+
+  it("forwards lineage on both the probe and paid retry, and omits it when absent", async () => {
+    const withLineage = recordingFetch((n) =>
+      n === 1 ? json(challenge(10_000n), 402) : json({ ok: true }, 202)
+    )
+    await Effect.runPromise(
+      fetchWithPayment(
+        "https://hub.test/x/s/demo",
+        { method: "POST" },
+        { account, fetch: withLineage.fetch, lineage: "cap.abc" }
+      )
+    )
+    expect(withLineage.calls).toHaveLength(2)
+    for (const req of withLineage.calls) {
+      expect(req.headers.get("x-arcade-hire-capability")).toBe("cap.abc")
+    }
+
+    const withoutLineage = recordingFetch((n) =>
+      n === 1 ? json(challenge(10_000n), 402) : json({ ok: true }, 202)
+    )
+    await Effect.runPromise(
+      fetchWithPayment(
+        "https://hub.test/x/s/demo",
+        { method: "POST" },
+        { account, fetch: withoutLineage.fetch }
+      )
+    )
+    expect(withoutLineage.calls).toHaveLength(2)
+    for (const req of withoutLineage.calls) {
+      expect(req.headers.get("x-arcade-hire-capability")).toBeNull()
+    }
+  })
 })

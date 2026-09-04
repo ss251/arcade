@@ -45,6 +45,7 @@ export interface PurchaseArgs {
   readonly input: unknown
   readonly privateKey: string
   readonly maxAmountAtomic: bigint
+  readonly lineage?: string
 }
 
 export interface PurchaseResult {
@@ -60,12 +61,17 @@ export type PurchaseFn = (args: PurchaseArgs) => Promise<PurchaseResult>
 interface Ledger {
   budgetAtomic: bigint
   spentAtomic: bigint
+  hireCapability?: string
 }
 
 export interface HireBroker {
   readonly socketPath: string
   /** Called before a job starts: fixes that job's ceiling and returns its token. */
-  readonly openJob: (jobId: string, budgetUsd: number | undefined) => string
+  readonly openJob: (
+    jobId: string,
+    budgetUsd: number | undefined,
+    hireCapability?: string
+  ) => string
   /** Called when a job ends, so a token cannot outlive the work it was issued for. */
   readonly closeJob: (jobId: string) => void
   readonly spentUsd: (jobId: string) => number
@@ -85,7 +91,8 @@ const defaultPurchase: PurchaseFn = async (args) => {
       skillId: args.skillId,
       input: args.input,
       account: privateKeyToAccount(args.privateKey as `0x${string}`),
-      maxAmountAtomic: args.maxAmountAtomic
+      maxAmountAtomic: args.maxAmountAtomic,
+      ...(args.lineage === undefined ? {} : { lineage: args.lineage })
     })
   )
   const receipt = out.receipt as Record<string, unknown>
@@ -195,7 +202,8 @@ export const startHireBroker = (options: HireBrokerOptions): HireBroker => {
           skillId,
           input: body.input ?? {},
           privateKey: options.subBuyKey,
-          maxAmountAtomic: cap
+          maxAmountAtomic: cap,
+          ...(ledger.hireCapability === undefined ? {} : { lineage: ledger.hireCapability })
         })
         // Only settled work is charged: an unsettled purchase cost nothing, and counting it
         // would shrink the budget for work that never happened.
@@ -220,12 +228,13 @@ export const startHireBroker = (options: HireBrokerOptions): HireBroker => {
 
   return {
     socketPath: options.socketPath,
-    openJob: (jobId, budgetUsd) => {
+    openJob: (jobId, budgetUsd, hireCapability) => {
       ledgers.set(jobId, {
         // Absent means zero, never unlimited: a seller who declares `hire-skills` and
         // forgets the bound gets a skill that cannot spend.
         budgetAtomic: budgetUsd === undefined || budgetUsd <= 0 ? 0n : parsePrice(String(budgetUsd)),
-        spentAtomic: 0n
+        spentAtomic: 0n,
+        ...(hireCapability === undefined ? {} : { hireCapability })
       })
       return tokenFor(jobId)
     },
