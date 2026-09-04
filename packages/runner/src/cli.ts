@@ -1,10 +1,13 @@
 #!/usr/bin/env bun
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import {
   advisoryFor,
   assertManifestPublishable,
   credentialOf,
   NotPublishable,
+  parsePrice,
+  Price,
+  SkillManifest,
   toPublicListing
 } from "@arcade/core"
 import { formatUsdc } from "@arcade/core"
@@ -22,7 +25,18 @@ import {
   resolveSellerKey
 } from "./wallet.ts"
 import { checkHub, fetchBalanceAtomic, planIdentity } from "./onboard.ts"
-import { mkdir } from "node:fs/promises"
+import { mkdir, readFile } from "node:fs/promises"
+import { dirname, basename, resolve } from "node:path"
+import {
+  listMcpTools,
+  manifestFromMcpTool,
+  manifestFromOperation,
+  operationsOf,
+  parseAuthFlag,
+  parseMcpTarget,
+  publishableTools,
+  writeGeneratedSkills
+} from "./publish-introspect.ts"
 
 /**
  * `arcade` — the seller's entire interface.
@@ -33,7 +47,13 @@ import { mkdir } from "node:fs/promises"
  *   arcade doctor           verify the environment
  */
 
-const args = process.argv.slice(2)
+/** Application options end at --; a stdio server owns every subsequent argument. */
+const applicationArgs = (argv: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const separator = argv.indexOf("--")
+  return separator === -1 ? argv : argv.slice(0, separator)
+}
+const rawArgs = process.argv.slice(2)
+const args = applicationArgs(rawArgs)
 const cmd = args[0]
 const sub = args[1]
 
@@ -59,6 +79,21 @@ const usage = () => {
   arcade start [--skills DIR]                      connect to the hub and serve jobs
 
   arcade publish <skillDir>                        preview the PUBLIC projection
+  arcade publish mcp://<host>/<path> [--yes]       one listing per MCP tool
+  arcade publish mcp:// [options] -- <cmd> [args…] …from a stdio MCP server
+  arcade publish <openapi.json> [--yes]            one listing per OpenAPI operation
+
+    --price '$0.05'       price per generated listing (default $0.05)
+    --out DIR            output directory (default ./skills)
+    --tool NAME          select an MCP tool (repeatable)
+    --operation ID       select an OpenAPI operation (repeatable)
+    --auth header:X-Api-Key=UPSTREAM_KEY           bind an ENV NAME; also query:name=ENV
+    --include-writes     include MCP tools not marked read-only
+    --yes                write generated files; without it, preview only
+    --force              overwrite existing generated files
+    --json               directory preview as one JSON object, without prose
+    Put all arcade options before --; arguments after it belong to the server.
+
   arcade wallet import 0x<key>                     store an existing payout key in the keychain
   arcade wallet export                             print the payout key, to back it up
   arcade runner seat                               set up a local development seat
@@ -66,9 +101,205 @@ const usage = () => {
 `)
 }
 
-const flag = (name: string): string | undefined => {
-  const i = args.indexOf(name)
-  return i > -1 && args[i + 1] !== undefined && !args[i + 1]!.startsWith("--") ? args[i + 1]! : undefined
+/** Every value of a repeatable application flag, in order. */
+export const flagAll = (argv: ReadonlyArray<string>, name: string): ReadonlyArray<string> => {
+  const options = applicationArgs(argv)
+  const values: string[] = []
+  for (let i = 0; i < options.length; i += 1) {
+    if (options[i] !== name) continue
+    const value = options[i + 1]
+    if (value === undefined || !value.trim() || value.startsWith("-")) {
+      throw new Error(`${name} requires a value before --`)
+    }
+    values.push(value)
+    i += 1
+  }
+  return values
+}
+const flag = (name: string): string | undefined => flagAll(args, name)[0]
+
+const documentPath = (target: string): string => {
+  try { return new URL(target).pathname }
+  catch { return target }
+}
+
+/** Select the publishing path from the target, including a URL's document pathname. */
+export const publishTargetKind = (target: string): "mcp" | "openapi" | "dir" => {
+  if (target.startsWith("mcp://")) return "mcp"
+  if (/\.(json|ya?ml)$/i.test(documentPath(target))) return "openapi"
+  return "dir"
+}
+
+class PublishDocumentError extends Error {}
+const SPEC_BYTES = 5 * 1024 * 1024
+
+/** Remote documents have one deadline covering both headers and a bounded body. */
+const readOpenapiDocument = async (target: string): Promise<Record<string, unknown>> => {
+  if (/\.ya?ml$/i.test(documentPath(target))) {
+    throw new PublishDocumentError("YAML documents are not supported; convert the spec to JSON before publishing")
+  }
+  let raw: string
+  if (/^[a-z][a-z\d+.-]*:/i.test(target)) {
+    let url: URL
+    try {
+      url = new URL(target)
+      if (url.protocol !== "https:" || !url.hostname || url.username || url.password) throw new Error()
+    } catch { throw new PublishDocumentError("OpenAPI document URLs must use HTTPS without inline credentials") }
+    const controller = new AbortController()
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const download = async () => {
+      const response = await fetch(url, { redirect: "error", signal: controller.signal })
+      if (response.redirected || (response.status >= 300 && response.status < 400)) {
+        throw new PublishDocumentError("OpenAPI document redirects are not allowed")
+      }
+      if (!response.ok) throw new PublishDocumentError(`OpenAPI document returned HTTP status ${response.status}`)
+      const declaredSize = response.headers.get("content-length")
+      if (declaredSize !== null && Number(declaredSize) > SPEC_BYTES) {
+        throw new PublishDocumentError("OpenAPI document exceeds the 5 MiB size limit")
+      }
+      if (response.body === null) throw new PublishDocumentError("OpenAPI document has an empty body")
+      reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let text = ""
+      let bytes = 0
+      while (true) {
+        const chunk = await reader.read()
+        if (chunk.done) return text + decoder.decode()
+        bytes += chunk.value.byteLength
+        if (bytes > SPEC_BYTES) throw new PublishDocumentError("OpenAPI document exceeds the 5 MiB size limit")
+        text += decoder.decode(chunk.value, { stream: true })
+      }
+    }
+    try {
+      const deadline = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          reject(new PublishDocumentError("OpenAPI document exceeded the 30-second time limit"))
+          controller.abort()
+        }, 30_000)
+      })
+      raw = await Promise.race([download(), deadline])
+    } catch (error) {
+      if (error instanceof PublishDocumentError) throw error
+      throw new PublishDocumentError("Could not fetch the OpenAPI document; verify its HTTPS URL and availability")
+    } finally {
+      if (timer !== undefined) clearTimeout(timer)
+      controller.abort()
+      // Do not let a third-party stream hold publishing open while cancellation finishes.
+      void reader?.cancel().catch(() => {})
+    }
+  } else {
+    try { raw = await readFile(target, "utf8") }
+    catch { throw new PublishDocumentError("Could not read the OpenAPI JSON document") }
+    if (Buffer.byteLength(raw) > SPEC_BYTES) throw new PublishDocumentError("OpenAPI document exceeds the 5 MiB size limit")
+  }
+  try {
+    const spec: unknown = JSON.parse(raw)
+    if (spec === null || typeof spec !== "object" || Array.isArray(spec)) throw new Error()
+    return spec as Record<string, unknown>
+  } catch { throw new PublishDocumentError("OpenAPI document must be a valid JSON object") }
+}
+
+const generatedOptions = (argv: ReadonlyArray<string>, kind: "mcp" | "openapi") => {
+  const options = applicationArgs(argv)
+  if (options.includes("--json")) throw new Error("--json supports directory previews only; generate listings first, then preview their directories")
+  const valued = new Set(["--price", "--out", kind === "mcp" ? "--tool" : "--operation",
+    ...(kind === "openapi" ? ["--auth"] : [])])
+  const switches = new Set(["--yes", "--force", ...(kind === "mcp" ? ["--include-writes"] : [])])
+  for (let i = 0; i < options.length; i += 1) {
+    const name = options[i]!
+    if (valued.has(name)) { flagAll(options, name); i += 1 }
+    else if (!switches.has(name)) throw new Error("Unsupported publish option; use --help and put server arguments after --")
+  }
+  const one = (name: string) => {
+    const values = flagAll(options, name)
+    if (values.length > 1) throw new Error(`${name} can only be supplied once`)
+    return values[0]
+  }
+  const price = one("--price") ?? "$0.05"
+  try {
+    if (!Schema.is(Price)(price)) throw new Error()
+    parsePrice(price)
+  } catch { throw new Error("Invalid --price; use at least $0.000001 with at most six decimal places") }
+  const authValue = one("--auth")
+  return {
+    price,
+    outDir: one("--out") ?? skillsDirDefault,
+    only: new Set(flagAll(options, kind === "mcp" ? "--tool" : "--operation")),
+    auth: authValue === undefined ? undefined : parseAuthFlag(authValue),
+    includeWrites: options.includes("--include-writes"),
+    yes: options.includes("--yes"),
+    force: options.includes("--force")
+  }
+}
+
+/** The entire batch must be publishable before either a preview or a write is produced. */
+const validateGenerated = (manifests: ReadonlyArray<Record<string, unknown>>) => {
+  const ids = new Set<string>()
+  for (const manifest of manifests) {
+    let decoded: SkillManifest
+    try {
+      decoded = Schema.decodeUnknownSync(SkillManifest)(manifest)
+      assertManifestPublishable(decoded)
+      parsePrice(decoded.price)
+    } catch { throw new Error("Generated manifest is invalid; check its price and engine configuration") }
+    if (ids.has(decoded.id)) throw new Error("Selected entries produce duplicate listing ids")
+    ids.add(decoded.id)
+  }
+}
+
+/** Publish options exclude the target; any argv after -- is passed literally to MCP. */
+export const runPublishIntrospection = async (target: string, argv: ReadonlyArray<string>): Promise<void> => {
+  const kind = publishTargetKind(target)
+  if (kind === "dir") throw new Error("Introspection requires an MCP target or an OpenAPI JSON document")
+  const options = generatedOptions(argv, kind)
+  const separator = argv.indexOf("--")
+  const rest = separator === -1 ? [] : argv.slice(separator + 1)
+  let manifests: Record<string, unknown>[]
+  let extras: Array<{ id: string; name: string; content: string }> = []
+  let summary: string[]
+  if (kind === "mcp") {
+    const src = parseMcpTarget(target, rest)
+    const tools = await listMcpTools(src).catch(() => { throw new Error("Could not introspect that MCP server; verify its configuration") })
+    if ([...options.only].some((name) => !tools.some((tool) => tool.name === name))) {
+      throw new Error("Requested MCP tool was not found on the server")
+    }
+    const eligible = publishableTools(tools, options.includeWrites)
+    if ([...options.only].some((name) => !eligible.some((tool) => tool.name === name))) {
+      throw new Error("Requested MCP tool is not marked read-only; use --include-writes to select it")
+    }
+    const chosen = options.only.size === 0 ? eligible : eligible.filter((tool) => options.only.has(tool.name))
+    if (chosen.length === 0) throw new Error("No publishable MCP tools selected; check the server or use --include-writes")
+    manifests = chosen.map((tool) => manifestFromMcpTool(src, tool, { price: options.price }))
+    summary = [`server   ${src.url === undefined ? "local stdio MCP server" : "remote HTTPS MCP server"}`,
+      `tools    ${tools.length} found, ${chosen.length} to publish`,
+      ...tools.filter((tool) => !eligible.includes(tool)).map((tool) =>
+        `  skipped ${tool.name} — not marked read-only (pass --include-writes to sell it)`)]
+  } else {
+    if (rest.length > 0) throw new Error("Arguments after -- are only supported for a stdio MCP server")
+    const spec = await readOpenapiDocument(target)
+    const operations = operationsOf(spec)
+    if ([...options.only].some((id) => !operations.some((operation) => operation.operationId === id))) {
+      throw new Error("Requested OpenAPI operation was not found in the document")
+    }
+    const chosen = options.only.size === 0 ? operations : operations.filter((operation) => options.only.has(operation.operationId))
+    if (chosen.length === 0) throw new Error("No named OpenAPI operations selected")
+    manifests = chosen.map((ref) => manifestFromOperation(spec, ref, { specFile: "openapi.json", price: options.price,
+      ...(options.auth === undefined ? {} : { auth: options.auth }) }))
+    extras = manifests.map((manifest) => ({ id: String(manifest["id"]), name: "openapi.json", content: `${JSON.stringify(spec, null, 2)}\n` }))
+    summary = ["document OpenAPI JSON", `ops      ${operations.length} with an operationId, ${chosen.length} to publish`]
+  }
+  validateGenerated(manifests)
+  for (const line of summary) console.log(line)
+  console.log("")
+  for (const manifest of manifests) console.log(`${manifest["id"]}  ${manifest["price"]}`)
+  if (!options.yes) {
+    console.log(`\nNothing written. Re-run with --yes to create ${manifests.length} listing(s).`)
+    return
+  }
+  const written = await writeGeneratedSkills(options.outDir, manifests, extras, options.force)
+  for (const path of written) console.log(`wrote ${path}`)
+  console.log(`\nnext:  arcade publish ${options.outDir}/${manifests[0]!["id"]}    then  arcade start`)
 }
 
 const FAUCET = "https://faucet.circle.com"
@@ -426,14 +657,30 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
   }
 
   if (cmd === "publish") {
-    const dir = args[1]
-    if (dir === undefined) {
-      console.error("usage: arcade publish <skillDir>")
+    const target = args[1]
+    if (target === undefined || target.startsWith("-")) {
+      console.error("usage: arcade publish <skillDir|mcp://host/path|openapi.json> [options]\n" +
+        "       arcade publish mcp:// [options] -- <cmd> [args…]\n" +
+        "Run arcade publish --help for options.")
       process.exit(2)
     }
-    const parent = dir.replace(/\/[^/]+\/?$/, "")
-    const name = dir.replace(/\/$/, "").split("/").pop()!
-    const skills = yield* loadSkills(parent === dir ? "." : parent)
+    if (publishTargetKind(target) !== "dir") {
+      yield* Effect.tryPromise({
+        try: () => runPublishIntrospection(target, rawArgs.slice(2)),
+        catch: (error) => error instanceof Error ? error : new Error("Could not prepare generated listings")
+      })
+      return
+    }
+    if (args.slice(2).some((option) => option !== "--json")) {
+      throw new Error("Directory previews support --json; use --help for generated listing options")
+    }
+    const dir = target
+    const absoluteDir = resolve(dir)
+    const parent = dirname(absoluteDir)
+    const name = basename(absoluteDir)
+    const skills = yield* loadSkills(parent).pipe(
+      Effect.mapError(() => new Error("Could not load the skill manifest; check its JSON and engine configuration"))
+    )
     const found = skills.find((s) => s.dir.endsWith(`/${name}`))
     if (found === undefined) {
       console.error(`no arcade.json found under ${dir}`)
@@ -464,22 +711,38 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
     }
 
     const pub = toPublicListing(found.manifest)
+    const preview = {
+      target: dir,
+      skillId: found.manifest.id,
+      engine: { adapter: found.manifest.engine.adapter, credential: credentialOf(found.manifest) },
+      grants: [...found.manifest.engine.capabilities],
+      ...(advisory === undefined ? {} : { advisory }),
+      public: pub,
+      private: {
+        engine: found.manifest.engine,
+        secrets: found.manifest.secrets,
+        egress: found.manifest.egress,
+        workdir: found.manifest.workdir
+      }
+    }
+    if (args.includes("--json")) {
+      console.log(JSON.stringify(preview))
+      return
+    }
     const caps = found.manifest.engine.capabilities
-    console.log(`engine  ${found.manifest.engine.adapter} (${credentialOf(found.manifest)})`)
-    console.log(
-      `grants  ${caps.length === 0 ? "no tools — this job reaches neither the network nor the filesystem" : caps.join(", ")}\n`
-    )
+    const adapter = found.manifest.engine.adapter
+    const access = adapter === "mcp" ? "MCP server access through its configured HTTPS transport or local subprocess"
+      : adapter === "openapi" ? "HTTPS access to the configured API"
+      : adapter === "script" ? "seller executable access under the runner sandbox"
+      : caps.length === 0 ? "no model tools granted" : caps.join(", ")
+    console.log(`engine  ${adapter} (${credentialOf(found.manifest)})`)
+    console.log(`grants  ${access}\n`)
     console.log("PUBLISHED to the hub:\n")
     console.log(JSON.stringify(pub, null, 2))
     console.log("\nSTAYS ON THIS MACHINE (never transmitted):\n")
     console.log(
       JSON.stringify(
-        {
-          engine: found.manifest.engine,
-          secrets: found.manifest.secrets,
-          egress: found.manifest.egress,
-          workdir: found.manifest.workdir
-        },
+        preview.private,
         null,
         2
       )
@@ -514,7 +777,10 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
   usage()
 })
 
-Effect.runPromise(main).catch((e) => {
-  console.error(String((e as Error)?.message ?? e))
-  process.exit(1)
-})
+// Importing the helpers must never execute a seller command.
+if (import.meta.main) {
+  Effect.runPromise(main).catch((e) => {
+    console.error(String((e as Error)?.message ?? e))
+    process.exit(1)
+  })
+}
