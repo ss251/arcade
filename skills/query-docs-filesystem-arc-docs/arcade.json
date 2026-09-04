@@ -1,0 +1,46 @@
+{
+  "id": "query-docs-filesystem-arc-docs",
+  "version": "0.1.0",
+  "serviceName": "query_docs_filesystem_arc_docs",
+  "description": "Run a read-only shell-like query against a virtualized, in-memory filesystem rooted at `/` that contains ONLY the Arc Docs documentation pages and OpenAPI specs. This is NOT a shell on any real machine — nothing runs on the user's computer, the server host, or any network. The filesystem is a sandbox backed by documentation chunks.\n\nThis is how you read documentation pages: there is no separate \"get page\" tool. To read a page, pass its `.mdx` path (e.g. `/quickstart.mdx`, `/api-reference/create-",
+  "tags": [
+    "mcp"
+  ],
+  "price": "$0.02",
+  "bounds": {
+    "timeoutSec": 60
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "A shell command to run against the virtualized documentation filesystem (e.g., `rg -il \"keyword\" /`, `tree / -L 2`, `head -80 /path/file.mdx`)."
+      }
+    },
+    "required": [
+      "command"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "text"
+    ],
+    "properties": {
+      "text": {
+        "type": "string"
+      }
+    }
+  },
+  "egress": [
+    "docs.arc.io"
+  ],
+  "engine": {
+    "adapter": "mcp",
+    "credential": "none",
+    "url": "https://docs.arc.io/mcp",
+    "tool": "query_docs_filesystem_arc_docs"
+  }
+}

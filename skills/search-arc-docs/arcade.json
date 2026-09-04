@@ -1,0 +1,46 @@
+{
+  "id": "search-arc-docs",
+  "version": "0.1.0",
+  "serviceName": "Search documentation",
+  "description": "Search across the Arc Docs knowledge base to find relevant information, code examples, API references, and guides. Use this tool when you need to answer questions about Arc Docs, find specific documentation, understand how features work, or locate implementation details. The search returns contextual content with titles and direct links to the documentation pages. If you need the full content of a specific page, use the query_docs_filesystem tool to `head` or `cat` the page path (append `.mdx` t",
+  "tags": [
+    "mcp"
+  ],
+  "price": "$0.02",
+  "bounds": {
+    "timeoutSec": 60
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "text"
+    ],
+    "properties": {
+      "text": {
+        "type": "string"
+      }
+    }
+  },
+  "egress": [
+    "docs.arc.io"
+  ],
+  "engine": {
+    "adapter": "mcp",
+    "credential": "none",
+    "url": "https://docs.arc.io/mcp",
+    "tool": "search_arc_docs"
+  }
+}
