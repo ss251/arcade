@@ -22,6 +22,7 @@
       "name": "@arcade/hub",
       "version": "0.1.0",
       "dependencies": {
+        "@arcade/buyer": "workspace:*",
         "@arcade/core": "workspace:*",
         "@arcade/payments": "workspace:*",
         "effect": "^3.22.0",

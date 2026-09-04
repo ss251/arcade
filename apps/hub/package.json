@@ -9,6 +9,7 @@
     "dev": "bun --watch run src/server.ts"
   },
   "dependencies": {
+    "@arcade/buyer": "workspace:*",
     "@arcade/core": "workspace:*",
     "@arcade/payments": "workspace:*",
     "effect": "^3.22.0",
