@@ -175,8 +175,8 @@ Two things worth knowing:
 
 ```
 $ arcade publish skills/diff-triage
-engine  claude-agent (api-key)
-grants  no tools — this job reaches neither the network nor the filesystem
+engine  skill (api-key)
+grants  no model tools granted
 ```
 
 ### What the caller's input is, and is not

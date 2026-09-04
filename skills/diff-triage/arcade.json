@@ -101,9 +101,10 @@
     }
   },
   "engine": {
-    "adapter": "claude-agent",
+    "adapter": "skill",
     "credential": "api-key",
-    "entry": "agent.ts",
+    "entry": "SKILL.md",
+    "model": "claude-sonnet-5",
     "capabilities": []
   },
   "secrets": [
