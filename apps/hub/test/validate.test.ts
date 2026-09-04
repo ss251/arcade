@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { validateOutput } from "../src/validate.ts"
+import { validateJson, validateOutput } from "../src/validate.ts"
 
 /**
  * `validateOutput` decides whether a seller gets paid. A false PASS charges a buyer for
@@ -167,5 +167,21 @@ describe("validateOutput", () => {
       // This is what makes a malformed request cost the buyer nothing.
       expect(validateOutput({ error: "invalid address" }, schema)).toBe(false)
     })
+  })
+})
+
+describe("validateJson", () => {
+  const schema = { type: "object", required: ["address"], properties: { address: { type: "string", pattern: "^0x[a-fA-F0-9]{40}$" } } }
+  it("accepts a conforming object", () => {
+    expect(validateJson({ address: "0x" + "a".repeat(40) }, schema)).toBe(true)
+  })
+  it("rejects a missing required key", () => {
+    expect(validateJson({}, schema)).toBe(false)
+  })
+  it("rejects a pattern miss", () => {
+    expect(validateJson({ address: "nope" }, schema)).toBe(false)
+  })
+  it("keeps validateOutput as an alias", () => {
+    expect(validateOutput).toBe(validateJson)
   })
 })

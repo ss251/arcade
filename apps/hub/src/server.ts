@@ -33,6 +33,7 @@ import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
 import { StoreTag } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
 import { runJob } from "./pipeline.ts"
+import { inputGate } from "./input-gate.ts"
 import {
   renderIndex,
   renderListingPage,
@@ -774,6 +775,16 @@ const main = Effect.gen(function* () {
         if (found._tag === "Left") return json({ error: "not_found" }, 404)
         const { listing, seller } = found.right
 
+        const rawBody = await req.text()
+        let input: unknown
+        try {
+          input = rawBody === "" ? {} : JSON.parse(rawBody)
+        } catch {
+          return json({ error: "input_invalid", detail: "body is not JSON" }, 400)
+        }
+        const gate = inputGate(listing, input)
+        if (gate !== null) return json(gate, 400)
+
         const priceAtomic = parsePrice(listing.price)
         const resource = `${publicOrigin(url)}${path}`
 
@@ -805,7 +816,6 @@ const main = Effect.gen(function* () {
         }
         const verified = verifiedE.right
 
-        const input = await req.json().catch(() => ({}))
         const jobId = newJobId()
 
         // Record the job BEFORE answering, so the 202 is backed by state that survives this

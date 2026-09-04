@@ -7,6 +7,14 @@ import { Data } from "effect"
  * Grouped by the stage that produces them: payment → execution → settlement.
  */
 
+// ── Input (apps/hub paid endpoint, before any payment work) ──────────────────
+
+/** Request body does not satisfy the listing's `inputSchema` — answered with a 400. */
+export class InputInvalid extends Data.TaggedError("InputInvalid")<{
+  readonly skillId: string
+  readonly detail: string
+}> {}
+
 // ── Payment (packages/payments, apps/hub paywall) ────────────────────────────
 
 /** Payment header absent or unparseable — answered with a fresh 402 challenge. */
@@ -132,6 +140,7 @@ export class SecrecyViolation extends Data.TaggedError("SecrecyViolation")<{
 }> {}
 
 export type ArcadeError =
+  | InputInvalid
   | PaymentRequired
   | InvalidSignature
   | InsufficientFunds

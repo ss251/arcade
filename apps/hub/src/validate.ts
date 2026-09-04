@@ -1,5 +1,6 @@
 /**
- * Minimal JSON Schema validation for listing outputs.
+ * Minimal JSON Schema validation, shared by the hub's input gate (against `inputSchema`,
+ * before any payment work) and settlement (against `outputSchema`).
  *
  * Deliberately small and dependency-free: it covers the subset a skill manifest can declare
  * (type, required, properties, items, enum, min/max). A seller writing an exotic schema gets
@@ -24,7 +25,7 @@ const matchesType = (v: Json, t: string): boolean => {
   return actual === t
 }
 
-export const validateOutput = (value: Json, schema: Json): boolean => {
+export const validateJson = (value: Json, schema: Json): boolean => {
   if (schema === undefined || schema === null) return true
   if (typeof schema !== "object" || Array.isArray(schema)) return true
   const s = schema as Record<string, Json>
@@ -47,7 +48,7 @@ export const validateOutput = (value: Json, schema: Json): boolean => {
     const props = s["properties"]
     if (props !== undefined && typeof props === "object" && props !== null) {
       for (const [key, sub] of Object.entries(props as Record<string, Json>)) {
-        if (key in obj && !validateOutput(obj[key], sub)) return false
+        if (key in obj && !validateJson(obj[key], sub)) return false
       }
     }
   }
@@ -55,7 +56,7 @@ export const validateOutput = (value: Json, schema: Json): boolean => {
   if (Array.isArray(value)) {
     const items = s["items"]
     if (items !== undefined) {
-      for (const el of value) if (!validateOutput(el, items)) return false
+      for (const el of value) if (!validateJson(el, items)) return false
     }
     if (typeof s["minItems"] === "number" && value.length < (s["minItems"] as number)) return false
     if (typeof s["maxItems"] === "number" && value.length > (s["maxItems"] as number)) return false
@@ -80,3 +81,6 @@ export const validateOutput = (value: Json, schema: Json): boolean => {
 
   return true
 }
+
+/** Kept for existing call sites; settlement validation and input validation are the same check. */
+export const validateOutput = validateJson
