@@ -7,7 +7,7 @@ import { encodeFunctionData } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import { decodeEnsState, labelId, loadEnsDeployments, PERMISSIONED_REGISTRY_ABI, PERMISSIONED_RESOLVER_ABI } from "@arcade/core"
 import { makeEnsLiveness, makeEnsWriter, viemEnsWriter, type EnsCall, type EnsWriter, type EnsWriteClient } from "../src/ens.ts"
-import { withEnsJournal, type EnsJournalEntry } from "../src/ens-journal.ts"
+import { withEnsJournal, type EnsJournal, type EnsJournalEntry } from "../src/ens-journal.ts"
 
 const d = loadEnsDeployments()[0]!
 const seller = `0x${"11".repeat(20)}`, daemon = `0x${"22".repeat(20)}`, registry = `0x${"33".repeat(20)}`, resolver = `0x${"44".repeat(20)}`, tx = `0x${"aa".repeat(32)}`
@@ -94,6 +94,80 @@ const fixture = () => {
 }
 const renewal = { registry, anyId: labelId("usdc-flow-check"), expiry: 4600n }
 describe("verified Sepolia writer with durable uncertainty", () => {
+  const memoryJournal = () => {
+    let entries: readonly EnsJournalEntry[] = []
+    const journal: EnsJournal = { get entries() { return entries }, set: async entry => { entries = [entry] } }
+    return { journal, use: async <T>(_path: string, work: (j: EnsJournal) => Promise<T>) => work(journal) }
+  }
+  it.each(["renew", "price"] as const)("waits for a legitimately mined 12-second %s without another broadcast", async op => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000)
+    const f = fixture(), memory = memoryJournal(), receipt = f.client.receipt, began = Date.now()
+    const writer = makeEnsWriter({ state, journalPath, journal: memory.use, client: { ...f.client, receipt: async hash => {
+      if (Date.now() - began < 12000) throw Error("receipt not mined yet")
+      return receipt(hash)
+    } } })
+    const pending = (op === "renew" ? writer.renew(renewal) : writer.setText({ resolver, node: namehash(state.skills[0]!.name), key: "arcade.priceAtomic", value: "70000" })).then(value => ({ value }), error => ({ error }))
+    await vi.advanceTimersByTimeAsync(12001)
+    expect(await pending).toEqual({ value: tx })
+    expect(f.calls.filter(c => c === "send")).toHaveLength(1)
+    expect(memory.journal.entries[0]).toMatchObject({ stage: "confirmed", txHash: tx })
+  })
+  it("polls a permanently pending hash within one 55-second budget, then pauses without resending", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000)
+    const f = fixture(), memory = memoryJournal(), stop = vi.fn(), receipt = vi.fn(async () => { throw Error("not yet mined") })
+    const writer = makeEnsWriter({ state, journalPath, journal: memory.use, client: { ...f.client, receipt, stop } })
+    const live = makeEnsLiveness({ state, writer, priceAtomicFor: () => 50000n, log: () => {} })
+    let done = false; const pending = live.tick().then(() => { done = true })
+    await vi.advanceTimersByTimeAsync(54000); expect(done).toBe(false)
+    await vi.advanceTimersByTimeAsync(1001); await pending; await live.tick()
+    expect(done).toBe(true); expect(stop).toHaveBeenCalledTimes(1)
+    expect(receipt.mock.calls.length).toBeGreaterThan(10); expect(receipt.mock.calls.length).toBeLessThanOrEqual(29)
+    expect(f.calls.filter(c => c === "send")).toHaveLength(1)
+    expect(memory.journal.entries[0]).toMatchObject({ stage: "submitted", txHash: tx })
+  })
+  it("stop interrupts the longer pending receipt window promptly and cannot send later", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000)
+    const f = fixture(), memory = memoryJournal(), stop = vi.fn()
+    const writer = makeEnsWriter({ state, journalPath, journal: memory.use, client: { ...f.client, stop, receipt: () => new Promise(() => {}) } })
+    let done = false; const pending = writer.renew(renewal).catch(error => { done = true; return error })
+    await vi.advanceTimersByTimeAsync(1000); writer.stop(); await vi.advanceTimersByTimeAsync(1)
+    expect(done).toBe(true); expect(await pending).toMatchObject({ code: "ens_write_uncertain", retryable: false, txHash: tx })
+    await vi.advanceTimersByTimeAsync(120000)
+    expect(f.calls.filter(c => c === "send")).toHaveLength(1); expect(stop).toHaveBeenCalledTimes(1)
+    expect(memory.journal.entries[0]).toMatchObject({ stage: "submitted", txHash: tx })
+  })
+  it("charges slow preflight against the same deadline rather than adding a fresh receipt window", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000)
+    const f = fixture(), memory = memoryJournal(), stop = vi.fn(), receipt = vi.fn(async () => { throw Error("not mined") })
+    const slow = async <T>(work: () => Promise<T>) => { await new Promise(resolve => setTimeout(resolve, 4000)); return work() }
+    const writer = makeEnsWriter({ state, journalPath, journal: memory.use, client: { ...f.client, stop, receipt,
+      chainId: () => slow(f.client.chainId), read: call => slow(() => f.client.read(call)), simulate: call => slow(() => f.client.simulate(call)) } })
+    let done = false; const pending = writer.renew(renewal).catch(error => { done = true; return error })
+    await vi.advanceTimersByTimeAsync(54000); expect(done).toBe(false)
+    await vi.advanceTimersByTimeAsync(1001)
+    expect(done).toBe(true); expect(await pending).toMatchObject({ code: "ens_write_uncertain", retryable: false, txHash: tx })
+    expect(receipt.mock.calls.length).toBeGreaterThan(1); expect(receipt.mock.calls.length).toBeLessThan(20)
+    expect(f.calls.filter(c => c === "send")).toHaveLength(1); expect(stop).toHaveBeenCalledTimes(1)
+  })
+  it("never automatically retries an unknown send while extending only receipt reads", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000)
+    const f = fixture(), memory = memoryJournal(), send = vi.fn(async () => { throw Error("SECRET uncertain broadcast") }), receipt = vi.fn(f.client.receipt), stop = vi.fn()
+    const writer = makeEnsWriter({ state, journalPath, journal: memory.use, client: { ...f.client, send, receipt, stop } })
+    const live = makeEnsLiveness({ state, writer, priceAtomicFor: () => 50000n, log: () => {} })
+    const pending = live.tick(); await vi.advanceTimersByTimeAsync(1); await pending
+    await vi.advanceTimersByTimeAsync(120000); await live.tick()
+    expect(send).toHaveBeenCalledTimes(1); expect(receipt).not.toHaveBeenCalled(); expect(stop).toHaveBeenCalledTimes(1)
+    expect(memory.journal.entries[0]).toMatchObject({ stage: "intent" }); expect(memory.journal.entries[0]?.txHash).toBeUndefined()
+  })
+  it("contains a throwing client cancellation hook and still settles the known hash as uncertain", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000)
+    const f = fixture(), memory = memoryJournal(), writer = makeEnsWriter({ state, journalPath, journal: memory.use, client: { ...f.client,
+      receipt: async () => { throw Error("not mined") }, stop: () => { throw Error("PRIVATE cancel detail") } } })
+    const pending = writer.renew(renewal).catch(error => error)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(() => writer.stop()).not.toThrow()
+    expect(await pending).toMatchObject({ code: "ens_write_uncertain", retryable: false, txHash: tx })
+  })
   it("persists intent before send, hash before confirmation and verified readback before completion", async () => {
     const f = fixture(), send = f.client.send, receipt = f.client.receipt
     const writer = makeEnsWriter({ state, journalPath, client: { ...f.client,

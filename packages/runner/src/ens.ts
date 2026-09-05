@@ -119,10 +119,22 @@ export interface EnsWriterOptions {
  * hashes are reconciled first; no-hash intent is deliberately an owner intervention. */
 export const makeEnsWriter = (a: EnsWriterOptions): EnsWriter & { stop: () => void } => {
   const state = decodeEnsState(a.state), client = a.client, deployment = loadEnsDeployments().find(d => d.set === state.deploymentSet)!
-  const delays = a.pollDelaysMs ?? [500, 1000, 2000]
+  // One end-to-end operation (including preflight, wallet preparation, confirmation
+  // and durable readback) must finish before the ticker's unchanged 60s boundary.
+  // Poll normal Sepolia block inclusion; a 3.5s four-read window was too short.
+  const operationMs = 55_000, delays = a.pollDelaysMs, stopped = new AbortController()
   let closed = false
+  const stop = () => { if (closed) return; closed = true; stopped.abort(); try { client.stop?.() } catch {} }
   const checkOpen = () => { if (closed || a.isActive?.() === false) throw failed("ens_write_unavailable", true) }
-  const read = (address: string, abi: Abi, functionName: string, args: readonly unknown[]) => bounded(() => client.read({ address: address as Hex, abi, functionName, args }), 5000)
+  const read = async (address: string, abi: Abi, functionName: string, args: readonly unknown[]) => {
+    checkOpen(); const result = await bounded(() => client.read({ address: address as Hex, abi, functionName, args }), 5000); checkOpen(); return result
+  }
+  const pause = (ms: number) => new Promise<void>((resolve, reject) => {
+    const cleanup = () => { clearTimeout(timer); stopped.signal.removeEventListener("abort", abort) }
+    const abort = () => { cleanup(); reject(failed("ens_write_uncertain")) }
+    const timer = setTimeout(() => { cleanup(); resolve() }, ms)
+    stopped.signal.addEventListener("abort", abort, { once: true }); if (stopped.signal.aborted) abort()
+  })
   const chain = async () => {
     checkOpen()
     if (await bounded(client.chainId, 5000) !== 11155111) throw failed("ens_write_unavailable", true)
@@ -139,33 +151,45 @@ export const makeEnsWriter = (a: EnsWriterOptions): EnsWriter & { stop: () => vo
       checkOpen()
       let receipt: Awaited<ReturnType<EnsWriteClient["receipt"]>> | undefined
       try { receipt = await bounded(() => client.receipt(txHash), 5000) } catch {}
+      checkOpen()
       if (receipt !== undefined) {
         if (!hash(receipt.transactionHash) || receipt.transactionHash.toLowerCase() !== txHash || receipt.status !== "success" ||
           !address(receipt.from) || receipt.from.toLowerCase() !== entry.signer || !address(receipt.to) || receipt.to.toLowerCase() !== entry.target) throw failed("ens_write_uncertain", false, txHash)
         const transaction = await bounded(() => client.transaction(txHash), 5000)
+        checkOpen()
         const expectedInput = entry.op === "renew" ? encodeFunctionData({ abi: PERMISSIONED_REGISTRY_ABI, functionName: "renew", args: [BigInt(entry.resource), BigInt(entry.value)] }) :
           encodeFunctionData({ abi: PERMISSIONED_RESOLVER_ABI, functionName: "setText", args: [entry.resource as Hex, ENS_TEXT_KEYS.priceAtomic, entry.value] })
         if (!hash(transaction.hash) || transaction.hash.toLowerCase() !== txHash || !address(transaction.from) || transaction.from.toLowerCase() !== entry.signer ||
           !address(transaction.to) || transaction.to.toLowerCase() !== entry.target || typeof transaction.input !== "string" || transaction.input.toLowerCase() !== expectedInput) throw failed("ens_write_uncertain", false, txHash)
         await postcondition(entry)
+        checkOpen()
         await journal.set({ ...entry, stage: "confirmed" })
+        checkOpen()
         return txHash
       }
-      const delay = delays[attempt]
+      const delay = delays === undefined ? 2000 : delays[attempt]
       if (delay === undefined) throw failed("ens_write_uncertain", false, txHash)
-      await new Promise(resolve => setTimeout(resolve, delay))
+      await pause(delay)
     }
   }
   const execute = async (op: "renew" | "price", target: string, resource: string, value: string): Promise<string> => {
     let enteredSend = false, knownHash: string | undefined
+    let onStop: (() => void) | undefined
+    const cancelled = new Promise<never>((_resolve, reject) => {
+      onStop = () => reject(failed(enteredSend || knownHash ? "ens_write_uncertain" : "ens_write_unavailable", !enteredSend && !knownHash, knownHash))
+      stopped.signal.addEventListener("abort", onStop, { once: true }); if (stopped.signal.aborted) onStop()
+    })
+    const timer = setTimeout(stop, operationMs)
+    const work = async () => {
     try {
       checkOpen()
       if (!address(client.address) || client.address.toLowerCase() === state.seller || client.address.toLowerCase() === state.owner ||
-        state.daemon !== undefined && client.address.toLowerCase() !== state.daemon || delays.length > 4 || delays.some(n => !Number.isSafeInteger(n) || n < 0 || n > 2000)) throw failed("ens_write_unavailable", true)
+        state.daemon !== undefined && client.address.toLowerCase() !== state.daemon || delays !== undefined && (delays.length > 4 || delays.some(n => !Number.isSafeInteger(n) || n < 0 || n > 2000))) throw failed("ens_write_unavailable", true)
       const skill = state.skills.find(s => op === "renew" ? labelId(s.label).toString() === resource : namehash(s.name) === resource)
       if (!skill || target.toLowerCase() !== (op === "renew" ? state.skillRegistry : state.resolver) || !atomic(value) || op === "renew" && BigInt(value) >= 1n << 64n) throw failed("ens_write_unavailable", true)
       await chain()
       return await (a.journal ?? withEnsJournal)(a.journalPath, async journal => {
+        checkOpen()
         const entry: EnsJournalEntry = { chainId: 11155111, signer: client.address.toLowerCase(), op, target: target.toLowerCase(), resource, value, stage: "intent" }
         const pending = journal.entries.filter(e => e.stage !== "confirmed")
         const matches = (e: EnsJournalEntry) => e.chainId === 11155111 && e.signer === entry.signer && e.op === op && e.target === entry.target && e.resource === resource && e.value === value
@@ -194,6 +218,7 @@ export const makeEnsWriter = (a: EnsWriterOptions): EnsWriter & { stop: () => vo
           read(state.skillRegistry, PERMISSIONED_REGISTRY_ABI, "getExpiry", [labelId(skill.label)]),
           read(state.skillRegistry, PERMISSIONED_REGISTRY_ABI, "getOwner", [labelId(skill.label)]), bounded(client.timestamp, 5000)
         ])
+        checkOpen()
         if (typeof expiry !== "bigint" || expiry < 0n || expiry >= 1n << 64n || typeof stamp !== "bigint" || stamp < 0n || stamp >= 1n << 64n) throw failed("ens_write_unavailable", true)
         if (expiry <= stamp) throw failed("ens_owner_revival_needed")
         if (typeof owner !== "string" || owner.toLowerCase() !== state.seller) throw failed("ens_write_unavailable", true)
@@ -212,12 +237,12 @@ export const makeEnsWriter = (a: EnsWriterOptions): EnsWriter & { stop: () => vo
         }
         const call: EnsCall = op === "renew" ? { address: target as Hex, abi: PERMISSIONED_REGISTRY_ABI, functionName: "renew", args: [BigInt(resource), BigInt(value)] } :
           { address: target as Hex, abi: PERMISSIONED_RESOLVER_ABI, functionName: "setText", args: [resource, ENS_TEXT_KEYS.priceAtomic, value] }
-        await bounded(() => client.simulate(call), 5000)
+        checkOpen()
+        await bounded(() => { checkOpen(); return client.simulate(call) }, 5000)
         await chain()
         await journal.set(entry)
         checkOpen()
-        enteredSend = true
-        const tx = await bounded(() => client.send(call), 10_000)
+        const tx = await bounded(() => { checkOpen(); enteredSend = true; return client.send(call) }, 10_000)
         if (!hash(tx)) throw failed("ens_write_uncertain")
         knownHash = tx.toLowerCase()
         const submitted = { ...entry, stage: "submitted" as const, txHash: knownHash }
@@ -225,14 +250,17 @@ export const makeEnsWriter = (a: EnsWriterOptions): EnsWriter & { stop: () => vo
         return confirm(submitted, journal)
       })
     } catch (cause) {
-      if (cause instanceof EnsWriteFailed && trusted.has(cause)) throw cause
+      if (cause instanceof EnsWriteFailed && trusted.has(cause) && !(cause.retryable && (enteredSend || knownHash))) throw cause
       throw failed(enteredSend || knownHash ? "ens_write_uncertain" : "ens_write_unavailable", !enteredSend && !knownHash, knownHash)
     }
+    }
+    try { return await Promise.race([work(), cancelled]) }
+    finally { clearTimeout(timer); if (onStop) stopped.signal.removeEventListener("abort", onStop) }
   }
   return {
     renew: x => execute("renew", x.registry, x.anyId.toString(), x.expiry.toString()),
     setText: x => x.key !== ENS_TEXT_KEYS.priceAtomic ? Promise.reject(failed("ens_write_unavailable", true)) : execute("price", x.resolver, x.node.toLowerCase(), x.value),
-    stop: () => { closed = true; client.stop?.() }
+    stop
   }
 }
 
