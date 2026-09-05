@@ -88,6 +88,7 @@ export interface EvidenceBundle {
 const EVENTS = parseAbi([
   "event Transfer(address indexed from, address indexed to, uint256 value)",
   "event ApprovalForAll(address indexed owner, address indexed operator, bool approved)",
+  "event Settled(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce)",
   "event SettledTree(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce, bytes32 indexed treeHash, uint32 childCount, uint256 childTotalAtomic)"
 ])
 const events = (receipt: Record<string, unknown>, abi: Abi, eventName: string, emitter: string): Record<string, unknown>[] => {
@@ -180,13 +181,18 @@ export const assertErc8004Evidence = (c: EvidenceConfig, e: EvidenceBundle) => {
   insist(atomic(r["priceAtomic"]) === 10000n && atomic(r["sellerAtomic"]) === 9500n && atomic(r["feeAtomic"]) === 500n && r["feeBps"] === 500, "receipt does not prove the exact $0.01 / 5% split")
   insist(j["id"] === jobId && j["skillId"] === SKILL && j["status"] === "succeeded" && outcome["status"] === "succeeded" &&
     same(j["buyer"], c.buyer) && same(j["seller"], c.seller) && docBytes(j["input"]) === docBytes({ address: c.buyer }), "durable job does not match the single requested flow-check")
-  insist(r["parentJobId"] === undefined && (r["children"] === undefined || Array.isArray(r["children"]) && r["children"].length === 0) &&
-    same(r["treeHash"], treeHashOf(jobId, [])) && hash(r["authorizationNonce"]), "settlement must commit the exact childless job tree")
+  // The receipt records an empty tree locally. The paid pipeline calls V2 settle()
+  // for this childless job, so its on-chain proof is Settled, not a tree commitment.
+  insist(r["rootJobId"] === jobId && r["parentJobId"] === undefined && r["hop"] === 0 &&
+    Array.isArray(r["ancestors"]) && r["ancestors"].length === 0 && Array.isArray(r["children"]) && r["children"].length === 0 &&
+    same(r["treeHash"], treeHashOf(jobId, [])) && atomic(r["treeCommittedAtomic"]) === 0n && hash(r["authorizationNonce"]),
+    "receipt must describe the exact childless job")
   const settlement = chainReceipt(e.settlementReceipt, c.facilitator, c.splitter, e.startBlock, r["settleTx"])
   oneEvent(settlement, EVENTS, "Transfer", USDC, { from: c.buyer, to: c.splitter, value: 10000n })
   oneEvent(settlement, EVENTS, "Transfer", USDC, { from: c.splitter, to: c.seller, value: 9500n })
-  oneEvent(settlement, EVENTS, "SettledTree", c.splitter, { buyer: c.buyer, total: 10000n, sellerAmount: 9500n, feeAmount: 500n,
-    nonce: r["authorizationNonce"], treeHash: r["treeHash"], childCount: 0, childTotalAtomic: 0n })
+  insist(events(settlement, EVENTS, "SettledTree", c.splitter).length === 0, "childless settlement must not emit SettledTree")
+  oneEvent(settlement, EVENTS, "Settled", c.splitter, { buyer: c.buyer, total: 10000n, sellerAmount: 9500n, feeAmount: 500n,
+    nonce: r["authorizationNonce"] })
   const at = r["createdAtMs"]
   insist(typeof at === "number" && Number.isSafeInteger(at) && at >= 0, "invalid receipt timestamp")
   insist(outcome["stopReason"] === undefined || typeof outcome["stopReason"] === "string", "invalid job stop reason")

@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { decodeEventLog, parseAbi } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
+import { treeHashOf } from "@arcade/core"
 import type { RunnerConfig } from "../packages/runner/src/config.ts"
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url))
@@ -98,6 +99,7 @@ export const assertRestoredEvidence = (snapshot: EvidenceSnapshot, row: Evidence
 
 const EVENTS = parseAbi([
   "event Transfer(address indexed from, address indexed to, uint256 value)",
+  "event Settled(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce)",
   "event SettledTree(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce, bytes32 indexed treeHash, uint32 childCount, uint256 childTotalAtomic)"
 ])
 const atomic = (value: unknown): bigint => {
@@ -114,25 +116,37 @@ export const assertSettledEvidence = (row: EvidenceRow, receipt: unknown, chain:
     same(receipt["buyer"], cfg.buyer) && same(receipt["seller"], cfg.seller) && same(receipt["settleTx"], row.settleTx), "durable canary receipt does not match this purchase")
   insist(atomic(receipt["priceAtomic"]) === 10_000n && atomic(receipt["sellerAtomic"]) === 9_500n &&
     atomic(receipt["feeAtomic"]) === 500n && receipt["feeBps"] === 500, "receipt must prove the exact $0.01 / 5% split")
+  // The fixed flow-check never hires. The hub still records a canonical empty tree,
+  // but pipeline.ts deliberately calls settle (not settleWithTree) for this root.
+  insist(receipt["rootJobId"] === row.jobId && receipt["parentJobId"] === undefined && receipt["hop"] === 0 &&
+    Array.isArray(receipt["ancestors"]) && receipt["ancestors"].length === 0 &&
+    Array.isArray(receipt["children"]) && receipt["children"].length === 0 &&
+    same(receipt["treeHash"], treeHashOf(row.jobId, [])) && atomic(receipt["treeCommittedAtomic"]) === 0n &&
+    hash(receipt["authorizationNonce"]), "receipt must describe this canonical childless root and authorization")
   insist(object(chain) && chain["status"] === "0x1" && same(chain["transactionHash"], row.settleTx) &&
-    same(chain["from"], cfg.facilitator) && same(chain["to"], cfg.splitter) && Array.isArray(chain["logs"]), "transaction is not the successful configured Arc settlement")
-  let incoming = false, outgoing = false, settled = false
+    same(chain["from"], cfg.facilitator) && same(chain["to"], cfg.splitter) && Array.isArray(chain["logs"]) &&
+    chain["logs"].length <= 4096, "transaction is not the successful configured Arc settlement")
+  let incoming = 0, outgoing = 0, settled = 0, treeEvent = false
   for (const log of chain["logs"]) {
-    if (!object(log) || !Array.isArray(log["topics"]) || typeof log["data"] !== "string") continue
+    insist(object(log) && (log["removed"] === undefined || log["removed"] === false) &&
+      (log["transactionHash"] === undefined || hash(log["transactionHash"]) && same(log["transactionHash"], row.settleTx)),
+      "receipt log is removed or belongs to another transaction")
+    if (!Array.isArray(log["topics"]) || typeof log["data"] !== "string") continue
     try {
       const decoded = decodeEventLog({ abi: EVENTS, topics: log["topics"] as [`0x${string}`, ...`0x${string}`[]], data: log["data"] as `0x${string}` })
       if (decoded.eventName === "Transfer" && same(log["address"], USDC)) {
-        incoming ||= same(decoded.args.from, cfg.buyer) && same(decoded.args.to, cfg.splitter) && decoded.args.value === 10_000n
-        outgoing ||= same(decoded.args.from, cfg.splitter) && same(decoded.args.to, cfg.seller) && decoded.args.value === 9_500n
+        if (same(decoded.args.from, cfg.buyer) && same(decoded.args.to, cfg.splitter) && decoded.args.value === 10_000n) incoming++
+        if (same(decoded.args.from, cfg.splitter) && same(decoded.args.to, cfg.seller) && decoded.args.value === 9_500n) outgoing++
       }
-      if (decoded.eventName === "SettledTree" && same(log["address"], cfg.splitter)) {
-        settled ||= same(decoded.args.buyer, cfg.buyer) && decoded.args.total === 10_000n && decoded.args.sellerAmount === 9_500n &&
-          decoded.args.feeAmount === 500n && same(decoded.args.nonce, receipt["authorizationNonce"]) &&
-          same(decoded.args.treeHash, receipt["treeHash"]) && decoded.args.childCount === 0 && decoded.args.childTotalAtomic === 0n
+      if (decoded.eventName === "Settled" && same(log["address"], cfg.splitter)) {
+        if (same(decoded.args.buyer, cfg.buyer) && decoded.args.total === 10_000n && decoded.args.sellerAmount === 9_500n &&
+          decoded.args.feeAmount === 500n && same(decoded.args.nonce, receipt["authorizationNonce"])) settled++
       }
+      if (decoded.eventName === "SettledTree" && same(log["address"], cfg.splitter)) treeEvent = true
     } catch { /* Other token/native logs are not evidence for this receipt. */ }
   }
-  insist(incoming && outgoing && settled, "matching ERC-20 transfers and FeeSplitterV2 tree event are required")
+  insist(incoming === 1 && outgoing === 1 && settled === 1 && !treeEvent,
+    "exact ERC-20 transfers and childless FeeSplitterV2 Settled event are required; SettledTree is for actual lineage parents")
 }
 
 interface RecoveryControls {
@@ -371,7 +385,7 @@ Effect.runPromise(startDaemon({ config, skillsDir: ${JSON.stringify(skillsDir)} 
       skillId: SKILL, seller: cfg.seller, buyer: cfg.buyer, splitter: cfg.splitter,
       first: proof.first, offlineFailures: offlineRows, recovery: proof.second,
       claims: ["offline details return 404", "three durable offline failures", "all four catalogues omit the listing",
-        "reconnect alone preserves delisting", "distinct paid recovery restores discovery", "both receipts and on-chain transfers/tree events match"] }, null, 2))
+        "reconnect alone preserves delisting", "distinct paid recovery restores discovery", "both receipts and on-chain transfers/childless Settled events match"] }, null, 2))
     return proof
   }, async () => {
     clearTimeout(timer); process.off("SIGINT", onSignal); process.off("SIGTERM", onSignal)

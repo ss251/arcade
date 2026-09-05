@@ -540,7 +540,7 @@ prove delisting: the script also checks three new durable failed pay-tests for t
 seller/listing and omission from all four catalogues. After reconnect it verifies the
 delisted explanation, releases execution, and requires a distinct passing transaction
 before claiming recovery. It then stops its owned services and independently checks both
-durable marked receipts, ERC-20 transfers and FeeSplitterV2 tree events using bounded RPC
+durable marked receipts, ERC-20 transfers and FeeSplitterV2 childless `Settled` events using bounded RPC
 reads. An extra paid receipt, missing evidence or failed cleanup makes the command fail.
 The printed temporary evidence directory is retained with public proof and local sqlite
 history, never keys. All child environments are allowlisted.

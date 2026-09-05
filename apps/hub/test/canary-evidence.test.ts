@@ -6,6 +6,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { treeHashOf } from "@arcade/core"
 import {
   assertHiddenEvidence, assertOfflineEvidence, assertRestoredEvidence, assertSettledEvidence,
   gatedEntrySource, hubPreloadSource, readEvidenceConfig, runRecoverySequence,
@@ -22,7 +23,7 @@ const facilitator = privateKeyToAccount(env.ARCADE_FACILITATOR_KEY).address
 const splitter = env.ARCADE_FEE_SPLITTER
 const tx = `0x${"a".repeat(64)}`
 const nonce = `0x${"b".repeat(64)}`
-const treeHash = `0x${"c".repeat(64)}`
+const treeHash = treeHashOf("job_100", [])
 const id = "usdc-flow-check"
 const row = (atMs = 100, ok = true): EvidenceRow => ({ skillId: id, seller, atMs,
   jobId: ok ? `job_${atMs}` : "", ok, ...(ok ? { settleTx: tx } : {}) })
@@ -147,7 +148,9 @@ describe("real offline entry points", () => {
 
 describe("paid evidence requires real matching settlement logs", () => {
   const transferAbi = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)"])
-  const settledAbi = parseAbi(["event SettledTree(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce, bytes32 indexed treeHash, uint32 childCount, uint256 childTotalAtomic)"])
+  // FeeSplitterV2.settle (the actual childless pipeline) emits Settled, not SettledTree.
+  const settledAbi = parseAbi(["event Settled(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce)"])
+  const treeAbi = parseAbi(["event SettledTree(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce, bytes32 indexed treeHash, uint32 childCount, uint256 childTotalAtomic)"])
   const transfer = (from: string, to: string, amount: bigint) => ({
     address: "0x3600000000000000000000000000000000000000",
     topics: encodeEventTopics({ abi: transferAbi, eventName: "Transfer", args: { from: from as `0x${string}`, to: to as `0x${string}` } }),
@@ -155,16 +158,64 @@ describe("paid evidence requires real matching settlement logs", () => {
   })
   const receipt = { jobId: "job_100", skillId: id, buyer, seller, canary: true, settled: true,
     rail: "eip3009", network: "eip155:5042002", settleTx: tx, priceAtomic: "10000", sellerAtomic: "9500",
-    feeAtomic: "500", feeBps: 500, authorizationNonce: nonce, treeHash }
+    feeAtomic: "500", feeBps: 500, authorizationNonce: nonce, treeHash, rootJobId: "job_100", hop: 0,
+    ancestors: [], children: [], treeCeilingAtomic: { __bigint: "0" }, treeCommittedAtomic: { __bigint: "0" } }
+  const settledLog = ({ paidBy = buyer, paidNonce = nonce, total = 10000n, sellerAmount = 9500n, feeAmount = 500n } = {}) => ({
+    address: splitter,
+    topics: encodeEventTopics({ abi: settledAbi, eventName: "Settled", args: {
+      buyer: paidBy, nonce: paidNonce as `0x${string}` } }),
+    data: encodeAbiParameters(parseAbiParameters("uint256,uint256,uint256"), [total, sellerAmount, feeAmount])
+  })
+  const treeLog = {
+    address: splitter,
+    topics: encodeEventTopics({ abi: treeAbi, eventName: "SettledTree", args: {
+      buyer, nonce: nonce as `0x${string}`, treeHash } }),
+    data: encodeAbiParameters(parseAbiParameters("uint256,uint256,uint256,uint32,uint256"), [10000n, 9500n, 500n, 0, 0n])
+  }
   const chain = { transactionHash: tx, status: "0x1", from: facilitator, to: splitter,
-    logs: [transfer(buyer, splitter, 10000n), transfer(splitter, seller, 9500n), {
-      address: splitter,
-      topics: encodeEventTopics({ abi: settledAbi, eventName: "SettledTree", args: {
-        buyer, nonce: nonce as `0x${string}`, treeHash: treeHash as `0x${string}` } }),
-      data: encodeAbiParameters(parseAbiParameters("uint256,uint256,uint256,uint32,uint256"), [10000n, 9500n, 500n, 0, 0n])
-    }] }
-  it("accepts the matching durable marked receipt, ERC-20 transfers and splitter tree event", () => {
+    logs: [transfer(buyer, splitter, 10000n), transfer(splitter, seller, 9500n), settledLog()] }
+  it("accepts the real childless V2 Settled event with exact transfers and durable marked root", () => {
     expect(() => assertSettledEvidence(row(), receipt, chain, readEvidenceConfig(env))).not.toThrow()
+  })
+  it("does not invent an on-chain tree commitment for a childless purchase", () => {
+    expect(() => assertSettledEvidence(row(), receipt, { ...chain, logs: [...chain.logs.slice(0, 2), treeLog] }, readEvidenceConfig(env))).toThrow()
+    expect(() => assertSettledEvidence(row(), receipt, { ...chain, logs: [...chain.logs, treeLog] }, readEvidenceConfig(env))).toThrow()
+  })
+  it("requires the canonical childless root, not another root or an actual lineage parent", () => {
+    for (const over of [{ rootJobId: "job_other" }, { rootJobId: undefined }, { parentJobId: "job_parent" },
+      { hop: 1 }, { ancestors: ["job_parent"] }, { ancestors: undefined }, { children: undefined },
+      { children: [{ jobId: "job_child", priceAtomic: "1" }] }, { treeHash: `0x${"e".repeat(64)}` },
+      { treeCommittedAtomic: "1" }, { authorizationNonce: undefined }, { authorizationNonce: "not-a-nonce" }]) {
+      expect(() => assertSettledEvidence(row(), { ...receipt, ...over }, chain, readEvidenceConfig(env))).toThrow()
+    }
+  })
+  it("requires the Settled event to bind this payer, authorization nonce and exact split", () => {
+    for (const over of [{ paidBy: seller }, { paidNonce: `0x${"d".repeat(64)}` },
+      { total: 10001n }, { sellerAmount: 9501n }, { feeAmount: 499n }]) {
+      expect(() => assertSettledEvidence(row(), receipt, { ...chain,
+        logs: [...chain.logs.slice(0, 2), settledLog(over)] }, readEvidenceConfig(env))).toThrow()
+    }
+    expect(() => assertSettledEvidence(row(), { ...receipt, authorizationNonce: `0x${"d".repeat(64)}` }, chain, readEvidenceConfig(env))).toThrow()
+  })
+  it("rejects matching-looking logs with wrong emitter, removed status or transaction provenance", () => {
+    for (const index of [0, 1, 2]) {
+      for (const over of [{ address: buyer }, { removed: true }, { transactionHash: `0x${"d".repeat(64)}` }]) {
+        const logs = chain.logs.map((log, i) => i === index ? { ...log, ...over } : log)
+        expect(() => assertSettledEvidence(row(), receipt, { ...chain, logs }, readEvidenceConfig(env))).toThrow()
+      }
+    }
+  })
+  it("still independently requires both exact ERC-20 payment legs", () => {
+    for (const logs of [
+      [transfer(seller, splitter, 10000n), chain.logs[1]!, settledLog()],
+      [transfer(buyer, seller, 10000n), chain.logs[1]!, settledLog()],
+      [transfer(buyer, splitter, 10001n), chain.logs[1]!, settledLog()],
+      [chain.logs[0]!, transfer(splitter, buyer, 9500n), settledLog()],
+      [chain.logs[0]!, transfer(splitter, seller, 9499n), settledLog()]
+    ]) expect(() => assertSettledEvidence(row(), receipt, { ...chain, logs }, readEvidenceConfig(env))).toThrow()
+  })
+  it("rejects duplicate matching settlement events rather than choosing an ambiguous proof", () => {
+    expect(() => assertSettledEvidence(row(), receipt, { ...chain, logs: [...chain.logs, settledLog()] }, readEvidenceConfig(env))).toThrow()
   })
   it("rejects a hash alone, wrong chain/identity, simulated payment and arithmetic mismatch", () => {
     for (const over of [{ canary: false }, { rail: "test" }, { network: "eip155:1" },

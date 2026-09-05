@@ -34,7 +34,8 @@ const fixture = (): EvidenceBundle => {
     outputSchema: { type: "object", required: ["chainId"] } }
   const receipt = { jobId, skillId, skillVersion: "0.1.0", buyer: c.buyer, seller: c.seller, settled: true,
     rail: "eip3009", network: "eip155:5042002", settleTx: tx("a"), priceAtomic: "10000", sellerAtomic: "9500",
-    feeAtomic: "500", feeBps: 500, authorizationNonce: tx("b"), treeHash: treeHashOf(jobId, []), createdAtMs: at }
+    feeAtomic: "500", feeBps: 500, authorizationNonce: tx("b"), treeHash: treeHashOf(jobId, []), createdAtMs: at,
+    rootJobId: jobId, hop: 0, ancestors: [], children: [], treeCommittedAtomic: "0" }
   const job = { id: jobId, skillId, buyer: c.buyer, seller: c.seller, status: "succeeded",
     input: { address: c.buyer }, outcome: { status: "succeeded", stopReason: "end_turn", output: { chainId: 5042002 } } }
   const input = { ...receipt, origin, agentId, payTo: c.splitter, input: job.input, output: job.outcome.output,
@@ -49,7 +50,8 @@ const fixture = (): EvidenceBundle => {
   const receiptOf = (hash: string, from: string, to: string, logs: unknown[]) => ({
     transactionHash: hash, status: "0x1", from, to, blockNumber: "0x65", logs })
   const erc20 = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)"])
-  const tree = parseAbi(["event SettledTree(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce, bytes32 indexed treeHash, uint32 childCount, uint256 childTotalAtomic)"])
+  // Actual childless pipeline path calls FeeSplitterV2.settle, not settleWithTree.
+  const settled = parseAbi(["event Settled(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce)"])
   const transfer = (from: string, to: string, amount: bigint) => event(erc20, "Transfer", { from, to }, "uint256", [amount], "0x3600000000000000000000000000000000000000")
   return {
     origin, startBlock: 100n, chainId: "0x4cef52", manifest, job, receipt,
@@ -66,8 +68,8 @@ const fixture = (): EvidenceBundle => {
       parseAbi(["event ApprovalForAll(address indexed owner, address indexed operator, bool approved)"]),
       "ApprovalForAll", { owner: c.seller, operator: c.operator }, "bool", [true], registries.identity)]),
     settlementReceipt: receiptOf(tx("a"), c.facilitator, c.splitter, [transfer(c.buyer, c.splitter, 10000n), transfer(c.splitter, c.seller, 9500n),
-      event(tree, "SettledTree", { buyer: c.buyer, nonce: receipt.authorizationNonce, treeHash: receipt.treeHash },
-        "uint256,uint256,uint256,uint32,uint256", [10000n, 9500n, 500n, 0, 0n], c.splitter)]),
+      event(settled, "Settled", { buyer: c.buyer, nonce: receipt.authorizationNonce },
+        "uint256,uint256,uint256", [10000n, 9500n, 500n], c.splitter)]),
     requestReceipt: receiptOf(tx("e"), c.operator, registries.validation, [event(VALIDATION_REGISTRY_ABI, "ValidationRequest",
       { validatorAddress: c.validator, agentId: 123n, requestHash }, "string", [`${origin}/receipts/${jobId}/validation-request.json`], registries.validation)]),
     responseReceipt: receiptOf(tx("f"), c.validator, registries.validation, [event(VALIDATION_REGISTRY_ABI, "ValidationResponse",
@@ -143,6 +145,52 @@ describe("independently checked facts, never transaction hashes alone", () => {
     const result = assertErc8004Evidence(config(), fixture())
     expect(result).toMatchObject({ agentId, jobId, settlementTx: tx("a"), registrationTx: tx("c"), requestTx: tx("e"), responseTx: tx("f"), feedbackTx: tx("9") })
     expect(JSON.stringify(result)).not.toContain("PRIVATE-PROVIDER-REASON")
+  })
+  it("rejects the synthetic zero-child tree event instead of claiming the real childless path committed a tree", () => {
+    const c = config(), proof = fixture(), receipt = rec(proof.receipt), settlement = rec(proof.settlementReceipt)
+    const tree = parseAbi(["event SettledTree(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce, bytes32 indexed treeHash, uint32 childCount, uint256 childTotalAtomic)"])
+    settlement.logs = [...(settlement.logs as unknown[]).slice(0, 2), event(tree, "SettledTree", {
+      buyer: c.buyer, nonce: receipt.authorizationNonce, treeHash: receipt.treeHash },
+      "uint256,uint256,uint256,uint32,uint256", [10000n, 9500n, 500n, 0, 0n], c.splitter)]
+    expect(() => assertErc8004Evidence(c, proof)).toThrow("Settled")
+  })
+  it("rejects contradictory tree and ordinary settlement events in the same childless payment", () => {
+    const c = config(), proof = fixture(), receipt = rec(proof.receipt), settlement = rec(proof.settlementReceipt)
+    const tree = parseAbi(["event SettledTree(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce, bytes32 indexed treeHash, uint32 childCount, uint256 childTotalAtomic)"])
+    settlement.logs = [...settlement.logs as unknown[], event(tree, "SettledTree", {
+      buyer: c.buyer, nonce: receipt.authorizationNonce, treeHash: receipt.treeHash },
+      "uint256,uint256,uint256,uint32,uint256", [10000n, 9500n, 500n, 0, 0n], c.splitter)]
+    expect(() => assertErc8004Evidence(c, proof)).toThrow("SettledTree")
+  })
+  it("requires the actual explicit empty root lineage and zero committed child spend", () => {
+    for (const override of [{ rootJobId: undefined }, { rootJobId: "job_anotherRoot123456" }, { hop: undefined }, { hop: 1 },
+      { ancestors: undefined }, { ancestors: ["wallet-risk-note"] }, { children: undefined }, { children: [{}] },
+      { treeCommittedAtomic: undefined }, { treeCommittedAtomic: "1" }, { parentJobId: "job_parent1234567890" }]) {
+      const proof = fixture(); proof.receipt = { ...rec(proof.receipt), ...override }
+      expect(() => assertErc8004Evidence(config(), proof)).toThrow()
+    }
+  })
+  it("matches the childless Settled nonce, payer and all atomic amounts", () => {
+    const c = config(), settled = parseAbi(["event Settled(address indexed buyer, uint256 total, uint256 sellerAmount, uint256 feeAmount, bytes32 indexed nonce)"])
+    for (const override of [{ nonce: tx("1") }, { buyer: c.seller }, { total: 9999n }, { sellerAmount: 9000n }, { feeAmount: 1000n }]) {
+      const proof = fixture(), settlement = rec(proof.settlementReceipt)
+      const facts = { buyer: c.buyer, nonce: rec(proof.receipt).authorizationNonce, total: 10000n, sellerAmount: 9500n, feeAmount: 500n, ...override }
+      settlement.logs = [...(settlement.logs as unknown[]).slice(0, 2), event(settled, "Settled", { buyer: facts.buyer, nonce: facts.nonce },
+        "uint256,uint256,uint256", [facts.total, facts.sellerAmount, facts.feeAmount], c.splitter)]
+      expect(() => assertErc8004Evidence(c, proof)).toThrow("Settled")
+    }
+  })
+  it("rejects a childless settlement from another transaction or removed/cross-transaction event", () => {
+    const wrongReceipt = fixture()
+    rec(wrongReceipt.settlementReceipt).transactionHash = tx("1")
+    expect(() => assertErc8004Evidence(config(), wrongReceipt)).toThrow("requested transaction hash")
+    for (const override of [{ address: config().buyer }, { removed: true }, { transactionHash: tx("1") },
+      { blockNumber: "0x66" }, { blockHash: tx("2") }, { transactionIndex: "0x1" }]) {
+      const proof = fixture(), settlement = rec(proof.settlementReceipt), logs = settlement.logs as unknown[]
+      settlement.blockHash = tx("3"); settlement.transactionIndex = "0x0"
+      settlement.logs = [...logs.slice(0, 2), { ...rec(logs[2]), ...override }]
+      expect(() => assertErc8004Evidence(config(), proof)).toThrow()
+    }
   })
   it("can verify the mint and blanket approval independently before spending on a job", () => {
     const proof = fixture()
