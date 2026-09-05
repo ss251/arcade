@@ -4,7 +4,11 @@ H1's read-only public feeds are committed. H2 seller accounting and its read-onl
 route are implemented and independently reviewed, with the full gate passed.
 H3's private-tree projection and authenticated route are implemented and reviewed;
 their full gate passed. H4's bounded read-only web client and pure formatters are
-implemented and source-reviewed; their full gate and live browser evidence remain pending.
+committed as `d1f89f6` after their full test/type/web-build gate passed; this is not
+live hub or browser evidence. H5's `/chat` move, native-anchor navigation and `/`
+shell are implemented and source-reviewed with author-run isolated browser checks;
+the separate H5 full test/type/client-and-SSR-build gate passed. Seller, buyer and
+publish pages are future work.
 The full F shared-file dependency remains held, with the explicit H1-before-G8
 stats handoff preserved. No H merge or production deployment is claimed here.
 
@@ -30,6 +34,9 @@ stats handoff preserved. No H merge or production deployment is claimed here.
 - [Task 4 original implementation report](task-4-report.md)
 - [Task 4 compatibility follow-up](task-4-compatibility.md)
 - [Task 4 parent integration](task-4-integration.md)
+- [Task 5 brief and review boundary](task-5-brief.md)
+- [Task 5 historical author report](task-5-report.md)
+- [Task 5 parent review and full gate](task-5-parent-review.md)
 
 Only reviewed execution records are published. Private research, owner handoffs,
 runtime state and keys remain excluded. Original reports retain their dated

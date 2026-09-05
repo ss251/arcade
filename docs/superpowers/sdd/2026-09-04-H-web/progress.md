@@ -89,3 +89,65 @@ Parent also independently repeated 153 Vitest, three Bun / 26 assertions, and
 both exact nested TypeScript checks with zero diagnostics. The separate full
 test/type/web gate follows. No live hub,
 browser proof, new payment or H merge ahead of the remaining F implementation.
+
+## September 5 — H4 committed / H5 local browser checkpoint
+
+H4 committed as `d1f89f6` after its separate full gate passed: 2,308 Vitest tests
+across 113 files, 322 Bun tests / 3,678 assertions across 30 files, strict types
+and the web build. This supersedes H4's earlier pending-gate statements while
+preserving the original reports. It is not live hub or provider evidence.
+
+H5 moves the preserved chat page to `/chat`, adds exactly five section links with
+native anchors and current-page semantics, and leaves `/` as the intentional H6
+shell. Seller, buyer and publish destinations are not completed pages. Native
+navigation reloads; no SPA-transition claim is made. Chat/Confirm components,
+payment/ENS authority, H4 clients, provider configuration and dependencies remain
+unchanged; generated route registration retains the API routes.
+
+The author's 13:57:23 UTC failure-first checkpoint had an absent Nav module and
+an actual owned `/chat` 404. At 14:04:32 UTC, eight Nav/preservation cases, one
+actual-router case and eight unchanged Confirm cases passed. The author later
+ran the focused web suite: 231 tests / 17 files, not a full repository gate.
+Client and SSR builds plus exact nested web TypeScript passed, with initial
+fixture/checker setup mistakes and incomplete build evidence preserved in the
+[historical report](task-5-report.md).
+
+The author performed isolated browser interactions at 14:16–14:18 UTC: desktop
+1280 and mobile 390 layout measurements, light/dark mobile checks, keyboard focus,
+native navigation and synthetic local conversation/sidebar behavior. Parent read
+all eight source/test files, inspected all four actual screenshots and separately
+passed the nine Nav/route tests, eight Confirm tests and web strict check. Parent
+did not independently repeat the recorded browser clicks; screenshots are not
+substitutes for those interactions or automated assertions.
+
+The failed shared-browser consent/CUA attempts remain explicit: one created blank
+tab could not be closed through the unavailable surface and the other create
+result was unknown. This is distinct from successful isolated cleanup, where
+the owned tab, harness daemon, supervisor and Chrome/Vite children closed and
+both listeners refused connections afterward. No user consent was bypassed,
+unrelated tab operated, profile/runtime/screenshot exported or cleanup completeness
+claimed for the failed CUA attempts. No live provider, wallet or purchase was used.
+
+The sanitized public report preserves its original hash-bound content apart from
+the banner and explicit private-runtime path/identifier substitutions. The
+original remains unchanged. Publisher checks at 14:29:59 UTC verified exact
+banner/substitution equality, all 30 local links across the four selected public
+documents, no private runtime paths/identifiers or private clickable targets,
+unchanged eight source/test fingerprints and diff-check success. This is a
+targeted publication check, not a whole-repository secret scan or another browser
+run. Parent review and H5's separate full gate precede its commit; neither is
+assumed from H4's earlier pass.
+Canonical F-before-H dependencies remain in force.
+
+### H5 parent full-gate follow-up
+
+Parent source/public review is CLEAN. Exact copied-chat bytes outside approved
+changes, eight source hashes, three protected files and four screenshot hashes
+match. Parent repeated nine Nav/route tests plus eight actual ENS Confirm tests;
+web strict and exact nested-test/fixture TypeScript both passed. Parent viewed
+the screenshots but did not independently repeat the author's browser clicks.
+
+H5's own full gate passed 2,317 Vitest tests / 115 files, 322 Bun tests /
+3,678 assertions / 30 files, root/web strict and an actual keyless Vite client
+and SSR build. See the [parent review](task-5-parent-review.md). The scoped
+checkpoint is ready for an atomic commit, not a main merge or future-page claim.
