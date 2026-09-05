@@ -83,4 +83,18 @@ describe("G1 offline smoke scaffold", () => {
     expect(current).toContain("Tasks 2–6 remain gated")
     expect(readme).toContain("Missing owner prerequisites are not an unsupported-network result")
   })
+
+  test("records the indexed runbook match without claiming an atomic fully-synced head", () => {
+    const readme = text("../README.md")
+    const current = readme.split("## September 5, 2026 — indexed runbook match")[1]?.split("\n## ")[0]
+    expect(current).toBeDefined()
+    expect(current).toContain("G1 deployment and indexed-runbook query requirement: MET")
+    expect(current).toContain("2026-09-05T14:41:46.576Z")
+    expect(current).toContain("QmePuPnHraVaV9TmxaAwCCMKwTD8iFW96eoEUfSA1BoCW8")
+    expect(current).toContain("0x9a706d5760f11ba0c5aa1fe30afc6f4fa87e908bafa4a78cdafe3af1415eefd2")
+    expect(current).toContain("10,000 atomic units ($0.01)")
+    expect(current).toContain("six-block observed gap")
+    expect(current).toContain("not a fully-synced or dashboard-status proof")
+    expect(current).toContain("parent review, full gate, commit and explicit release")
+  })
 })

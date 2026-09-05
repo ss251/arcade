@@ -1,10 +1,12 @@
 # Plan G — execution records
 
 Task 1's local smoke scaffold, source-contract tests, pinned code generation and
-WASM build passed. The September 5 partial live checkpoint records an accepted
-one-shot Studio deployment and both keyless/authenticated data access, but empty
-settlement lists and no known-runbook match. Tasks 2–6 remain gated on that missing
-proof; neither full sync nor complete G1 live success is claimed.
+WASM build passed. The later September 5 indexed-match checkpoint now satisfies
+G1's deployment and known-runbook query requirement: both historical transactions
+appear, with the exact filtered hash, buyer and $0.01 amount matching the runbook.
+The indexer was six blocks behind the separately observed head, not proved fully
+synced. Tasks 2–6 local work awaits parent review, full gate, commit and explicit
+release. Earlier partial/empty observations remain unchanged historical records.
 This worktree must not merge ahead of Plan F.
 
 - [Approved plan](../../plans/2026-09-04-G-graph.md)
@@ -17,6 +19,9 @@ This worktree must not merge ahead of Plan F.
 - [Runtime security review and superseding correction](task-1-live-runtime-review.md)
 - [Independent keyless deployment/indexing observation](task-1-live-evidence-review.md)
 - [Parent publication review and later indexing checkpoint](task-1-live-parent-review.md)
+- [Final indexed-runbook-match brief](task-1-indexed-match-brief.md)
+- [Exact later indexing and Arc-head observation](task-1-later-indexing-review.md)
+- [Final indexed-match parent review and gates](task-1-indexed-match-parent-review.md)
 - [Task 7 brief](task-7-brief.md)
 - [Task 7 implementation report](task-7-report.md)
 - [Task 10 brief](task-10-brief.md)

@@ -183,3 +183,48 @@ The parent's one later keyless query at 14:10:24.097 UTC reached block 42,441,11
 with the exact CID and no indexing errors. Both settlement lists remained empty.
 No paid query, new settlement or deployment was performed. The partial checkpoint
 is ready for its small atomic commit, not a main merge or G2–6 release.
+
+## September 5 — G1 indexed runbook requirement met
+
+At 14:41:46.576 UTC the independent reviewer made the single newly authorized
+keyless GraphQL request. The exact acknowledged CID returned data with no indexing
+errors: both historical runbook hashes appeared in the latest list, and the
+exact `9a706d57…` filter returned one settlement at block 53,891,400, total 10,000
+atomic units ($0.01), from the runbook buyer. Parent reread the runbook and
+confirmed the hash, amount and address match. The full values are retained in the
+[later observation](task-1-later-indexing-review.md).
+
+The one authorized `eth_blockNumber` read returned 60,593,643 at 14:41:46.442 UTC;
+Graph reported 60,593,637, a six-block gap between observations 134 ms apart. This
+is not exact synchronization, a Studio dashboard status, independent fresh
+receipt/log verification or another payment. The prior empty Graph results and
+the parent's historical RPC receipt absence remain unchanged. Keyless access is
+time-qualified; no permanent access policy or decentralized/x402 support is inferred.
+
+G1's deployment and indexed-known-runbook evidence requirement is now met. G2–6
+local implementation remains conditional on parent review, full gate, commit and
+explicit release. No new deploy, upload, purchase, G merge or authority expansion
+is implied. The [final brief](task-1-indexed-match-brief.md) separates this evidence
+checkpoint from its pending publication gate.
+
+The earlier six scaffold contracts and all partial reports remain unchanged.
+A seventh current-status test genuinely failed against the previous README at
+14:46:35 UTC (six passed, one failed) before this dated status update. Only
+documentation and that new assertion are in scope; schema, manifest, mapping,
+ABI, package, lock and private runtime are unchanged. After the update, all seven
+scaffold checks / 45 assertions passed by 14:48:20 UTC and on the final repeat;
+the exact nested strict check and diff check passed. All 48 local links/anchors
+across the five publication documents resolve. The report copy is original bytes
+plus its two-line banner, with zero body substitutions. The separate parent full
+gate remains pending, never inferred from the earlier partial publication's pass.
+
+### Final indexed-match parent gate
+
+Parent review and the separate full gate now passed: 2,338 Vitest /115 files,
+348 Bun /3,692 assertions /32 files (including 19 private runtime/security checks),
+root/web strict zero diagnostics and actual smoke WASM build. Parent independently
+repeated 7 scaffold checks /45 assertions, exact nested strict, banner-only byte
+comparison and six unchanged source/toolchain fingerprints. The new
+[parent review](task-1-indexed-match-parent-review.md) records these checks and
+retains the evidence limits. Ready for the small atomic evidence commit; local
+G2–6 source release is a subsequent parent decision, not another live operation.

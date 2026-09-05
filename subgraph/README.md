@@ -1,4 +1,4 @@
-# ARCADE ledger — G1 local smoke scaffold
+# ARCADE ledger — G1 smoke checkpoint
 
 This temporary smoke subgraph maps the **v1 pilot FeeSplitter's `Settled` event**
 to immutable `Settlement` entities. It does not yet index FeeSplitterV2 trees or
@@ -9,10 +9,46 @@ The minimal ABI matches [the local contract](../contracts/FeeSplitter.sol); the
 pilot address is recorded in [the runbook](../docs/runbook.md#the-fee-splitter-goes-on-the-runner).
 `startBlock: 0` is the plan's temporary smoke setting, **not** a verified creation block.
 
+## September 5, 2026 — indexed runbook match
+
+**G1 deployment and indexed-runbook query requirement: MET.** The separately
+approved keyless observation at `2026-09-05T14:41:46.576Z` returned actual data from
+the [acknowledged Studio endpoint](https://api.studio.thegraph.com/query/1721684/arcade-ledger-arc-testnet/v0.0.1-smoke),
+with exact CID `QmePuPnHraVaV9TmxaAwCCMKwTD8iFW96eoEUfSA1BoCW8` and
+`hasIndexingErrors: false`. Its latest list contained both historical runbook
+transactions, and the exact known-transaction filter returned:
+
+- Transaction `0x9a706d5760f11ba0c5aa1fe30afc6f4fa87e908bafa4a78cdafe3af1415eefd2`.
+- **10,000 atomic units ($0.01)**; buyer
+  `0xdaaca688ce93d6ea0bdf4cda9925c5526f3ca5e1`, matching the runbook address.
+- Recorded settlement block **53,891,400**.
+
+The other latest-list transaction was
+`0x6366215e96a33e97e4a177453c858e9b1b8639fcff4bb72e1e7dcf5459fc8143`,
+also 10,000 atomic units from the same buyer. No new payment created this evidence.
+The indexer reported block **60,593,637**, hash
+`0xba9c8a058c6154849101164f04390fa08e511d53235c7f5b3fc4baf5bc639f1d`.
+The sole concurrent `eth_blockNumber` request to the first pinned Arc-testnet RPC
+returned **60,593,643** at `2026-09-05T14:41:46.442Z`: a **six-block observed gap**.
+These reads were 134 ms apart, **not a fully-synced or dashboard-status proof**.
+
+This is indexed historical data, not another direct RPC receipt/log check or
+independent confirmation of the seller/fee split. Earlier empty lists and RPC
+receipt absence remain historical observations below; they are not rewritten.
+Keyless access worked at this instant, not necessarily under a permanent policy.
+No V2 tree/registry, decentralized-publication or Graph x402 coverage is inferred.
+
+The [final indexed-match brief](../docs/superpowers/sdd/2026-09-04-G-graph/task-1-indexed-match-brief.md)
+and [exact observation](../docs/superpowers/sdd/2026-09-04-G-graph/task-1-later-indexing-review.md)
+record the evidence and bounds. G2–6 local implementation may proceed only after
+parent review, full gate, commit and explicit release. No new deployment, upload,
+settlement, spending authority or G merge is authorized by this checkpoint.
+
 ## Historical local-only checkpoint
 
 The following bullets preserve the original local-build checkpoint. Its pending
-statements are superseded by the dated partial live checkpoint below; they are
+statements are superseded first by the partial checkpoint and now by the indexed
+match above; they are
 not the current deployment or query status.
 
 - Local preparation: PASS on 2026-09-05 — 6 scaffold checks (31 assertions), local
@@ -125,11 +161,12 @@ bun --no-env-file run deploy --version-label v0.0.1-smoke
 
 Do not place a deploy key in this file, source, command arguments, logs or `.env`. Studio
 authentication and any credential persistence require a separately approved owner workflow.
-The dated checkpoint above records the actual returned URL and query observations;
-the matched-runbook-settlement requirement is still outstanding.
+The partial checkpoint above records when the returned URL worked but the
+matched-runbook-settlement requirement was still outstanding. The later indexed
+match now satisfies that evidence requirement; source release remains parent-owned.
 
-Tasks 2–6 remain gated on the complete deployment, indexed data and known-settlement proof. Missing owner prerequisites are not an unsupported-network result.
+Tasks 2–6 remain gated on parent review, full gate, commit and explicit source release. Missing owner prerequisites are not an unsupported-network result.
 Only an actual supported-network rejection can trigger the plan's fallback: retain hub-computed
 statistics, record the sanitized rejection, and separately scope the independent Graph
-cost-of-goods half. No fallback or complete G1 live result is claimed here. Canonical F-before-G
+cost-of-goods half. No fallback or fully-synced result is inferred here. Canonical F-before-G
 merge order remains in force.
