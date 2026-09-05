@@ -25,6 +25,11 @@ independently mined. F2–12 code work is unblocked; no extra live allowance is 
 - [Task 4 parent integration and publication review](task-4-parent-review.md)
 - [Task 5 current brief, evidence sequence and accounting limits](task-5-brief.md)
 - [Task 5 parent foundation/correction review and gate chronology](task-5-parent-review.md)
+- [Task 6 brief and lifecycle service scope](task-6-brief.md)
+- [Task 6 initial independent review and bounded-ID finding](task-6-independent-review.md)
+- [Task 6 identifier correction and genuine regressions](task-6-bound-correction.md)
+- [Task 6 final independent correction review](task-6-bound-review.md)
+- [Task 6 parent review and gate chronology](task-6-parent-review.md)
 - [Progress](progress.md)
 - [Gate evidence and owner prerequisites](../../../evidence/m6-gateway.md)
 
@@ -57,3 +62,20 @@ canonical ledger checkpoint. The parent replacement full gate passed; public
 review and F5's commit remain pending. No session routes or live sessions ship here;
 F6 source remains held. Earlier test-to-onchain assumptions are historical and
 superseded by the explicit simulated test category. Full F precedes G, H and I.
+
+F5 subsequently committed as `8b8ebb2` after independent source/public review and
+its full gate. F6's thin service is now implemented; its initial complete gate
+passed, then independent review reproduced a session-local job-ID bound mismatch.
+The separate correction also enforces the ledger's projected skill-label grammar.
+Corrected focused checks pass 87 Vitest and four private Bun regressions / six
+assertions, with exact nested strict typing and unchanged F5 fingerprints.
+Final independent correction review and the corrected full gate are in progress.
+Original reports retain their recorded checkpoints; no live session, funding or
+batch proof is supplied. F7–8 remain required before paid session integration.
+
+F6's final independent correction review is CLEAN, with a separate 87-test focused
+rerun, four private Bun regressions / six assertions and exact strict checks.
+The corrected complete repository test/root-web type gate passed. Initial
+publication review is also CLEAN (six exact copies / 63 resolving links); the
+final review copy and current index addenda receive a final delta check before
+the atomic commit. This is a local lifecycle milestone, not live session evidence.

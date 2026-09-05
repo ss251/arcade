@@ -231,3 +231,60 @@ held settling/uncertain funds and one-shot dispatch remain mandatory. F6 readine
 has an additive explicit-test-category correction, but its source is held until
 F5's commit. Canonical priority is F5–12, then full F before G, H and I; G/H source
 is held. F1 approval is consumed, F13 has no new evidence and no push is authorized.
+
+## September 6 — F6 thin service and independent bound correction
+
+F5 subsequently committed separately as `8b8ebb2`: twelve foundation source/test
+paths and fourteen scrubbed execution-record/index paths, after independent public
+review and the full gate. The parent verified ten historical copies with three
+explicit locator redactions and 69 resolving local links. No private journal,
+owner handoff or research tree was committed; nothing was pushed.
+
+The [F6 brief](task-6-brief.md) indexes the original readiness, decisions and
+author report. The stateless facade delegates budget/state decisions to F5,
+preserves one-shot begin and uncertainty holds, and returns fresh validated closed
+artifacts without remote settlement claims. Initial focused checks passed 80
+Vitest / four files; the parent's initial complete gate passed 2,348 Vitest /
+115 files, 374 Bun / 3,794 assertions / 33 files and root/web strict typing.
+
+The [independent review](task-6-independent-review.md) then reproduced three
+job-ID boundary failures, despite those passing gates. Its private interruption
+and cleanup case passed. The [correction](task-6-bound-correction.md) keeps a
+session-local 16–128 job suffix and the exact F5 skill-label grammar; no global
+schema or foundation file changed. Five collected boundary failures were observed
+before the fix, including a malformed reservation result and projected skill label.
+The correction's seven cases now pass; original author/review evidence is retained.
+
+The corrected focused checkpoint is 87 Vitest / four files, four private Bun /
+six assertions and exact source/test/private strict typing with zero diagnostics.
+Parent independently repeated those private regressions and exact strict check,
+read the full correction and verified all fourteen F5 fingerprints unchanged.
+Six prepared historical copies match their originals after the banner and explicit
+public-locator/private-fixture substitutions. The [parent review](task-6-parent-review.md)
+keeps the earlier complete gate distinct from the corrected gate now running.
+Final independent correction/public review and atomic F6 commit remain pending.
+
+Actual Plan F12 is normal live session evidence; F13 is conditional fallback only
+after F1 fails. F1 passed, so fallback is not triggered. Under the current no-new-
+spending instruction, no further live session, deposit, transfer or withdrawal is
+run. Full F still precedes G, H and I; no new authority or GitHub push is implied.
+
+### F6 corrected gate and final review
+
+The [final independent correction review](task-6-bound-review.md) is CLEAN:
+87 Vitest / four files, unchanged private four Bun / six assertions, exact
+source/test/private strict typing and all fourteen F5 fingerprints matched.
+The reviewer preserved the initial failed checkpoint and did not claim a full
+repository rerun. Parent read the complete follow-up and verified its frozen scope.
+
+The corrected complete test and root/web type gate passed, final exit zero:
+Vitest phase passed (its exact summary count was truncated and is not inferred),
+374 Bun / 3,794 assertions / 33 files and strict checks. The private four F6
+regressions are separately run evidence, not added to the full gate's Bun total.
+No source changed during this gate; no live operation or GitHub push occurred.
+
+Independent publication review is CLEAN for six historical copies with six exact
+literal substitutions and ten public files with 63 resolving local links. The
+final follow-up copy and the current parent/index addenda form the last bounded
+publication delta before the atomic F6 commit; earlier audit checkpoints remain
+unchanged. Seven historical reports/planning copies are now prepared in total.
