@@ -49,3 +49,32 @@ ID/field types. The preceding full gate and parent's 77-test focused run passed.
 G11's own staged whole-repository gate passed: 2,222 Vitest / 110 files, 255 Bun /
 1,377 assertions / 23 files, strict TypeScript exit zero. No production service-payment
 verifier, trusted validator configuration, paid query or live proof is claimed.
+
+## September 5 — G12 local implementation checkpoint
+
+G11 committed as `d56b43e`. G12 client and runner are frozen, independently
+cross-reviewed CLEAN, and parent has read all production source/tests/reports.
+Genuine failure-first safety regressions and exact source/dependency adaptations
+are preserved in the two original reports and dated integration record.
+
+Parent repeated 165 skill Vitest cases (including seven separately scoped G13
+guide cases), ten actual Bun process/HTTP fixtures with 79 assertions, root/web
+TypeScript and the exact root compiler options plus every nested skill test: all
+passed. Two client-fixture hygiene/typing follow-ups are explicitly recorded and
+do not change production code or the retained originals.
+
+The staged G12 whole-repository test and strict-type gate exited zero. Bun
+reported 265 tests / 1456 assertions / 25 files. This frozen-worktree run also
+included G7's separately reviewed local Graph service and G13's guide tests,
+neither staged in G12; staged G12 source/tests do not import those later tasks.
+Final public-copy review and the separate local task commit follow. No live Base
+query/payment, Studio deployment, service-payment verifier or G2–6 work occurred.
+F's local checkpoint is now on main, but its funded gate remains owner-pending;
+G still does not merge ahead of the full F shared-file dependency.
+
+Final G12 public-artifact review is CLEAN: both implementation reports exactly
+match their retained originals plus the approved banner; all 17 local links in
+the reviewed seven documents resolve, with no personal/temp paths or private
+clickable targets. Reviewer accepted the two documented test-only follow-ups,
+without claiming another test run or paid network evidence. Source and staged
+scope are frozen for the final precommit gate.

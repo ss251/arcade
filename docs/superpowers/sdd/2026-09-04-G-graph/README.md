@@ -14,6 +14,10 @@ This worktree must not merge ahead of Plan F.
 - [Task 10 implementation report](task-10-report.md)
 - [Task 11 brief](task-11-brief.md)
 - [Task 11 implementation report](task-11-report.md)
+- [Task 12 brief](task-12-brief.md)
+- [Task 12 client report](task-12-client-report.md)
+- [Task 12 runner report](task-12-run-report.md)
+- [Task 12 integration and unsigned observation](task-12-integration.md)
 - [Progress](progress.md)
 - [Subgraph operator notes](../../../../subgraph/README.md)
 

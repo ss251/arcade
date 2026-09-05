@@ -1,7 +1,8 @@
 # Feedback envelope fields are claims, not independent payment verification.
-query CounterpartyAttestations($agentIds: [String!]!) {
-  _meta { block { number hash } hasIndexingErrors }
+query CounterpartyAttestations($agentIds: [String!]!, $block: Block_height!) {
+  _meta(block: $block) { block { number hash } hasIndexingErrors }
   feedbacks(
+    block: $block
     where: { agent_in: $agentIds }
     first: 100
     orderBy: createdAt

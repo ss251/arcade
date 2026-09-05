@@ -109,6 +109,15 @@ describe("counterparty-graph listing contract", () => {
 })
 
 describe("pinned query and dependency contract", () => {
+  it("pins scoped low-level payment dependencies and the second query to the first snapshot", () => {
+    const pkg = JSON.parse(read("../../../package.json")) as { dependencies: Record<string, string> }
+    expect(pkg.dependencies["@x402/fetch"]).toBe("2.25.0")
+    expect(pkg.dependencies["@x402/evm"]).toBe("2.25.0")
+    const query = read("../queries/attestations.graphql")
+    expect(query).toContain("$block: Block_height!")
+    expect(query).toContain("_meta(block: $block)")
+    expect(query).toMatch(/feedbacks\(\s*block: \$block/)
+  })
   it("loads the installed factory offline without invoking it or touching fetch", async () => {
     const network = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network forbidden in G10"))
     const client = await import("@graphprotocol/client-x402")
@@ -151,8 +160,8 @@ describe("pinned query and dependency contract", () => {
 
   it("pins feedback bindings and payer provenance without relaying feedback prose", () => {
     const query = read("../queries/attestations.graphql")
-    expect(query).toContain("query CounterpartyAttestations($agentIds: [String!]!)")
-    expect(query).toContain("_meta { block { number hash } hasIndexingErrors }")
+    expect(query).toContain("query CounterpartyAttestations($agentIds: [String!]!, $block: Block_height!)")
+    expect(query).toContain("_meta(block: $block) { block { number hash } hasIndexingErrors }")
     expect(query).toContain("where: { agent_in: $agentIds }")
     expect(query).toContain("first: 100")
     for (const field of ["feedbackIndex", "feedbackHash", "feedbackId", "agentId", "agentRegistry", "clientAddress", "proofOfPaymentFromAddress", "proofOfPaymentToAddress", "proofOfPaymentChainId", "proofOfPaymentTxHash"]) expect(query).toMatch(new RegExp(`\\b${field}\\b`))
