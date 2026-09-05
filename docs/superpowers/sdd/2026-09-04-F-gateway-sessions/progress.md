@@ -406,3 +406,48 @@ The private two-case fixture is a separate run, not part of those full totals.
 Six historical execution copies have ten literal locator substitutions. Final
 public audit and atomic F10 commit are next. No live session, funding, approval
 replay, production change or push; F12 live remains NOT RUN and F13 not triggered.
+
+## September 6 — F11 explicit funding and session CLI
+
+F10 committed as `dc86bf1` after its independent final publication audit.
+F11 is in source verification, not yet through the complete gate. Pure policy
+and withdrawal codecs passed40 focused Vitest, parent private5/25 and exact
+strict checks; three exact pinned runtime fixtures retain upstream notices.
+CLI/session author and parent each passed26 Bun/122 assertions on frozen source.
+Journal review reproduced three transcript/finalization contract gaps; its
+unchanged private6/21 and selected collected22/77 now pass, with exact strict0.
+The parent independently repeated the same private6/21.
+
+Runtime review found a cancellation-resource defect: close could resolve before
+a delayed journal open returned an unowned handle. The claim stayed retained and
+all signer/network/send counters stayed zero. Correction and retained-UUID
+read-only recovery tests remain active. These are offline implementation checks,
+not new live funding or a full F11 acceptance gate.
+
+The [brief](task-11-brief.md) indexes twelve preserved execution artifacts.
+Production withdrawal remains fail-closed on current Minter identity mismatch;
+pending-only deposit evidence cannot retire a claim as fully correlated credit.
+Observed available funds are not declared unusable. Neither technical limit
+creates an owner approval request. Canonical full F, then G/H/I remains in force;
+no new spending, consumed approval replay, production change or push.
+
+### F11 final source review and complete gate
+
+The later runtime freeze resolves the delayed-open resource finding: independent
+pause/abort/release observes one real late close and causal witness, a retained
+claim, fixed unresolved-close uncertainty and zero signer/network/send calls.
+Selected collected1/5 and exact3-root strict0 pass. The author and parent each
+ran all42 runtime/journal tests/165 assertions; the separate private6/21 remains
+unchanged. Parent read the retained-UUID GET correction and its actual test;
+it does not reset uncertainty, grant mint authority or mutate the journal.
+
+The sole frozen full gate started Vitest05:07:15IST and passed2,648Vitest/123files,
+501Bun/4,541assertions/39files and root/web strict checks, exit0. All14 source
+hashes match afterward; no private standalone test is added to those counts.
+See the [parent review](task-11-parent-review.md) for exact scope and limitations.
+
+Initial public audit CLEAN covered12 exact historical copies,23 substitutions,
+15 files,98 local Markdown links and28 retained external links (not fetched).
+Two final runtime copies add one locator substitution; the final18-file delta
+audit and atomic commit follow. Current Minter identity and exact API-credit
+attribution remain technical acceptance limits, not authority to spend again.

@@ -11,7 +11,8 @@ import { callSkill } from "./index.ts"
  * so it cannot land in shell history.
  */
 
-const args = process.argv.slice(2)
+/** Importing the buyer package/entry never dispatches or reads a spending key. */
+const legacyBuyerMain = async (args: readonly string[], env: Readonly<Record<string, string | undefined>>): Promise<number> => {
 const skillId = args[0]
 
 const flag = (name: string): string | undefined => {
@@ -26,17 +27,17 @@ env:
   ARCADE_BUYER_KEY   buyer private key (testnet throwaway)
   ARCADE_HUB         hub URL (default http://localhost:8787)
 `)
-  process.exit(2)
+  return 2
 }
 
-const hubUrl = flag("hub") ?? process.env["ARCADE_HUB"] ?? "http://localhost:8787"
+const hubUrl = flag("hub") ?? env["ARCADE_HUB"] ?? "http://localhost:8787"
 const inputRaw = flag("input") ?? "{}"
 const maxAmount = flag("max-amount")
 
-const key = process.env["ARCADE_BUYER_KEY"]
+const key = env["ARCADE_BUYER_KEY"]
 if (key === undefined) {
   console.error("ARCADE_BUYER_KEY is not set (use a testnet throwaway key)")
-  process.exit(2)
+  return 2
 }
 
 const main = Effect.gen(function* () {
@@ -85,5 +86,25 @@ const main = Effect.gen(function* () {
 const exit = await Effect.runPromiseExit(main)
 if (Exit.isFailure(exit)) {
   console.error(Cause.pretty(exit.cause))
-  process.exit(1)
+  return 1
+}
+return 0
+}
+
+/** Reserved strict commands cannot fall through to the permissive legacy parser. */
+export const buyerMain = async (raw: readonly string[], env: Readonly<Record<string, string | undefined>>): Promise<number> => {
+  const { fundingMain, captureCliArgv } = await import("./gateway-funding-cli.ts")
+  let args: readonly string[]
+  try { args = captureCliArgv(raw) } catch { return fundingMain([], { env, role: "buyer" }) }
+  if (args[0] === "session" || args[0] === "--help" || args[0]?.startsWith("gateway-")) {
+    return fundingMain(args, { env, role: "buyer" })
+  }
+  return legacyBuyerMain(args, env)
+}
+
+if (import.meta.main) {
+  if (process.argv[2] === "session" || process.argv[2] === "--help" || process.argv[2]?.startsWith("gateway-")) {
+    const { runOwnedFundingCli } = await import("./gateway-funding-cli.ts")
+    await runOwnedFundingCli(() => buyerMain(process.argv.slice(2), process.env))
+  } else process.exitCode = await buyerMain(process.argv.slice(2), process.env)
 }

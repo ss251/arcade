@@ -37,6 +37,7 @@ independently mined. F2–12 code work is unblocked; no extra live allowance is 
 - [Task 8 private paid-session integration and review index](task-8-brief.md)
 - [Task 9 captured buyer session SDK and review index](task-9-brief.md)
 - [Task 10 captured MCP sessions and review index](task-10-brief.md)
+- [Task 11 explicit funding, session CLI and technical limits](task-11-brief.md)
 - [Progress](progress.md)
 - [Gate evidence and owner prerequisites](../../../evidence/m6-gateway.md)
 
@@ -135,3 +136,19 @@ corrections. Its [brief](task-10-brief.md) separates actual SDK/protocol tests f
 live evidence. The full frozen gate passed2608 Vitest/121 files,433 Bun/4254
 assertions/37 files and root/web strict typing; all source hashes match. Final
 public audit and the atomic MCP commit follow. F11 funding remains separate.
+
+F10 subsequently committed as `dc86bf1`. F11's pure policy/codecs and CLI/session
+slice are independently reviewed, and the journal's three original contract
+regressions pass unchanged. Runtime cancellation cleanup and retained-capability
+read-only recovery remain in verification; no full F11 gate or completion is
+claimed yet. The [brief](task-11-brief.md) preserves the distinct current Minter
+identity and transaction-correlated deposit-credit limitations. No new live
+operation is authorized; F12 live remains NOT RUN and F13 was not triggered.
+
+F11's later frozen checkpoint passes the complete gate:2,648Vitest/123 files,
+501Bun/4,541assertions/39 files and root/web strict typing. The late-open cleanup
+correction is independently CLEAN, and parent reviewed the retained-UUID GET
+without attributing it to that narrower review. Initial publication audit was
+CLEAN12 exact copies/23 substitutions/15 files; two final historical runtime
+copies and the [parent gate record](task-11-parent-review.md) now receive the
+final delta audit before commit. Technical live-acceptance limits remain.
