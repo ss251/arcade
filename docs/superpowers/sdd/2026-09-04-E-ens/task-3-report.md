@@ -1,0 +1,11 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# E3 — parent label and registration stage
+
+Complete code task at88fa14f (f1214ba..88fa14f). Mandatoryfullgate1780Vitest+107Bun+tsc/diff passed with E8 frozen uncommitted; E3 commit contains onlyfour scoped files. Independent b9review CLEAN and rerun5Vitest+15Bun/51assertions.
+
+Initial5missing-export Red+scriptmissingmodule06:47:30 →5Vitest+8Bun06:49:53. Rootreview added genuine4Red06:57 then5thbinding Red06:58; all15Bun+5VitestGreen06:58:48. Fixed commitment preflight beforetokenwrites, independentlycomputed exactseven-field ABIhash, uint256 feeceiling, exactquoteallowanceincludingclosingoldoversizedgrant, andpostconfirmationtokenreadbacks. Explicitlabelconsent precedesreads/writes; perwriteSepolia/preintent/confirmationcheckpoints; min/maxcommitwindowbounded; unknownsendneverretried; postregisterownerreadbackmandatory. Clock/token/checkpoint/wrongchain/invalidargument/correlatedcommitnegativepaths covered.
+
+PublickeylessSepoliadryrun at01:25UTC selecteddeploymentA/proposedarcade.eth available. No keysread/generated, no namespace selected onowner'sbehalf, no transactions. Ownerentrydated06:56 andKeychainnamescorrected07:00 inmainhandoff. Liveentrydeliberatelyrefuses beforeanyIOunlessdryrun untilE4/E5 fullyintegrated; planliteralstubaftermint wouldcausepartialirreversibleeffects andwasnotcopied. DefaultMCPendpointnotinvented. Productiondrivercontract stillfutureE5, injectedstageisnotclaimedlive.
+
+SourceABIverified against official https://raw.githubusercontent.com/ensdomains/contracts-v2/97a57293f3b4279d94b571e678edb53ce62638f4/contracts/src/registrar/ETHRegistrar.sol : makeCommitment purebindsallsevenfields, registerhasnomaxFeeparameter hence exactallowance; isAvailable/getRegisterPrice/currentcommitconstants. ts-testing skill supplied behavior-first TDD. Reports/state/keysnotstaged. No push.

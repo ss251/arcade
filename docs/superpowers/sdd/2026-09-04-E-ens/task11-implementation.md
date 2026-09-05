@@ -1,0 +1,27 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# E11 — MCP by ENS name and conservative session reservations
+
+Owned files: `packages/buyer/src/mcp.ts`, existing `packages/buyer/test/mcp.test.ts`, new `packages/buyer/test/mcp-ens.test.ts`. The separate test file isolates ENS authority, real offline SDK signing and concurrent/reserved accounting from catalogue/identity tests. Root owns E9 SDK changes including the `authorizedAmountAtomic` provenance field. No git staging/commits, real keys, network calls, payments, services or owner configuration changes.
+
+## TDD evidence
+
+- 08:29:34: 23 genuine Reds against the unchanged MCP: actual SDK MCP tool schema/transport by-name call; XOR routing; typed resolution failures; unsafe quotes; stalled-body cancellation; ID/name concurrent budgets; unknown paid outcomes; actual-price accounting.
+- 08:36:26: the new 23 cases and 39 existing ERC-8004 evidence tests passed. Seven existing MCP failures identified the intentional schema change and stale partial challenge/receipt fixtures. Those fixtures were upgraded to full `PaymentRequirements`, HTTPS test origin, receipt price and local authorization amount; no authority checks were relaxed.
+- 08:40:09: two additional genuine Reds proved that a real SDK beforeSign mismatch lost its typed unsigned explanation/reservation release, and a forged lower receipt price could release budget despite a larger local authorization. A separate new real SDK signature test initially used an incorrect test import (`decodeHeader`, corrected to the actual `decodeHeaderJson` export); that harness typo is not claimed as a product Red.
+- Root added genuine SDK regressions ensuring `authorizedAmountAtomic` comes only from the locally signed `paid.amountAtomic`, never similarly named response JSON. MCP now requires exact local/receipt amount agreement for settled accounting.
+- 08:43:50: a genuine real-SDK regression demonstrated a still-redeemable authorization followed by a hostile hub's `failed`/`settled:false` response. The second purchase must remain blocked by the first reservation. This now passes without another signature.
+- 08:44:06: **92/92 focused MCP tests Green** (28 ENS/reservations, 25 existing MCP, 39 unchanged ERC-8004 evidence); global `bunx tsc --noEmit` and `git diff --check` exit 0. Small subsequent wording/indentation cleanup changes no behavior; final checkpoint repeated before freeze.
+
+## Behavior and necessary plan adaptations
+
+- Effect Schema derives both advertised object schema and runtime XOR: exactly one `skillId`/`name`, required `input`, finite positive optional cap. Excess arguments are refused. Existing valid ID requests retain their route and read-only catalogue/identity projections remain unchanged.
+- ENS failures distinguish missing records from unavailable resolution. No RPC outage is called expiry; fixed messages omit provider/credential material. Resolution and all unsigned quote validation complete before buyer-key access.
+- Purchasing uses actual input, not the plan's `{}` probe (the real hub validates input before issuing payment requirements). Headers and complete JSON bodies share a 10-second deadline, a 128 KiB bound, no credentials and redirect refusal. Late responses are explicitly cancelled. There is no advisory-price fallback for a purchase.
+- Exactly one decoded challenge is required. Endpoint bytes, canonical uint256 amount, nonzero payee, selected ready Arc network, USDC asset and bounded validity are checked. By-name payee/chain must agree with ENS. The SDK receives the resolved name and pinned endpoint origin, and independently repeats its final pre-sign authority check.
+- All purchases, whether by ID or ENS, share one serialized lease. The amount passed to the actual signer cannot exceed the quote, per-call ceiling or remaining session budget. A reservation exists before invoking the paying SDK.
+- Settlement accounting requires the SDK's local authorization amount to equal the reported receipt price and stay within the reserved quote. Unknown/defect/poll outcomes, malformed or contradictory receipts, and **every signed non-settlement response** retain the reservation. A remote failure does not cancel an authorization. Only explicit typed pre-sign failures or trusted SDK responses proving no local authorization may release it.
+- The session budget is process-local, not a durable transaction journal; uncertainty explicitly warns against retries, budget reset or restart before manual reconciliation. No automatic refund, reset or resend is introduced.
+- Seller output remains fenced in model-facing text and raw only in structured content. By-name structured output carries `name`; the existing ID path retains `skillId`. Raw remote receipt prose is not repeated as authoritative text. Budget text/structured output distinguishes reserved funds from confirmed spending.
+
+The ts-testing skill guided behavior-first TDD, real MCP transport, isolated deterministic signer/fetch fixtures and fake-clock deadlines. Requested context7/payment skills were unavailable; installed Effect Schema and existing payment/SDK sources were inspected instead. Live by-name proof remains owner-gated and was not attempted.

@@ -1,0 +1,21 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# E15 published re-point command — offline lifecycle regression
+
+Only the ignored test/report were edited. The test extracts the full JS from the actual `docs/runbook.md` production re-point Bash block, removes imports, and injects inert state, public-reader, key-derivation and writer dependencies. No actual wallet/key, network, RPC, journal or transaction function is called. Exact textual timers are invoked through the injected scheduler, not by waiting five minutes. Deferred operations are released and the extracted command is awaited in test cleanup.
+
+Genuine pre-fix result: **3 failures, 1 pass** (tool chunk `87b267`): stalled `readEnsState`, stalled `openSetupSession`, and stalled `closeSession` each reached the intended boundary, but firing the command's 300000ms cancellation timer did not cause terminal nonzero exit. The existing syntax/exact-three-key check passed. This is a deadline defect, not evidence that any transaction was sent after cancellation.
+
+The current cancel callback sets a flag and initiates close for an available session. It cannot reject an uncooperative promise before the session exists, and finally clears its sole timer before awaiting close. The production driver's close waits for its work set/write queue; an unresponsive filesystem operation can therefore keep the command alive.
+
+Minimal root-owned fix recommendation: preserve the existing cooperative cancellation and shared close promise, add a separate command-wide hard fuse at approximately310000ms that emits only a fixed uncertainty diagnostic and exits nonzero, and keep that fuse armed until all final cleanup has finished. Do not clear it before awaiting close. A forced exit must never print a success object or permit a fresh journal/automatic resend. Preserve late-open cancellation checks and the driver's intent/hash-before-broadcast boundary. Wrap cleanup diagnostics so a failure remains fixed/redacted.
+
+Authority and mutation scope reviewed separately by B9: only endpoint, web and context are written; raw current price/payee/chain and owner root ALL roles are preserved/read back. The context JSON is rebuilt with the current price (11000 after the demonstration), so describing its change as routing-only is inaccurate. An expired leaf remains absent after a text-only re-point; the typed guarded-name absence check is retained.
+
+## Root fix independently verified — GREEN, frozen
+
+Root applied the documentation-only correction after those three genuine failures. The final snippet keeps a300000ms cooperative timer, propagates its AbortController into every existing Request-based fetch seam with redirects refused and credentials omitted, and arms a330000ms hard nonzero-exit fuse. The hard callback uses `try/finally`, so even a cancellation-hook failure cannot bypass terminal failure. Both timers remain active until final awaited shared session close completes. A late-opened session is still followed by the cancelled guard and the same final close; no duplicate close or success output is introduced. Public authority/identity/readback checks and the exact three-key write scope are unchanged. The shell now checks repository-root source and the main branch before reading the owner key, without a personal absolute `cd`.
+
+Independent rerun after reviewing the actual final snippet: **4/4 tests,19 assertions**, standalone strict TypeScript and `git diff --check` all exit0 (tool chunk `a12304`). The three formerly failing boundaries now reach the hard nonzero deadline with no success object. The context wording now explicitly says its embedded price is refreshed while the raw price/payee/chain are preserved. Source-bound test/report are frozen; no command, real key, network, RPC or live helper was executed.
+
+`ts-testing` guidance influenced the test choice: reproduce observable lifecycle failure against the actual published program, while isolating all external capabilities rather than testing a rewritten helper.

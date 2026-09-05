@@ -1,0 +1,7 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# Task6 — scoped liveness and price writer
+
+Implemented EnsWriter/makeEnsLiveness/RENEW_FRACTION/viemEnsWriter plus private cross-process pending journal. Pure schema from core; runtime IO is runner/src/ens-state.ts after E5 hygiene correction. Actual bounded/cancellable viem transport on Sepolia, no CCIP, fresh ownership/expiry/role/proxy checks before single broadcast, exact retained receipt+transaction+readback required. Missing manifests never renewed; quarterTTL throttle; only priceAtomic writable. Scoped daemon cannot revive expired names or hold root RENEW. Unknown sends pause and stop writer before any delayed checkpoint resumes; known pending price/later skill reconciles before current first renewal, no duplicate old broadcast.
+
+Full detailed Reds/Greens and review in task6-7-implementation.md (read by root). Missing module and streamed-body Reds; role/connection/transaction mutations; late-checkpoint race; journal stage/path; cross-op restart/current owner Reds all reproduced before fixes. Final40focused(26writer+8journal+6daemon)+tsc/diffGreen; B9 independently40Green and reviewedCLEAN. No live keys/writes. Mandatory full commit gate recorded in ledger.
