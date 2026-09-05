@@ -26,6 +26,10 @@ The earlier Encode × Circle Programmable Money hackathon build (the prior Arc b
 
 Plan I is cross-cutting packaging as well as part of M9: continuity, architecture/README updates, interop, new capture/video, check-ins and submission evidence. This checkpoint is not completion of those remaining deliverables.
 
+### Dated follow-up — September 5, 2026, 08:57 UTC
+
+M1's free-route follow-ups are now merged through `c6f6676` in three atomic Codex-attributed commits. The full B13 local live script passed all three adapters (`succeeded / end_turn`, exit 0); the [dated execution record](superpowers/sdd/2026-09-04-B-publish-adapters/free-route-integration.md) separates that result from dummy-provider tests and the earlier paid FX call. It is not hub output-schema, payment or independently verified provider-billing proof. The frozen table and attribution counts in this document retain their original `f300b79` checkpoint rather than silently changing history. Plans F–I are not made complete by this follow-up.
+
 ## Evidence and limits
 
 The [runbook](runbook.md) records the actual hashes, amounts, refusal observations, cleanup and deviations: [lineage](runbook.md#plan-a--evidence-lineage), [adapter evidence](runbook.md#plan-b--evidence-publish-adapters), [pay-tests](runbook.md#plan-c--evidence-automatic-delisting-and-recovery), [ERC-8004](runbook.md#plan-d--erc-8004-identity-and-settlement-evidence) and [ENS](runbook.md#ens-namespaces-sepolia). Use those measured amounts rather than the plan's earlier demo estimates.

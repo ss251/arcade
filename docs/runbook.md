@@ -72,8 +72,8 @@ bash scripts/e2e-publish-adapters.sh --only search-arc-docs --only fx-rate
 
 This explicitly **partial** live run returned `succeeded / end_turn` for both selected
 adapters (MCP output 42,790 bytes; FX output 69 bytes) and exited 0. It named `diff-triage`
-as excluded. The default command runs all three, but that live run remains pending an
-owner-provided Anthropic API key. Local adapter execution does not itself validate
+as excluded. At that earlier checkpoint the default three-adapter run was still key-gated;
+the later owner-selected free-route result below supersedes that blocker. Local adapter execution does not itself validate
 output schemas at the hub or prove a payment.
 
 A separate **paid FX purchase** through a real loopback-only hub and FX-only runner
@@ -107,6 +107,41 @@ Arc's parallel native 18-decimal transfer logs). No `waitForTransactionReceipt` 
 was used. The temporary services were stopped afterward; saved runner configuration,
 Keychain items and mainnet were not changed. This paid single-call proof is separate
 from Plan A's subsequently verified descendant-lineage demonstration below.
+
+### B13 free-route follow-up — full local execution PASS
+
+On main `c6f6676`, within **2026-09-05 08:56:14–08:57:28 UTC**, the actual default
+`scripts/e2e-publish-adapters.sh` exited 0: **3 succeeded, 0 failed**. No `--only`
+selection, adapter/capability removal, hub or wallet was used.
+
+| Listing | Adapter | Result | Output bytes |
+| --- | --- | --- | --- |
+| diff-triage | skill | succeeded / end_turn | 1,173 |
+| search-arc-docs | mcp | succeeded / end_turn | 42,790 |
+| fx-rate | openapi | succeeded / end_turn | 69 |
+
+The owner-selected model alias is exactly `glm-5.3-flash` through the existing
+Anthropic-Messages-compatible loopback API at port 8317, using its API key rather
+than a subscription. The two model manifests explicitly declare the base URL and
+API-key environment names. The native custom-route guard supplies only a random
+per-job local capability to the CLI, binds the exact upstream model/tool surface,
+refuses redirects and uncertain resends, buffers bounded complete responses, and
+closes with the job. Bun children and shell previews disable dotenv loading.
+
+The consuming command used only the inline Keychain proxy key, an otherwise empty
+environment, private umask and a 360-second timeout. It did not restart/reconfigure
+the shared proxy or write preview listings. A read-only post-run check at08:57:35 UTC
+confirmed the consuming process was absent; the observer arrived after exit and
+did not independently sample the former native descendant tree. The actual native
+cleanup fixtures and runtime cleanup gate are separate evidence.
+
+This result proves local adapter execution, **not** the hub's output-schema gate or
+a new payment. The paid FX transaction above remains separate. Direct Messages
+pricing gives only this exact alias zero token rates; server-tool costs remain
+accounted, and native SDK cost is not independent provider billing.
+`counterparty-brief` web-search/hiring capabilities remain unproven on this route.
+The [public SDD follow-up](superpowers/sdd/2026-09-04-B-publish-adapters/free-route-integration.md)
+records genuine test failures, the three commits, independent reviews and all gates.
 
 ---
 

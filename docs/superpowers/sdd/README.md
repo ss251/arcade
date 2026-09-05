@@ -5,7 +5,7 @@ These are sanitized copies of the execution records for ARCADE's ETHOnline conti
 | Plan | Records | Implementation checkpoint |
 | --- | --- | --- |
 | A — Settlement core | [Briefs, reports, preparation and original work order](2026-09-04-A-settlement-core/README.md) | Complete; approved three-settlement lineage proof passed. |
-| B — Publish adapters | [Reports and preparation](2026-09-04-B-publish-adapters/README.md) | Adapter implementation landed; full three-adapter live proof still pending. |
+| B — Publish adapters | [Reports and preparation](2026-09-04-B-publish-adapters/README.md) | Complete; full three-adapter local live execution passed. Separate paid FX proof remains distinct. |
 | C — Pay-tested listings | [Reports and preparation](2026-09-04-C-canary/README.md) | Complete; approved scheduled-purchase, delisting and recovery proof passed. |
 | D — ERC-8004 | [Reports and preparation](2026-09-04-D-erc8004/README.md) | Complete; approved identity, settlement and validation proof passed. |
 | E — ENS namespaces | [Reports and preparation](2026-09-04-E-ens/README.md) | Complete; approved isolated live continuation passed. Production URLs remain pending. |
@@ -16,7 +16,7 @@ Plans F–I have [committed implementation plans](../plans/2026-09-04-02-executi
 
 Reports preserve the checkpoint at which they were written, including genuine test failures, partial live results, blockers and later corrections. A later dated completion can supersede an earlier pending statement without erasing it. Public copies are documentation, not fresh execution or authorization. Follow the [current runbook](../../runbook.md) for current behavior and operator commands; command blocks in historical records are not current instructions.
 
-The publication includes 118 selected Markdown artifacts and five plan indexes. Originals remain in place. Personal filesystem and transient runtime locations were normalized, and links to excluded private artifacts were omitted. Non-clickable repository-relative structural references may remain for context. Retained 64-hex evidence values were individually classified as public transactions, blocks or commitments.
+The initial publication includes 118 selected Markdown artifacts and five plan indexes. B's later dated integration record and three reviewed follow-up copies extend that archive without rewriting historical reports. Originals remain in place. Personal filesystem and transient runtime locations were normalized, and links to excluded private artifacts were omitted. Non-clickable repository-relative structural references may remain for context. Retained 64-hex evidence values were individually classified as public transactions, blocks or commitments.
 
 No private keys, registration secrets, runtime journals, databases, owner-action ledgers, heartbeat logs, raw terminal logs, private executable helpers or unrelated internal research were copied. Sanitization does not turn an offline test into live evidence, a temporary loopback endpoint into a production deployment, or an old approval into permission to repeat a transaction.
 
