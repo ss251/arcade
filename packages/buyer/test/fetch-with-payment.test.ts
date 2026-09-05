@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest"
 import { Effect } from "effect"
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
-import { ARC_CAIP2, USDC_ADDRESS, parsePrice } from "@arcade/core"
-import { HEADER_PAYMENT_SIGNATURE, decodeHeaderJson } from "@arcade/payments"
+import { recoverTypedDataAddress } from "viem"
+import { ARC_CAIP2, ARC_CHAIN_ID, GATEWAY_WALLET, USDC_ADDRESS, parsePrice } from "@arcade/core"
+import { HEADER_PAYMENT_SIGNATURE, decodeHeaderJson, TRANSFER_TYPES } from "@arcade/payments"
 import { fetchWithPayment } from "../src/fetch-with-payment.ts"
 
 /**
@@ -52,6 +53,107 @@ const json = (body: unknown, status: number) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
 
 describe("fetchWithPayment", () => {
+  const gateway = (extra: Record<string, unknown> = {}) => {
+    const body = challenge(10000n)
+    return { ...body, accepts: [{ ...body.accepts[0]!, extra: { name: "GatewayWalletBatched", version: "1", verifyingContract: GATEWAY_WALLET, ...extra } }] }
+  }
+  it("signs exactly the pinned Gateway domain at the actual request boundary", async () => {
+    const { fetch, calls } = recordingFetch(n => n === 1 ? json(gateway(), 402) : json({ ok: true }, 202))
+    const signer = { ...account }, spy = vi.spyOn(signer, "signTypedData"), beforeSign = vi.fn(() => null)
+    const result = await Effect.runPromise(fetchWithPayment("https://hub.test/x/s/demo", { method: "POST", body: "same-body" },
+      { account: signer, fetch, maxAmountAtomic: 10000n, lineage: "cap.fixture", beforeSign }))
+    expect(result).toMatchObject({ paid: true, amountAtomic: 10000n }); expect(spy).toHaveBeenCalledTimes(1); expect(beforeSign).toHaveBeenCalledTimes(1)
+    expect(calls).toHaveLength(2)
+    const wire = decodeHeaderJson(calls[1]!.headers.get(HEADER_PAYMENT_SIGNATURE)!) as {
+      accepted: unknown; payload: { signature: `0x${string}`; authorization: { from: `0x${string}`; to: `0x${string}`; value: string; validAfter: string; validBefore: string; nonce: `0x${string}` } }
+    }
+    const a = wire.payload.authorization
+    expect((await recoverTypedDataAddress({ domain: { name: "GatewayWalletBatched", version: "1", chainId: ARC_CHAIN_ID, verifyingContract: GATEWAY_WALLET },
+      types: TRANSFER_TYPES, primaryType: "TransferWithAuthorization", message: { ...a, value: BigInt(a.value), validAfter: BigInt(a.validAfter), validBefore: BigInt(a.validBefore) },
+      signature: wire.payload.signature })).toLowerCase()).toBe(account.address.toLowerCase())
+    expect(wire.accepted).toEqual(gateway().accepts[0])
+    for (const request of calls) { expect(request.redirect).toBe("error"); expect(request.credentials).toBe("omit"); expect(request.headers.get("x-arcade-hire-capability")).toBe("cap.fixture") }
+    expect(await calls[1]!.text()).toBe("same-body")
+  })
+  it.each([
+    { name: "GatewayWalletBatched", version: "2", verifyingContract: GATEWAY_WALLET },
+    { name: "GatewayWalletBatched", version: "1" },
+    { name: "GatewayWalletBatched", version: "1", verifyingContract: SELLER },
+    { name: "UnknownDomain", version: "2" },
+    { name: "USDC", version: "2", verifyingContract: GATEWAY_WALLET },
+    { verifyingContract: GATEWAY_WALLET }, { name: "USDC", version: "wrong" }
+  ])("refuses explicit unsupported domains before either signer or paid retry %#", async extra => {
+    const body = challenge(10000n); body.accepts[0]!.extra = extra
+    const { fetch, calls } = recordingFetch(() => json(body, 402)), signer = { ...account }, spy = vi.spyOn(signer, "signTypedData")
+    const result = await Effect.runPromise(Effect.either(fetchWithPayment("https://hub.test/x/s/demo", { method: "POST" }, { account: signer, fetch })))
+    expect(result).toMatchObject({ _tag: "Left", left: { _tag: "RpcFailure", method: "402" } })
+    expect(spy).not.toHaveBeenCalled(); expect(calls).toHaveLength(1)
+  })
+  it.each(["", "0", "-1", "01", "1e3", " 1000", "0x10", "x".repeat(1000)])("returns a fixed typed refusal before BigInt on malformed amounts %#", async amount => {
+    const body = gateway(); body.accepts[0]!.amount = amount
+    const { fetch, calls } = recordingFetch(() => json(body, 402)), signer = { ...account }, spy = vi.spyOn(signer, "signTypedData")
+    const result = await Effect.runPromise(Effect.either(fetchWithPayment("https://hub.test/x/s/demo", { method: "POST" }, { account: signer, fetch })))
+    expect(result).toMatchObject({ _tag: "Left", left: { method: "402", reason: "Unsupported payment requirements. Nothing was signed." } })
+    expect(spy).not.toHaveBeenCalled(); expect(calls).toHaveLength(1)
+  })
+  it("does not let a beforeSign callback mutate the authority snapshot after its cap was checked", async () => {
+    const { fetch, calls } = recordingFetch(n => n === 1 ? json(gateway(), 402) : json({ ok: true }, 202)), signer = { ...account }, spy = vi.spyOn(signer, "signTypedData")
+    const result = await Effect.runPromise(Effect.either(fetchWithPayment("https://hub.test/x/s/demo", { method: "POST" }, {
+      account: signer, fetch, beforeSign: requirements => { (requirements as { payTo: string }).payTo = `0x${"4".repeat(40)}`; return null }
+    })))
+    expect(result._tag).toBe("Left"); expect(spy).not.toHaveBeenCalled(); expect(calls).toHaveLength(1)
+  })
+  it.each([Number.NaN, Infinity, "10000", -1n, 1n << 256n])("rejects a malformed caller cap without a request or signature %#", async cap => {
+    const { fetch, calls } = recordingFetch(n => n === 1 ? json(gateway(), 402) : json({ ok: true }, 202)), signer = { ...account }, spy = vi.spyOn(signer, "signTypedData")
+    const result = await Effect.runPromise(Effect.either(fetchWithPayment("https://hub.test/x/s/demo", { method: "POST" },
+      { account: signer, fetch, maxAmountAtomic: cap as unknown as bigint })))
+    expect(result._tag).toBe("Left"); expect(spy).not.toHaveBeenCalled(); expect(calls).toHaveLength(0)
+  })
+  it("keeps the original URL, body and headers when beforeSign mutates the caller's objects", async () => {
+    const { fetch, calls } = recordingFetch(n => n === 1 ? json(gateway(), 402) : json({ ok: true }, 202))
+    const input = new URL("https://hub.test/x/s/demo"), headers = new Headers({ "x-original": "yes" })
+    const init: RequestInit = { method: "POST", body: "original-body", headers }
+    const result = await Effect.runPromise(fetchWithPayment(input, init, { account, fetch, beforeSign: () => {
+      input.hostname = "foreign.test"; init.method = "DELETE"; init.body = "changed-body"; headers.set("x-original", "changed"); return null
+    } }))
+    expect(result.paid).toBe(true); expect(calls).toHaveLength(2)
+    for (const request of calls) {
+      expect(request.url).toBe("https://hub.test/x/s/demo")
+      expect(request.method).toBe("POST")
+      expect(request.headers.get("x-original")).toBe("yes")
+      expect(await request.text()).toBe("original-body")
+    }
+  })
+  it.each(["view", "arraybuffer", "params"])("snapshots %s body bytes before either request and caller mutation", async kind => {
+    const bytes = new Uint8Array([88, 65, 66, 67, 89]), params = new URLSearchParams("value=original")
+    const body = kind === "view" ? bytes.subarray(1, 4) : kind === "arraybuffer" ? bytes.buffer : params
+    const expected = kind === "view" ? "ABC" : kind === "arraybuffer" ? "XABCY" : "value=original"
+    const { fetch, calls } = recordingFetch(n => n === 1 ? json(gateway(), 402) : json({}, 202))
+    await Effect.runPromise(fetchWithPayment("https://hub.test/x/s/demo", { method: "POST", body }, { account, fetch, beforeSign: () => {
+      bytes.fill(90); params.set("value", "changed"); return null
+    } }))
+    expect(calls).toHaveLength(2)
+    for (const request of calls) {
+      expect(await request.text()).toBe(expected)
+      if (kind === "params") expect(request.headers.get("content-type")).toBe("application/x-www-form-urlencoded;charset=UTF-8")
+    }
+  })
+  it.each(["string", "bytes", "blob"])("allows the exact1MiB %s replay boundary", async kind => {
+    const body = kind === "string" ? "x".repeat(1_048_576) : kind === "bytes" ? new Uint8Array(1_048_576) : new Blob([new Uint8Array(1_048_576)], { type: "application/octet-stream" })
+    const { fetch, calls } = recordingFetch(n => n === 1 ? json(gateway(), 402) : json({}, 202))
+    const result = await Effect.runPromise(fetchWithPayment("https://hub.test/x/s/demo", { method: "POST", body }, { account, fetch }))
+    expect(result.paid).toBe(true); expect(calls).toHaveLength(2)
+    for (const request of calls) expect((await request.arrayBuffer()).byteLength).toBe(1_048_576)
+  })
+  it.each(["string", "unicode", "bytes", "blob", "stream", "form"])("refuses nonreplayable or oversized %s before a probe", async kind => {
+    const body = kind === "string" ? "x".repeat(1_048_577) : kind === "unicode" ? "é".repeat(524_289) : kind === "bytes" ? new Uint8Array(1_048_577) :
+      kind === "blob" ? new Blob([new Uint8Array(1_048_577)]) : kind === "stream" ? new ReadableStream({ start(controller) { controller.close() } }) : new FormData()
+    let calls = 0
+    const fetch = Object.assign(async () => { calls++; return json({}, 200) }, { preconnect() { throw Error("No preconnect") } })
+    const result = await Effect.runPromise(Effect.either(fetchWithPayment("https://hub.test/x/s/demo", { method: "POST", body }, { account, fetch })))
+    expect(result).toMatchObject({ _tag: "Left", left: { _tag: "RpcFailure", reason: "Unsupported payment request. Nothing was signed." } })
+    expect(calls).toBe(0)
+  })
   it("runs the final beforeSign refusal without producing a signature",async()=>{
     const {fetch,calls}=recordingFetch(()=>json(challenge(10000n),402))
     const signer={...account},signTypedData=vi.spyOn(signer,"signTypedData")

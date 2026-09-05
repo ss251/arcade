@@ -1,7 +1,7 @@
 import {describe,expect,it,vi} from "vitest"
 import {Effect} from "effect"
 import {privateKeyToAccount} from "viem/accounts"
-import {ARC_CAIP2,USDC_ADDRESS} from "@arcade/core"
+import {ARC_CAIP2,ARC_CHAIN_ID,GATEWAY_WALLET,USDC_ADDRESS} from "@arcade/core"
 import {HEADER_PAYMENT_SIGNATURE} from "@arcade/payments"
 import {callSkill} from "../src/index.ts"
 import type {EnsReader} from "../src/ens-policy.ts"
@@ -21,6 +21,21 @@ const fixture=(change:Record<string,unknown>={},pollUrl="https://hub.example/job
 }
 const run=(f:ReturnType<typeof fixture>,extra:Record<string,unknown>={})=>Effect.runPromise(Effect.either(callSkill({name:NAME,input:{ok:true},account:f.account,ensReader:reader,fetch:f.fetch,pollIntervalMs:1,maxWaitMs:10,...extra})))
 describe("hire by ENS name before signature",()=>{
+  const gatewayExtra={name:"GatewayWalletBatched",version:"1",verifyingContract:GATEWAY_WALLET}
+  it("keeps the complete ENS authority path when the actual SDK selects Gateway signing",async()=>{
+    const f=fixture({extra:gatewayExtra}),result=await run(f,{maxAmountAtomic:10000n,expectedHubUrl:"https://hub.example",lineage:"cap.gateway-fixture"})
+    expect(result).toMatchObject({_tag:"Right",right:{jobId:"job_test",authorizedAmountAtomic:10000n,result:{ok:true}}})
+    expect(f.sign).toHaveBeenCalledTimes(1)
+    expect(f.sign.mock.calls[0]?.[0]).toMatchObject({domain:{name:"GatewayWalletBatched",version:"1",chainId:ARC_CHAIN_ID,verifyingContract:GATEWAY_WALLET},message:{to:PAYEE,value:10000n}})
+    expect(f.calls.map(r=>r.url)).toEqual([ENDPOINT,ENDPOINT,"https://hub.example/jobs/job_test/result"])
+    expect(f.calls.slice(0,2).every(r=>r.headers.get("x-arcade-hire-capability")==="cap.gateway-fixture")).toBe(true)
+    expect(f.calls.every(r=>r.redirect==="error"&&r.credentials==="omit")).toBe(true)
+  })
+  it.each([{payTo:SELLER},{network:"eip155:1"},{asset:SELLER},{resource:"https://foreign.example/x/seller/flow"},
+    {extra:{...gatewayExtra,version:"2"}}])("refuses contradictory ENS/Gateway authority before signature %#",async change=>{
+    const f=fixture({extra:gatewayExtra,...change}),result=await run(f)
+    expect(result._tag).toBe("Left");expect(f.sign).not.toHaveBeenCalled();expect(f.calls).toHaveLength(1)
+  })
   it("uses the resolved endpoint and splitter, signs once, polls with the same injected fetch and fences the route seller",async()=>{
     const f=fixture(),result=await run(f)
     expect(result).toMatchObject({_tag:"Right",right:{jobId:"job_test",result:{ok:true}}})

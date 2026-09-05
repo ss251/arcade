@@ -54,3 +54,50 @@ public references, CLI output is exact, historical records are unchanged, links
 resolve and no key, signature, raw transaction or private journal path is exported.
 Receipt/gas/pending-credit facts are separately attributed to the read-only verifier;
 the public-copy reviewer did not claim another live query or test run.
+
+## September 5 — F2 public preparation checkpoint
+
+F2 Gateway signing and the buyer request-copy policy are implemented and frozen
+with focused tests. See the [brief](task-2-brief.md), [original implementation
+report](task-2-report.md), [initial independent review](task-2-independent-review.md)
+and [correction follow-up](task-2-independent-followup.md). The three reports keep
+their recorded checkpoints unchanged after the standard publication banner.
+
+The initial reviewer reproduced issued-authorization reflection in the Gateway
+paid error and mutable native file-backed Blob replay. The narrowly released
+follow-up fixed the Gateway-only diagnostic and added a bounded eager Blob copy;
+the preserved two genuine Reds passed afterward. Its final focused checkpoint is
+128 Vitest tests, 13 collected Bun cases / 75 assertions and exact-target strict
+TypeScript with zero diagnostics. These are reported offline results, not new
+runs performed by the public-artifact preparer or independent settlement proof.
+
+The original report's Blob immutability claim and the initial review's unresolved
+findings are historical, superseded for the exercised paths by that follow-up.
+Parent source review and independent rerun are underway; whole-repository gates,
+public-copy approval and the atomic F2 commit remain pending at this checkpoint.
+F1's live allowance stays consumed; F3 settlement, later session work and further
+live evidence are not completed by this publication. No extra live authority or
+GitHub push is implied.
+
+### F2 parent correction and publication review
+
+The [parent review](task-2-integration.md) is CLEAN after reading all final source,
+tests and historical reports. Independent reruns passed 128 Vitest, 13 collected
+Bun cases / 75 assertions plus the two preserved private regressions, and exact
+nested strict TypeScript. All three public report bodies match their originals
+after the standard banner; brief/index claims preserve the evidence limits.
+The publication preparer independently resolved 29 local links and found no
+private material. Whole-repository gates and the atomic commit remain pending.
+
+### F2 full repository gate
+
+The parent ran `bun --no-env-file run test` and
+`bun --no-env-file run typecheck` against the frozen worktree before the ordered
+F2 commit: the complete Vitest phase passed, then 331 Bun cases / 3,601 assertions
+across 31 files passed, followed by strict root and web TypeScript; final exit zero.
+This worktree also contained the independently frozen F3/F4 source and tests;
+their presence in the gate does not merge their ownership or complete their tasks.
+Only F2's exact source/test/public-artifact paths are selected for its commit.
+No source changed during the gate, no live action was repeated, and nothing was
+pushed. The Vitest summary count was not retained in the bounded output, so no
+unverified total is supplied for that phase.
