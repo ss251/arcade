@@ -33,9 +33,9 @@ describe("skill harness integration", () => {
     writeFileSync(preload, `import { mock } from "bun:test";
 mock.module(${JSON.stringify(sdk)}, () => ({
   query: async function* ({ options }) {
-    yield { type: "result", subtype: "success", stop_reason: "end_turn", num_turns: 1,
-      total_cost_usd: 0, structured_output: { cwd: options.cwd, tools: options.allowedTools,
-        settings: options.settingSources, hasReference: options.systemPrompt.includes("references/check.md") } };
+    yield { type: "result", subtype: "success", is_error: false, stop_reason: "end_turn", num_turns: 1,
+      total_cost_usd: 0, usage: { input_tokens: 1, output_tokens: 1 }, structured_output: { cwd: options.cwd, tools: options.allowedTools,
+        model: options.model, settings: options.settingSources, hasReference: options.systemPrompt.includes("references/check.md") } };
   }
 }));`)
     return preload
@@ -49,6 +49,22 @@ mock.module(${JSON.stringify(sdk)}, () => ({
       const definition = { systemPrompt: "", credential }
       expect(skill.envGrants(definition)).toEqual(claude.envGrants(definition))
     }
+  })
+
+  it.each(["glm-5.3-flash", undefined])("honors the manifest model override %s for module-backed agents", (model) => {
+    const dir = mkdtempSync(join(tmpdir(), "arcade-model-override-"))
+    try {
+      const entry = join(dir, "agent.ts")
+      writeFileSync(entry, 'export default { systemPrompt: "test", model: "claude-opus-5" };')
+      const run = spawnSync("bun", ["--no-env-file", "run", `--preload=${fakeProvider(dir)}`, "packages/runner/src/engines/harness.ts", entry], {
+        cwd: new URL("../../..", import.meta.url), env: { PATH: process.env["PATH"] ?? "" },
+        input: JSON.stringify({ jobId: "model", input: {}, skillDir: dir, adapter: "claude-agent",
+          bounds: { timeoutSec: 3 }, outputSchema: {}, engineConfig: { adapter: "claude-agent", model } }),
+        encoding: "utf8", timeout: 5_000
+      })
+      expect(run.status, run.stderr).toBe(0)
+      expect(JSON.parse(run.stdout).output.model).toBe(model ?? "claude-opus-5")
+    } finally { rmSync(dir, { recursive: true, force: true }) }
   })
 
   it("loads a real SKILL.md and refuses oversized input before any model call", () => {

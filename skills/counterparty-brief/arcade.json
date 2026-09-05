@@ -143,15 +143,17 @@
     "adapter": "claude-api",
     "credential": "api-key",
     "entry": "agent.ts",
+    "model": "glm-5.3-flash",
     "capabilities": [
       "web-search",
       "hire-skills"
     ]
   },
   "secrets": [
-    "ANTHROPIC_API_KEY"
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_BASE_URL"
   ],
   "egress": [
-    "api.anthropic.com"
+    "127.0.0.1"
   ]
 }

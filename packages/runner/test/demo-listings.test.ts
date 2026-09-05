@@ -36,8 +36,19 @@ describe("diff-triage, as a skill directory", () => {
   })
 
   it("keeps the model choice private", () => {
-    expect(skill.manifest.engine.model).toBe("claude-sonnet-5")
-    expect(JSON.stringify(toPublicListing(skill.manifest))).not.toContain("sonnet")
+    expect(skill.manifest.engine.model).toBe("glm-5.3-flash")
+    expect(JSON.stringify(toPublicListing(skill.manifest))).not.toContain("glm-")
+  })
+})
+
+describe("the owner-selected free API route", () => {
+  it.each(["diff-triage", "counterparty-brief"])("%s explicitly forwards only its declared API route credentials", async (id) => {
+    const { manifest } = (await readBySlug(id))!
+    expect(manifest.engine.model).toBe("glm-5.3-flash")
+    expect(manifest.engine.credential).toBe("api-key")
+    expect(manifest.secrets).toEqual(["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"])
+    expect(manifest.egress).toEqual(["127.0.0.1"])
+    expect(JSON.stringify(toPublicListing(manifest))).not.toMatch(/glm-|ANTHROPIC_|127\.0\.0\.1/)
   })
 })
 

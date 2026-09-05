@@ -155,7 +155,9 @@ const agentFor = async (request: HarnessRequest, entryArg: string): Promise<Skil
   if (agent === undefined || typeof agent.systemPrompt !== "string") {
     throw new Error(`${entry} must default-export an agent with a systemPrompt (see defineAgent)`)
   }
-  return agent
+  // The private manifest is the operator's model selection. Keep all other module
+  // settings intact, including its fallback model when no override was published.
+  return config?.model === undefined ? agent : { ...agent, model: config.model }
 }
 
 const main = async () => {

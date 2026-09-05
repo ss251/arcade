@@ -15,7 +15,7 @@ interface FakeMessage {
   content: Array<Record<string, unknown>>
   stop_reason: string | null
   stop_details?: { category?: string } | null
-  usage: Record<string, number>
+  usage: unknown
 }
 
 const msg = (over: Partial<FakeMessage> = {}): FakeMessage => ({
@@ -84,6 +84,17 @@ const job = (bounds: Partial<HarnessJob["bounds"]> = {}): HarnessJob => ({
 // ── completion contract ─────────────────────────────────────────────────────
 
 describe("completion", () => {
+  it.each(["max_tokens", "model_context_window_exceeded", "stop_sequence", "pause_turn", "compaction"])(
+    "does not accept a parsed submit from noncomplete %s", async (stop_reason) => {
+      const spy: FakeRunner = { consumed: 0, pushed: [] }
+      const out = await runClaudeApi(agent(), job(), PROMPT,
+        fakeClient([msg({ stop_reason, content: [toolUse("submit", { ok: true })] })], spy))
+      expect(out.stopReason).toBe(stop_reason)
+      expect(out.error).toBe("agent submitted before a complete provider response")
+      expect(out.output).toBeUndefined()
+      expect(spy.consumed).toBe(1)
+    })
+
   it("returns the submit arguments as the job output", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
     const out = await runClaudeApi(
@@ -169,6 +180,39 @@ describe("refusal", () => {
 // ── bounds are a ceiling, not a postmortem ──────────────────────────────────
 
 describe("bounds enforcement", () => {
+  it.each([
+    { bounds: { maxCostUsd: 0.001 }, expected: "maxCostUsd" },
+    { bounds: { maxTokens: 100 }, expected: "maxTokens" },
+    { bounds: { maxToolCalls: 0 }, expected: "maxToolCalls" }
+  ])("checks $expected even on the final submit turn", async ({ bounds, expected }) => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(agent(), job(bounds), PROMPT,
+      fakeClient([msg({ content: [toolUse("submit", { ok: true })] })], spy))
+    expect(out.stopReason).toBe("bounds_exceeded")
+    expect(out.error).toContain(expected)
+    expect(out.output).toBeUndefined()
+    expect(spy.signal?.aborted).toBe(true)
+  })
+
+  it("prices the explicit free alias at zero without removing token accounting", async () => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(agent({ model: "glm-5.3-flash" }), job({ maxCostUsd: 0.01 }), PROMPT,
+      fakeClient([msg({ content: [toolUse("submit", { ok: true })] })], spy))
+    expect(out.stopReason).toBe("end_turn")
+    expect(out.costUsd).toBe(0)
+    expect(out.usage.tokens).toBe(1500)
+    expect(spy.params?.["model"]).toBe("glm-5.3-flash")
+  })
+
+  it("still enforces token bounds for a free-model final submit", async () => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(agent({ model: "glm-5.3-flash" }), job({ maxCostUsd: 0.01, maxTokens: 100 }), PROMPT,
+      fakeClient([msg({ content: [toolUse("submit", { ok: true })] })], spy))
+    expect(out.stopReason).toBe("bounds_exceeded")
+    expect(out.error).toContain("maxTokens")
+    expect(out.output).toBeUndefined()
+  })
+
   it("aborts mid-run once the cost ceiling is crossed", async () => {
     const spy: FakeRunner = { consumed: 0, pushed: [] }
     // Each turn bills 20k output tokens = $0.50 on Opus 5. One turn already exceeds the
@@ -211,7 +255,7 @@ describe("bounds enforcement", () => {
       agent(),
       job(),
       PROMPT, fakeClient(
-        [msg({ usage: { output_tokens: 90_000 } }), msg({ content: [toolUse("submit", { ok: true })] })],
+        [msg({ usage: { input_tokens: 0, output_tokens: 90_000 } }), msg({ content: [toolUse("submit", { ok: true })] })],
         spy
       )
     )
@@ -339,7 +383,7 @@ describe("cost estimate", () => {
       agent(),
       job(),
       PROMPT, fakeClient(
-        [msg({ content: [toolUse("submit", {})], usage: { cache_read_input_tokens: 100_000 } })],
+        [msg({ content: [toolUse("submit", {})], usage: { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 100_000 } })],
         spy
       )
     )
@@ -349,7 +393,7 @@ describe("cost estimate", () => {
       agent(),
       job(),
       PROMPT, fakeClient(
-        [msg({ content: [toolUse("submit", {})], usage: { input_tokens: 100_000 } })],
+        [msg({ content: [toolUse("submit", {})], usage: { input_tokens: 100_000, output_tokens: 0 } })],
         spy2
       )
     )
@@ -365,7 +409,7 @@ describe("cost estimate", () => {
       agent(),
       job({ maxTokens: 50_000 }),
       PROMPT, fakeClient(
-        Array.from({ length: 5 }, () => msg({ usage: { cache_read_input_tokens: 40_000 } })),
+        Array.from({ length: 5 }, () => msg({ usage: { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 40_000 } })),
         spy
       )
     )
@@ -375,6 +419,76 @@ describe("cost estimate", () => {
 })
 
 describe("cost accounting", () => {
+  it.each(["__proto__", "toString", "constructor"])("rejects inherited pricing entry %s before a request", async (model) => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(agent({ model }), job({ maxCostUsd: 0.01 }), PROMPT,
+      fakeClient([msg({ content: [toolUse("submit", { ok: true })] })], spy))
+    expect(out.stopReason).toBe("rejected")
+    expect(out.error).toContain("no price known")
+    expect(spy.params).toBeUndefined()
+    expect(spy.consumed).toBe(0)
+  })
+
+  it("prices inherited server-tool names as unknown tools, not prototype members", async () => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(agent({ model: "glm-5.3-flash" }), job({ maxCostUsd: 0.01 }), PROMPT,
+      fakeClient([msg({ content: [toolUse("submit", { ok: true })],
+        usage: { input_tokens: 1, output_tokens: 1, server_tool_use: { toString: 2 } } })], spy))
+    expect(out.stopReason).toBe("bounds_exceeded")
+    expect(out.costUsd).toBeCloseTo(0.02)
+    expect(out.output).toBeUndefined()
+  })
+
+  it.each([
+    ["missing usage", undefined], ["null usage", null], ["array usage", []],
+    ["missing input", { output_tokens: 1 }], ["missing output", { input_tokens: 1 }],
+    ["negative input", { input_tokens: -1, output_tokens: 1 }],
+    ["NaN output", { input_tokens: 1, output_tokens: NaN }],
+    ["infinite output", { input_tokens: 1, output_tokens: Infinity }],
+    ["fractional output", { input_tokens: 1, output_tokens: 0.5 }],
+    ["string output", { input_tokens: 1, output_tokens: "1" }],
+    ["unsafe input", { input_tokens: Number.MAX_SAFE_INTEGER + 1, output_tokens: 1 }],
+    ["negative cache", { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: -1 }],
+    ["string cache", { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: "2" }],
+    ["array tools", { input_tokens: 1, output_tokens: 1, server_tool_use: [] }],
+    ["negative tools", { input_tokens: 1, output_tokens: 1, server_tool_use: { web_search_requests: -2 } }],
+    ["null tool count", { input_tokens: 1, output_tokens: 1, server_tool_use: { web_search_requests: null } }],
+    ["overflow total", { input_tokens: Number.MAX_SAFE_INTEGER, output_tokens: 1 }]
+  ])("refuses %s before accepting a free-model submit", async (_label, usage) => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(agent({ model: "glm-5.3-flash" }), job({ maxCostUsd: 0.01, maxTokens: 100 }), PROMPT,
+      fakeClient([msg({ usage, content: [toolUse("submit", { ok: true })] })], spy))
+    expect(out.stopReason).toBe("error")
+    expect(out.error).toBe("provider returned invalid usage accounting")
+    expect(out.output).toBeUndefined()
+    expect(out.usage.tokens).toBe(0)
+    expect(out.costUsd).toBe(0)
+    expect(spy.signal?.aborted).toBe(true)
+  })
+
+  it("accepts documented null optional cache and server-tool usage with required counts", async () => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(agent({ model: "glm-5.3-flash" }), job({ maxCostUsd: 0.01 }), PROMPT,
+      fakeClient([msg({ content: [toolUse("submit", { ok: true })], usage: {
+        input_tokens: 1, output_tokens: 2, cache_creation_input_tokens: null,
+        cache_read_input_tokens: null, server_tool_use: null
+      } })], spy))
+    expect(out.stopReason).toBe("end_turn")
+    expect(out.usage.tokens).toBe(3)
+    expect(out.costUsd).toBe(0)
+  })
+
+  it.each(["web_search_requests", "future_tool_requests"])("does not make %s free with the explicit free token alias", async (tool) => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(agent({ model: "glm-5.3-flash" }), job({ maxCostUsd: 0.01 }), PROMPT,
+      fakeClient([msg({ content: [toolUse("submit", { ok: true })],
+        usage: { input_tokens: 0, output_tokens: 0, server_tool_use: { [tool]: 2 } } })], spy))
+    expect(out.stopReason).toBe("bounds_exceeded")
+    expect(out.output).toBeUndefined()
+    expect(out.costUsd).toBeCloseTo(0.02)
+    expect(spy.consumed).toBe(1)
+  })
+
   /**
    * `maxCostUsd` is what the seller guide calls "the bound that actually protects your
    * margin". Two ways it silently did nothing: server-side tool calls were not counted at
@@ -413,7 +527,7 @@ describe("cost accounting", () => {
         [
           msg({
             content: [toolUse("submit", {})],
-            usage: { server_tool_use: { some_future_tool_requests: 5 } } as never
+            usage: { input_tokens: 0, output_tokens: 0, server_tool_use: { some_future_tool_requests: 5 } }
           })
         ],
         spy
@@ -449,5 +563,41 @@ describe("cost accounting", () => {
       fakeClient([msg({ content: [toolUse("submit", { ok: true })] })], spy)
     )
     expect(out.stopReason).not.toBe("rejected")
+  })
+})
+
+describe("private provider diagnostics", () => {
+  it.each(["setup", "options", "iteration"] as const)("sanitizes a provider failure during %s", async (stage) => {
+    const fail = () => { throw new Error("PRIVATE_PROVIDER_BODY_AND_KEY_FIXTURE") }
+    const client = { beta: { messages: { toolRunner() {
+      if (stage === "setup") fail()
+      return {
+        setRequestOptions() { if (stage === "options") fail() },
+        async *[Symbol.asyncIterator]() { fail(); yield msg() }
+      }
+    } } } } as never
+    const out = await runClaudeApi(agent(), job(), PROMPT, client)
+    expect(out.stopReason).toBe("error")
+    expect(out.error).toBe("provider request failed")
+    expect(JSON.stringify(out)).not.toContain("PRIVATE_PROVIDER_BODY_AND_KEY_FIXTURE")
+    expect(out.output).toBeUndefined()
+  })
+
+  it("does not echo an arbitrary provider refusal category", async () => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(agent(), job(), PROMPT,
+      fakeClient([msg({ stop_reason: "refusal", stop_details: { category: "PRIVATE_PROVIDER_CATEGORY" } })], spy))
+    expect(out.stopReason).toBe("refusal")
+    expect(JSON.stringify(out)).not.toContain("PRIVATE_PROVIDER_CATEGORY")
+  })
+
+  it("does not echo or accept an unknown provider stop reason", async () => {
+    const spy: FakeRunner = { consumed: 0, pushed: [] }
+    const out = await runClaudeApi(agent(), job(), PROMPT,
+      fakeClient([msg({ stop_reason: "PRIVATE_PROVIDER_STOP_REASON", content: [toolUse("submit", { ok: true })] })], spy))
+    expect(out.stopReason).toBe("error")
+    expect(out.error).toBe("provider request failed")
+    expect(out.output).toBeUndefined()
+    expect(JSON.stringify(out)).not.toContain("PRIVATE_PROVIDER_STOP_REASON")
   })
 })

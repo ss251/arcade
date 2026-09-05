@@ -20,6 +20,9 @@ import type { Engine, HarnessJob, JobEnvelope, SkillAgent } from "./types.js"
 
 /** USD per million tokens. Cache reads bill at 0.1x input, writes at 1.25x. */
 const PRICING: Record<string, { input: number; output: number }> = {
+  // Owner-selected free b.ai route through the local Messages proxy. This is an exact
+  // alias, not a free fallback for unknown models; server tools retain their own costs.
+  "glm-5.3-flash": { input: 0, output: 0 },
   "claude-opus-5": { input: 5, output: 25 },
   "claude-opus-4-8": { input: 5, output: 25 },
   "claude-opus-4-7": { input: 5, output: 25 },
@@ -42,11 +45,41 @@ const SERVER_TOOL_USD: Record<string, number> = {
 }
 
 interface Usage {
-  input_tokens?: number
-  output_tokens?: number
+  input_tokens: number
+  output_tokens: number
   cache_creation_input_tokens?: number
   cache_read_input_tokens?: number
   server_tool_use?: Record<string, number> | null
+}
+
+class InvalidUsage extends Error {
+  constructor() { super("provider returned invalid usage accounting") }
+}
+
+const count = (value: unknown): number => {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) throw new InvalidUsage()
+  return value
+}
+
+/** SDK types do not validate proxy JSON. Missing mandatory counts are not zero usage. */
+const validatedUsage = (value: unknown): Usage => {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) throw new InvalidUsage()
+  const u = value as Record<string, unknown>
+  const own = (key: string) => Object.hasOwn(u, key) ? u[key] : undefined
+  const input = count(own("input_tokens"))
+  const output = count(own("output_tokens"))
+  // BetaUsage explicitly permits null cache/tool accounting; absent optional fields
+  // are also emitted by Messages-compatible providers. Only these mean zero.
+  const cacheCreation = count(own("cache_creation_input_tokens") ?? 0)
+  const cacheRead = count(own("cache_read_input_tokens") ?? 0)
+  count(input + output + cacheCreation + cacheRead)
+  const server = own("server_tool_use")
+  if (server !== undefined && server !== null && (typeof server !== "object" || Array.isArray(server))) {
+    throw new InvalidUsage()
+  }
+  const tools = Object.fromEntries(Object.entries(server ?? {}).map(([key, n]) => [key, count(n)]))
+  return { input_tokens: input, output_tokens: output, cache_creation_input_tokens: cacheCreation,
+    cache_read_input_tokens: cacheRead, server_tool_use: tools }
 }
 
 /** Raised when a model's price is unknown, so the ceiling fails closed rather than open. */
@@ -61,12 +94,13 @@ export class UnpricedModel extends Error {
   }
 }
 
-export const estimateCostUsd = (model: string, u: Usage): number => {
-  const p = PRICING[model]
+export const estimateCostUsd = (model: string, usage: unknown): number => {
+  const p = Object.hasOwn(PRICING, model) ? PRICING[model] : undefined
   // Fail closed. Returning 0 for an unknown model disabled `maxCostUsd` entirely — the
   // seller guide calls it "the bound that actually protects your margin", and a typo in a
   // model name silently removed it.
   if (p === undefined) throw new UnpricedModel(model)
+  const u = validatedUsage(usage)
 
   const tokens =
     ((u.input_tokens ?? 0) * p.input +
@@ -79,7 +113,8 @@ export const estimateCostUsd = (model: string, u: Usage): number => {
   for (const [k, n] of Object.entries(u.server_tool_use ?? {})) {
     // An unknown server tool is priced at the highest known rate rather than zero: the
     // ceiling should over-estimate an unfamiliar cost, never ignore it.
-    tools += (n ?? 0) * (SERVER_TOOL_USD[k] ?? Math.max(...Object.values(SERVER_TOOL_USD)))
+    const rate = Object.hasOwn(SERVER_TOOL_USD, k) ? SERVER_TOOL_USD[k]! : Math.max(...Object.values(SERVER_TOOL_USD))
+    tools += n * rate
   }
 
   return tokens + tools
@@ -203,12 +238,16 @@ export const hireTool = (hireFn: typeof hire = hire) => ({
 // ── the run ─────────────────────────────────────────────────────────────────
 
 const REFUSAL_STOP_REASONS = new Set(["refusal"])
+const REFUSAL_CATEGORIES = new Set(["cyber", "bio", "frontier_llm", "reasoning_extraction", "general_harms"])
+const STOP_REASONS = new Set(["end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn",
+  "compaction", "refusal", "model_context_window_exceeded"])
+const COMPLETE_STOP_REASONS = new Set(["end_turn", "tool_use"])
 
 export const runClaudeApi = async (
   agent: SkillAgent,
   job: HarnessJob,
   prompt: string,
-  client: Anthropic = new Anthropic()
+  client?: Anthropic
 ): Promise<JobEnvelope> => {
   const model = agent.model ?? "claude-opus-5"
   const { bounds } = job
@@ -216,7 +255,7 @@ export const runClaudeApi = async (
   // Checked before a token is spent: if the ceiling cannot be enforced, the job must not
   // start. A bound that silently does nothing is worse than no bound, because the seller
   // priced their listing believing it was there.
-  if (bounds.maxCostUsd !== undefined && PRICING[model] === undefined) {
+  if (bounds.maxCostUsd !== undefined && !Object.hasOwn(PRICING, model)) {
     return {
       stopReason: "rejected",
       usage: { turns: 0, tokens: 0, toolCalls: 0 },
@@ -253,27 +292,38 @@ export const runClaudeApi = async (
     ...((agent.capabilities ?? []).includes("hire-skills") ? [hireTool()] : [])
   ]
 
-  const runner = client.beta.messages.toolRunner({
-    model,
-    // Per-response ceiling. Thinking shares this budget with the response text, so a tight
-    // value truncates mid-answer rather than saving money.
-    max_tokens: agent.maxTokensPerTurn ?? 16000,
-    output_config: { effort: agent.effort ?? "medium" },
-    system: agent.systemPrompt,
-    tools: tools as never,
-    ...(bounds.maxTurns === undefined ? {} : { max_iterations: bounds.maxTurns }),
-    messages: [{ role: "user", content: [{ type: "text", text: prompt }] }]
-  })
-  runner.setRequestOptions({ signal: abort.signal })
-
   let lastStopReason: string | undefined
 
   try {
+    const runner = (client ?? new Anthropic()).beta.messages.toolRunner({
+      model,
+      // Per-response ceiling. Thinking shares this budget with the response text, so a tight
+      // value truncates mid-answer rather than saving money.
+      max_tokens: agent.maxTokensPerTurn ?? 16000,
+      output_config: { effort: agent.effort ?? "medium" },
+      system: agent.systemPrompt,
+      tools: tools as never,
+      ...(bounds.maxTurns === undefined ? {} : { max_iterations: bounds.maxTurns }),
+      messages: [{ role: "user", content: [{ type: "text", text: prompt }] }]
+    })
+    // A provider POST may already have incurred cost when its response fails. Neither
+    // automatic repeats nor redirecting its credential to another origin are safe.
+    // BetaToolRunner forwards this object to Messages.create unchanged. Its public
+    // setter type lists only a subset; use the SDK's full request type, without casts.
+    const requestOptions: Anthropic.RequestOptions = { signal: abort.signal, maxRetries: 0,
+      fetchOptions: { redirect: "error", credentials: "omit" } }
+    runner.setRequestOptions(requestOptions)
     for await (const message of runner as AsyncIterable<Anthropic.Beta.BetaMessage>) {
       totals.turns += 1
-      const u = (message.usage ?? {}) as unknown as Usage
-      totals.tokens += billableTokens(u)
-      costUsd += estimateCostUsd(model, u)
+      const u = validatedUsage(message.usage)
+      const tokens = count(totals.tokens + billableTokens(u))
+      const cost = costUsd + estimateCostUsd(model, u)
+      if (!Number.isFinite(cost) || cost < 0) throw new InvalidUsage()
+      totals.tokens = tokens
+      costUsd = cost
+      if (typeof message.stop_reason !== "string" || !STOP_REASONS.has(message.stop_reason)) {
+        throw new Error("invalid provider stop reason")
+      }
       lastStopReason = message.stop_reason ?? undefined
 
       // A declined request is a 200 with an empty or partial body. Checking stop_reason
@@ -282,7 +332,7 @@ export const runClaudeApi = async (
       if (message.stop_reason !== null && REFUSAL_STOP_REASONS.has(message.stop_reason)) {
         const details = message.stop_details as { category?: string } | null | undefined
         return {
-          stopReason: details?.category ? `refusal:${details.category}` : "refusal",
+          stopReason: details?.category && REFUSAL_CATEGORIES.has(details.category) ? `refusal:${details.category}` : "refusal",
           usage: totals,
           costUsd
         }
@@ -293,8 +343,6 @@ export const runClaudeApi = async (
         totals.toolCalls += 1
         if (block.name === "submit") submitted = block.input
       }
-
-      if (submitted !== undefined) break
 
       // Cost first: a run can sit under every token bound and still cost more than the
       // call earns.
@@ -309,6 +357,18 @@ export const runClaudeApi = async (
         abort.abort()
         break
       }
+      // Submission does not exempt the final response from the published ceilings.
+      if (submitted !== undefined) {
+        // A parseable object is not proof that generation completed. In particular,
+        // truncation and compaction do not complete the work. We never request stop_sequences,
+        // so that delimiter also cannot establish this engine's completion contract.
+        if (!COMPLETE_STOP_REASONS.has(message.stop_reason)) {
+          abort.abort()
+          return { stopReason: message.stop_reason, usage: totals, costUsd: costUsd + subSpendUsd(),
+            error: "agent submitted before a complete provider response" }
+        }
+        break
+      }
 
       // A server tool that exhausts its internal iteration budget stops the turn with
       // `pause_turn`. The runner does not resume it: without this the loop ends quietly
@@ -318,12 +378,15 @@ export const runClaudeApi = async (
       }
     }
   } catch (e) {
+    abort.abort()
     if (breach === undefined) {
       return {
         stopReason: "error",
         usage: totals,
         costUsd,
-        error: String((e as Error)?.message ?? e)
+        // Provider errors can contain request bodies, URLs and credentials. Only our
+        // fixed accounting diagnostic is safe to return; never copy external details.
+        error: e instanceof InvalidUsage ? e.message : "provider request failed"
       }
     }
   }

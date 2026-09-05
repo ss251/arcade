@@ -30,7 +30,7 @@ describe("arcade publish subprocess integration", () => {
     const manifest = JSON.parse(readFileSync(join(root, "skills/diff-triage/arcade.json"), "utf8"))
     expect(preview).toMatchObject({ target: "skills/diff-triage", skillId: "diff-triage",
       engine: { adapter: manifest.engine.adapter, credential: "api-key" }, grants: [],
-      public: { id: "diff-triage" }, private: { engine: manifest.engine, secrets: ["ANTHROPIC_API_KEY"] } })
+      public: { id: "diff-triage" }, private: { engine: manifest.engine, secrets: ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"] } })
     expect(preview.public).not.toHaveProperty("engine")
     expect(preview.public).not.toHaveProperty("secrets")
     expect(existsSync(join(dir, ".arcade"))).toBe(false)
