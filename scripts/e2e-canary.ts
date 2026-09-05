@@ -172,7 +172,53 @@ const bounded = <T>(promise: Promise<T>, ms: number, message: string): Promise<T
   const timer = setTimeout(() => reject(new EvidenceError(message)), ms)
   promise.then((value) => { clearTimeout(timer); resolve(value) }, (error) => { clearTimeout(timer); reject(error) })
 })
-interface OwnedProcess { readonly child: ChildProcess; readonly exited: Promise<void>; done: boolean }
+export interface OwnedProcess { readonly child: ChildProcess; readonly exited: Promise<void>; done: boolean }
+
+/** One ownership boundary for the evidence command's subprocesses. */
+export class OwnedProcesses {
+  private readonly owned = new Set<OwnedProcess>()
+  launch(file: string, env: Record<string, string>, preload?: string, read?: (text: string) => void): OwnedProcess {
+    const child = spawn("bun", ["--no-env-file", "run", ...(preload === undefined ? [] : ["--preload", preload]), file], {
+      cwd: ROOT, env: { PATH: process.env["PATH"] ?? "/usr/bin:/bin", LANG: "en_US.UTF-8", ...env }, stdio: ["ignore", "pipe", "pipe"]
+    })
+    let entry: OwnedProcess
+    const exited = new Promise<void>((resolve) => {
+      child.on("error", () => {
+        // Signal errors do not prove exit. Only failed spawn (no PID) or close does.
+        if (child.pid === undefined) { entry.done = true; resolve() }
+      })
+      child.once("close", () => { entry.done = true; resolve() })
+    })
+    entry = { child, exited, done: false }; this.owned.add(entry)
+    child.stdout?.on("data", (chunk) => read?.(String(chunk)))
+    child.stderr?.resume() // Never print or persist child diagnostics that might contain secrets.
+    return entry
+  }
+  async stop(entry: OwnedProcess | undefined): Promise<void> {
+    if (entry === undefined || !this.owned.has(entry)) return
+    if (!entry.done) {
+      insist(Number.isInteger(entry.child.pid) && entry.child.pid! > 1, "refusing to signal an invalid child PID")
+      entry.child.kill("SIGTERM")
+      try { await bounded(entry.exited, 3_000, "child did not stop") }
+      catch { entry.child.kill("SIGKILL"); await bounded(entry.exited, 3_000, "owned child could not be reaped") }
+    }
+    this.owned.delete(entry)
+  }
+  async close(): Promise<void> {
+    let cleanupFailed = false
+    for (const entry of [...this.owned].reverse()) { try { await this.stop(entry) } catch { cleanupFailed = true } }
+    if (cleanupFailed) throw new EvidenceError("an owned process could not be confirmed stopped")
+  }
+}
+
+/** A verified result is publishable only after every owned process is confirmed stopped. */
+export const withEvidenceCleanup = async <T>(
+  work: () => Promise<T>, cleanup: () => Promise<void>, publish: (proof: T) => void
+): Promise<void> => {
+  let proof: T
+  try { proof = await work() } finally { await cleanup() }
+  publish(proof)
+}
 
 /** Live execution is called only by the command entry point after explicit key preflight. */
 export const runLiveEvidence = async (cfg: EvidenceConfig): Promise<void> => {
@@ -180,36 +226,12 @@ export const runLiveEvidence = async (cfg: EvidenceConfig): Promise<void> => {
   const onSignal = () => controller.abort()
   process.on("SIGINT", onSignal); process.on("SIGTERM", onSignal)
   const timer = setTimeout(onSignal, 300_000)
-  const owned = new Set<OwnedProcess>()
+  const owned = new OwnedProcesses()
   let directory: string | undefined
   let runner: OwnedProcess | undefined
   let hub: OwnedProcess | undefined
   let database: import("bun:sqlite").Database | undefined
-  const baseEnv = { PATH: process.env["PATH"] ?? "/usr/bin:/bin", LANG: "en_US.UTF-8" }
-  const launch = (file: string, env: Record<string, string>, preload?: string, read?: (text: string) => void): OwnedProcess => {
-    const child = spawn("bun", ["run", ...(preload === undefined ? [] : ["--preload", preload]), file], {
-      cwd: ROOT, env: { ...baseEnv, ...env }, stdio: ["ignore", "pipe", "pipe"]
-    })
-    let entry: OwnedProcess
-    const exited = new Promise<void>((resolve) => {
-      child.once("error", () => { entry.done = true; resolve() })
-      child.once("close", () => { entry.done = true; resolve() })
-    })
-    entry = { child, exited, done: false }; owned.add(entry)
-    child.stdout?.on("data", (chunk) => read?.(String(chunk)))
-    child.stderr?.resume() // Never print or persist child diagnostics that might contain secrets.
-    return entry
-  }
-  const stop = async (entry: OwnedProcess | undefined) => {
-    if (entry === undefined || !owned.has(entry)) return
-    if (!entry.done) {
-      insist(Number.isInteger(entry.child.pid) && entry.child.pid! > 1, "refusing to signal an invalid child PID")
-      entry.child.kill("SIGTERM")
-      try { await bounded(entry.exited, 3_000, "child did not stop") }
-      catch { entry.child.kill("SIGKILL"); await bounded(entry.exited, 3_000, "owned child could not be reaped") }
-    }
-    owned.delete(entry)
-  }
+  const launch = owned.launch.bind(owned), stop = owned.stop.bind(owned)
   const check = () => insist(!controller.signal.aborted, "evidence run interrupted or exceeded five minutes")
   const request = async (url: string, init?: RequestInit) => {
     check()
@@ -233,7 +255,7 @@ export const runLiveEvidence = async (cfg: EvidenceConfig): Promise<void> => {
     } while (Date.now() < end)
     throw new EvidenceError(message)
   }
-  try {
+  await withEvidenceCleanup(async () => {
     insist(await rpc("eth_chainId", []) === "0x4cef52", "RPC is not Arc testnet chain 5042002")
     directory = await mkdtemp(join(tmpdir(), "arcade-canary-evidence-"))
     console.log(`Local evidence directory: ${directory}`)
@@ -348,17 +370,18 @@ Effect.runPromise(startDaemon({ config, skillsDir: ${JSON.stringify(skillsDir)} 
       first: proof.first, offlineFailures: offlineRows, recovery: proof.second,
       claims: ["offline details return 404", "three durable offline failures", "all four catalogues omit the listing",
         "reconnect alone preserves delisting", "distinct paid recovery restores discovery", "both receipts and on-chain transfers/tree events match"] }, null, 2))
+    return proof
+  }, async () => {
+    clearTimeout(timer); process.off("SIGINT", onSignal); process.off("SIGTERM", onSignal)
+    try { await owned.close() } finally {
+      database?.close()
+      if (directory !== undefined) console.log(`Retained local evidence (no keys): ${directory}`)
+    }
+  }, proof => {
     console.log("PASS — two independently verified Arc testnet purchases; genuine scheduled canary, no payment mocks.")
     console.log(`First: https://testnet.arcscan.app/tx/${proof.first.settleTx}`)
     console.log(`Recovery: https://testnet.arcscan.app/tx/${proof.second.settleTx}`)
-  } finally {
-    clearTimeout(timer); process.off("SIGINT", onSignal); process.off("SIGTERM", onSignal)
-    let cleanupFailed = false
-    for (const entry of [...owned].reverse()) { try { await stop(entry) } catch { cleanupFailed = true } }
-    database?.close()
-    if (directory !== undefined) console.log(`Retained local evidence (no keys): ${directory}`)
-    if (cleanupFailed) throw new EvidenceError("an owned process could not be confirmed stopped")
-  }
+  })
 }
 
 export const main = async (argv: string[] = process.argv.slice(2)): Promise<number> => {
