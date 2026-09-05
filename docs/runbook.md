@@ -716,3 +716,23 @@ still names the now-stopped loopback server; it is **not** a durable public endp
 The explicitly approved blanket operator grant remains on-chain and covers every current
 and future identity NFT owned by this seller in this registry. No identity transfer,
 unrequested revocation or automatic remint/retry was performed.
+
+## ENS namespaces (Sepolia): deployment preflight
+
+Read-only verification on 2026-09-05 at 01:07:42 UTC used Sepolia chain11155111
+via `https://ethereum-sepolia-rpc.publicnode.com`. Both manifest roots returned their
+own expected `.eth` registry and both registrar addresses had deployed code. Runtime
+discovery selected **set A**, the current ENS docs/app deployment. This verifies the
+root links and registrar code presence, not every ABI, resolver route or contract's
+security; it does not claim any ARCADE namespace has been registered.
+
+Addresses live only in `config/ens/sepolia.json`; the shared resolver reads the root
+links with bounded requests and refuses a reported wrong-chain RPC. The beta registrar
+uses `isAvailable(string)`, not the plan's stale `available(string)` signature. Role
+grant functions and resolver authorizations return `bool`. ABIs were checked against
+the [ENS deployment sources](https://docs.ens.domains/learn/deployments/) and
+[deployed registrar source](https://github.com/ensdomains/contracts-v2/blob/97a57293f3b4279d94b571e678edb53ce62638f4/contracts/src/registrar/ETHRegistrar.sol).
+
+The owner still chooses/approves the parent label and provisions two separate funded
+Sepolia keys before any setup transaction. No label is selected or registered by this
+preflight. ENSv2 is beta, and deployment addresses may change.

@@ -1,5 +1,6 @@
-import { encodeAbiParameters, keccak256, stringToHex, toHex } from "viem"
+import { encodeAbiParameters, keccak256, parseAbi, stringToHex, toHex, type PublicClient } from "viem"
 import { labelhash, namehash, normalize, packetToBytes } from "viem/ens"
+import ensSepolia from "../../../config/ens/sepolia.json" with { type: "json" }
 
 /** ENSv2 beta names live on Sepolia; payment settlement stays on the selected Arc chain. */
 export const ENS_SEPOLIA_CHAIN_ID = 11155111
@@ -115,4 +116,129 @@ export const ensTtlSeconds = (raw?: string): number => {
   if (!Number.isSafeInteger(seconds)) throw new Error("ARCADE_ENS_TTL is outside safe integer seconds")
   if (seconds < 60) throw new Error("ARCADE_ENS_TTL must be at least 60s")
   return seconds
+}
+
+// Deployed contracts-v2 @97a57293f3b4279d94b571e678edb53ce62638f4 sources.
+// In particular the beta registrar exposes isAvailable (not ENSv1's available).
+export const ROOT_REGISTRY_ABI = parseAbi(["function getSubregistry(string label) view returns (address)"])
+export const ETH_REGISTRAR_ABI = parseAbi([
+  "function isAvailable(string label) view returns (bool)",
+  "function getRegisterPrice(string label, uint64 duration, address paymentToken) view returns (uint256 base, uint256 premium)",
+  "function MIN_COMMITMENT_AGE() view returns (uint64)",
+  "function MAX_COMMITMENT_AGE() view returns (uint64)",
+  "function MIN_REGISTER_DURATION() view returns (uint64)",
+  "function commitmentAt(bytes32 commitment) view returns (uint64)",
+  "function makeCommitment(string label, address owner, bytes32 secret, address subregistry, address resolver, uint64 duration, bytes32 referrer) pure returns (bytes32)",
+  "function commit(bytes32 commitment)",
+  "function register(string label, address owner, bytes32 secret, address subregistry, address resolver, uint64 duration, address paymentToken, bytes32 referrer) returns (uint256)",
+  "function renew(string label, uint64 duration, address paymentToken, bytes32 referrer)"
+])
+export const PERMISSIONED_REGISTRY_ABI = parseAbi([
+  "function register(string label, address owner, address registry, address resolver, uint256 roleBitmap, uint64 expiry) returns (uint256)",
+  "function renew(uint256 anyId, uint64 newExpiry)", "function unregister(uint256 anyId)",
+  "function setSubregistry(uint256 anyId, address registry)", "function setResolver(uint256 anyId, address resolver)",
+  "function setParent(address parent, string label)",
+  "function grantRoles(uint256 anyId, uint256 roleBitmap, address account) returns (bool)",
+  "function revokeRoles(uint256 anyId, uint256 roleBitmap, address account) returns (bool)",
+  "function grantRootRoles(uint256 roleBitmap, address account) returns (bool)",
+  "function revokeRootRoles(uint256 roleBitmap, address account) returns (bool)",
+  "function getOwner(uint256 anyId) view returns (address)",
+  "function getSubregistry(string label) view returns (address)",
+  "function getExpiry(uint256 anyId) view returns (uint64)",
+  "function getState(uint256 anyId) view returns ((uint8 status, uint64 expiry, address latestOwner, uint256 tokenId, uint256 resource) state)",
+  "function hasRoles(uint256 resource, uint256 roleBitmap, address account) view returns (bool)",
+  "function hasRootRoles(uint256 roleBitmap, address account) view returns (bool)",
+  "function roles(uint256 resource, address account) view returns (uint256)"
+])
+export const PERMISSIONED_RESOLVER_ABI = parseAbi([
+  "function initialize(address admin, uint256 roleBitmap, bytes[] setters)",
+  "function setText(bytes32 node, string key, string value)", "function text(bytes32 node, string key) view returns (string)",
+  "function setAddr(bytes32 node, uint256 coinType, bytes value)", "function clearRecords(bytes32 node)",
+  "function multicall(bytes[] data) returns (bytes[])",
+  "function authorizeTextRoles(bytes toName, string key, address account, bool grant) returns (bool)",
+  "function authorizeNameRoles(bytes toName, uint256 roleBitmap, address account, bool grant) returns (bool)",
+  "function revokeRootRoles(uint256 roleBitmap, address account) returns (bool)",
+  "function hasRoles(uint256 resource, uint256 roleBitmap, address account) view returns (bool)"
+])
+export const VERIFIABLE_FACTORY_ABI = parseAbi([
+  "function deployProxy(address implementation, uint256 salt, bytes data) returns (address proxy)",
+  "function verifyContract(address proxy) view returns (address implementation)",
+  "event ProxyDeployed(address indexed sender, address indexed proxyAddress, uint256 salt, address implementation)"
+])
+export const USER_REGISTRY_INIT_ABI = parseAbi(["function initialize(address rootAccount, uint256 roleBitmap)"])
+export const MOCK_USDC_ABI = parseAbi([
+  "function mint(address to, uint256 amount)", "function approve(address spender, uint256 amount) returns (bool)",
+  "function balanceOf(address account) view returns (uint256)", "function allowance(address owner, address spender) view returns (uint256)"
+])
+
+export interface EnsDeployment {
+  readonly set: "A" | "B"
+  readonly source: string
+  readonly rootRegistry: `0x${string}`
+  readonly ethRegistry: `0x${string}`
+  readonly ethRegistrar: `0x${string}`
+  readonly universalResolver: `0x${string}`
+  readonly permissionedResolverImpl: `0x${string}`
+  readonly userRegistryImpl: `0x${string}`
+  readonly verifiableFactory: `0x${string}`
+  readonly mockUsdc: `0x${string}`
+}
+export interface EnsChainReader {
+  readonly readContract: (args: { readonly address: `0x${string}`; readonly abi: unknown; readonly functionName: string; readonly args: readonly unknown[] }) => Promise<unknown>
+  /** Production viem clients supply this; omitted only by a non-network test reader. */
+  readonly getChainId?: () => Promise<number>
+}
+/** Adapt the plan's intentionally unknown ABI boundary to one statically typed RPC call.
+ * Real viem clients cannot directly implement a reader promising to accept every unknown
+ * ABI. Validate the discovery operation, then supply the pinned ABI without an unsafe cast.
+ */
+export const ensDeploymentReader = (client: Pick<PublicClient, "readContract" | "getChainId">): EnsChainReader => ({
+  getChainId: () => client.getChainId(),
+  readContract: async a => {
+    if (a.functionName !== "getSubregistry" || a.args.length !== 1 || a.args[0] !== "eth") throw new Error("ENS: unsupported deployment discovery call")
+    return client.readContract({ address: addressOf(a.address), abi: ROOT_REGISTRY_ABI, functionName: "getSubregistry", args: ["eth"] })
+  }
+})
+const deploymentFields = ["rootRegistry", "ethRegistry", "ethRegistrar", "universalResolver", "permissionedResolverImpl", "userRegistryImpl", "verifiableFactory", "mockUsdc"] as const
+const checkedDeployment = (value: unknown): EnsDeployment => {
+  if (typeof value !== "object" || value === null) throw new Error("ENS: invalid deployment configuration")
+  const fields = Object.getOwnPropertyDescriptors(value)
+  const own = (key: string): unknown => fields[key] !== undefined && "value" in fields[key] ? fields[key].value : undefined
+  const set = own("set"), source = own("source")
+  if ((set !== "A" && set !== "B") || typeof source !== "string" || source.length > 512 || !source.startsWith("https://")) throw new Error("ENS: invalid deployment configuration")
+  const addresses = {} as Record<typeof deploymentFields[number], `0x${string}`>
+  for (const field of deploymentFields) {
+    const v = own(field)
+    if (typeof v !== "string" || /^0x0{40}$/i.test(v)) throw new Error("ENS: invalid deployment address")
+    addresses[field] = addressOf(v)
+  }
+  return Object.freeze({ set, source, ...addresses })
+}
+const checkedSets = (sets: readonly unknown[]): ReadonlyArray<EnsDeployment> => {
+  if (!Array.isArray(sets) || sets.length < 1 || sets.length > 2) throw new Error("ENS: invalid deployment candidates")
+  const result = sets.map(checkedDeployment)
+  if (new Set(result.map(d=>d.set)).size !== result.length) throw new Error("ENS: duplicate deployment candidate")
+  return Object.freeze(result)
+}
+export const loadEnsDeployments = (): ReadonlyArray<EnsDeployment> => {
+  if (ensSepolia.chainId !== ENS_SEPOLIA_CHAIN_ID) throw new Error("ENS deployment manifest must select Sepolia")
+  return checkedSets(ensSepolia.deployments)
+}
+const readDeadline = <T>(read: () => Promise<T>): Promise<T> => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error("ENS read timed out")), 5000)
+  Promise.resolve().then(read).then(value => { clearTimeout(timer); resolve(value) }, () => { clearTimeout(timer); reject(new Error("ENS read unavailable")) })
+})
+/** Bounded, read-only discovery. This validates root→eth only, not all deployed bytecode. */
+export const resolveEnsDeployment = async (reader: EnsChainReader, sets: ReadonlyArray<EnsDeployment> = loadEnsDeployments()): Promise<EnsDeployment> => {
+  const candidates = checkedSets(sets)
+  if (reader.getChainId !== undefined && await readDeadline(() => reader.getChainId!()) !== ENS_SEPOLIA_CHAIN_ID) throw new Error("ENS RPC must be Sepolia")
+  const findings: string[] = []
+  for (const d of candidates) {
+    try {
+      const got = await readDeadline(() => reader.readContract({ address:d.rootRegistry, abi:ROOT_REGISTRY_ABI, functionName:"getSubregistry", args:["eth"] }))
+      if (typeof got === "string" && got.length === 42 && ADDRESS.test(got) && got.toLowerCase() === d.ethRegistry) return d
+      findings.push(`set ${d.set}: inconsistent root-to-eth registry link`)
+    } catch { findings.push(`set ${d.set}: root registry unreadable`) }
+  }
+  throw new Error(`no consistent ENSv2 deployment on Sepolia: ${findings.join("; ")}. Update config/ens/sepolia.json from the official ENS deployments; beta addresses may change.`)
 }

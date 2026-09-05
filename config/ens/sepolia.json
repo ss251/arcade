@@ -1,0 +1,28 @@
+{
+  "chainId": 11155111,
+  "note": "ENSv2 beta parallel Sepolia deployment sets, checked against official sources 2026-09-05. Resolve root-to-eth links at runtime; these are not permanent mainnet addresses. Set A is the docs/app deployment at contracts-v2 97a57293f3b4279d94b571e678edb53ce62638f4; set B is the contracts-v2 main address manifest.",
+  "deployments": [
+    {
+      "set": "A", "source": "https://docs.ens.domains/learn/deployments#sepolia-ensv2-beta",
+      "rootRegistry": "0x8115186e8f2e0b0281e86ab91f0f48ba90364354",
+      "ethRegistry": "0xbdc85dd5b15d7ecb354cd7cb6f2c50b4f2c4f0e2",
+      "ethRegistrar": "0xa88553f454b77203b0d036a05c894d555eaaa2cc",
+      "universalResolver": "0x6d80f2172cfdec5730fe683860c33d26fc42e6f1",
+      "permissionedResolverImpl": "0x9eae5c2730a7dd16bdd1dee6421a1b91e3b0365e",
+      "userRegistryImpl": "0x624a25d67b59d587752ebec8dded8827dae52050",
+      "verifiableFactory": "0x10dc6333cdfe1fcef624c6e0a8221b91804cd7ef",
+      "mockUsdc": "0x768f42455a2d082e23ceef7d51e5787c82d67a39"
+    },
+    {
+      "set": "B", "source": "https://github.com/ensdomains/contracts-v2/blob/main/contracts/docs/addresses/sepolia.md",
+      "rootRegistry": "0x11b5bfbe9078d826b1edbdd1cfc12f5828d9f50c",
+      "ethRegistry": "0x67b728a792e789a8978b30cf1b3b641f19354b43",
+      "ethRegistrar": "0xa4449a0dd2b83007553d9b1d28b583a46a805a30",
+      "universalResolver": "0x6d80f2172cfdec5730fe683860c33d26fc42e6f1",
+      "permissionedResolverImpl": "0x7e4b2d59938930168024201752ee5503df402303",
+      "userRegistryImpl": "0x840fa461059862ea466a711e8c98c8de732061c0",
+      "verifiableFactory": "0x118bc31a50d559f7015a8da26d54b3b030cdb70f",
+      "mockUsdc": "0xd3322b29a7bdee707d1684676f149bf41aa3422f"
+    }
+  ]
+}
