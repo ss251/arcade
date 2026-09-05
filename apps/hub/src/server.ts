@@ -56,6 +56,7 @@ import { scrubReceipt } from "./receipts-feed.ts"
 export { scrubReceipt, type PublicReceiptRow, type PublicReceiptChild } from "./receipts-feed.ts"
 import { listingReceiptFeed, publicStats, receiptLimit } from "./public-feeds.ts"
 import { receiptChildExplorer, receiptExplorer } from "./receipt-reference.ts"
+import { sellerSummary, SellerSummaryUnavailable } from "./summary.ts"
 import { chainCheck, chainMetadataCheck, chainStartupRefusal } from "./chain-check.ts"
 import { createChainRpc } from "./chain-rpc.ts"
 import {
@@ -996,6 +997,27 @@ const main = Effect.gen(function* () {
             heartbeatAgeMs: Date.now() - r.lastSeenMs
           }))
         )
+      }
+
+      const sellerSummaryMatch = /^\/sellers\/(0x[a-fA-F0-9]{40})\/summary$/.exec(path)
+      if (sellerSummaryMatch !== null && req.method === "GET") {
+        const seller = sellerSummaryMatch[1]!
+        if (/^0x0{40}$/.test(seller)) return json({ error: "not_found" }, 404)
+        // Deliberately public derived economics, with no private receipt handles. Use
+        // complete raw ledger inputs locally: the public feed removes payer/lineage data
+        // needed to distinguish known spend from unavailable funding attribution.
+        const result = await run(Effect.gen(function* () {
+          const listings = yield* store.allListings
+          const receipts = yield* store.allReceipts
+          const runners = yield* store.allRunners
+          return yield* Effect.try({
+            try: () => sellerSummary(seller, listings, receipts, runners, Date.now()),
+            catch: error => error instanceof SellerSummaryUnavailable ? error : new SellerSummaryUnavailable()
+          })
+        }).pipe(Effect.exit))
+        // Store defects and the named accounting refusal share a fixed public response;
+        // neither provider/storage diagnostics nor private job IDs reach the caller.
+        return result._tag === "Failure" ? json({ error: "seller_summary_unavailable" }, 503) : json(result.value)
       }
 
       if (path === "/receipts" && req.method === "GET") {
