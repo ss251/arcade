@@ -12,6 +12,8 @@ This worktree must not merge ahead of Plan F.
 - [Local implementation report](task-1-report.md)
 - [Task 10 brief](task-10-brief.md)
 - [Task 10 implementation report](task-10-report.md)
+- [Task 11 brief](task-11-brief.md)
+- [Task 11 implementation report](task-11-report.md)
 - [Progress](progress.md)
 - [Subgraph operator notes](../../../../subgraph/README.md)
 

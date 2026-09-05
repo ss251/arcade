@@ -38,3 +38,14 @@ whole-repository gate passed: 2,222 Vitest tests / 110 files, 255 Bun tests /
 1,377 assertions / 23 files, and strict TypeScript exit zero. This frozen-worktree
 run also included the separately reviewed, not-yet-committed G11 tests. G10's
 staged tests do not import G11, and its commit remains separately scoped.
+
+## September 5 — G11 local implementation checkpoint
+
+G10 committed separately as `03d6f1d`. G11 implementation and its 48 focused tests
+are frozen; genuine failures and conservative contract adaptations are retained
+in the task report. Parent independently read all source/tests/report and found no
+blocking issue; sibling cross-check verified the G10 contract and pinned Agent0
+ID/field types. The preceding full gate and parent's 77-test focused run passed.
+G11's own staged whole-repository gate passed: 2,222 Vitest / 110 files, 255 Bun /
+1,377 assertions / 23 files, strict TypeScript exit zero. No production service-payment
+verifier, trusted validator configuration, paid query or live proof is claimed.
