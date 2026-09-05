@@ -40,10 +40,23 @@ observer must also capture the actual unsigned HTTP402 `lineage_cycle` refusal, 
 fourth job or payment. PASS requires successful cleanup. Private checkpoints are retained;
 reconcile them and the chain before any manual rerun after uncertainty.
 
-Live evidence remains pending as of 2026-09-05. The distinct sub-buy wallet has been
-owner-provisioned, but direct execution approval is still required. The real local
-three-hop regression uses simulated payment/RPC and does not count as live evidence;
-append independently verified root/descendant transaction hashes only after a live run.
+**Live PASS — independently verified at `2026-09-05T04:38:07.372Z` on Arc testnet
+(`eip155:5042002`).** The owner-approved run settled all three useful jobs:
+
+| skill / hop | USDC paid (6-decimal atomic) | verified settlement |
+|---|---|---|
+| `loop-probe` / 0 | $0.30 (300,000) | [root transaction](https://testnet.arcscan.app/tx/0x0d02f5f9793bc7baede3d88b65666052be2b549bc10ea4024d74ecacce28e23d) |
+| `wallet-risk-note` / 1 | $0.05 (50,000) | [child transaction](https://testnet.arcscan.app/tx/0x315c65b65a03a4a7ab381263d22e7eaf1d435544486d71caac80037c52abf656) |
+| `usdc-flow-check` / 2 | $0.01 (10,000) | [grandchild transaction](https://testnet.arcscan.app/tx/0xe944dc51e6a14b762336bcc04bef9020b63368280c8207692792065fd23d3be3) |
+
+Total buyer/subbuyer expenditure was **$0.36 plus facilitator gas**; the root's
+committed descendant total was 60,000 atomic ($0.06). The independently rebuilt tree
+hash was `0x87cb3b5b32d849ebb6d5777ac247bdbdb15aa532b226fb86a591c491fa8f4a28`.
+The observed self-hire returned HTTP 402 `lineage_cycle` **before payment**
+(`hadPayment: false`), with no fourth job or settlement. All owned services were
+confirmed stopped before PASS. Public proof is retained in the run's `evidence.json`;
+the private SQLite checkpoint is retained separately for reconciliation, not published
+or included in a public database dump.
 
 ## Plan B — Evidence: publish adapters
 
