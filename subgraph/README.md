@@ -123,6 +123,50 @@ and no indexing errors. Both lists were still empty; the gate remains unproved.
 The [parent review](../docs/superpowers/sdd/2026-09-04-G-graph/task-1-live-parent-review.md)
 records the separate successful full local tests/types and unchanged WASM build.
 
+## G2 local schema transition
+
+September 5, 2026: G2 local-only implementation was released separately. The local
+schema now contains the eight planned ledger/registry entities plus
+immutable `TreeOccurrence` and `ListingClaim` records. This does not change the acknowledged G1 CID
+or its retained deployment/indexed-match proof above. No new deployment or live
+query was performed for this local transition.
+
+The unchanged pilot-only manifest still runs a temporary `smoke.ts` adapter. It
+now attaches each settlement to its actual emitter, increments that emitter's
+event-derived counters once per immutable transaction/log occurrence, and leaves
+listing attribution unknown. It creates **no Marketplace row** or invented
+registry counts; absence is unavailable, not a measured zero. The sole manifest
+change adds `Splitter` to its declared entities. Address, network, start block,
+ABI and handler remain unchanged.
+
+The schema separates an emitted tree hash from immutable event occurrences.
+The hash summary has a nullable root/count, an occurrence count and an ambiguity
+flag; later mappings must clear the root on collisions and preserve full uint32
+counts as BigInt rather than wrap them into signed Int. Registry metadata may
+record only a typed agent-scoped claim until independently trusted assignment
+exists. Neither metadata strings nor look-alike getters prove hub ownership or
+payment provenance. G3–5 must implement those rules and their runtime tests.
+
+Offline AST tests validate entity fields, nullability, immutability and all three
+actual G7 query selections. Negative mutations exercise missing/changed contracts.
+The original G1 schema is preserved in a SHA256-pinned test fixture. Codegen and
+WASM compilation remain required local gates, **not graph-node runtime save/load evidence**.
+No Matchstick execution, collision/revocation mapping runtime test or registry
+coverage is claimed by G2. The prior indexed CID remains the historical v1 smoke.
+
+From `subgraph/`, the focused G2 checks are:
+
+```bash
+bun --no-env-file test ./checks/scaffold.bun.test.ts ./checks/schema.bun.test.ts
+bun --no-env-file run codegen
+bun --no-env-file run build
+```
+
+The 37 focused checks / 109 assertions, exact nested strict TypeScript check,
+actual pinned code generation and WASM build passed on September 5. The separate
+parent full gate and commit are not inferred from these local results. G3–6,
+dynamic emitters, registry handlers and new deployment remain unreleased here.
+
 ## Isolated local toolchain
 
 Run from `subgraph/`, not the repository root:

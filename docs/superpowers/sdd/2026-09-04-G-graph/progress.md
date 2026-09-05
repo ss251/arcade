@@ -228,3 +228,46 @@ comparison and six unchanged source/toolchain fingerprints. The new
 [parent review](task-1-indexed-match-parent-review.md) records these checks and
 retains the evidence limits. Ready for the small atomic evidence commit; local
 G2–6 source release is a subsequent parent decision, not another live operation.
+
+## September 5 — G2 local schema checkpoint
+
+G1's final indexed-match evidence checkpoint committed as `eccbbc8`. Parent then
+released only the bounded G2 schema transition. The eight planned entities plus
+immutable TreeOccurrence/ListingClaim, temporary buildable pilot adapter, minimal
+Splitter entity declaration and hash-pinned original-schema fixture are complete.
+Canonical attribution stays unknown without independently trusted assignment;
+the partial smoke creates no Marketplace or registry counts.
+
+The actual 15:15:51 UTC Red was 1 pass / 29 fail. Primary missing-schema/query/
+adapter failures are distinguished from mutation cases whose target fields did
+not yet exist. After implementation, 37 focused Bun checks /109 assertions passed
+by 15:18:26 UTC and on the final repeat. Exact nested strict, actual pinned
+codegen/WASM build and diff check passed. The [brief](task-2-brief.md) and
+[original report copy](task-2-report.md) describe the seven paths and exact limits.
+
+Parent read the source with no actionable finding; the separate full gate and
+commit remain pending here. This is schema/AST/source/compile evidence, not
+graph-node runtime indexing or new Studio proof. Original G1 schema bytes and
+all dated G1 evidence remain unchanged. No G3–6 handler, deployment, upload, key,
+payment, network call or early G merge was performed. The public report body is
+unchanged with a banner-only copy and no privacy substitutions.
+
+### G2 parent full gate
+
+After that publisher checkpoint, the separate parent command exited zero:
+2,338 Vitest tests /115 files, 378 Bun tests /3,756 assertions /33 files (including
+19 private G1 runtime/security checks), and root/web strict zero diagnostics.
+Parent repeated the 37 focused checks /109 assertions and exact nested strict,
+verified all ten source/toolchain fingerprints and the exact original-schema
+fixture, and completed a CLEAN full source/test read. Parent's own codegen/WASM
+repeat and the atomic commit follow; they are not inferred from the author's
+earlier successful build. No live operation, G3–6 release or G merge is implied.
+
+### G2 final parent review
+
+Parent actual pinned codegen and WASM build repeat now exited zero. Final source
+and public review are clean; ten fingerprints, exact historical schema bytes,
+banner-only report copy and46local-filelinks/privacy were independently checked.
+The [parent review](task-2-parent-review.md) separates those actual checks from
+unperformed graph-node runtime/indexing proof. Ready for the atomic local G2
+commit; no deployment, G3–6 source release or early main merge follows implicitly.

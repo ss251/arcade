@@ -1,11 +1,172 @@
-type Settlement @entity(immutable: true) {
+# Local G2 ledger schema. The deployed G1 CID retains its original smoke schema.
+# Canonical relationships require independently trusted bindings. Metadata claims
+# alone do not establish a hub listing, settlement provenance or current owner.
+
+type Marketplace @entity(immutable: false) {
+  "Singleton arcade. Absent while the temporary smoke cannot supply full coverage."
+  id: ID!
+  settlementCount: BigInt!
+  treeCount: BigInt!
+  settledVolumeAtomic: BigInt!
+  feeAtomic: BigInt!
+  childTotalAtomic: BigInt!
+  agentCount: BigInt!
+  "Unrevoked registry records, not automatically verified service payments."
+  feedbackCount: BigInt!
+  validationRequestCount: BigInt!
+  "Policy-classified registry responses, not independent payment proof."
+  validationPassCount: BigInt!
+  splitterCount: BigInt!
+  "Event timestamp in seconds, never a block number."
+  updatedAt: BigInt!
+}
+
+type Splitter @entity(immutable: false) {
+  "Actual event emitter address. Discovery is not contract or listing verification."
   id: Bytes!
+  "First discovery channel: static or metadata; not an authority assertion."
+  source: String!
+  "Null without independently trusted hub/agent/seller/splitter binding."
+  listing: Listing
+  "First observed event block, not an inferred deployment block."
+  firstSeenBlock: BigInt!
+  settlementCount: BigInt!
+  settledVolumeAtomic: BigInt!
+  settlements: [Settlement!]! @derivedFrom(field: "splitter")
+}
+
+type Settlement @entity(immutable: true) {
+  "Transaction hash plus log index: an event occurrence, not an arbitrary digest."
+  id: Bytes!
+  splitter: Splitter!
   buyer: Bytes!
+  "All money fields are 6-decimal ERC-20 USDC atomic integers."
   totalAtomic: BigInt!
   sellerAtomic: BigInt!
   feeAtomic: BigInt!
+  "Public EIP-3009 authorization nonce emitted by the splitter."
   nonce: Bytes!
+  "Hash summary for tree-bearing events only; it can become ambiguous."
+  tree: Tree
   blockNumber: BigInt!
   timestamp: BigInt!
   txHash: Bytes!
+}
+
+type Tree @entity(immutable: false) {
+  "Caller-provided emitted tree hash. It does not validate an off-chain receipt tree."
+  id: Bytes!
+  "Null after distinct occurrences collide; never overwrite it with a chosen new root."
+  root: Settlement
+  "First observed count if signed-Int representable, otherwise null. Exact value is on occurrence."
+  childCount: Int
+  "First observed event facts, not sums or facts about a chosen replacement root."
+  childTotalAtomic: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  occurrenceCount: BigInt!
+  ambiguous: Boolean!
+}
+
+type TreeOccurrence @entity(immutable: true) {
+  "Actual transaction hash plus log index; distinct occurrences never overwrite each other."
+  id: Bytes!
+  treeHash: Bytes!
+  root: Settlement!
+  splitter: Splitter!
+  "Exact emitted uint32, represented without signed-Int narrowing."
+  childCount: BigInt!
+  childTotalAtomic: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: BigInt!
+}
+
+type Agent @entity(immutable: false) {
+  "chainId:agentId convention assumes one explicitly pinned identity registry per chain."
+  id: ID!
+  chainId: BigInt!
+  agentId: BigInt!
+  registry: Bytes!
+  "Required actual owner. Unknown registration means no canonical Agent, never empty/zero bytes."
+  owner: Bytes!
+  agentWallet: Bytes
+  agentURI: String
+  "Only independently bound canonical assignment, not an arbitrary metadata string."
+  listing: Listing
+  createdAt: BigInt!
+  updatedAt: BigInt!
+  feedbackCount: BigInt!
+  validationRequestCount: BigInt!
+  validationPassCount: BigInt!
+  feedback: [Feedback!]! @derivedFrom(field: "agent")
+  validations: [Validation!]! @derivedFrom(field: "agent")
+}
+
+type Listing @entity(immutable: false) {
+  "Canonical hub listing ID, created only after independently trusted assignment."
+  id: ID!
+  agent: Agent!
+  feeSplitter: Splitter
+  priceAtomic: BigInt
+  endpoint: String
+  updatedAt: BigInt!
+}
+
+type ListingClaim @entity(immutable: true) {
+  "Metadata transaction hash plus log index. This records a claim, not assignment authority."
+  id: Bytes!
+  agent: Agent!
+  registry: Bytes!
+  "Only supported arcade.listingId/feeSplitter/priceAtomic/endpoint keys."
+  metadataKey: String!
+  "Exactly one typed claim matches the key; future mappings enforce canonical decoding/bounds."
+  claimedListingId: String
+  claimedSplitter: Bytes
+  claimedPriceAtomic: BigInt
+  claimedEndpoint: String
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: BigInt!
+}
+
+type Feedback @entity(immutable: false) {
+  "agentEntityId:clientAddress:feedbackIndex, within the pinned registry."
+  id: ID!
+  agent: Agent!
+  clientAddress: Bytes!
+  feedbackIndex: BigInt!
+  "Actual signed registry value; not coerced to an unsigned payment amount."
+  value: BigInt!
+  valueDecimals: Int!
+  tag1: String
+  tag2: String
+  endpoint: String
+  feedbackURI: String
+  feedbackHash: Bytes
+  isRevoked: Boolean!
+  createdAt: BigInt!
+  revokedAt: BigInt
+  txHash: Bytes!
+}
+
+type Validation @entity(immutable: false) {
+  "Request hash within the single pinned validation registry."
+  id: Bytes!
+  agent: Agent!
+  validatorAddress: Bytes!
+  requestURI: String
+  response: Int
+  responseURI: String
+  responseHash: Bytes
+  tag: String
+  "PENDING/PASSED/FAILED is response policy classification, not trust or payment proof."
+  status: String!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+  requestTxHash: Bytes!
+  responseTxHash: Bytes
 }

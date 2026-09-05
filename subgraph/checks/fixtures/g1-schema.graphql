@@ -1,0 +1,11 @@
+type Settlement @entity(immutable: true) {
+  id: Bytes!
+  buyer: Bytes!
+  totalAtomic: BigInt!
+  sellerAtomic: BigInt!
+  feeAtomic: BigInt!
+  nonce: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}

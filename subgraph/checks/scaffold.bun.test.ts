@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
+import { createHash } from "node:crypto"
 
 const text = (relative: string): string => readFileSync(new URL(relative, import.meta.url), "utf8")
 const json = (relative: string): unknown => JSON.parse(text(relative))
@@ -34,7 +35,7 @@ describe("G1 offline smoke scaffold", () => {
       dataSources: [{ kind: "ethereum", name: "FeeSplitterSmoke", network: "arc-testnet",
         source: { address, abi: "FeeSplitter", startBlock: 0 },
         mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
-          file: "./src/smoke.ts", entities: ["Settlement"],
+          file: "./src/smoke.ts", entities: ["Settlement", "Splitter"],
           abis: [{ name: "FeeSplitter", file: "./abis/FeeSplitter.json" }],
           eventHandlers: [{ event: "Settled(indexed address,uint256,uint256,uint256,indexed bytes32)", handler: "handleSettled" }]
         }
@@ -43,7 +44,11 @@ describe("G1 offline smoke scaffold", () => {
   })
 
   test("preserves immutable atomic-money fields and transaction/log event identity", () => {
-    expect(text("../schema.graphql").replace(/\s+/g, " ").trim()).toBe(
+    const historical = text("./fixtures/g1-schema.graphql")
+    expect(createHash("sha256").update(historical).digest("hex")).toBe(
+      "114cfff3389dccb395606f4aa6db60d02fb49c7a5886788cf5dc6f64777aee1c"
+    )
+    expect(historical.replace(/\s+/g, " ").trim()).toBe(
       "type Settlement @entity(immutable: true) { id: Bytes! buyer: Bytes! totalAtomic: BigInt! sellerAtomic: BigInt! feeAtomic: BigInt! nonce: Bytes! blockNumber: BigInt! timestamp: BigInt! txHash: Bytes! }"
     )
     const mapping = text("../src/smoke.ts")

@@ -16,6 +16,7 @@ dataSources:
       file: ./src/smoke.ts
       entities:
         - Settlement
+        - Splitter
       abis:
         - name: FeeSplitter
           file: ./abis/FeeSplitter.json

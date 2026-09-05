@@ -5,8 +5,11 @@ WASM build passed. The later September 5 indexed-match checkpoint now satisfies
 G1's deployment and known-runbook query requirement: both historical transactions
 appear, with the exact filtered hash, buyer and $0.01 amount matching the runbook.
 The indexer was six blocks behind the separately observed head, not proved fully
-synced. Tasks 2–6 local work awaits parent review, full gate, commit and explicit
-release. Earlier partial/empty observations remain unchanged historical records.
+synced. G1's final evidence checkpoint committed as `eccbbc8`. G2's separately
+released local schema transition is implemented with focused checks and WASM
+build passed; its separate parent full test/type gate and actual build repeat
+also passed. The local commit remains pending at this checkpoint. Tasks 3–6 remain
+unreleased. Earlier partial/empty observations remain unchanged historical records.
 This worktree must not merge ahead of Plan F.
 
 - [Approved plan](../../plans/2026-09-04-G-graph.md)
@@ -22,6 +25,9 @@ This worktree must not merge ahead of Plan F.
 - [Final indexed-runbook-match brief](task-1-indexed-match-brief.md)
 - [Exact later indexing and Arc-head observation](task-1-later-indexing-review.md)
 - [Final indexed-match parent review and gates](task-1-indexed-match-parent-review.md)
+- [Task 2 local schema brief](task-2-brief.md)
+- [Task 2 implementation report](task-2-report.md)
+- [Task 2 parent review and final gates](task-2-parent-review.md)
 - [Task 7 brief](task-7-brief.md)
 - [Task 7 implementation report](task-7-report.md)
 - [Task 10 brief](task-10-brief.md)
