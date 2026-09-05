@@ -1,0 +1,11 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# A9 live follow-up — 2026-09-05
+
+Trusted direct user message explicitly approved A9 live lineage. Main source c3b8083; import-safe/offline harness suite16/187 assertions Green before execution. Inline canonical Keychain items consumed only by isolated env-i command; no printed/stored keys, new wallets, funding, saved owner configuration or mainnet actions.
+
+One bounded run PASS at2026-09-05T04:38:07.372Z. Public proof `<LIVE_RUN_ARTIFACT>` (independently read by root/C1); private hub.sqlite retained, not published. Root $0.30, descendants$0.05+$0.01; total$0.36 plus facilitator gas. Three confirmed Arc settlements, unique jobs/nonces, actual root-only SettledTree, two ordinary Settled events, exact payer balance deltas, matchingUSDCtransfers, two committed reservations and reconstructed tree hash0x87cb3b5b32d849ebb6d5777ac247bdbdb15aa532b226fb86a591c491fa8f4a28 verified. Actual unsigned capability cycle402, no fourth job or payment. Owned services reaped before PASS.
+
+Canonical A worktree clean-rebased mainc3b8083; C1 only modified A runbook pending paragraph, root independently reviewed exact source proof. Staged full gate1656Vitest+113Bun/599assertions+tsc/diff Green (session95214). Atomic follow-up6eb44c5, exactCo-Authored-By trailer. Mainfast-forwarded6eb44c5; required all-four mergegate session6621 underway. No push. C10/D13 subsequent live results separately documented in their own plan follow-ups.
+
+Final integration update: the previously pending all-four main merge gate completed GREEN. Root confirmed 1,656 Vitest +113 Bun, TypeScript checks, web production build and16 Forge tests. A live-doc commit6eb44c5 remains in main; subsequent separately gated C6eed333 and Dcc5a683 live-evidence updates are now merged, with the same final all-four main gate GREEN at cc5a683. This append preserves the original live proof and earlier gate history; no new live action, tracked edit, Git mutation or gate execution was performed by the report updater.
