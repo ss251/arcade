@@ -91,3 +91,28 @@ The public brief/report, two local guide links and shell-fence syntax were
 reviewed; no shell command from the guide was executed. The separate staged
 G13 whole-repository test/type gate follows this checkpoint. No paid Base query,
 Studio deployment, production change or F-before-G merge exception is claimed.
+
+## September 5 — G7 local service checkpoint
+
+G13 committed separately as `4a217f8` after its own final gate passed:
+2,325 Vitest / 114 files, 265 Bun / 1,456 assertions / 25 files and strict
+TypeScript exit zero. G7's frozen source and 15 focused tests were included but
+not staged in that gate. Its fixed read-only service is not wired into any route.
+
+Parent read all G7 source, tests and original report. Independent read-only source
+review is CLEAN, including compatibility with the planned schema. Genuine
+missing-module and two transport regression Reds, the corrected invalid
+child-versus-root-total assumption, and actual owned-loopback deadline/redirect
+evidence are preserved in the original report. Final focused 15/15 tests and
+strict TypeScript passed; no independent live provider result is claimed.
+
+The original report remains unchanged; this archive copy only adds its public
+checkpoint banner. Public-copy review and G7's separate staged full test/type
+gate follow. G1 Studio live and G2–6 are still held; G8 will wait for H1's actual
+read-only stats source contract and the canonical shared-file merge dependencies.
+
+Independent public-copy audit found one extra trailing newline in the initial
+export. Parent removed only that blank line and directly compared the final bytes:
+exact original plus banner PASS. The audit otherwise found the brief/report CLEAN
+for scope, privacy and evidence claims; neither contains Markdown links. Source
+and staged scope remain frozen for the final G7 precommit gate.
