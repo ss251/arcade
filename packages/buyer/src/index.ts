@@ -5,7 +5,7 @@ import { RpcFailure } from "@arcade/core"
 
 export * from "./fetch-with-payment.ts"
 import { fetchWithPayment } from "./fetch-with-payment.ts"
-import { resolveEnsListing, ensRefusal, parseArcadeEndpoint, sepoliaEnsReader, type EnsReader } from "./ens-policy.ts"
+import { resolveEnsListing, ensRefusal, parseArcadeEndpoint, sepoliaEnsReader, type EnsReader, type EnsListing } from "./ens-policy.ts"
 import type { PaymentRequirements } from "@arcade/payments"
 export * from "./ens-policy.ts"
 
@@ -158,3 +158,16 @@ export const callSkill = (args: CallSkillArgs) =>
       })
     )
   })
+
+/** Promise boundary for scripts without a direct Effect dependency. Typed failures
+ * remain the original Left, not a FiberFailure string that loses refusal semantics. */
+export const callSkillPromise = async (args: CallSkillArgs): Promise<SkillResult> => {
+  const result = await Effect.runPromise(Effect.either(callSkill(args)))
+  if (result._tag === "Left") throw result.left
+  return result.right
+}
+export const resolveEnsListingPromise = async (reader: EnsReader, name: string): Promise<EnsListing> => {
+  const result = await Effect.runPromise(Effect.either(resolveEnsListing(reader, name)))
+  if (result._tag === "Left") throw result.left
+  return result.right
+}
