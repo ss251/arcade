@@ -1,5 +1,6 @@
 export * from "./chain.ts"
 export * from "./erc8004.ts"
+export * from "./ens.ts"
 export * from "./chain-config.ts"
 export * from "./engine.ts"
 export * from "./untrusted.ts"
