@@ -549,3 +549,88 @@ history, never keys. All child environments are allowlisted.
 Nineteen offline script tests and a separate real-loopback scheduled recovery test on the
 simulated rail pass; neither is represented as live on-chain evidence. Append the two
 verified Arcscan links only after the live command succeeds.
+
+## Plan D — ERC-8004 identity and settlement evidence
+
+The hub exposes `GET /erc8004` with public registry/role addresses and
+`GET /listings/:id/agent-registration.json`. Sellers mint with their own key:
+`arcade identity register <skill> --approve-operator <public-operator-address>`.
+The flag is explicit consent: ERC-721 approval allows that operator to transfer **all
+current and future identity NFTs** owned by this seller in the registry. It is not a
+validation-only permission. `arcade identity status` is offline. The runner config
+durably journals mint intent and submitted hashes; an uncertain broadcast must be
+reconciled before another registration is attempted. Confirmed identity is saved before
+approval, so approval failure never requires a second mint.
+
+Hello announces only serving identities. Ownership is checked on chain, and the worker
+checks again before writing evidence. After receipt persistence, a bounded asynchronous
+queue writes validation requests/responses and settled-payment feedback. These writes
+never decide payment. All applicable compact, hash-only documents persist before the
+first broadcast; conflicting bytes or failed persistence stop attestation. These routes
+serve immutable stored bytes even after the runner disconnects or the hub restarts:
+
+- `/receipts/:jobId/validation-request.json`
+- `/receipts/:jobId/validation-response.json`
+- `/receipts/:jobId/feedback.json`
+
+Raw inputs, outputs and provider diagnostics are not published in these documents.
+The detail page and `arcade_describe_skill` expose measured counts from this hub's
+validator/attester only. Transferred/unverified ownership and stale/unreadable data
+withhold counts. A displayed registration transaction is **announced**, not independently
+verified by the ownership read. Catalogue polling does not query every agent's registry.
+
+### OWNER-gated live proof
+
+`bash scripts/e2e-erc8004.sh --help` is offline and needs no keys. The actual run requires
+six distinct, funded Arc-testnet role keys: seller, buyer, facilitator, operator,
+validator and attester. Creating/funding/storing them is an **OWNER** action. No role is
+silently borrowed from another key. The seller's `ARCADE_FEE_SPLITTER` must already be
+its FeeSplitterV2 with canonical Arc USDC and a 500-bps fee; preflight verifies seller,
+version, token and fee before any mint. Do not reuse the demo splitter unless its
+immutable seller equals this run's seller. If needed, the owner chooses the immutable
+treasury and deploys a matching splitter:
+
+```bash
+DEPLOYER_KEY="$(security find-generic-password -s arcade-seller-key -w)" \
+SELLER='<seller-public-address>' TREASURY='<owner-chosen-treasury-address>' \
+FEE_BPS=500 ARCADE_NETWORK=arc-testnet \
+bun --no-env-file run scripts/deploy-splitter.ts --v2 --network arc-testnet
+```
+
+After provisioning, the owner runs this from the repository root, substituting only
+the two public placeholders (never private keys). Supply secrets only to this command:
+
+```bash
+ARCADE_NETWORK=arc-testnet \
+ARCADE_SELLER_KEY="$(security find-generic-password -s arcade-seller-key -w)" \
+ARCADE_BUYER_KEY="$(security find-generic-password -s arcade-buyer-key -w)" \
+ARCADE_FACILITATOR_KEY="$(security find-generic-password -s arcade-facilitator-key -w)" \
+ARCADE_OPERATOR_KEY="$(security find-generic-password -s arcade-operator-key -w)" \
+ARCADE_VALIDATOR_KEY="$(security find-generic-password -s arcade-validator-key -w)" \
+ARCADE_ATTESTER_KEY="$(security find-generic-password -s arcade-attester-key -w)" \
+ARCADE_FEE_SPLITTER='<matching-seller-v2-splitter-address>' \
+bash scripts/e2e-erc8004.sh --approve-operator '<operator-public-address>'
+```
+
+This creates an isolated config/database and loopback hub/runner; it never initializes
+or modifies the owner's saved runner configuration. Child environments are allowlisted
+and automatic dotenv loading is disabled. It registers once, verifies the mint,
+current ownership, exact token URI and operator approval **before** buying one fixed
+`usdc-flow-check` job for $0.01. Native Arc USDC is also needed for registration,
+approval, settlement and registry gas; registration's own preflight requires at least
+0.05 native USDC on the seller. The script does not fund any account or resend an
+uncertain transaction.
+
+Success requires independently checked successful transaction receipts and exact
+registry/USDC/splitter events, current validation/feedback state, and matching served,
+durable and committed document bytes. Event scans are bounded to the fresh run.
+`PASS` prints only after owned processes are confirmed stopped. Failure retains the
+isolated registration journal/database for reconciliation; **do not blindly rerun**.
+The minted registration URI is temporary loopback and stops serving on cleanup. Public
+document exports are retained as evidence; this is not a persistent public deployment.
+Keep the private SQLite job store local; do not upload it with public proof artifacts.
+
+**Live status, 2026-09-05:** OWNER-pending six distinct funded roles and a matching
+seller splitter. Offline tests and local HTTP simulations do not satisfy the live gate.
+Append verified registration, settlement, validation and feedback explorer links only
+after the live harness reports success.
