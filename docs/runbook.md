@@ -674,7 +674,45 @@ The minted registration URI is temporary loopback and stops serving on cleanup. 
 document exports are retained as evidence; this is not a persistent public deployment.
 Keep the private SQLite job store local; do not upload it with public proof artifacts.
 
-**Live status, 2026-09-05:** OWNER-pending six distinct funded roles and a matching
-seller splitter. Offline tests and local HTTP simulations do not satisfy the live gate.
-Append verified registration, settlement, validation and feedback explorer links only
-after the live harness reports success.
+**Live PASS — independently verified at `2026-09-05T04:42:24.773Z` on Arc testnet
+(`eip155:5042002`).** Agent **891730** served the single $0.01 `usdc-flow-check` job
+`job_7f4b653b140843c4b6a4`. All six key-derived public addresses matched the owner's
+approved roles before any mutation:
+
+| Role | Verified public address |
+| --- | --- |
+| Seller | `0xcf821769ED3c0E55e152745377bb833d7155A78a` |
+| Buyer | `0xdaACA688cE93d6EA0BDf4cdA9925C5526f3cA5e1` |
+| Facilitator | `0xbE8EfcCA100f618Bd1e6C694f865069eADAE5f8b` |
+| Operator | `0xEd7FB16e4E0FE0961222A1ba3fFD0896a8e35669` |
+| Validator | `0xF6Da48DF7f3Fee4D43e796d6893CC74323F5C859` |
+| Attester | `0x936F452e5E2fA53548B7920f3148f0abf6594B53` |
+
+The run reused FeeSplitterV2 `0x9e304ec13dd862c81ee8caa8fd262dac426fbedf`,
+independently checking its seller, Arc USDC asset, version and 500bps fee. The paid job
+transferred 10,000 atomic USDC in, paid the seller 9,500 and accrued 500 as the fee;
+registry and facilitator gas were additional. No fee withdrawal occurred.
+
+| Confirmed operation | Independent transaction proof |
+| --- | --- |
+| Identity mint | [Registered](https://testnet.arcscan.app/tx/0xcef7afe3ee60519d355aae8008b0b8fcda8dc92a93e3ffd584f835057f001f52) |
+| Explicit blanket operator grant | [ApprovalForAll](https://testnet.arcscan.app/tx/0xa388ce6152823e42e8520d9739f50a423970f5e315e239aeb20c837cc80307f9) |
+| Childless payment | [Settled and USDC transfers](https://testnet.arcscan.app/tx/0x2d8b135488f63af0c4ddf580f1e1d39609af373f06b7f8388a3746edb6520e3e) |
+| Operator request | [ValidationRequest](https://testnet.arcscan.app/tx/0x1be2a35ae56cdd2eeb8ea2b237519ed5b16e74a0073c5cf8f463df4071509611) |
+| Validator response | [ValidationResponse](https://testnet.arcscan.app/tx/0xd356b19c8e7d28537e59d15248c78175d36fd956eb08c56ea799eef47e86e5db) |
+| Attester feedback | [NewFeedback](https://testnet.arcscan.app/tx/0x41c84d417a0674fccbff2f413bee5f3f2a91981034f1f8830afd75828e05afb6) |
+
+Fresh ownership, token URI, operator approval, each transaction's exact events and the
+current validation/feedback state matched. Served and persisted document bytes matched
+these on-chain commitments:
+
+- Request: `0xf55f89faa96336c46f8e55504295f1003f3c869248f67c68a48f31b783fbb2e2`.
+- Response: `0xa35cfe1993fa658751686e97d9c7fac1684974174f79952782436120f83e99b4`.
+- Feedback: `0x4002d5d2e6d2da0eadc9c1690829113926db27256c846e92dd3f837968b6ef07`.
+
+All owned services were confirmed stopped before PASS. Public document exports and
+`evidence.json` are retained separately from the private SQLite checkpoint. The token URI
+still names the now-stopped loopback server; it is **not** a durable public endpoint.
+The explicitly approved blanket operator grant remains on-chain and covers every current
+and future identity NFT owned by this seller in this registry. No identity transfer,
+unrequested revocation or automatic remint/retry was performed.
