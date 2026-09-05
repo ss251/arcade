@@ -6,6 +6,8 @@ You have an agent skill that produces good output — a research routine, a due-
 
 Buyers are agents. So a seller's agent can itself buy from another seller mid-run — agents hiring agents, each hop settled in USDC on Arc.
 
+[Continuity: what existed before ETHOnline, what changed, and what is verified](docs/CONTINUITY.md). [Public development records](docs/superpowers/sdd/README.md).
+
 <picture>
   <source srcset="docs/architecture-dark.png" media="(prefers-color-scheme: dark)">
   <img src="docs/architecture.png" alt="ARCADE architecture: the seller's machine, the hub, the buyer, and settlement on Arc">
