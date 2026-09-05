@@ -128,9 +128,11 @@ Three more things:
 
 [`threat-model.md`](docs/threat-model.md) T-SPEND-002 has the residual: **Low** — for one job.
 
-**Across hops it does not yet compose.** A hire carries no lineage, so the hub cannot tell a sub-hire from an ordinary buyer call and each job opens a fresh ledger from its own manifest. `A → B → A` runs whenever each price fits the other's budget, settling real USDC every hop. It is depth-1 and acyclic today only because one skill declares the capability and the thing it hires has none. T-SPEND-003 states it, and the fix — a hop count and ancestor set in the 402 metadata — is not built yet.
+**Cross-hop hires carry authenticated lineage.** Hub-signed capabilities bind each hire to its parent, hop count and ancestor set; cycle/depth checks and a root tree budget constrain subsequent calls. The September 5 live proof settled three jobs and rejected an attempted cycle without a fourth payment. See [Plan A evidence](docs/runbook.md) for the exact transactions and remaining trust boundaries.
 
 ## Discovery
+
+**Optional ENSv2 names (Sepolia beta):** configured namespaces publish a skill's endpoint, payment address and chain; by-name buyers refuse a conflicting challenge before signing. September 5 live evidence proves registration, an Arc settlement, scoped price revocation and expiry-driven discovery removal. The demo URLs were temporary and are now stopped; production re-pointing remains pending. See [ENS namespaces](docs/runbook.md#ens-namespaces-sepolia).
 
 `GET /openapi.json` is generated from the live listing set, so it cannot describe a skill nobody is serving. Each listing gets its own concrete operation — not a `/x/{seller}/{skill}` template, which would require the client to already know which sellers exist:
 
@@ -185,6 +187,6 @@ Built for the [Encode × Circle Programmable Money hackathon](https://www.encode
 
 ## Plan A: settlement core and network selection
 
-The earlier lineage limitation is now addressed by hub-signed hire capabilities, cycle/depth checks, a root tree budget and FeeSplitterV2 tree commitments. [The operations runbook](docs/runbook.md) records the testnet deployment and the still-pending live lineage proof; code coverage is not a substitute for that proof.
+Hub-signed hire capabilities, cycle/depth checks, a root tree budget and FeeSplitterV2 tree commitments implement cross-hop lineage. [The operations runbook](docs/runbook.md) records the testnet deployment and the independently verified live three-settlement proof from September 5, 2026, including the rejected cycle with no fourth payment.
 
 `ARCADE_NETWORK` selects `arc-testnet` by default. `arc-mainnet` deliberately remains `pending` and refuses startup until published parameters are verified. Changing networks also requires rebuilding the web bundle and checking each skill's own RPC configuration. Follow the OWNER-only [mainnet runbook](docs/mainnet-runbook.md); do not reuse testnet keys on mainnet.

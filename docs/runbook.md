@@ -105,8 +105,8 @@ confirmed status `0x1`, the expected splitter destination, and ERC-20 transfers 
 10,000 atomic into the splitter and 9,500 atomic to the seller (6 decimals, distinct from
 Arc's parallel native 18-decimal transfer logs). No `waitForTransactionReceipt` loop
 was used. The temporary services were stopped afterward; saved runner configuration,
-Keychain items and mainnet were not changed. This paid single-call proof does not
-complete Plan A's owner-blocked descendant-lineage demonstration.
+Keychain items and mainnet were not changed. This paid single-call proof is separate
+from Plan A's subsequently verified descendant-lineage demonstration below.
 
 ---
 
@@ -717,7 +717,9 @@ The explicitly approved blanket operator grant remains on-chain and covers every
 and future identity NFT owned by this seller in this registry. No identity transfer,
 unrequested revocation or automatic remint/retry was performed.
 
-## ENS namespaces (Sepolia): deployment preflight
+## ENS namespaces (Sepolia)
+
+### Status and verified deployment preflight
 
 Read-only verification on 2026-09-05 at 01:07:42 UTC used Sepolia chain11155111
 via `https://ethereum-sepolia-rpc.publicnode.com`. Both manifest roots returned their
@@ -733,6 +735,583 @@ grant functions and resolver authorizations return `bool`. ABIs were checked aga
 the [ENS deployment sources](https://docs.ens.domains/learn/deployments/) and
 [deployed registrar source](https://github.com/ensdomains/contracts-v2/blob/97a57293f3b4279d94b571e678edb53ce62638f4/contracts/src/registrar/ETHRegistrar.sol).
 
-The owner still chooses/approves the parent label and provisions two separate funded
-Sepolia keys before any setup transaction. No label is selected or registered by this
-preflight. ENSv2 is beta, and deployment addresses may change.
+The owner subsequently approved the exact parent label `arcade` and the two distinct,
+funded Sepolia roles on September 5, 2026. A fresh keyless check at04:59:12 UTC,
+block11638194, confirmed deployment A's resolver routing, `arcade` available, owner
+`0x8260C32f90593f1B3B3bcba0Ec1D40ff8C189469` holding0.699977751775519 ETH and daemon
+`0x88797d820C111205eCd993BE850D4f35687909e3` holding0.3 ETH. Availability is not a
+reservation or registration. ENSv2 is beta, and deployment addresses may change.
+
+**The owner-approved isolated demo passed on September 5, 2026 at 06:47 UTC.**
+Registration, renewal, by-name Arc settlement, scoped price revocation, synthetic
+pre-signature refusal and genuine expiry-driven catalogue removal are proved below.
+All demo services are stopped; these are not production URLs. The first run completed
+setup but failed its short renewal-confirmation window and stopped safely. That failed
+result remains separate from the later explicitly approved owner-renewal continuation;
+no registration or unknown transaction was repeated. Fresh independent post-cleanup
+checks proved all six records and owner update authority even after leaf expiry.
+ENS naming uses Sepolia (`11155111`); paid jobs settle on Arc testnet (`5042002`).
+
+Setup registers only explicitly selected skills. Ordinary publishing does not register
+a name. Enabling `ARCADE_ENS_ROOT` on a hub is a namespace-wide discovery policy: it
+derives candidate names for valid listings and can hide names whose required records
+are successfully observed missing, including names never registered. An unavailable
+RPC does not expire a listing. Do not enable this policy on unrelated production
+listings merely to stage the demo.
+
+Parent pointers and root administration are deliberately not irreversibly locked with
+`revokeRootRoles`: the owner retains migration and grant authority. The scoped daemon
+is not a substitute for trusting that administrator. Contracts-v2 is beta, not a final
+mainnet deployment; update the manifest and reverify source/runtime compatibility when
+deployments change.
+
+### Configuration
+
+| Setting | Consumer and behavior |
+| --- | --- |
+| `ARCADE_ENS_ROOT` | Hub/stock buyer reader: normalized `.eth` second-level parent; unset or blank disables resolution/observation. Runner: optional consistency check against state, not its enable switch. |
+| `ARCADE_ENS_STATE` | Setup/runner: absolute normalized `.json` path, default `$HOME/.arcade/ens.json`. Validated public namespace addresses, skill names/prices and `ttlSeconds`; no wallet keys. Missing state is inert, malformed state is a diagnostic. |
+| `ARCADE_ENS_OWNER_KEY` | Setup and explicitly authorized owner demo operations only. Must match the approved public owner. Never pass it to the runner or hub. |
+| `ARCADE_ENS_DAEMON_KEY` | Separate scoped Sepolia account, validated by setup and used by the runner. Owner, seller and daemon must differ. Missing key disables runner ENS writes. |
+| `ARCADE_ENS_RPC` | HTTPS Sepolia JSON-RPC without credentials/query/fragment. Setup/runner default to `https://ethereum-sepolia-rpc.publicnode.com`; stock buyer uses viem's Sepolia default. Set explicitly for reproducibility; the chain is independently checked. |
+| `ARCADE_ENS_UNIVERSAL_RESOLVER` | Stock buyer/hub: optional manifest-pinned override, not an arbitrary resolver. Actual `ROOT_REGISTRY` routing must match the selected deployment. Setup/runner use verified state. |
+| `ARCADE_ENS_CHECK_MS` | Hub interval after each bounded observer cycle; default `300000` (5min), integer `1000`–`2147483647`. `60000` suits a demo but does not guarantee an exact removal time. |
+| `ARCADE_ENS_SELLER_LABELS` | Hub: optional JSON map of lowercase public seller addresses to canonical seller labels when setup `--seller-label` differs from the default `s` plus the first ten address hex digits. Labels are not ownership proof. |
+| `ARCADE_ENS_CCIP_ORIGINS` | Stock reader: comma-separated allowlist of up to four trusted HTTPS gateway origins. Empty by default; unknown gateways are unavailable. No redirects, literal IP/local hosts or arbitrary fallback. Allowlisted DNS ownership remains operator trust. |
+| `ARCADE_ENS_SETUP_JOURNAL` | Setup: defaults to `<state path>.setup.json`. Private request-bound journal, including the registration commitment secret. Never publish it or delete its lock to force a retry. |
+| `ARCADE_ENS_JOURNAL` | Runner: defaults to `ens-pending.json` beside state. Separate from the state file; retains intent, known hashes and confirmed results for reconciliation. |
+| `ARCADE_ENS_DEMO_JOURNAL` | Price-lock demo owner journal; default `<state path>.demo.json`. Request-bound private journal, distinct from setup, runner, state and config paths. |
+| `ARCADE_ENS_DEMO_DAEMON_JOURNAL` | Price-lock demo daemon journal; default `<state path>.demo-daemon.json`. Must also differ from the demo owner journal. Retain both after an uncertain write. |
+
+**TTL comes from setup `--ttl` and persisted state, not `ARCADE_ENS_TTL`.** The latter
+is not read by the runtime. Default `--ttl 6h`; an owner can choose `--ttl 15m` for a
+short demo. Accepted TTL is 60 seconds through one year. `--seller-ttl` defaults to
+`90d` and must cover the skill TTL; parent registration lasts one year.
+
+The runner checks on its heartbeat and normally renews a served name once per quarter
+TTL after the initial renewal. Six hours means a 90-minute cadence, approximately
+**16 renewals/day/skill**, plus startup/restart and changed-price transactions, not four.
+Fifteen minutes gives roughly 3.75 minutes between renewals. This is best-effort timing,
+not a gas-cost ceiling or guarantee. Unserved/missing manifests are not renewed.
+
+### Owner-approved setup
+
+1. Approve the exact parent label, public namespace owner, existing public Arc seller,
+   separate public Sepolia daemon, selected skill IDs and actual hub/web origins. Only
+   supply `--mcp` for a real endpoint; do not invent one or substitute Arc wallet roles.
+2. The owner provisions and funds the two Sepolia accounts. Canonical Keychain services
+   are `arcade-ens-owner` and `arcade-ens-daemon`, without a `-key` suffix. No account,
+   key, faucet or terms action is delegated by these instructions.
+3. Replace the quoted public placeholders and run the keyless availability proposal:
+
+   ```bash
+   ARCADE_ENS_RPC=https://ethereum-sepolia-rpc.publicnode.com \
+   bun --no-env-file run scripts/ens-setup.ts \
+     --seller '<seller-public-address>' --skills usdc-flow-check \
+     --root-label '<proposed-label>' --dry-run
+   ```
+
+   This may propose a fallback and prints `ownerApprovalRequired: true`; it neither
+   reserves a label nor validates every live prerequisite. Approve the exact fresh result.
+4. Serve the selected listings. Setup probes each listing's real `canaryInput`, requires
+   a matching unsigned Arc-USDC 402 and independently verifies FeeSplitterV2 version,
+   seller, USDC and 500bps fee. `payTo` is that splitter, not necessarily the seller EOA.
+   Optional `--agent-id` requires current Arc IdentityRegistry ownership.
+5. The following is an **owner-only mutating template, not executed or authorized by
+   this document**. Replace public placeholders only and approve the sequence/gas first:
+
+   ```bash
+   env -i PATH="$PATH" /bin/bash --noprofile --norc -c '
+     set +x
+     set -euo pipefail
+     test -f ./scripts/ens-setup.ts # Run from the repository root.
+     ARCADE_ENS_OWNER_KEY="$(/usr/bin/security find-generic-password -s arcade-ens-owner -w)"
+     ARCADE_ENS_DAEMON_KEY="$(/usr/bin/security find-generic-password -s arcade-ens-daemon -w)"
+     export ARCADE_ENS_OWNER_KEY ARCADE_ENS_DAEMON_KEY
+     export ARCADE_ENS_RPC=https://ethereum-sepolia-rpc.publicnode.com
+     export ARCADE_ENS_STATE="<owner-chosen-absolute-state-path>.json"
+     exec bun --no-env-file run scripts/ens-setup.ts \
+       --seller "<seller-public-address>" \
+       --owner "<owner-public-address>" --daemon "<daemon-public-address>" \
+       --skills usdc-flow-check \
+       --root-label "<approved-label>" --confirm-root-label "<approved-label>" \
+       --hub "<actual-hub-origin>" --web "<actual-web-origin>" --ttl 15m
+   '
+   ```
+
+   This may perform multiple Sepolia transactions: proxy deployment, parent/subname
+   registration, records and scoped grants. The beta registrar uses MockUSDC; setup
+   can mint a shortfall, sets the exact quoted allowance and refuses a quote above
+   `100000000` atomic units. This is separate from Arc job payments and is not zero-cost.
+6. Start only the intended runner with that state and the **daemon key only**, using
+   its normal owner-approved seller/config launcher. Start the intended hub with the
+   same root/RPC, any custom seller-label map and `ARCADE_ENS_CHECK_MS=60000`. Expect
+   `[ens] confirmed renewal of <name> (<hash>)`; independently verify the receipt and
+   changed expiry. Do not pass the owner key to either service.
+
+The private journal fixes the request, deployment, records, roles and chain-derived
+expiries. Setup does not silently adopt an existing namespace. Changed arguments,
+conflicting records/grants, expired names, crash-held locks or ambiguous broadcasts
+require reconciliation, not a new journal or blind rerun. A returned hash alone is not
+confirmation. Runtime state IO lives in the runner package, not browser-safe core.
+
+### Resolution, buying and the web card
+
+`GET /names/<name>` is unsigned. A successful projection contains `name`, `skillId`,
+`seller`, `endpoint`, `payTo`, `chain`, advisory `priceAtomic` (or null) and `expired:false`.
+Missing required records returns 404 `ens_name_expired`; unavailable RPC/configuration
+returns 503 `ens_resolution_unavailable`. The legacy missing-record code is broader
+than proved expiry: a name may be expired, unregistered or misconfigured.
+
+The reader verifies onchain-only `UniversalResolver.findOwner(dnsName)` for the exact
+name before bounded text/allowed CCIP reads. Raw text is not liveness proof: an expired
+leaf can still route through an ancestor resolver holding old records. See the pinned
+[resolver traversal](https://github.com/ensdomains/contracts-v2/blob/97a57293f3b4279d94b571e678edb53ce62638f4/contracts/src/universalResolver/libraries/LibRegistry.sol)
+and [registry expiry behavior](https://github.com/ensdomains/contracts-v2/blob/97a57293f3b4279d94b571e678edb53ce62638f4/contracts/src/registry/PermissionedRegistry.sol).
+
+The SDK accepts either `{name, input, account, ...}` or `{hubUrl, seller, skillId,
+input, account, ...}`, never both. By-name lineage also requires `expectedHubUrl`.
+The actual-input 402 must agree with resolved payee/chain/endpoint before signing;
+ENS price is advisory, not a replacement for the caller's spending cap. MCP
+`arcade_call_skill` likewise accepts exactly one `name` or `skillId`. Its session
+budget retains reservations for uncertain signed calls.
+
+The `arcade-buy` CLI remains ID-only. By-name callers use the SDK, not a fictional
+`arcade-buy <name>` mode. The web card shows a name only after its actual-input quote
+verifies the `/names` result against endpoint, seller, skill, payee and chain.
+An advertised listing name alone is insufficient. Relay checks precede signature
+forwarding; result polling is bounded and same-origin. A signed, unconfirmed
+authorization may remain redeemable: reconcile settlement evidence before retrying.
+
+For an **owner-approved live by-name purchase**, select the registered `usdc-flow-check`
+name and actual hub, replace public placeholders, and explicitly approve one purchase
+of at most `10000` atomic USDC ($0.01) plus the facilitator's Arc gas before running:
+
+```bash
+(
+set +x
+env -i PATH="$PATH" \
+ARCADE_DEMO_NAME='usdc-flow-check.<seller-label>.<approved-label>.eth' \
+ARCADE_DEMO_HUB='<actual-hub-origin>' \
+ARCADE_ENS_ROOT='<approved-label>.eth' \
+ARCADE_ENS_RPC=https://ethereum-sepolia-rpc.publicnode.com \
+ARCADE_BUYER_KEY="$(/usr/bin/security find-generic-password -s arcade-buyer-key -w)" \
+bun --no-env-file -e '
+  import { callSkillPromise } from "@arcade/buyer";
+  import { privateKeyToAccount } from "viem/accounts";
+  try {
+    const result = await callSkillPromise({
+      name: process.env.ARCADE_DEMO_NAME,
+      expectedHubUrl: process.env.ARCADE_DEMO_HUB,
+      input: {address: "0xAeB742d58cc7F5CF656fCD9Beb07Bf0C1ACa6f5b"},
+      account: privateKeyToAccount(process.env.ARCADE_BUYER_KEY),
+      maxAmountAtomic: 10000n
+    });
+    console.log(JSON.stringify({jobId: result.jobId, status: result.status, receipt: result.receipt}));
+  } catch {
+    console.error("By-name outcome unavailable; reconcile any signed authorization before retrying.");
+    process.exitCode = 1;
+  }
+'
+)
+```
+
+This uses the public Promise API, so the root command needs no undeclared `effect`
+dependency. The displayed receipt is a remote outcome, not independent chain proof.
+Correlate the successful Arc transaction and exact splitter/USDC events before adding
+it to the evidence ledger. Do not rerun automatically after a signed uncertain outcome.
+
+### Evidence and recovery boundaries
+
+The three-beat harness requires an explicit beat and selected name; it must not choose
+the first skill or default to a mutating `all` run. Price-lock/all additionally requires
+exact-name write consent. These invocation templates are separate from the dated live
+results in the public evidence ledger below.
+
+First inspect the key-free help:
+
+```bash
+bun --no-env-file run scripts/ens-demo.ts --help
+```
+
+After the namespace exists, these **read-only templates** use its explicit state file
+and exact name. Replace all quoted public placeholders. They do not need wallet keys:
+
+```bash
+env -i PATH="$PATH" \
+  ARCADE_ENS_STATE='<absolute-state-path>.json' \
+  ARCADE_ENS_RPC=https://ethereum-sepolia-rpc.publicnode.com \
+  ARCADE_HUB='<actual-hub-origin>' \
+  bun --no-env-file run scripts/ens-demo.ts tampered-402 \
+    --name '<skill>.<seller-label>.<approved-label>.eth' --timeout-ms 120000
+
+env -i PATH="$PATH" \
+  ARCADE_ENS_STATE='<absolute-state-path>.json' \
+  ARCADE_ENS_RPC=https://ethereum-sepolia-rpc.publicnode.com \
+  ARCADE_HUB='<actual-hub-origin>' \
+  bun --no-env-file run scripts/ens-demo.ts expiry \
+    --name '<skill>.<seller-label>.<approved-label>.eth' \
+    --timeout-ms 1500000 --poll-ms 5000
+```
+
+For expiry, keep the intended runner serving until the harness confirms its live
+baseline. Then stop only that runner and record the stop time; leave the hub running.
+A 15-minute TTL fits the 25-minute maximum wait only if competing renewers have also
+been stopped. Timeout or unavailable public state exits nonzero, without claiming
+expiry. This script does not stop services or change their saved configuration.
+
+The **mutating price-lock template below is owner-only and not executed or authorized
+by this document**. First approve the selected name and exactly two Sepolia writes plus
+gas: the daemon raises its persisted baseline price by `1000` atomic units, then the
+owner revokes that name's scoped price grant. Quiesce competing price writers before
+starting. The bumped price and revoked grant are intentionally left in place.
+
+```bash
+env -i PATH="$PATH" /bin/bash --noprofile --norc -c '
+  set +x
+  set -euo pipefail
+  test -f ./scripts/ens-demo.ts # Run from the repository root.
+  export ARCADE_ENS_STATE="<absolute-state-path>.json"
+  export ARCADE_ENS_RPC=https://ethereum-sepolia-rpc.publicnode.com
+  export ARCADE_HUB="<actual-hub-origin>"
+  ARCADE_ENS_OWNER_KEY="$(/usr/bin/security find-generic-password -s arcade-ens-owner -w)"
+  ARCADE_ENS_DAEMON_KEY="$(/usr/bin/security find-generic-password -s arcade-ens-daemon -w)"
+  export ARCADE_ENS_OWNER_KEY ARCADE_ENS_DAEMON_KEY
+  exec bun --no-env-file run scripts/ens-demo.ts price-lock \
+    --name "<skill>.<seller-label>.<approved-label>.eth" \
+    --confirm-name "<skill>.<seller-label>.<approved-label>.eth" \
+    --timeout-ms 300000
+'
+```
+
+`all` runs price-lock, synthetic tampered-402 and expiry in that order, and requires the
+same exact-name consent; it is never the default. Prefer separate beats when collecting
+evidence so recovery and runner-stop timing remain explicit. A nonzero result after a
+write may mean the transaction was submitted but its outcome could not be proved.
+Inspect retained journals and chain state before retrying; do not delete locks, repeat
+unknown submissions, or treat silence as a failed transaction.
+
+- **Price-lock** deliberately changes the price and revokes only that name's daemon
+  price permission. The owner first quiesces competing price writers. A denial must
+  decode the pinned `EACUnauthorizedAccountRoles` error for the selected daemon,
+  name resource and role16; RPC errors or arbitrary reverts are not proof. Public
+  simulation is not a mined revert transaction.
+- **Price recovery** is separate owner work: restore the intended price, confirm it,
+  then regrant only `authorizeTextRoles(dnsNameOf(name), "arcade.priceAtomic", daemon,
+  true)` on the exact resolver and verify the scoped role. Never grant root, wildcard
+  or payee authority. Rerunning setup is not general recovery: it rejects populated
+  differing records. Price revocation does not revoke renewal permission.
+- **Tampered 402** exercises the actual buyer SDK with synthetic conflicting challenges
+  and zero signatures/paid retries. Even with real ENS resolution, this is not a paid
+  Arc job or settlement proof.
+- **Passive expiry** needs an initially live registration, actual Sepolia block time
+  reaching the leaf's expiry, retained registration lineage, absent current exact-name
+  owner and successful catalogue observation. A failed fetch is not expiry. If runner
+  disconnect removed the row, report “registration expired and catalogue absent;
+  removal cause unproven.” Stronger watcher proof requires a matching detail200 with
+  `ensExpired:true` plus catalogue absence. The harness never kills an arbitrary runner.
+- **Revival** requires separately authorized owner/root-RENEW action: the limited
+  daemon can maintain an unexpired name but cannot revive it. Do not broaden its role
+  or silently register a replacement. Verify fresh hierarchy/resolution after recovery.
+- **Delist by unregister** is the authorized `skillRegistry.unregister(labelId(skillId))`
+  call. It invalidates a registration immediately, distinct from passive expiry and the
+  hub's canary `delisted` flag. Do not unregister to manufacture an expiry result. No
+  unregister/re-register convenience CLI is supplied.
+
+### Production re-point — pending owner action before September 13
+
+Prerequisites: deploy/verify the production hub and web separately; they must already serve the same seller's real `usdc-flow-check` at the canonical V2 payout. Stop competing owner record writers. Select the existing state and one dedicated journal path; never substitute a fresh journal to bypass an uncertain prior attempt. The command is deliberately scoped to the local demo's one skill, with no MCP/agent-registration addition. It permits the retained leaf to be live or expired: **text-only re-pointing never revives it**. This command does not start services, deploy contracts, register names, transfer ownership, restore price, regrant daemon roles or change payout/chain.
+
+The retained state and old local origin below identify the approved September 5 demo. After cleanup, an unchanged private recovery copy was retained under gitignored `handoff/ens-demo-2026-09-05/` (directory mode0700); the original temporary checkpoints were not moved or overwritten. Replace only the two production-host placeholders after separately deploying and verifying those services. Read only `arcade-ens-owner` inside the consuming shell; no daemon, seller, buyer or facilitator key is needed. Run from the main repository root after the E implementation is merged. This command is documented, not executed; it does not authorize a production change. Keep the exact same parameters and journal for reconciliation; an error after signing is not permission to retry with new coordinates.
+
+```bash
+env -i PATH="$PATH" \
+  ARCADE_ENS_STATE="$PWD/handoff/ens-demo-2026-09-05/ens.json" \
+  ARCADE_ENS_REPOINT_JOURNAL="$PWD/handoff/ens-demo-2026-09-05/owner-repoint.json" \
+  ARCADE_ENS_REPOINT_NAME='usdc-flow-check.scf821769ed.arcade.eth' \
+  ARCADE_ENS_EXPECTED_OLD_ORIGIN='http://127.0.0.1:51989' \
+  ARCADE_ENS_PRODUCTION_HUB='https://<actual-production-hub-host>' \
+  ARCADE_ENS_PRODUCTION_WEB='https://<actual-production-web-host>' \
+  ARCADE_ENS_RPC=https://ethereum-sepolia-rpc.publicnode.com \
+  /bin/bash --noprofile --norc <<'SH'
+set +x
+set -euo pipefail
+test -f ./scripts/ens-setup-driver.ts # Run from the repository root.
+test "$(git branch --show-current)" = main
+ARCADE_ENS_OWNER_KEY="$(/usr/bin/security find-generic-password -s arcade-ens-owner -w)"
+export ARCADE_ENS_OWNER_KEY
+exec bun --no-env-file - <<'JS'
+import { resolve } from "node:path";
+import { encodeFunctionData, keccak256, parseAbi, stringToHex } from "viem";
+import { namehash } from "viem/ens";
+import { privateKeyToAccount } from "viem/accounts";
+import { ALL_ROLES, ENS_TEXT_KEYS, PERMISSIONED_RESOLVER_ABI, VERIFIABLE_FACTORY_ABI, loadEnsDeployments, skillTextRecords } from "@arcade/core";
+import { ensStatePath, readEnsState } from "./packages/runner/src/ens-state.ts";
+import { ensJournalPath } from "./packages/runner/src/ens-journal.ts";
+import { parseSetupArgs } from "./scripts/ens-setup.ts";
+import { setupPublicClient } from "./scripts/ens-setup-runtime.ts";
+import { prepareSkillRecords } from "./scripts/ens-setup-skills.ts";
+import { openSetupSession } from "./scripts/ens-setup-driver.ts";
+import { demoObservation, demoPublicClient } from "./scripts/ens-demo.ts";
+import { EnsNameExpired, resolveEnsListingPromise, sepoliaEnsReader } from "@arcade/buyer";
+const check = value => { if (!value) throw Error("owner re-point refused"); };
+const same = (a, b) => typeof a === "string" && typeof b === "string" && a.toLowerCase() === b.toLowerCase();
+let session, observer, closingSession, closing, cancelled = false;
+const controller = new AbortController();
+const closeSession = () => {
+  if (!session) return Promise.resolve();
+  if (closingSession === session && closing) return closing;
+  closingSession = session; closing = Promise.resolve().then(() => session.close()); return closing;
+};
+const cancel = () => {
+  cancelled = true; controller.abort();
+  try { observer?.close(); } catch { /* The hard deadline still applies. */ }
+  void closeSession().catch(() => {});
+};
+const timer = setTimeout(cancel, 300000);
+const hardTimer = setTimeout(() => {
+  try { cancel(); } finally {
+    console.error("Owner re-point deadline reached; retain journal/hash and reconcile. No automatic resend.");
+    process.exit(1);
+  }
+}, 330000);
+process.once("SIGTERM", cancel); process.once("SIGINT", cancel);
+const fetcher = request => {
+  check(!cancelled);
+  return fetch(new Request(request, {redirect:"error", credentials:"omit", signal:AbortSignal.any([request.signal,controller.signal])}));
+};
+try {
+  const path = ensStatePath(), state = await readEnsState(path);
+  check(state?.root === "arcade.eth" && state.owner && state.daemon);
+  const name = process.env.ARCADE_ENS_REPOINT_NAME, skill = state.skills.find(s => s.name === name);
+  check(skill?.skillId === "usdc-flow-check" && name.length < 220);
+  const hub = new URL(process.env.ARCADE_ENS_PRODUCTION_HUB), web = new URL(process.env.ARCADE_ENS_PRODUCTION_WEB);
+  check([hub, web].every(u => u.protocol === "https:" && u.pathname === "/" && !u.username && !u.password && !u.search && !u.hash));
+  const old = new URL(process.env.ARCADE_ENS_EXPECTED_OLD_ORIGIN);
+  check(old.protocol === "http:" && old.hostname === "127.0.0.1" && old.port && old.pathname === "/" && !old.username && !old.password && !old.search && !old.hash);
+  const args = parseSetupArgs(["--seller", state.seller, "--owner", state.owner, "--daemon", state.daemon, "--skills", skill.skillId,
+    "--root-label", "arcade", "--confirm-root-label", "arcade", "--seller-label", state.sellerLabel, "--ttl", `${state.ttlSeconds}s`, "--hub", hub.origin, "--web", web.origin]);
+  const plans = await prepareSkillRecords(args, state.root, fetcher), plan = plans[0];
+  check(plans.length === 1 && plan.name === name);
+  const rpc = process.env.ARCADE_ENS_RPC, pub = setupPublicClient(rpc, fetcher), deployment = loadEnsDeployments().find(d => d.set === state.deploymentSet);
+  check(deployment && await pub.getChainId() === 11155111);
+  observer = demoPublicClient(rpc, fetcher);
+  const snapshot = await demoObservation(state, name, observer).snapshot();
+  check(same(snapshot.latestOwner,state.seller) && (snapshot.status === 2 && snapshot.expiry > snapshot.timestamp && same(snapshot.owner,state.seller) ||
+    snapshot.status === 0 && snapshot.expiry <= snapshot.timestamp && /^0x0{40}$/i.test(snapshot.owner)));
+  const rolesAbi = parseAbi(["function roles(uint256 resource,address account) view returns(uint256)"]);
+  for (const [proxy, implementation] of [[state.sellerRegistry, deployment.userRegistryImpl], [state.skillRegistry, deployment.userRegistryImpl], [state.resolver, deployment.permissionedResolverImpl]]) {
+    check(same(await pub.readContract({address:deployment.verifiableFactory, abi:VERIFIABLE_FACTORY_ABI, functionName:"verifyContract", args:[proxy]}), implementation));
+    check(await pub.readContract({address:proxy, abi:rolesAbi, functionName:"roles", args:[0n,state.owner]}) === ALL_ROLES);
+  }
+  const node = namehash(name), text = key => pub.readContract({address:state.resolver, abi:PERMISSIONED_RESOLVER_ABI, functionName:"text", args:[node,key]});
+  const before = Object.fromEntries(await Promise.all(Object.values(ENS_TEXT_KEYS).map(async key => [key, await text(key)])));
+  const proposed = Object.fromEntries(plan.records.map(r => [r.key,r.value]));
+  check(same(before[ENS_TEXT_KEYS.payTo], proposed[ENS_TEXT_KEYS.payTo]) && before[ENS_TEXT_KEYS.chain] === proposed[ENS_TEXT_KEYS.chain]);
+  check(before[ENS_TEXT_KEYS.endpoint] === `${old.origin}/x/${state.seller}/${skill.skillId}` || before[ENS_TEXT_KEYS.endpoint] === proposed[ENS_TEXT_KEYS.endpoint]);
+  check(before[ENS_TEXT_KEYS.web] === `${old.origin}/skill/${skill.skillId}` || before[ENS_TEXT_KEYS.web] === proposed[ENS_TEXT_KEYS.web]);
+  check(before[ENS_TEXT_KEYS.mcp] === "");
+  const currentPrice = before[ENS_TEXT_KEYS.priceAtomic];
+  check(/^(0|[1-9][0-9]{0,77})$/.test(currentPrice));
+  const context = proposed[ENS_TEXT_KEYS.context].split("\n\n")[0];
+  check(before[ENS_TEXT_KEYS.context].startsWith(`${context}\n\n`));
+  const records = skillTextRecords({name, endpoint:proposed[ENS_TEXT_KEYS.endpoint], webUrl:proposed[ENS_TEXT_KEYS.web],
+    payTo:before[ENS_TEXT_KEYS.payTo], caip2:before[ENS_TEXT_KEYS.chain], priceAtomic:BigInt(currentPrice), context});
+  const updates = records.filter(r => [ENS_TEXT_KEYS.endpoint, ENS_TEXT_KEYS.web, ENS_TEXT_KEYS.context].includes(r.key));
+  check(updates.length === 3);
+  const call = {address:state.resolver, abi:PERMISSIONED_RESOLVER_ABI, functionName:"multicall", args:[updates.map(r => encodeFunctionData({abi:PERMISSIONED_RESOLVER_ABI, functionName:"setText", args:[node,r.key,r.value]}))]};
+  const journal = resolve(process.env.ARCADE_ENS_REPOINT_JOURNAL);
+  check(![path, `${path}.setup.json`, ensJournalPath(process.env), `${path}.demo.json`, `${path}.demo-daemon.json`].map(p => resolve(p)).includes(journal));
+  const binding = keccak256(stringToHex(JSON.stringify({format:"owner-repoint-v1",state,name,old:old.origin,updates})));
+  check(!cancelled);
+  const ownerKey = process.env.ARCADE_ENS_OWNER_KEY;
+  check(/^0x[0-9a-fA-F]{64}$/.test(ownerKey) && same(privateKeyToAccount(ownerKey).address,state.owner));
+  session = await openSetupSession({path:journal,privateKey:ownerKey,rpcUrl:rpc,binding,root:state.root,owner:state.owner,seller:state.seller,daemon:state.daemon,
+    ttlSeconds:state.ttlSeconds,sellerTtlSeconds:state.ttlSeconds,fetch:fetcher});
+  check(!cancelled);
+  const step = `owner-repoint:${name}`, metadata = {name,resolver:state.resolver,hub:hub.origin,web:web.origin};
+  await session.driver.simulate(call);
+  await session.driver.checkpoint({step,state:"intent",metadata});
+  const txHash = await session.driver.send(step,call);
+  await session.driver.checkpoint({step,state:"confirmed",txHash,metadata});
+  for (const [key,value] of Object.entries(before)) check(await text(key) === (updates.find(r => r.key === key)?.value ?? value));
+  const afterSnapshot = await demoObservation(state,name,observer).snapshot();
+  check(afterSnapshot.tokenId === snapshot.tokenId && same(afterSnapshot.latestOwner,snapshot.latestOwner));
+  const resolutionExpectedAbsent = afterSnapshot.status === 0 && afterSnapshot.expiry <= afterSnapshot.timestamp && /^0x0{40}$/i.test(afterSnapshot.owner);
+  if (!resolutionExpectedAbsent) check(afterSnapshot.status === 2 && afterSnapshot.expiry > afterSnapshot.timestamp && same(afterSnapshot.owner,state.seller));
+  const reader = sepoliaEnsReader({env:{ARCADE_ENS_ROOT:state.root,ARCADE_ENS_UNIVERSAL_RESOLVER:state.universalResolver,ARCADE_ENS_RPC:rpc},fetch:fetcher});
+  if (resolutionExpectedAbsent) {
+    let absent = false;
+    try { await resolveEnsListingPromise(reader,name); } catch (error) { if (error instanceof EnsNameExpired) absent = true; else throw error; }
+    check(absent);
+  } else {
+    const resolved = await resolveEnsListingPromise(reader,name);
+    check(resolved.endpoint === proposed[ENS_TEXT_KEYS.endpoint] && same(resolved.payTo,before[ENS_TEXT_KEYS.payTo]) && resolved.chainCaip2 === before[ENS_TEXT_KEYS.chain]);
+  }
+  for (const proxy of [state.sellerRegistry,state.skillRegistry,state.resolver]) check(await pub.readContract({address:proxy,abi:rolesAbi,functionName:"roles",args:[0n,state.owner]}) === ALL_ROLES);
+  check(!cancelled);
+  await closeSession(); observer.close(); check(!cancelled);
+  console.log(JSON.stringify({name,txHash,changedKeys:updates.map(r=>r.key),pricePreserved:currentPrice,endpoint:proposed[ENS_TEXT_KEYS.endpoint],resolutionExpectedAbsent}));
+} catch { console.error("Owner re-point not proved; inspect the retained journal and chain before any retry. No automatic resend."); process.exitCode = 1; }
+finally {
+  cancelled = true; controller.abort();
+  try {
+    try { observer?.close(); } catch { console.error("Owner observer cleanup requires reconciliation."); process.exitCode = 1; }
+    try { await closeSession(); } catch { console.error("Owner journal cleanup requires reconciliation."); process.exitCode = 1; }
+  } finally {
+    clearTimeout(timer); clearTimeout(hardTimer);
+    process.removeListener("SIGTERM",cancel); process.removeListener("SIGINT",cancel);
+  }
+}
+JS
+SH
+```
+
+The command atomically updates only the endpoint, web and context text keys. It refreshes the context JSON's routing and embedded price to match the current raw price. It preserves that raw price (including a deliberately bumped demo price), payee, chain, optional identity records, ownership and grants. A current MCP record refuses this narrow command rather than leaving a stale local MCP claim. An existing ERC-8004 registration URI is a separate registry field and is not rewritten by this ENS operation. A production web URL must be independently verified to serve before invocation; setup preflight validates its shape, not its HTML.
+
+### Expiry and recovery are separate operations
+
+Re-pointing text is not renewal. An expired leaf's resolver records remain owner-editable via root SET_TEXT, but guarded ENS resolution remains absent. The runnable command verifies the changed raw records and owner/root authority, checks the unchanged token/latestOwner and returns `resolutionExpectedAbsent:true` only when chain state and typed guarded-name absence both agree. It does not call that a live endpoint. For the same retained registration, an explicitly approved owner/root-RENEW call would be `skillRegistry.renew(labelId(skill.label), <fixed-approved-future-expiry>)`, using the existing driver with a **different recovery journal and binding** and the intent→send→confirmed→readback discipline above. This is a separate future operation, not part of the executable re-point command. Verify owner root RENEW, retained token/latestOwner against the demo proof, live parents, and a fixed future expiry on actual Sepolia time. Do not unregister/register/transfer or grant daemon root RENEW. Recheck per-name daemon roles after revival; restore only the exact scoped grant if absent and separately approved.
+
+Price recovery is also separate: owner `setText(namehash(name), "arcade.priceAtomic", "10000")`, confirm direct/hardened readback, then `authorizeTextRoles(dnsNameOf(name), "arcade.priceAtomic", daemon, true)` only if explicitly approved. The former price-lock journal is not reused for these opposite operations. Setup's original expiry/record binding means rerunning setup is not a migration or recovery command. No recovery transaction is implied by this note's existence.
+
+### Public evidence ledger — first run and completed continuation
+
+The September 5 approved isolated run used deployment **A** and
+`usdc-flow-check.scf821769ed.arcade.eth`. Setup finished at05:46:57 UTC. ENS owner
+`0x8260C32f90593f1B3B3bcba0Ec1D40ff8C189469`, seller
+`0xcf821769ED3c0E55e152745377bb833d7155A78a` and daemon
+`0x88797d820C111205eCd993BE850D4f35687909e3` were distinct and matched their approved
+keys before mutation. No wallet keys were printed, persisted or passed to the wrong role.
+
+The [ENS app profile for arcade.eth](https://app.ens.dev/arcade.eth) independently
+displayed the approved owner and September 5, 2026–September 5, 2027 parent registration
+when read on September 5. Parent availability does not imply the expiring skill leaf is
+live; its current exact-name state must be checked separately.
+
+| Namespace component | Verified address |
+| --- | --- |
+| SellerRegistry under `arcade.eth` | `0x80f1ba46a19702eedc3aa4fe28f6c2071a2a0928` |
+| SkillRegistry under `scf821769ed.arcade.eth` | `0xdafbdd2d7109d4706999573f60a3d1c17a96bdc6` |
+| PermissionedResolver | `0x7070e0805ec7ef405c02e3f38fef453ecb712190` |
+
+| Confirmed Sepolia operation | Transaction proof |
+| --- | --- |
+| Parent registration | [Register arcade.eth](https://sepolia.etherscan.io/tx/0xf20d14c99278b133f7567bb6050c317526df2c54d86b57e024434851e0681bed) |
+| Seller subname registration | [Register scf821769ed.arcade.eth](https://sepolia.etherscan.io/tx/0x021ec6bd72c2ef2a678e156a57ab2b9bee2d46fc871e637b9478d1fd67333aff) |
+| Skill subname registration | [Register usdc-flow-check](https://sepolia.etherscan.io/tx/0xd7d2470b13a97d2229ce65e5ad3e42ba515e8726a40856228a0a50244ba7b2da) |
+| Initial six text records | [Set records](https://sepolia.etherscan.io/tx/0xda352327b520f72dca2f6f4498f21a2188329061f640081972c34f41dff96a5c) |
+| Per-name daemon renewal grant | [Authorize renewal](https://sepolia.etherscan.io/tx/0x6bdf44c5182aad4abcea70c9331f159b1f4916e61a900f8b359e3ea0df4b3426) |
+| Per-name, per-key daemon price grant | [Authorize price](https://sepolia.etherscan.io/tx/0x12ed2aed1e59acb7154ac5b9b6662e2943904d47b9f444b98492f8c7af1c9f0e) |
+| Initial daemon renewal | [Renew the existing leaf](https://sepolia.etherscan.io/tx/0x412e2c70961f2582fbbbc53f2bb5e18f56cfb1386e1856233592f8df32d7d1bb) |
+
+The renewal increased expiry from1788587784 to1788588119. Its exact signer,
+recipient and `renew(labelId("usdc-flow-check"),1788588119)` calldata were independently
+correlated with successful block11638428/hash
+`0xee6bddf5368b377cee6aea43ab9b98a078bf4e129e94df353c9f53ee42ec4155`.
+The initial runner's four-receipt/3.5-second polling window missed that confirmation.
+The first supervisor therefore **failed and stopped all owned services at05:49:59 UTC**,
+before any by-name purchase or price mutation. That failed result is retained; a later
+continuation does not rewrite it as success or repeat registration/renewal automatically.
+
+Independent keyless reads **after cleanup**, at Sepolia block11638471/hash
+`0xea5e4a84902eb4b7e968368ddfa0a36e325b9ab6a020f2ee917b5a3f92101123`, verified the three
+current proxy implementations and parent mounts, owner raw `ALL_ROLES` and daemon root0
+on each, and all six exact text records. Same-value owner `setText` simulations succeeded
+for every written key, proving retained update authority without signing. The leaf was
+still live at that block, with unchanged token/latestOwner and expiry1788588119.
+
+The actual endpoint was
+`http://127.0.0.1:51989/x/0xcf821769ed3c0e55e152745377bb833d7155a78a/usdc-flow-check`;
+the web record was `http://127.0.0.1:51989/skill/usdc-flow-check`, which returned HTML200
+during the run. **These URLs served only during the owned run and stopped after cleanup.**
+Independent post-cleanup GET received connection refusal. They are not public production
+endpoints or judge-accessible services. The production re-point command above is pending.
+
+The first run's evidence is partial; no Arc settlement, price revocation or watcher
+removal is claimed by it. After explicit approval of one fresh 15-minute window, the
+owner renewed the **same retained registration**, without new setup or grants:
+[Owner renewal](https://sepolia.etherscan.io/tx/0xb06f82ad01e791ecd27a57cde0a141842f6f2ce3a9362965436fc8c48fa5b6f2).
+Independent readback at block 11638640, hash
+`0xa3d6532c3370aec400d21469e5d76671cfdbf1163ffdb0daaf3a678aab78f473`, confirmed expiry
+1788590760 (**2026-09-05 06:46:00 UTC**), unchanged token/latestOwner, all six records,
+and owner update authority. The continuation independently checked both renewal
+transactions' exact signers, calldata and successful receipts before starting a
+non-renewing seller runner at the original loopback origin. Its purchase, revocation,
+tampered-challenge, watcher-expiry and final cleanup proof follow separately below.
+
+The actual by-name purchase completed at **06:32:45 UTC**: job
+`job_eed1146faa6a45c0912a`, [Arc settlement](https://testnet.arcscan.app/tx/0xf3d8b2eef12c3d68c96f8641be5f1f94d31f29f29a6ca65da8e04baadecca4ef).
+Independent receipt and USDC/splitter event verification found exactly **10,000 atomic
+USDC ($0.01)**, split into 9,500 for the seller and 500 in fees. Arc block 60536850 has
+hash `0xc7e7cb65db59af56bdbc27b71e61fd67554c2bbc6decb7df49934c6d765c4394`.
+This was a real ordinary job, not a fabricated canary receipt: **one name on Sepolia,
+one settlement on Arc**.
+
+The scoped price-lock beat completed at **06:34:16 UTC**:
+
+| Operation | Confirmed transaction / result |
+| --- | --- |
+| Daemon price update, 10,000 → 11,000 atomic USDC | [Update price](https://sepolia.etherscan.io/tx/0x007e6bec63896613711ffab3628245cdaf320c48cb84ec0738ba631e23fa0ffb) |
+| Owner revokes only that daemon's price grant | [Revoke scoped grant](https://sepolia.etherscan.io/tx/0x2442e78156df1d7fd58c19e124b91c16ac83beea32d966f52c7e1919431cd3fc) |
+| Subsequent same-daemon `setText` simulation | Exact `EACUnauthorizedAccountRoles`, selector `0x4b27a133`; expected account, resource and role checked |
+
+Known non-price routing/context records stayed unchanged. **Price remains 11,000 and
+the scoped price grant remains revoked.** No restoration or regrant was performed.
+The typed denial is a simulation, not another submitted transaction.
+
+At **06:34:27 UTC**, the real buyer SDK rejected two synthetic challenge substitutions
+(wrong payee and wrong chain), both with `ens_payto_mismatch`: **zero signatures and
+zero paid requests**. These probes exercised pre-signature refusal but are not additional
+payment evidence. The passive-expiry baseline was observed at Sepolia block 11638654
+with expiry 1788590760.
+
+**Passive expiry and cleanup passed:** no further renewal, unregister or replacement
+registration was sent. The seller served without the daemon renewal key throughout
+the observation, and the hub watcher marked the matching detail record `ensExpired`
+while it still returned HTTP200. The catalogue successfully omitted the skill. This
+distinguishes real expiry-driven removal from a disconnected runner or failed fetch.
+
+| Observation | Verified UTC / chain coordinate |
+| --- | --- |
+| Renewal disabled, seller still serving | 06:32:51 UTC; fixed expiry 1788590760 |
+| Registration expiry | 06:46:00 UTC (1788590760) |
+| Guarded name absence and watcher-driven catalogue removal confirmed | 06:46:59 UTC; block 11638715, chain timestamp 1788590808 |
+| All owned services stopped | 06:47:00.333 UTC |
+| Supervisor's post-cleanup proof and PASS | 06:47:10.487 UTC; block 11638715, hash `0xe8faeedc519be10bc92075fe03840353e3bf7c3818ccea3ac309b275a315fb0f` |
+| Separate keyless verification after the run | Block 11638719, hash `0x5ec46dd8e11213de49e80618d98c1b77c383c0462def18996e9515d68f6927bd`, chain timestamp 1788590856 |
+
+That separate verification re-read current proxy implementations, parent mounts,
+owner raw `ALL_ROLES` and daemon root0 on all three proxies, and all six exact records.
+Six same-value owner `setText` simulations succeeded **after expiry and cleanup**.
+The registration is now status0 with zero current owner; token/latestOwner are retained.
+Its token is
+`23970333715751076124179036471974348465258195195405327158223653295910559940609`;
+the expired resource equals that token, advancing from the live resource (token−1).
+Actual GET to the loopback origin received connection refusal. Thus the URLs served
+**only during the two owned runs and stopped after each cleanup**, while every written
+record remains updatable by `arcade-ens-owner`.
+
+The raw price is still **11,000**; the untouched context JSON still describes its original
+10,000 price, and the daemon's scoped price permission remains revoked. Production
+re-pointing, a future owner-root renewal, intended raw-price restoration and scoped
+price regrant remain distinct pending owner actions. None was silently performed.
+The original daemon journal's submitted entry is retained with its successful chain
+reconciliation; it was not resent or automatically rewritten. The exact production
+re-point command above refreshes routing and context only, not liveness or raw price.
+
+### Evidence checklist for future runs
+
+| Evidence | Required observation |
+| --- | --- |
+| Deployment | UTC/block, actual chain11155111, selected set and live root/UniversalResolver links. The dated keyless preflight above remains separate. |
+| Parent/namespace | Approved name, owner, successful registration hashes, seller/skill registries and resolver with proxy provenance, exact ownership/expiry/pointers/records/grants. Only then publish name-specific ENS-app and Sepolia transaction links. |
+| Renewal | Exact daemon/name/registry, confirmed hash, previous/new expiry and observed block. A log line alone is insufficient. |
+| By-name payment | Resolved authority, correlated real job/receipt, successful Arc transaction and independently checked splitter/USDC events and amounts. A signature or HTTP result is not settlement. |
+| Revocation | Before/after price, daemon-write and owner-revoke hashes, exact decoded simulation denial and unchanged known non-price records; explicit recovery status. |
+| Expiry | Live baseline token/owner/resource/expiry; owner stop time; final chain state/time; first guarded record absence and successful catalogue absence; detail200/404 distinction. Passive expiry advances the derived resource's low32-bit version while retaining token/latestOwner. |
+| Cleanup/recovery | Authorized restoration/regrant/revival hashes and readbacks; unresolved journal operations; processes stopped or intentionally retained. |
+
+Publish only that public evidence subset. Keep setup journals, commitment secrets,
+keys, headers, raw job stores and provider credentials private. No placeholder hash,
+offline receipt, or pre-existing unrelated Arc transaction substitutes for a missing beat.
