@@ -1,7 +1,8 @@
 import { Cause, Context, Effect, Layer, Queue, Ref, Schedule, type Scope } from "effect"
-import { buildFeedback, buildValidationRequest, buildValidationResponse, docHash, feedbackUrl,
+import { buildFeedback, buildValidationRequest, buildValidationResponse, docBytes, docHash, feedbackUrl,
   loadChainConfig, validationRequestUrl, validationResponseUrl } from "@arcade/core"
 import { Erc8004Failed, Erc8004Tag, type Erc8004 } from "./erc8004.ts"
+import { StoreTag, type Erc8004DocKind } from "./store.ts"
 
 /** Only terminal receipt facts enter this best-effort service; it never decides payment. */
 export interface AttestJob {
@@ -38,6 +39,7 @@ export interface Attest {
   readonly idle: Effect.Effect<void>
 }
 export class AttestTag extends Context.Tag("@arcade/hub/Attest")<AttestTag, Attest>() {}
+export type DocSink = (jobId: string, kind: Erc8004DocKind, bytes: string) => Effect.Effect<void>
 
 const QUEUE_CAPACITY = 512
 const WRITE_TIMEOUT_MS = 90_000
@@ -57,7 +59,7 @@ const write = (op: string, action: () => Effect.Effect<string, Erc8004Failed>) =
   Effect.either
 )
 
-export const processOne = (erc8004: Erc8004, job: AttestJob): Effect.Effect<AttestOutcome> => Effect.gen(function* () {
+export const processOne = (erc8004: Erc8004, job: AttestJob, docSink?: DocSink): Effect.Effect<AttestOutcome> => Effect.gen(function* () {
   if (!erc8004.armed) return { skipped: "hub is not armed for ERC-8004", errors: [] }
   if (job.agentId === undefined) return { skipped: "no agent registered for this listing", errors: [] }
   const chain = loadChainConfig("arc-testnet")
@@ -81,6 +83,15 @@ export const processOne = (erc8004: Erc8004, job: AttestJob): Effect.Effect<Atte
   if (!/^0x[0-9a-fA-F]{40}$/.test(owner) || owner.toLowerCase() !== job.seller.toLowerCase()) {
     return { skipped: "current seller ownership could not be confirmed", errors: [] }
   }
+  if (docSink !== undefined) {
+    // Persist ALL immutable bytes before any registry transaction. A failed/conflicting
+    // document must never leave the chain pointing at bytes this hub cannot serve.
+    const docs: ReadonlyArray<readonly [Erc8004DocKind, string]> = [
+      ["validation-request", docBytes(requestDoc)], ["validation-response", docBytes(responseDoc)],
+      ...(feedbackDoc === undefined ? [] : [["feedback", docBytes(feedbackDoc)] as const])
+    ]
+    for (const [kind, bytes] of docs) yield* Effect.suspend(() => docSink(job.jobId, kind, bytes)).pipe(Effect.timeout("5 seconds"))
+  }
   const request = yield* write("validationRequest", () => erc8004.requestValidation({ agentId: job.agentId!,
     requestURI: validationRequestUrl(job.origin, job.jobId), requestHash }))
   if (request._tag === "Left") return { errors: [request.left.reason] }
@@ -101,14 +112,14 @@ export const processOne = (erc8004: Erc8004, job: AttestJob): Effect.Effect<Atte
 
 /** Single scoped worker keeps wallet nonces serialized. Count accepted work BEFORE
  * offering it, so idle cannot observe an empty queue between take and processing. */
-export const makeAttest = (erc8004: Erc8004): Effect.Effect<Attest, never, Scope.Scope> => Effect.gen(function* () {
+export const makeAttest = (erc8004: Erc8004, docSink?: DocSink): Effect.Effect<Attest, never, Scope.Scope> => Effect.gen(function* () {
   const queue = yield* Effect.acquireRelease(Queue.dropping<AttestJob>(QUEUE_CAPACITY), Queue.shutdown)
   const pending = yield* Ref.make(0)
   let closed = false
   yield* Effect.addFinalizer(() => Effect.sync(() => { closed = true }))
   const worker = Effect.gen(function* () {
     const job = yield* Queue.take(queue)
-    yield* processOne(erc8004, job).pipe(
+    yield* processOne(erc8004, job, docSink).pipe(
       Effect.flatMap(out => out.errors.length ? log("[hub] ERC-8004 attestation incomplete; receipt unchanged") : Effect.void),
       Effect.ensuring(Ref.update(pending, n => n - 1))
     )
@@ -128,4 +139,8 @@ export const makeAttest = (erc8004: Erc8004): Effect.Effect<Attest, never, Scope
     idle: Effect.repeat(Ref.get(pending), { while: n => n > 0 && !closed, schedule: Schedule.spaced("5 millis") }).pipe(Effect.asVoid)
   }
 })
-export const AttestLive: Layer.Layer<AttestTag, never, Erc8004Tag> = Layer.scoped(AttestTag, Effect.flatMap(Erc8004Tag, makeAttest))
+export const AttestLive: Layer.Layer<AttestTag, never, Erc8004Tag | StoreTag> = Layer.scoped(AttestTag, Effect.gen(function* () {
+  const erc8004 = yield* Erc8004Tag
+  const store = yield* StoreTag
+  return yield* makeAttest(erc8004, store.putErc8004Doc)
+}))

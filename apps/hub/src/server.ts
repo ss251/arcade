@@ -271,8 +271,9 @@ if (RAIL !== "test" && process.env["ARCADE_CHAIN_CHECK"] !== "0") {
 }
 
 const Erc8004Layer = Erc8004FromEnv(chainConfig.erc8004)
-const AppLive = Layer.mergeAll(StoreFromEnv(), BrokerLive, railLayer(), Erc8004Layer,
-  AttestLive.pipe(Layer.provide(Erc8004Layer)))
+const StoreLayer = StoreFromEnv()
+const AppLive = Layer.mergeAll(StoreLayer, BrokerLive, railLayer(), Erc8004Layer,
+  AttestLive.pipe(Layer.provide(Layer.merge(StoreLayer, Erc8004Layer))))
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2), {
@@ -909,6 +910,17 @@ const main = Effect.gen(function* () {
         // See `publicReceipt` for exactly what this withholds and why (job ids at any
         // depth, buyer address, the settlement's authorization nonce).
         return json(receipts.map(publicReceipt))
+      }
+
+      // Public hash-only documents survive runner disconnection and hub restart. Never
+      // rebuild from current listing/output state or expose the private job payload here.
+      const documentMatch = /^\/receipts\/([A-Za-z0-9_-]{1,256})\/(validation-request|validation-response|feedback)\.json$/.exec(path)
+      if (documentMatch !== null && req.method === "GET") {
+        const kind = documentMatch[2] as "validation-request" | "validation-response" | "feedback"
+        const bytes = await run(store.getErc8004Doc(documentMatch[1]!, kind))
+        return bytes === undefined ? json({ error: "not_found" }, 404) : new Response(bytes, {
+          headers: { "content-type": "application/json", "cache-control": "public, max-age=31536000, immutable" }
+        })
       }
 
       const jobMatch = /^\/jobs\/([A-Za-z0-9_]+)$/.exec(path)

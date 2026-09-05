@@ -136,6 +136,7 @@ export interface StoreState {
   readonly ratings: Array<Rating>
   readonly trees: Map<string, Array<TreeRow>>
   readonly payTests: Map<string, Array<PayTestRow>>
+  readonly erc8004Docs: Map<string, string>
 }
 
 const empty = (): StoreState => ({
@@ -145,10 +146,30 @@ const empty = (): StoreState => ({
   receipts: [],
   ratings: [],
   trees: new Map(),
-  payTests: new Map()
+  payTests: new Map(),
+  erc8004Docs: new Map()
 })
 
+export type Erc8004DocKind = "validation-request" | "validation-response" | "feedback"
+export const erc8004DocKey = (jobId: string, kind: Erc8004DocKind): string => {
+  if (typeof jobId !== "string" || !/^[A-Za-z0-9_-]{1,256}$/.test(jobId) ||
+    !["validation-request", "validation-response", "feedback"].includes(kind)) throw new Error("invalid registry document key")
+  return `${jobId}/${kind}`
+}
+/** Persist exact JSON object bytes, never re-serialize a committed document. */
+export const validateErc8004DocBytes = (bytes: string): void => {
+  if (typeof bytes !== "string" || bytes.length > 1_048_576 || new TextEncoder().encode(bytes).byteLength > 1_048_576) {
+    throw new Error("registry document exceeds the storage limit")
+  }
+  let doc: unknown
+  try { doc = JSON.parse(bytes) } catch { throw new Error("registry document must be a JSON object") }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) throw new Error("registry document must be a JSON object")
+}
+
 export interface Store {
+  /** Identical retries succeed; conflicting bytes fail before any registry write. */
+  readonly putErc8004Doc: (jobId: string, kind: Erc8004DocKind, bytes: string) => Effect.Effect<void>
+  readonly getErc8004Doc: (jobId: string, kind: Erc8004DocKind) => Effect.Effect<string | undefined>
   readonly putListing: (rec: ListingRecord) => Effect.Effect<void>
   readonly getListing: (skillId: string) => Effect.Effect<ListingRecord, ListingNotFound>
   readonly allListings: Effect.Effect<ReadonlyArray<ListingRecord>>
@@ -211,6 +232,19 @@ const setTreeState = (s: StoreState, childJobId: string, state: TreeRow["state"]
 }
 
 export const makeStore = (ref: Ref.Ref<StoreState>): Store => ({
+  putErc8004Doc: (jobId, kind, bytes) => Ref.update(ref, s => {
+    const key = erc8004DocKey(jobId, kind)
+    validateErc8004DocBytes(bytes)
+    const existing = s.erc8004Docs.get(key)
+    if (existing !== undefined) {
+      if (existing !== bytes) throw new Error("registry document already exists with different bytes")
+      return s
+    }
+    const erc8004Docs = new Map(s.erc8004Docs)
+    erc8004Docs.set(key, bytes)
+    return { ...s, erc8004Docs }
+  }),
+  getErc8004Doc: (jobId, kind) => Effect.map(Ref.get(ref), s => s.erc8004Docs.get(erc8004DocKey(jobId, kind))),
   putListing: (rec) =>
     Ref.update(ref, (s) => {
       const listings = new Map(s.listings)

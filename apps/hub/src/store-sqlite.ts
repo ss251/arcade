@@ -1,7 +1,8 @@
 import { Database } from "bun:sqlite"
 import { Effect, Layer, Ref, Schema } from "effect"
 import { Job, Rating, Receipt } from "@arcade/core"
-import { StoreTag, makeStore, payTestKey, PAY_TEST_HISTORY, type PayTestRow, type Store, type StoreState, type TreeRow } from "./store.ts"
+import { StoreTag, makeStore, payTestKey, PAY_TEST_HISTORY, erc8004DocKey, validateErc8004DocBytes,
+  type Erc8004DocKind, type PayTestRow, type Store, type StoreState, type TreeRow } from "./store.ts"
 
 /**
  * Durable hub state.
@@ -44,6 +45,13 @@ import { StoreTag, makeStore, payTestKey, PAY_TEST_HISTORY, type PayTestRow, typ
  */
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS erc8004_docs (
+  job_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  bytes TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (job_id, kind)
+);
 CREATE TABLE IF NOT EXISTS jobs (
   id TEXT PRIMARY KEY,
   status TEXT NOT NULL,
@@ -115,6 +123,8 @@ export interface SqliteStore {
 export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
   const db = new Database(path, { create: true })
   db.exec("PRAGMA journal_mode = WAL")
+  // A completed document sink must be durable before its hash can be sent on chain.
+  db.exec("PRAGMA synchronous = FULL")
   db.exec(SCHEMA)
 
   // Anything non-terminal was left behind by a process that no longer exists. `boot_id`
@@ -177,6 +187,14 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     payTests.set(key, [...(payTests.get(key) ?? []), entry].slice(-PAY_TEST_HISTORY))
   }
 
+  const erc8004Docs = new Map<string, string>()
+  for (const row of db.query<{ job_id: string; kind: Erc8004DocKind; bytes: string }, []>(
+    "SELECT job_id, kind, bytes FROM erc8004_docs").all()) {
+    const key = erc8004DocKey(row.job_id, row.kind)
+    validateErc8004DocBytes(row.bytes)
+    erc8004Docs.set(key, row.bytes)
+  }
+
   // Listings and runners start EMPTY by design — see the note above.
   const initial: StoreState = {
     listings: new Map(),
@@ -185,7 +203,8 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     receipts,
     ratings,
     trees,
-    payTests
+    payTests,
+    erc8004Docs
   }
 
   const ref = Effect.runSync(Ref.make(initial))
@@ -225,8 +244,24 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     prunePayTestStmt.run(row.skillId, row.seller)
   })
 
+  const putDoc = db.query("INSERT INTO erc8004_docs (job_id, kind, bytes, created_at_ms) VALUES (?, ?, ?, ?) ON CONFLICT(job_id, kind) DO NOTHING")
+  const getDoc = db.query<{ bytes: string }, [string, string]>("SELECT bytes FROM erc8004_docs WHERE job_id = ? AND kind = ?")
+  const persistDoc = db.transaction((jobId: string, kind: Erc8004DocKind, bytes: string) => {
+    putDoc.run(jobId, kind, bytes, Date.now())
+    // Check disk, not a potentially stale in-memory snapshot in another open process.
+    // Silently ignoring a conflict would let a caller attest a hash we will never serve.
+    if (getDoc.get(jobId, kind)?.bytes !== bytes) throw new Error("registry document already exists with different bytes")
+  })
+
   const store: Store = {
     ...inner,
+    putErc8004Doc: (jobId, kind, bytes) => Effect.uninterruptible(Effect.sync(() => {
+      erc8004DocKey(jobId, kind)
+      validateErc8004DocBytes(bytes)
+      persistDoc.immediate(jobId, kind, bytes)
+      // No yielding or memory publication before the durable transaction commits.
+      Effect.runSync(inner.putErc8004Doc(jobId, kind, bytes))
+    })),
     putJob: (job) =>
       Effect.tap(inner.putJob(job), () =>
         Effect.sync(() =>
@@ -320,5 +355,6 @@ const emptyState = (): StoreState => ({
   receipts: [],
   ratings: [],
   trees: new Map(),
-  payTests: new Map()
+  payTests: new Map(),
+  erc8004Docs: new Map()
 })
