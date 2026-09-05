@@ -33,6 +33,16 @@ it("only reads the requested detail identity, rechecking ownership and withholdi
     const owners = output.match(/\[owner-read\] \d+/g) ?? [], reads = output.match(/\[evidence-read\] \d+/g) ?? []
     expect(owners).toEqual(["[owner-read] 1", "[owner-read] 2", "[owner-read] 3", "[owner-read] 4", "[owner-read] 5"])
     expect(reads).toEqual(["[evidence-read] 1", "[evidence-read] 3", "[evidence-read] 5"])
+    for (const [id, verified, current] of [["fresh", true, true], ["transferred", false, false],
+      ["stale", true, false], ["unreadable", false, false], ["unverified", true, true]] as const) {
+      const detail = await (await get(`/listings/evidence-${id}`)).json()
+      expect(detail.erc8004).toMatchObject({ verified, stale: !current, chain: "eip155:5042002" })
+      expect(Object.keys(detail.erc8004).sort()).toEqual((current ? ["agentId", "registrationTx", "verified", "chain", "registry",
+        "validationPasses", "validationsRead", "settlementFeedback", "stale"] : ["agentId", "registrationTx", "verified", "chain", "registry", "stale"]).sort())
+      if (current) expect(detail.erc8004).toMatchObject({ validationPasses: 7, validationsRead: 8, settlementFeedback: 5 })
+      expect(JSON.stringify(detail)).not.toMatch(/PRIVATE_RPC|PRIVATE_SERVICE/)
+    }
+    expect(await (await get("/listings/evidence-missing")).json()).not.toHaveProperty("erc8004")
     expect(output).not.toMatch(/PRIVATE_RPC|PRIVATE_SERVICE/)
   } finally {
     if (child.exitCode === null && child.signalCode === null) await new Promise<void>(resolve => {

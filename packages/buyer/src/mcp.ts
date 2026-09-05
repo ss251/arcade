@@ -110,6 +110,68 @@ const hubJson = async (path: string): Promise<unknown> => {
   return res.json()
 }
 
+export interface Erc8004Evidence {
+  readonly agentId: string
+  readonly registrationTx?: string
+  readonly verified: boolean
+  readonly chain: string
+  readonly registry: string
+  readonly validationPasses?: number
+  readonly validationsRead?: number
+  readonly settlementFeedback?: number
+  readonly stale: boolean
+}
+
+/** Network responses are untrusted even when their TypeScript shape is known. Keep the
+ * same public, validated projection in model-facing text and machine-readable content. */
+const checkedErc8004Evidence = (raw: unknown): { evidence: Erc8004Evidence; explorer: string } | undefined => {
+  try {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined
+    const own = (key: string): unknown => {
+      const descriptor = Object.getOwnPropertyDescriptor(raw, key)
+      return descriptor !== undefined && Object.hasOwn(descriptor, "value") ? descriptor.value : undefined
+    }
+    const agentId = own("agentId"), network = own("chain"), registry = own("registry")
+    const config = loadChainConfig()
+    if (config.status !== "ready" || config.erc8004 === undefined ||
+      typeof agentId !== "string" || !/^(0|[1-9][0-9]{0,77})$/.test(agentId) || BigInt(agentId) >= 2n ** 256n ||
+      network !== config.caip2 || typeof registry !== "string" ||
+      registry.toLowerCase() !== config.erc8004.identity.toLowerCase()) return undefined
+    const explorer = new URL(config.explorerBaseUrl)
+    if (explorer.protocol !== "https:" || explorer.username || explorer.password || explorer.search || explorer.hash) return undefined
+    const registrationTx = own("registrationTx"), verified = own("verified") === true
+    const base: Erc8004Evidence = { agentId, chain: config.caip2, registry: config.erc8004.identity,
+      verified, stale: true,
+      ...(typeof registrationTx === "string" && /^0x[0-9a-fA-F]{64}$/.test(registrationTx) ? { registrationTx } : {}) }
+    const passes = own("validationPasses"), reads = own("validationsRead"), feedback = own("settlementFeedback")
+    const count = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    const current = verified && own("stale") === false && count(passes) && count(reads) && count(feedback) &&
+      passes <= reads && reads <= 20 && feedback <= 4096
+    return { explorer: config.explorerBaseUrl.replace(/\/+$/, ""), evidence: current
+      ? { ...base, stale: false, validationPasses: passes, validationsRead: reads, settlementFeedback: feedback }
+      : base }
+  } catch { return undefined }
+}
+
+/** These are hub-reported, measured facts. A supplied transaction hash remains an
+ * announcement: checking ownerOf does not establish which transaction minted the NFT. */
+export const renderErc8004Evidence = (raw: Erc8004Evidence | undefined): string => {
+  const heading = "SETTLEMENT EVIDENCE (ERC-8004 on Arc)\n"
+  if (raw === undefined) return heading + "  This skill has no ERC-8004 identity published."
+  const checked = checkedErc8004Evidence(raw)
+  if (checked === undefined) return heading + "  Identity evidence is unavailable for the selected network; counts and links are withheld."
+  const e = checked.evidence
+  return heading +
+    `  agent                #${e.agentId} on ${e.chain}, registry ${e.registry}\n` +
+    (e.registrationTx === undefined ? "" :
+      `  announced registration ${checked.explorer}/tx/${e.registrationTx}\n  mint transaction     not independently verified\n`) +
+    `  ownership            ${e.verified ? "confirmed by the hub's IdentityRegistry.ownerOf read" : "unverified — current seller ownership is not confirmed"}\n` +
+    (e.stale ? "  the registries could not be read or verified; counts are withheld" :
+      `  validations passed   ${e.validationPasses} of ${e.validationsRead}, answered by the hub's validator key\n` +
+      `  settlements vouched  ${e.settlementFeedback}, from the hub's attester key only — each names a settlement transaction`) +
+    "\n  These are counts of recorded transactions. Nothing here gates a purchase."
+}
+
 interface Listing {
   readonly id: string
   readonly serviceName: string
@@ -123,6 +185,7 @@ interface Listing {
   readonly replaces?: string
   readonly stats?: Record<string, unknown>
   readonly ratings?: Record<string, unknown>
+  readonly erc8004?: Erc8004Evidence
 }
 
 const listings = async (): Promise<ReadonlyArray<Listing>> =>
@@ -416,6 +479,9 @@ const dispatch = async (name: string, rawArgs: unknown): Promise<CallToolResult>
       // available: …" rather than a bare 404 the agent has to guess at.
       await findListing(skillId)
       const detail = (await hubJson(`/listings/${skillId}`)) as Listing
+      const evidence = checkedErc8004Evidence(detail.erc8004)?.evidence
+      const { erc8004: _untrustedEvidence, ...withoutEvidence } = detail
+      const publicDetail = { ...withoutEvidence, ...(evidence === undefined ? {} : { erc8004: evidence }) }
       return ok(
         `${skillId} — ${detail.price}/call, seller ${detail.seller}\n\n` +
           // Name and description are the seller's, so they are quoted rather than spoken.
@@ -424,8 +490,9 @@ const dispatch = async (name: string, rawArgs: unknown): Promise<CallToolResult>
           `OUTPUT SCHEMA\n${JSON.stringify(detail.outputSchema, null, 2)}\n\n` +
           `BOUNDS (the seller's declared limits for one call)\n${JSON.stringify(detail.bounds, null, 2)}\n\n` +
           `MEASURED STATS\n${JSON.stringify(detail.stats ?? {}, null, 2)}\n\n` +
+          `${renderErc8004Evidence(detail.erc8004)}\n\n` +
           `RATINGS (only wallets that paid for a call can leave one)\n${JSON.stringify(detail.ratings ?? {}, null, 2)}`,
-        { skill: detail as unknown as Record<string, unknown> }
+        { skill: publicDetail }
       )
     }
 

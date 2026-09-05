@@ -900,7 +900,9 @@ const main = Effect.gen(function* () {
         const ratings = await run(store.ratingsFor(listingMatch[1]!))
         const avg =
           ratings.length === 0 ? null : ratings.reduce((a, r) => a + r.stars, 0) / ratings.length
+        const identity = await run(listingEvidence(res.right, erc8004, chainConfig, rail.name))
         return json({ ...res.right.listing, seller: res.right.seller, stats, ratings: { count: ratings.length, average: avg },
+          ...(identity === undefined ? {} : { erc8004: identity }),
           delisted: res.right.delisted === true, payTested: res.right.payTested ?? null,
           payTestHistory: await run(store.payTestHistory(res.right.listing.id, res.right.seller)) })
       }
