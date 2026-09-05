@@ -51,3 +51,28 @@ The H2 full precommit gate passed 2,237 Vitest tests across 111 files, 309 Bun
 tests / 3,455 assertions across 28 files, and root/web strict TypeScript. H3's
 separately scoped pure tests were present but neither imported nor staged by H2.
 No main merge, funded F result, live seller earnings or deployed route is claimed.
+
+H2 committed separately as e253f34. H3's final pure projection passed 20 focused
+tests and independent review. Both historical public copies are byte-exact plus
+their banner; the three recorded hashes match and privacy review is CLEAN.
+
+At 11:50:41 UTC, seven actual-router tests genuinely failed for the absent tree
+route, cache/error behavior and a shared Unicode-token error on existing jobs.
+The canonical ASCII-hex guard fixes that existing 500 without changing minted
+tokens. The new tree route authenticates before reading receipts and emits only
+private, no-store responses. Final 11:53:16 UTC checks passed seven Bun tests /
+175 assertions, exact targeted TypeScript and diff checks. Independent source
+review is CLEAN with its own seven-test / 175-assertion HTTP run and cleanup proof.
+Parent read the complete route diff, test and original report. All prior reports
+remain unchanged. H3 is frozen for public-copy checks and its separate full gate.
+
+The owner's later F1 approval enabled a separate one-deposit/one-payment run on
+main. Its accepted Gateway transfer and buyer debit passed; recipient credit is
+pending batch, not available or independently mined. This unlocks F2–12 code work,
+not an H/G merge before the remaining F implementation or any new paid allowance.
+
+Final public H3 review is CLEAN: all three report copies remain byte-exact plus
+the banner, local links resolve and no private material was exported. H3's own
+full gate passed 2,237 Vitest tests / 111 files, 316 Bun tests / 3,630 assertions /
+29 files, and strict root/web TypeScript. Source scope remains frozen for its
+separate local commit; H4 source work has not started.

@@ -57,6 +57,7 @@ export { scrubReceipt, type PublicReceiptRow, type PublicReceiptChild } from "./
 import { listingReceiptFeed, publicStats, receiptLimit } from "./public-feeds.ts"
 import { receiptChildExplorer, receiptExplorer } from "./receipt-reference.ts"
 import { sellerSummary, SellerSummaryUnavailable } from "./summary.ts"
+import { buildTreeView } from "./tree-view.ts"
 import { chainCheck, chainMetadataCheck, chainStartupRefusal } from "./chain-check.ts"
 import { createChainRpc } from "./chain-rpc.ts"
 import {
@@ -1340,6 +1341,27 @@ const main = Effect.gen(function* () {
           await Bun.sleep(300)
         }
         return json({ job_id: jobId, status: "pending" }, 202)
+      }
+
+      if (path === "/trees" || path.startsWith("/trees/")) {
+        const treeJson = (body: unknown, status = 200) => {
+          const response = json(body, status)
+          response.headers.set("cache-control", "private, no-store")
+          return response
+        }
+        const treeMatch = /^\/trees\/(job_[A-Za-z0-9]{16,128})$/.exec(path)
+        if (req.method !== "GET" || treeMatch === null) return treeJson({ error: "not_found" }, 404)
+        const rootJobId = treeMatch[1]!
+        // Root capability only, checked before any ledger read. The builder also
+        // refuses to promote a child with its own otherwise-valid job capability.
+        if (!jobTokenOk(rootJobId, tokenFrom(req, url))) return treeJson({ error: "not_found" }, 404)
+        const result = await run(store.allReceipts.pipe(
+          Effect.map(receipts => buildTreeView(rootJobId, receipts)),
+          Effect.exit
+        ))
+        if (result._tag === "Failure") return treeJson({ error: "tree_unavailable" }, 503)
+        if (result.value === undefined) return treeJson({ error: "not_found" }, 404)
+        return treeJson(result.value)
       }
 
       // `POST /publish` used to live here, behind `ARCADE_PUBLISH_TOKEN` defaulting to
