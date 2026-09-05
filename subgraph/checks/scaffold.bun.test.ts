@@ -68,13 +68,19 @@ describe("G1 offline smoke scaffold", () => {
     expect(git).not.toContain("subgraph/")
   })
 
-  test("does not label an offline build as Studio deployment or indexed-chain evidence", () => {
+  test("separates the historical local build from the partial live indexing checkpoint", () => {
     const readme = text("../README.md")
-    expect(readme).toContain("Studio deployment: PENDING")
-    expect(readme).toContain("Query URL: PENDING")
-    expect(readme).toContain("Authorization requirement: UNVERIFIED")
-    expect(readme).toContain("Registry support: UNVERIFIED")
-    expect(readme).toContain("Tasks 2–6 remain gated")
+    expect(readme).toContain("Historical local-only checkpoint")
+    const current = readme.split("## September 5, 2026 — partial live checkpoint")[1]?.split("\n## ")[0]
+    expect(current).toBeDefined()
+    expect(current).toContain("2026-09-05T13:24:16.472Z")
+    expect(current).toContain("QmePuPnHraVaV9TmxaAwCCMKwTD8iFW96eoEUfSA1BoCW8")
+    expect(current).toContain("https://api.studio.thegraph.com/query/1721684/arcade-ledger-arc-testnet/v0.0.1-smoke")
+    expect(current).toContain("2026-09-05T13:36:11.268Z")
+    expect(current).toContain("2026-09-05T13:45:02.316Z")
+    expect(current).toContain("latest settlements and the exact known-transaction filter were empty")
+    expect(current).toContain("not a fully-synced or complete G1 live PASS")
+    expect(current).toContain("Tasks 2–6 remain gated")
     expect(readme).toContain("Missing owner prerequisites are not an unsupported-network result")
   })
 })

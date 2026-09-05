@@ -1,15 +1,22 @@
 # Plan G — execution records
 
 Task 1's local smoke scaffold, source-contract tests, pinned code generation and
-WASM build passed. The live Studio account/deployment/query gate remains pending;
-no query URL or network-support result is invented. Tasks 2–6 remain gated on it.
+WASM build passed. The September 5 partial live checkpoint records an accepted
+one-shot Studio deployment and both keyless/authenticated data access, but empty
+settlement lists and no known-runbook match. Tasks 2–6 remain gated on that missing
+proof; neither full sync nor complete G1 live success is claimed.
 This worktree must not merge ahead of Plan F.
 
 - [Approved plan](../../plans/2026-09-04-G-graph.md)
 - [Design specification](../../specs/2026-09-04-ethonline-continuity-design.md)
 - [Original work order](../2026-09-04-A-settlement-core/work-order.md)
-- [Current Task 1 brief](task-1-brief.md)
+- [Original Task 1 local brief](task-1-brief.md)
 - [Local implementation report](task-1-report.md)
+- [Dated Task 1 partial live brief](task-1-live-brief.md)
+- [Historical private-runtime implementation report](task-1-live-runtime-report.md)
+- [Runtime security review and superseding correction](task-1-live-runtime-review.md)
+- [Independent keyless deployment/indexing observation](task-1-live-evidence-review.md)
+- [Parent publication review and later indexing checkpoint](task-1-live-parent-review.md)
 - [Task 7 brief](task-7-brief.md)
 - [Task 7 implementation report](task-7-report.md)
 - [Task 10 brief](task-10-brief.md)

@@ -132,3 +132,54 @@ independent source review is CLEAN. Independent public review is also CLEAN: fou
 exact bannered reports, 27 resolved local links and a targeted privacy scan. The
 separate full gate remains pending. No live Graph purchase, new nested profile or
 historical A9 replay is claimed.
+
+## September 5 — G1 partial live deployment and indexing checkpoint
+
+This entry supersedes the earlier owner-pending status without rewriting any
+historical report. One owner-approved deployment of the already-uploaded CID
+`QmePuPnHraVaV9TmxaAwCCMKwTD8iFW96eoEUfSA1BoCW8` was acknowledged at
+13:24:16.472 UTC, returning the exact versioned Studio endpoint recorded in the
+[live brief](task-1-live-brief.md). The private journal retained intent before
+dispatch and completion afterward; no repeat or re-upload is claimed.
+
+Both early authorization modes returned HTTP 200 with GraphQL startup errors.
+At 13:36:11.268 UTC, an independent keyless read returned data at block 5,481,110;
+at 13:45:02.316 UTC, the parent authenticated read returned data at block
+16,195,110. Both reported the exact CID and `hasIndexingErrors: false`; both
+latest and exact known-transaction lists were empty. Thus both modes served data
+at their observed times, but neither full synchronization nor an indexed
+runbook-settlement match is proved. G1 remains partial and G2–6 remain held.
+The primary registry observation and parent historical RPC-absence observations
+are separately attributed in the brief; neither is replaced with new payment
+evidence or used to infer decentralized/x402 availability.
+
+The original private runtime, security-follow-up and independent evidence reports
+are retained unchanged. Their public copies add a historical banner, with the
+evidence copy removing the personal owner label and exact private journal path.
+No executable helper, journal, secret, owner handoff or internal research is
+published. The original runtime report's old sanitizer claim and hashes remain
+historical and are explicitly superseded by its linked security follow-up.
+
+The README contract was updated with a genuine five-pass/one-fail Red before the
+dated README change. The final six tests / 36 assertions, exact nested strict
+TypeScript, unchanged source/original-report fingerprints, three exact public
+copies, all 43 local links and targeted privacy/diff checks passed by 14:00:34 UTC.
+Parent independent review and the separate full gate remain pending; this is not
+a whole-repository privacy or gate claim. No deployment, query or network request is performed
+by this documentation update, and no F-before-G merge exception is introduced.
+
+### Parent checkpoint after the publisher freeze
+
+Parent selected-file review is CLEAN, with independently repeated exact-copy,
+original/source fingerprint, 43-link, privacy, six-test / 36-assertion and nested
+strict checks. The separate full test/root-and-web-type command exited 0; Bun
+reported 347 tests / 3,683 assertions across 32 files, including 19 retained private
+runtime tests. Vitest passed, with no invented numeric count after bounded output.
+An actual corrected subgraph WASM build also passed; the first malformed command
+only printed help and is not counted as build evidence. See the
+[parent report](task-1-live-parent-review.md).
+
+The parent's one later keyless query at 14:10:24.097 UTC reached block 42,441,110
+with the exact CID and no indexing errors. Both settlement lists remained empty.
+No paid query, new settlement or deployment was performed. The partial checkpoint
+is ready for its small atomic commit, not a main merge or G2–6 release.
