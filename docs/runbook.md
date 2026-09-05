@@ -1350,3 +1350,19 @@ re-point command above refreshes routing and context only, not liveness or raw p
 Publish only that public evidence subset. Keep setup journals, commitment secrets,
 keys, headers, raw job stores and provider credentials private. No placeholder hash,
 offline receipt, or pre-existing unrelated Arc transaction substitutes for a missing beat.
+
+## M6 — one approved Gateway probe, September 5, 2026
+
+F1's single owner-approved live invocation passed its deposit, verification,
+accepted-transfer and buyer-debit criteria. It deposited exactly 0.5 Arc-testnet
+USDC and authorized one 0.001 USDC payment to the distinct approved recipient.
+Approval and deposit gas totaled 0.003574125 native USDC. No withdraw or session
+run occurred; the consumed allowance must not be replayed.
+
+The buyer has 0.499 USDC available. The recipient has **0 available / 0.001 USDC
+pending batch**, and the correlated transfer remains `received` with no batch hash.
+Do not present this as available seller funds or independently mined batch proof.
+See [M6 evidence](evidence/m6-gateway.md) and the [exact live follow-up](superpowers/sdd/2026-09-04-F-gateway-sessions/task-1-live-report.md)
+for amounts, addresses, transactions, transfer identifier and exact CLI output.
+F2–12 implementation is unblocked, while further live runs and F13 retain their
+separate evidence/owner-approval requirements. EIP-3009 remains the application default.

@@ -1,5 +1,24 @@
 # M6 Gateway gate — September 5, 2026
 
+## Later approved live result — PASS with pending-batch limits
+
+The unchanged reviewed probe ran once with the owner's dedicated buyer and exact
+0.5 USDC deposit / 0.001 USDC payment approval. It exited zero after closing the
+private journal. Independent read-only reconciliation completed at 12:02:07.320
+UTC: successful approval and deposit, exact calldata/events, sequential nonces,
+accepted correlated transfer and buyer balance 499000 atomic. Actual approval plus
+deposit gas totaled 0.003574125 native USDC.
+
+Recipient credit is **0 available / 1000 atomic pending batch**. Transfer status
+is `received` with no batch transaction hash. F1's acceptance/debit gate passed;
+available recipient credit and independently mined batch settlement are **not**
+proven. F2–12 code work is unblocked; no new paid run or F13 action is authorized.
+See the [dated live report, exact CLI output and transaction references](../superpowers/sdd/2026-09-04-F-gateway-sessions/task-1-live-report.md).
+The one-run approval is consumed: never replay its command or select a new journal
+to bypass it. Private journals and key material remain excluded from the repository.
+
+## Earlier local-only checkpoint — retained historical record
+
 **Full funded gate: OWNER-PENDING / UNPROVEN.** The bounded local probe is
 implemented and its offline tests pass. No F1 buyer key, approval transaction,
 deposit, payment authorization, verify request or settle request has been used.

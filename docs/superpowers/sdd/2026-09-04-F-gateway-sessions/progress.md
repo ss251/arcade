@@ -28,3 +28,29 @@ these remain offline evidence, not a funded Gateway run.
 The commit records only the local milestone, not full F1 completion. Actual
 owner-selected funding, key workflow, distinct recipient and spend approval
 remain missing; F2–12 and any F13 decision are unchanged.
+
+## September 5 — approved single live gate
+
+The owner later provided a dedicated funded buyer and approved exactly one 0.5
+USDC deposit plus bounded gas and one 0.001 USDC payment to a distinct recipient.
+The unchanged reviewed CLI ran once on main0e5d03c, exited zero and printed PASS
+after closing its fresh private journal. Public preflight and independent source
+audit preceded the inline-only key read. The accepted transfer was created at
+11:53:45.570 UTC; its buyer balance is exactly 499000 atomic. Recipient balance is
+zero available / 1000 pending batch. The transfer has no reported batch hash and
+no independent mined-payment claim is made. Read-only reconciliation did not retry
+any mutation. See the dated live report; original local reports are unchanged.
+
+F2–12 implementation is now unblocked. Full F/G/H merge ordering, no-push policy,
+F13's separate evidence and all further live-spend approvals remain unchanged.
+This publication has its own independent review and full test/type gate pending.
+
+The live-evidence publication's own full gate passed 2,145 Vitest tests / 108
+files, 301 Bun tests / 3,389 assertions / 26 files, and strict root/web TypeScript.
+No source changed and the approved live probe was not replayed during testing.
+
+Independent public review is CLEAN: all eleven retained journal events match the
+public references, CLI output is exact, historical records are unchanged, links
+resolve and no key, signature, raw transaction or private journal path is exported.
+Receipt/gas/pending-credit facts are separately attributed to the read-only verifier;
+the public-copy reviewer did not claim another live query or test run.

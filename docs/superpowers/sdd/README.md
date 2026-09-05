@@ -9,7 +9,7 @@ These are sanitized copies of the execution records for ARCADE's ETHOnline conti
 | C — Pay-tested listings | [Reports and preparation](2026-09-04-C-canary/README.md) | Complete; approved scheduled-purchase, delisting and recovery proof passed. |
 | D — ERC-8004 | [Reports and preparation](2026-09-04-D-erc8004/README.md) | Complete; approved identity, settlement and validation proof passed. |
 | E — ENS namespaces | [Reports and preparation](2026-09-04-E-ens/README.md) | Complete; approved isolated live continuation passed. Production URLs remain pending. |
-| F — Gateway sessions | [Gate brief, report and progress](2026-09-04-F-gateway-sessions/README.md) | F1 local probe implemented; funded live gate OWNER-PENDING. Session implementation remains gated. |
+| F — Gateway sessions | [Gate brief, report and progress](2026-09-04-F-gateway-sessions/README.md) | F1 single live gate passed acceptance/debit checks; recipient credit pending batch. F2–12 code work unblocked; session live evidence remains separate. |
 
 Plans F–I have [committed implementation plans](../plans/2026-09-04-02-execution-index.md); their execution records are published as that work progresses. This index does not claim those plans are complete.
 
