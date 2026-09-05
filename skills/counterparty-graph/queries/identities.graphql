@@ -1,0 +1,31 @@
+# Fixed Base ERC-8004 evidence query. Hitting any page cap is incomplete evidence.
+query CounterpartyIdentities($address: Bytes!) {
+  _meta { block { number hash } hasIndexingErrors }
+  asWallet: agents(where: { agentWallet: $address }, first: 25) { ...AgentCore }
+  asOwner: agents(where: { owner: $address }, first: 25) { ...AgentCore }
+}
+
+fragment AgentCore on Agent {
+  id
+  chainId
+  agentId
+  owner
+  agentWallet
+  totalFeedback
+  lastActivity
+  registrationFile {
+    name
+    active
+    x402Support
+    supportedTrusts
+    mcpEndpoint
+    ens
+  }
+  validations(first: 25) {
+    id
+    status
+    response
+    validatorAddress
+    agent { id }
+  }
+}

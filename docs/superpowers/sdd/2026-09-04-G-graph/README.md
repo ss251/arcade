@@ -10,6 +10,8 @@ This worktree must not merge ahead of Plan F.
 - [Original work order](../2026-09-04-A-settlement-core/work-order.md)
 - [Current Task 1 brief](task-1-brief.md)
 - [Local implementation report](task-1-report.md)
+- [Task 10 brief](task-10-brief.md)
+- [Task 10 implementation report](task-10-report.md)
 - [Progress](progress.md)
 - [Subgraph operator notes](../../../../subgraph/README.md)
 

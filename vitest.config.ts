@@ -7,7 +7,9 @@ export default defineConfig({
     include: [
       "packages/*/test/**/*.test.ts",
       "apps/*/test/**/*.test.ts",
-      "apps/*/test/**/*.test.tsx"
+      "apps/*/test/**/*.test.tsx",
+      // Sellable skill logic belongs in the same gate as application code.
+      "skills/*/test/**/*.test.ts"
     ],
     // Live-chain tests are opt-in: `bun test --project=live` style runs, or ARCADE_LIVE=1.
     //

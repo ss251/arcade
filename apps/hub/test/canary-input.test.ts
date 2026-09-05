@@ -174,10 +174,10 @@ describe("payTestSkipReason", () => {
 })
 
 describe("first-party listings", () => {
-  it("validates all eight declared inputs and skips only the unchanged $0.30 lineage probe at a $0.25 cap", () => {
+  it("validates all nine declared inputs and skips only the unchanged $0.30 lineage probe at a $0.25 cap", () => {
     const skills = fileURLToPath(new URL("../../../skills", import.meta.url))
     const directories = readdirSync(skills, { withFileTypes: true }).filter((entry) => entry.isDirectory())
-    expect(directories).toHaveLength(8)
+    expect(directories).toHaveLength(9)
     for (const directory of directories) {
       const raw: unknown = JSON.parse(readFileSync(join(skills, directory.name, "arcade.json"), "utf8"))
       const pub = toPublicListing(Schema.decodeUnknownSync(SkillManifest)(raw))

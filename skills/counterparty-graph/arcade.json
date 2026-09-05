@@ -1,0 +1,76 @@
+{
+  "id": "counterparty-graph",
+  "version": "0.1.0",
+  "serviceName": "Counterparty Graph",
+  "description": "Applies an evidence policy to ERC-8004 identity, validation and feedback from The Graph on Base. Returns allow, manual-review or refuse with bounded reasons and source coordinates. Raw payment claims are not verified settlements; this is not a financial safety assessment.",
+  "tags": ["thegraph", "erc8004", "diligence", "x402", "compose"],
+  "price": "$0.05",
+  "bounds": { "timeoutSec": 90 },
+  "inputSchema": {
+    "type": "object",
+    "required": ["address"],
+    "additionalProperties": false,
+    "properties": {
+      "address": { "type": "string", "pattern": "^0x[a-fA-F0-9]{40}$", "description": "The public EVM address whose Base evidence is assessed." }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["address", "verdict", "identities", "attesterSettledCount", "contradictions", "sources", "evidenceFlags"],
+    "properties": {
+      "address": { "type": "string", "pattern": "^0x[a-f0-9]{40}$" },
+      "verdict": { "type": "string", "enum": ["allow", "manual-review", "refuse"], "description": "Evidence-policy eligibility, not a guarantee of counterparty conduct." },
+      "identities": {
+        "type": "array", "maxItems": 50,
+        "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["agentId", "chainId", "owner", "agentWallet", "name", "active", "x402Support", "ens", "supportedTrusts", "validationsPassed", "validationsFailed"],
+          "properties": {
+            "agentId": { "type": "string", "pattern": "^8453:(0|[1-9][0-9]{0,77})$" },
+            "chainId": { "type": "integer", "enum": [8453] },
+            "owner": { "type": "string", "pattern": "^0x[a-f0-9]{40}$" },
+            "agentWallet": { "type": ["string", "null"], "pattern": "^0x[a-f0-9]{40}$" },
+            "name": { "type": ["string", "null"], "minLength": 1, "maxLength": 256 },
+            "active": { "type": ["boolean", "null"] },
+            "x402Support": { "type": ["boolean", "null"] },
+            "ens": { "type": ["string", "null"], "minLength": 1, "maxLength": 253 },
+            "supportedTrusts": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+            "validationsPassed": { "type": "integer", "minimum": 0, "maximum": 25 },
+            "validationsFailed": { "type": "integer", "minimum": 0, "maximum": 25 }
+          }
+        }
+      },
+      "attesterSettledCount": { "type": "integer", "minimum": 0, "maximum": 100, "description": "Unique non-self clients with independently verified service-settlement evidence, never raw claimed payment hashes." },
+      "contradictions": {
+        "type": "array", "maxItems": 8, "uniqueItems": true,
+        "items": { "type": "string", "enum": ["no-erc8004-identity", "validation-failed", "registration-inactive", "x402-unsupported", "wallet-differs-from-owner", "feedback-revoked", "self-attested", "unattested-no-proof-of-payment"] }
+      },
+      "evidenceFlags": {
+        "type": "array", "maxItems": 12, "uniqueItems": true,
+        "items": { "type": "string", "enum": ["malformed-evidence", "source-invalid", "metadata-missing", "metadata-inconsistent", "evidence-incomplete", "identity-conflict", "relationship-mismatch", "registration-missing", "validation-unknown", "validation-untrusted", "payment-proof-unverified", "payment-proof-invalid"] }
+      },
+      "sources": {
+        "type": "array", "maxItems": 2,
+        "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["name", "endpoint", "subgraphId", "block", "blockHash", "chain", "costAtomic"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "endpoint": { "type": "string", "enum": ["https://gateway.thegraph.com/api/x402/subgraphs/id/43s9hQRurMGjuYnC1r2ZwS6xSQktbFyXMPMqGKUFJojb"] },
+            "subgraphId": { "type": "string", "enum": ["43s9hQRurMGjuYnC1r2ZwS6xSQktbFyXMPMqGKUFJojb"] },
+            "block": { "type": ["integer", "null"], "minimum": 0, "maximum": 9007199254740991 },
+            "blockHash": { "type": ["string", "null"], "pattern": "^0x[a-f0-9]{64}$" },
+            "chain": { "type": "string", "enum": ["eip155:8453"] },
+            "costAtomic": { "type": ["string", "null"], "pattern": "^(0|[1-9][0-9]{0,77})$", "description": "Locally verified query spend in atomic USDC; null when unknown, not an advertised price." },
+            "paymentTx": { "type": ["string", "null"], "pattern": "^0x[a-f0-9]{64}$" }
+          }
+        }
+      }
+    }
+  },
+  "canaryInput": { "address": "0x3600000000000000000000000000000000000000" },
+  "engine": { "adapter": "script", "entry": "run.ts", "capabilities": [] },
+  "secrets": ["GRAPH_X402_PAYER_KEY", "GRAPH_X402_KEYCHAIN_SERVICE"],
+  "egress": ["gateway.thegraph.com", "mainnet.base.org"]
+}

@@ -24,3 +24,17 @@ Plan: [2026-09-04-G-graph](../../plans/2026-09-04-G-graph.md).
   transaction or current network-support result is claimed. G2–6 have not started.
 - G10–12 safety preparation may proceed independently; no paid Base request or
   query claim is authorized by this ledger. F-before-G merge order remains required.
+
+## September 5 — G10 local implementation checkpoint
+
+Task 1 local milestone committed as `53b7ab1`; its live gate remains unchanged.
+Task 10 is implemented with genuine collected Red, actual zero-budget decode
+failure and exact eight-to-nine canary compatibility regression recorded in its
+report. Focused 147 tests / strict checks passed. Parent separately repeated all
+77 G10/G11 focused tests successfully. G10 independent source/dependency/public
+report review is CLEAN; parent confirmed the installed client transport limits.
+No key, paid query, chain write, Studio deployment or live proof occurred. The
+whole-repository gate passed: 2,222 Vitest tests / 110 files, 255 Bun tests /
+1,377 assertions / 23 files, and strict TypeScript exit zero. This frozen-worktree
+run also included the separately reviewed, not-yet-committed G11 tests. G10's
+staged tests do not import G11, and its commit remains separately scoped.
