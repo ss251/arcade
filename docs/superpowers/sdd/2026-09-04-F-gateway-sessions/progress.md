@@ -288,3 +288,39 @@ literal substitutions and ten public files with 63 resolving local links. The
 final follow-up copy and the current parent/index addenda form the last bounded
 publication delta before the atomic F6 commit; earlier audit checkpoints remain
 unchanged. Seven historical reports/planning copies are now prepared in total.
+
+## F6 commit and F7 lifecycle HTTP freeze — September 6, 2026
+
+F6 committed separately as `5d61133`, after the final independent publication
+delta was CLEAN: seven exact historical copies, nine literal substitutions,
+eleven public files and 67 resolving local links. Its corrected complete gate
+and source review remain documented above; original failed checkpoints remain.
+
+F7's [brief](task-7-brief.md) and [author report](task-7-report.md) record the
+seven-file lifecycle HTTP implementation, actual body/authentication/privacy Reds
+and the final 101-test Vitest / 11-test Bun / 184-assertion focused checkpoint.
+Exact seven-file typing passed. Parent read all frozen source and tests and
+matched seven F7 plus two F6 fingerprints. The [parent review](task-7-parent-review.md)
+keeps the focused checkpoint distinct from independent and complete gates now
+in progress. Readiness/decision/preparation copies retain their historical states.
+
+Native loopback tests prove complete application responses and explicit owned
+cleanup, not peer TCP EOF or external Gateway activity. F8 remains required for
+paid session calls. F12 live stays NOT RUN under no-new-spending instructions;
+F13 fallback is not triggered by the passing F1. No approval replay or push.
+
+### F7 final source review and complete gate
+
+The [independent source review](task-7-independent-review.md) is CLEAN, with 101
+focused Vitest / four files, 11 actual Bun / 184 assertions, exact seven-root
+typing and a separately attributed seven-case / 19-assertion supplement with
+eight-root typing. Parent independently repeated the supplement and seven-root
+typing. Frozen seven F7 plus two F6 hashes remain unchanged. Peer EOF is still
+unproved; complete application responses and owned cleanup are what was observed.
+
+The parent's complete gate passed: 2,412 Vitest / 116 files, 385 Bun / 3,978
+assertions / 34 files and strict root/web checks, exit zero. The later standalone
+supplement is not in that collected total. Initial public review was CLEAN for
+four exact copies, two literal substitutions and 69 valid local links. Five
+historical copies are now prepared with seven total locator substitutions;
+final review-copy/index delta and atomic F7 commit remain pending.

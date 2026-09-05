@@ -30,6 +30,10 @@ independently mined. F2–12 code work is unblocked; no extra live allowance is 
 - [Task 6 identifier correction and genuine regressions](task-6-bound-correction.md)
 - [Task 6 final independent correction review](task-6-bound-review.md)
 - [Task 6 parent review and gate chronology](task-6-parent-review.md)
+- [Task 7 private lifecycle HTTP brief](task-7-brief.md)
+- [Task 7 implementation and actual-router evidence](task-7-report.md)
+- [Task 7 parent review and gate chronology](task-7-parent-review.md)
+- [Task 7 final independent source/runtime review](task-7-independent-review.md)
 - [Progress](progress.md)
 - [Gate evidence and owner prerequisites](../../../evidence/m6-gateway.md)
 
@@ -79,3 +83,19 @@ The corrected complete repository test/root-web type gate passed. Initial
 publication review is also CLEAN (six exact copies / 63 resolving links); the
 final review copy and current index addenda receive a final delta check before
 the atomic commit. This is a local lifecycle milestone, not live session evidence.
+
+F6 subsequently committed as `5d61133` after the final CLEAN publication delta
+(seven exact copies, nine literal substitutions, eleven public files and 67 local
+links). F7's seven-file private lifecycle HTTP implementation is now frozen.
+Author checks pass 101 focused Vitest and 11 actual Bun / 184 assertions plus
+exact nested strict typing. Parent read the complete source/tests and matched
+all seven source plus two F6 fingerprints. Independent source/public review and
+the complete repository gate are pending at this checkpoint. F8 paid integration
+remains separate; no new live payment or Gateway batch proof is claimed.
+
+F7's final independent source review is CLEAN: 101 focused Vitest, 11 actual Bun /
+184 assertions and exact strict checks, plus the separately run seven-case /
+19-assertion supplement. Parent's frozen full gate passed 2,412 Vitest / 116 files,
+385 Bun / 3,978 assertions / 34 files and root/web strict typing. Initial public
+review is CLEAN; the final independent-report copy and index delta are reviewed
+before the atomic commit. Earlier pending checkpoints remain historical.

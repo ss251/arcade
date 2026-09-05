@@ -18,6 +18,7 @@ import { explorerTxUrl, formatPrice, type Receipt } from "@arcade/core"
  *    for every root. `hop` and `ancestors` (a list of SKILL ids, not job ids) stay, because
  *    they describe shape without naming a call.
  *  - `buyer` — a wallet address plus a skill id is a purchase history.
+ *  - `sessionId` — names a buyer's private session accounting and receipt.
  *  - `authorizationNonce` — the EIP-3009 nonce backing the settlement, scoped to whoever
  *    holds the job token, not the public.
  */
@@ -28,6 +29,7 @@ export const publicReceipt = (r: Receipt) => {
     authorizationNonce: _authorizationNonce,
     rootJobId: _rootJobId,
     parentJobId: _parentJobId,
+    sessionId: _sessionId,
     children,
     ...rest
   } = r

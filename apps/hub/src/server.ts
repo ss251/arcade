@@ -31,7 +31,7 @@ import {
   GatewayLive,
   RailTest
 } from "@arcade/payments"
-import { createHmac, timingSafeEqual } from "node:crypto"
+import { createHmac } from "node:crypto"
 import { createPublicClient, http, recoverMessageAddress } from "viem"
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
@@ -43,6 +43,8 @@ import { listingEvidence } from "./listing-evidence.ts"
 import { AttestLive, AttestTag } from "./attest.ts"
 import { runJob } from "./pipeline.ts"
 import { RailsTag, railsLayerFrom } from "./rails.ts"
+import { makeSessions } from "./sessions.ts"
+import { makeSessionRoutes, timingSafeTokenOk } from "./server-sessions.ts"
 import { inputGate } from "./input-gate.ts"
 import { payTestSkipReason } from "./canary-input.ts"
 import { canaryFromEnv, canaryLoop } from "./canary.ts"
@@ -450,19 +452,13 @@ const main = Effect.gen(function* () {
    * so nothing has to be persisted or expired, and a buyer who has the 202 can always
    * re-derive access to their own job and nobody else's.
    */
-  const hubSecret =
-    process.env["ARCADE_HUB_SECRET"] ?? crypto.randomUUID() + crypto.randomUUID()
+  const configuredHubSecret = process.env["ARCADE_HUB_SECRET"]
+  const hubSecret = configuredHubSecret ?? crypto.randomUUID() + crypto.randomUUID()
   const jobToken = (jobId: string): string =>
     createHmac("sha256", hubSecret).update(`arcade-job:${jobId}`).digest("hex").slice(0, 32)
-  const jobTokenOk = (jobId: string, presented: string | null): boolean => {
-    if (presented === null) return false
-    const expected = jobToken(jobId)
-    // Constant-time: token comparison is a guessing oracle otherwise.
-    return (
-      presented.length === expected.length &&
-      timingSafeEqual(Buffer.from(presented), Buffer.from(expected))
-    )
-  }
+  const jobTokenOk = (jobId: string, presented: string | null): boolean => timingSafeTokenOk(jobToken(jobId), presented)
+  const sessions = makeSessions({ store, rails, chain: chainConfig })
+  const handleSessionRoute = makeSessionRoutes({ sessions, rails, sessionStorage: store.sessionStorage, hubSecret, configuredHubSecret })
   const tokenFrom = (req: Request, url: URL): string | null =>
     req.headers.get("x-job-token") ?? url.searchParams.get("token")
 
@@ -778,6 +774,9 @@ const main = Effect.gen(function* () {
     async fetch(req) {
       const url = new URL(req.url)
       const path = url.pathname
+
+      const sessionResponse = await handleSessionRoute(req)
+      if (sessionResponse !== undefined) return sessionResponse
 
       if (path === "/ws") {
         const data = {}

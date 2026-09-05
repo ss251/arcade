@@ -46,6 +46,14 @@ const receipt = Receipt.make({
 })
 
 describe("publicReceipt", () => {
+  it("excludes the private session identifier while preserving existing public evidence", () => {
+    const sessionId = `ses_${"a".repeat(32)}`
+    const pub = publicReceipt(Receipt.make({ ...receipt, sessionId }))
+    expect(JSON.stringify(pub)).not.toContain(sessionId)
+    expect(pub).not.toHaveProperty("sessionId")
+    expect(pub).toMatchObject({ skillId: "parent", rail: "test", network: "eip155:5042002", priceAtomic: "250000" })
+  })
+
   it("carries no jobId, buyer, or authorizationNonce at any depth", () => {
     const pub = publicReceipt(receipt)
     const json = JSON.stringify(pub, (_k, v) => (typeof v === "bigint" ? v.toString() : v))
