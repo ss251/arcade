@@ -8,6 +8,7 @@ import { fetchWithPayment } from "./fetch-with-payment.ts"
 import { resolveEnsListing, ensRefusal, parseArcadeEndpoint, sepoliaEnsReader, type EnsReader, type EnsListing } from "./ens-policy.ts"
 import type { PaymentRequirements } from "@arcade/payments"
 export * from "./ens-policy.ts"
+export * from "./session.ts"
 
 /**
  * `callSkill` — the one function a buyer agent needs.

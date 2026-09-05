@@ -35,6 +35,7 @@ independently mined. F2–12 code work is unblocked; no extra live allowance is 
 - [Task 7 parent review and gate chronology](task-7-parent-review.md)
 - [Task 7 final independent source/runtime review](task-7-independent-review.md)
 - [Task 8 private paid-session integration and review index](task-8-brief.md)
+- [Task 9 captured buyer session SDK and review index](task-9-brief.md)
 - [Progress](progress.md)
 - [Gate evidence and owner prerequisites](../../../evidence/m6-gateway.md)
 
@@ -113,3 +114,16 @@ passed2,529Vitest/119files,409Bun/4,170assertions/36files and root/web strict ty
 All13source hashes remain frozen. Final public-copy audit and the atomic commit
 follow; F9 supplies the buyer client next. See the [parent review](task-8-parent-review.md)
 for exact independent counts and preserved correction chronology.
+
+F8 subsequently committed as `1953256` after the final CLEAN publication audit:
+13 exact historical copies, one locator substitution,17 public files and99 local
+links. F9's captured buyer session SDK is now in final source review. Its
+[brief](task-9-brief.md) separates actual owned-runtime evidence from live payments
+and indexes the retained readiness, decisions and review reports. Full F still
+precedes G, H and I; no new spending or push is authorized.
+
+F9's final lifecycle correction review is CLEAN, including the unchanged
+temporal regressions. Its complete frozen gate passed2,571Vitest/120files,
+433Bun/4,254assertions/37files and root/web strict typing. All eight source hashes
+still match. The final historical-report copies and publication audit precede
+the atomic commit; F10 remains a separate MCP integration step.

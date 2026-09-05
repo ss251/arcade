@@ -355,3 +355,32 @@ assertions/twofiles, exact7strict0 plus separate5cases/40assertions. Author308
 assertions remains its own run; pending polling accounts for variable counts.
 All13source hashes still match. Public review reached12exactcopies/16paths/95links;
 the final router copy/current summaries receive the final audit before commit.
+
+## F8 commit and F9 buyer session review — September 6, 2026
+
+F8 committed separately as `1953256` after its documented complete gate and final
+CLEAN publication audit:13 exact copies, one locator substitution,17 public files,
+99 resolving local links and all13 frozen source hashes independently matched.
+Historical checkpoints above remain unchanged.
+
+F9's [brief](task-9-brief.md) indexes its funding-independent SDK, immutable private
+capability facades, local issued-exposure accounting and read-only quote/status/
+close recovery. Wire and transport reviews are CLEAN within their stated scopes;
+final lifecycle review and the whole repository gate remain pending. The
+[parent review](task-9-parent-review.md) preserves separate author/independent
+counts. No live session, funding or mining proof is inferred from owned tests.
+F10 MCP and F11 funding remain separate; F12 live NOT RUN and no F13 fallback.
+
+### F9 final source review and complete gate
+
+Independent lifecycle review reproduced stale open-after-close reporting and a
+changed closed artifact; neither reopened signing. The bounded correction is
+CLEAN on unchanged private3/12,46 selected Vitest and exact strict typing. The
+author preserved its original188-line report and appended the correction. Final
+source and test hashes are in the [parent review](task-9-parent-review.md).
+
+Parent's frozen complete gate beginning03:15:37IST passed2,571Vitest/120files,
+433Bun/4,254assertions/37files and root/web strict checks, exit0. All eight source
+hashes matched afterward. Ten historical execution copies are now prepared with
+13 explicit locator substitutions; final public audit and atomic F9 commit are
+next. No live session, funding, approval replay or GitHub push occurred.
