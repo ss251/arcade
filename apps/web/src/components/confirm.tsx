@@ -43,6 +43,8 @@ export interface ConfirmProps {
   readonly price: string
   readonly payTo: string
   readonly network: string
+  /** Present only after the quote matched the hub's live ENS records, not listing metadata. */
+  readonly ensName?: string | undefined
   /** Blocked reasons render the card as an explanation instead of an action. */
   readonly blocked?: string | undefined
   /**
@@ -118,6 +120,7 @@ export const Confirm = ({
   price,
   payTo,
   network,
+  ensName,
   blocked,
   onConnect,
   connecting,
@@ -173,6 +176,8 @@ export const Confirm = ({
         <span className="tool-id">{skillId}</span>
       </div>
 
+      {ensName === undefined ? null : <div className="ens-name" title={ensName}>{ensName}</div>}
+
       {/* The subject of the card. Mark at cap height beside it, not decorating it. */}
       <div className="price-block">
         <UsdcMark />
@@ -182,7 +187,7 @@ export const Confirm = ({
       <dl className="confirm-facts">
         <div className="fact">
           <dt>
-            pays
+            pays{ensName === undefined ? "" : " · from ENS"}
             <CopyButton value={payTo} label="the payout address" />
           </dt>
           <dd>
@@ -200,8 +205,9 @@ export const Confirm = ({
 
       {blocked === undefined ? (
         <p className="confirm-law">
-          Your wallet signs this in your browser. Nothing is charged unless the result
-          validates — a refusal or timeout leaves your balance untouched.
+          Your wallet signs in your browser. ARCADE hubs settle only after the result validates.
+          If the outcome is unconfirmed, a signed authorization may remain valid — check the
+          settlement record before retrying.
         </p>
       ) : (
         <p className="confirm-blocked">{blocked}</p>

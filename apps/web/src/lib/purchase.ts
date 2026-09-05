@@ -37,6 +37,7 @@ export class PriceMovedAboveApproval extends Error {
 }
 
 export interface SigningRequest {
+  readonly ensName?: string
   readonly skillId: string
   /** The resource the payment authorises. Derived, never supplied by the client. */
   readonly resource: string
@@ -63,10 +64,10 @@ export interface SigningRequest {
  * the number changed. Re-asking would be defensible; silently proceeding would not.
  */
 export const deriveSigningRequest = async (
-  approved: { readonly skillId: string; readonly maxAmountUsd: string; readonly toolCallId: string }
+  approved: { readonly skillId: string; readonly maxAmountUsd: string; readonly toolCallId: string; readonly input?: unknown }
 ): Promise<SigningRequest> => {
   const approvedAtomic = parsePrice(approved.maxAmountUsd)
-  const quote = await hub.quote(approved.skillId)
+  const quote = await hub.quote(approved.skillId, approved.input)
   const quotedAtomic = BigInt(quote.amountAtomic)
 
   if (quotedAtomic > approvedAtomic) {
@@ -84,6 +85,7 @@ export const deriveSigningRequest = async (
     network: quote.network,
     amountAtomic: quote.amountAtomic,
     price: formatPrice(quotedAtomic),
+    ...(quote.ensName === undefined ? {} : { ensName: quote.ensName }),
     toolCallId: approved.toolCallId
   }
 }

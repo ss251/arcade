@@ -24,7 +24,7 @@ import { arcade_quote, arcade_receipts, arcade_list_skills } from "../src/lib/to
  */
 
 const opts = { toolCallId: "t1", messages: [] } as never
-const HUB = "http://hub.test"
+const HUB = "https://hub.test"
 process.env["ARCADE_HUB"] = HUB
 
 const stub = (body: unknown, status = 200) =>
@@ -42,10 +42,13 @@ describe("figures handed to a model are exact strings", () => {
     stub({ accepts: [{ amount: "120000", payTo: "0xabc", asset: "0x36", network: "eip155:5042002" }] })
     const listingFetch = vi.fn(async (input: string | URL | Request) =>
       String(input).includes("/listings/")
-        ? new Response(JSON.stringify({ id: "diff-triage", seller: "0xseller", price: "$0.12" }))
+        ? new Response(JSON.stringify({ id: "diff-triage", seller: `0x${"1".repeat(40)}`, price: "$0.12" }))
         : new Response(
             JSON.stringify({
-              accepts: [{ amount: "120000", payTo: "0xabc", asset: "0x36", network: "eip155:5042002" }]
+              x402Version: 2,
+              accepts: [{ scheme: "exact", amount: "120000", payTo: `0x${"2".repeat(40)}`,
+                asset: "0x3600000000000000000000000000000000000000", network: "eip155:5042002",
+                resource: `${HUB}/x/0x${"1".repeat(40)}/diff-triage`, maxTimeoutSeconds: 604900 }]
             }),
             { status: 402 }
           )

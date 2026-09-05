@@ -20,7 +20,7 @@ import { decide } from "../src/lib/approval.ts"
  * settlement is a separate claim, measured on a rail, and stated as such when it exists.
  */
 
-const HUB = "http://hub.test"
+const HUB = "https://hub.test"
 process.env["ARCADE_HUB"] = HUB
 
 const SELLER = "0x1111111111111111111111111111111111111111"
@@ -37,12 +37,16 @@ const stubHub = (priceAtomic: string, skillId = "diff-triage") =>
       if (url.includes("/x/")) {
         return new Response(
           JSON.stringify({
+            x402Version: 2,
             accepts: [
               {
+                scheme: "exact",
                 amount: priceAtomic,
                 payTo: SELLER,
                 asset: "0x3600000000000000000000000000000000000000",
-                network: "eip155:5042002"
+                network: "eip155:5042002",
+                resource: `${HUB}/x/${SELLER}/${skillId}`,
+                maxTimeoutSeconds: 604900
               }
             ]
           }),

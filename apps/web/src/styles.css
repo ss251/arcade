@@ -1142,6 +1142,15 @@ a {
   flex: 1;
 }
 
+/* A full, checkable identifier. Existing measured face and neutral token; never truncated. */
+.confirm .ens-name {
+  font: 11px/1.4 var(--mono);
+  color: var(--slate);
+  letter-spacing: 0.01em;
+  margin: 2px 0 10px;
+  overflow-wrap: anywhere;
+}
+
 .confirm-head .usdc {
   font-size: 17px;
   font-weight: 600;

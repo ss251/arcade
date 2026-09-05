@@ -4,6 +4,7 @@ import { TreeFormatter } from "effect/ParseResult"
 import { fenceListing, fenceListings, formatPrice, parsePrice } from "@arcade/core"
 import * as hub from "./hub.ts"
 import { deriveSigningRequest, PriceMovedAboveApproval } from "./purchase.ts"
+import { purchaseInput } from "./purchase-input.ts"
 
 /**
  * The five READ-ONLY tools. Nothing here can spend.
@@ -300,21 +301,15 @@ export const arcade_call_skill = tool({
   inputSchema: std(CallArgs),
   execute: async ({ skillId, maxAmountUsd, input }, { toolCallId }) => {
     try {
-      const request = await deriveSigningRequest({ skillId, maxAmountUsd, toolCallId })
+      const parsedInput = purchaseInput(input)
+      const request = await deriveSigningRequest({ skillId, maxAmountUsd, toolCallId, input: parsedInput })
       return {
         awaitingSignature: true,
         ...request,
         // Passed straight through to the job. Parsed here only so a malformed string fails
         // NOW, with the model still able to fix it, rather than after a payment has been
         // verified and the work dispatched.
-        input: ((): unknown => {
-          if (input === undefined || input.trim() === "") return {}
-          try {
-            return JSON.parse(input)
-          } catch {
-            return {}
-          }
-        })(),
+        input: parsedInput,
         note:
           "Nothing has been spent yet. This is what the visitor's wallet will be asked to " +
           "sign; it was derived from the approved skill and ceiling, not supplied by you."

@@ -17,7 +17,7 @@ import { READ_ONLY_TOOLS } from "../src/lib/tools.ts"
  * bug looks like a model being unhelpful.
  */
 
-const HUB = "http://hub.test"
+const HUB = "https://hub.test"
 process.env["ARCADE_HUB"] = HUB
 
 const LISTING = {

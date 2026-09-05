@@ -8,6 +8,8 @@ import { COMMANDS, matchCommands, parseCommand, type Command } from "../lib/comm
 import type { StoredMessage } from "../lib/history.ts"
 import { getProvider, currentChainId, connect, walletBlocker } from "../lib/wallet.ts"
 import { signPayment } from "../lib/sign.ts"
+import { purchaseInput } from "../lib/purchase-input.ts"
+import { jsonFetch } from "../lib/hub-http.ts"
 
 /**
  * The buying agent's chat surface.
@@ -339,28 +341,40 @@ const TextPart = ({ text }: { text: string }) => {
  * dead end reached by consent, which is worse than a refusal, because the visitor would
  * believe they had bought something.
  */
-export type QuoteFn = (skillId: string) => Promise<{
+export type QuoteFn = (skillId: string, input?: unknown) => Promise<{
   readonly price: string
   readonly payTo: string
   readonly network: string
+  readonly ensName?: string
 }>
 
-const fetchQuote: QuoteFn = async (skillId) => {
-  const res = await fetch(`/api/quote?skillId=${encodeURIComponent(skillId)}`)
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { detail?: string }
-    throw new Error(body.detail ?? `the endpoint did not answer (HTTP ${res.status})`)
+export const fetchQuote: QuoteFn = async (skillId, input) => {
+  try {
+    const res = await jsonFetch("/api/quote", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ skillId, input: purchaseInput(input) })
+    })
+    const body = res.body as Record<string, unknown> | null
+    if (res.status !== 200 || !body || typeof body["price"] !== "string" ||
+        typeof body["payTo"] !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(body["payTo"]) ||
+        typeof body["network"] !== "string" ||
+        (body["ensName"] !== undefined && (typeof body["ensName"] !== "string" || body["ensName"].length > 253))) throw new Error()
+    return { price: body["price"], payTo: body["payTo"], network: body["network"],
+      ...(body["ensName"] === undefined ? {} : { ensName: body["ensName"] as string }) }
+  } catch {
+    throw new Error("Payment terms or ENS verification are unavailable. Nothing was signed.")
   }
-  return (await res.json()) as { price: string; payTo: string; network: string }
 }
 
 export const PendingPurchase = ({
   skillId,
+  input,
   maxAmountUsd,
   onDecide,
   quote = fetchQuote
 }: {
   skillId: string
+  input?: unknown
   maxAmountUsd: string
   onDecide: (approved: boolean) => void
   /** Injected so the card renders in a test without a network. */
@@ -401,14 +415,16 @@ export const PendingPurchase = ({
 
   useEffect(() => {
     let live = true
-    quote(skillId).then(
+    setTerms(undefined)
+    setFailed(undefined)
+    quote(skillId, input).then(
       (t) => live && setTerms(t),
       (e: Error) => live && setFailed(e.message)
     )
     return () => {
       live = false
     }
-  }, [skillId, quote])
+  }, [skillId, input, quote])
 
   useEffect(() => {
     let live = true
@@ -446,6 +462,7 @@ export const PendingPurchase = ({
       price={terms?.price ?? maxAmountUsd}
       payTo={terms?.payTo ?? ""}
       network={terms?.network ?? ""}
+      {...(terms?.ensName === undefined ? {} : { ensName: terms.ensName })}
       blocked={
         failed !== undefined
           ? `The endpoint did not return payment terms, so there is nothing to sign: ${failed}`
@@ -531,6 +548,33 @@ export const readSettlement = (
   }
 }
 
+export const SettlementFailure = ({ skillId, detail }: { skillId: string; detail?: string | undefined }) => (
+  <div className="tool-out">
+    <div className="tool-row">
+      <span className="tool-id">{skillId}</span>
+      <span className="tool-note">outcome unconfirmed</span>
+    </div>
+    <p className="tool-note">{detail ?? "Check the hub's settlement record before retrying."}</p>
+  </div>
+)
+
+export const SettlementProgress = ({ skillId, price, phase }: {
+  skillId: string; price: string; phase: "signing" | "settling"
+}) => (
+  <div className="tool-out">
+    <div className="marker is-running" role="status">
+      <span className="marker-dot" aria-hidden="true" />
+      <span className="marker-name">{skillId}</span>
+      <span className="marker-doing">
+        {phase === "signing"
+          ? "waiting for your wallet to sign — no gas, no chain round-trip"
+          : "authorization signed; awaiting hub outcome"}
+      </span>
+      <span className="marker-state">{price}</span>
+    </div>
+  </div>
+)
+
 const Settlement = ({ request }: { request: Record<string, unknown> }) => {
   const [phase, setPhase] = useState<"signing" | "settling" | "done" | "failed">("signing")
   const [detail, setDetail] = useState<string | undefined>(undefined)
@@ -588,35 +632,22 @@ const Settlement = ({ request }: { request: Record<string, unknown> }) => {
   }, [skillId, payTo, amountAtomic])
 
   if (phase === "signing" || phase === "settling") {
-    return (
-      <div className="tool-out">
-        <div className={`marker is-running`} role="status">
-          <span className="marker-dot" aria-hidden="true" />
-          <span className="marker-name">{skillId}</span>
-          <span className="marker-doing">
-            {phase === "signing"
-              ? "waiting for your wallet to sign — no gas, no chain round-trip"
-              : "paid; the seller is running the job"}
-          </span>
-          <span className="marker-state">{price}</span>
-        </div>
-      </div>
-    )
+    return <SettlementProgress skillId={skillId} price={price} phase={phase} />
   }
 
   if (phase === "failed") {
-    return (
-      <div className="tool-out">
-        <div className="tool-row">
-          <span className="tool-id">{skillId}</span>
-          <span className="unsettled">not settled</span>
-        </div>
-        <p className="tool-note">{detail ?? "the purchase did not complete"} — you were not charged.</p>
-      </div>
-    )
+    return <SettlementFailure skillId={skillId} detail={detail} />
   }
 
-  const s = readSettlement(outcome ?? {})
+  return <SettlementOutcome skillId={skillId} price={price} outcome={outcome ?? {}} />
+}
+
+export const SettlementOutcome = ({ skillId, price, outcome }: {
+  skillId: string; price: string; outcome: Record<string, unknown>
+}) => {
+  const s = readSettlement(outcome)
+  if (!s.settled) return <SettlementFailure skillId={skillId}
+    detail="The hub reports no settlement. The signed authorization may still be valid; check the settlement record before retrying." />
   return (
     <Purchase
       skillId={skillId}
@@ -703,6 +734,7 @@ export const Thread = ({
                     <PendingPurchase
                       key={i}
                       skillId={skillId}
+                      input={input["input"]}
                       maxAmountUsd={max}
                       onDecide={(approved) => onApproval(id, approved)}
                       {...(quote === undefined ? {} : { quote })}

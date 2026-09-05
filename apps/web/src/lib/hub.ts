@@ -12,7 +12,11 @@
  * costs nothing. That is exactly why a quote can be free.
  */
 
-const HUB = process.env["ARCADE_HUB"] ?? "http://localhost:8787"
+import { Schema } from "effect"
+import { dnsNameOf, loadChainConfig } from "@arcade/core"
+import { PaymentRequirements } from "@arcade/payments"
+import { hubJson, hubOrigin } from "./hub-http.ts"
+import { purchaseInput } from "./purchase-input.ts"
 
 export interface ListingSummary {
   readonly id: string
@@ -26,6 +30,8 @@ export interface ListingSummary {
 }
 
 export interface ListingDetail extends ListingSummary {
+  /** Advertised only; quote verifies it before publishing it as provenance. */
+  readonly ensName?: string
   readonly inputSchema: unknown
   readonly outputSchema: unknown
   readonly bounds?: Record<string, unknown>
@@ -60,14 +66,11 @@ export class HubUnreachable extends Error {
 }
 
 const get = async <T>(path: string): Promise<T> => {
-  let res: Response
   try {
-    res = await fetch(`${HUB}${path}`, { headers: { accept: "application/json" } })
-  } catch (e) {
-    throw new HubUnreachable(path, String((e as Error)?.message ?? e))
-  }
-  if (!res.ok) throw new HubUnreachable(path, `HTTP ${res.status}`)
-  return (await res.json()) as T
+    const res = await hubJson(path, { headers: { accept: "application/json" } })
+    if (res.status < 200 || res.status >= 300) throw new Error()
+    return res.body as T
+  } catch { throw new HubUnreachable(path, "request unavailable or invalid") }
 }
 
 export const listSkills = (): Promise<ReadonlyArray<ListingSummary>> =>
@@ -80,6 +83,8 @@ export const receipts = (): Promise<ReadonlyArray<ReceiptRow>> =>
   get<ReadonlyArray<ReceiptRow>>("/receipts")
 
 export interface Quote {
+  /** Checked via /names against this quote, not copied from an advertised listing. */
+  readonly ensName?: string
   readonly skillId: string
   readonly seller: string
   /** Atomic units, 6-dec, as a decimal string — never a JS number. */
@@ -108,36 +113,58 @@ export interface Quote {
  * would actually have to sign, so a listing whose advertised price has drifted from its
  * endpoint is caught here rather than after a signature.
  */
-export const quote = async (skillId: string): Promise<Quote> => {
+export const quote = async (skillId: string, input: unknown = {}): Promise<Quote> => {
+  if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(skillId)) throw new Error("Invalid skill identifier")
+  const body = JSON.stringify(purchaseInput(input))
   const listing = await describeSkill(skillId)
+  const address = (value: unknown): value is string => typeof value === "string" &&
+    /^0x[0-9a-fA-F]{40}$/.test(value) && !/^0x0{40}$/i.test(value)
+  if (!listing || listing.id !== skillId || !address(listing.seller)) throw new Error("Invalid listing identity")
   const resource = `/x/${listing.seller}/${listing.id}`
-  let res: Response
+  const endpoint = hubOrigin() + resource
+  let requirement: PaymentRequirements
+  let original: Record<string, unknown>
   try {
-    res = await fetch(`${HUB}${resource}`, {
+    const response = await hubJson(resource, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      // An empty body is enough to draw the challenge; the paywall runs before validation.
-      body: "{}"
+      body
     })
-  } catch (e) {
-    throw new HubUnreachable(resource, String((e as Error)?.message ?? e))
+    const challenge = Schema.decodeUnknownSync(Schema.Struct({ x402Version: Schema.Literal(2), accepts: Schema.Array(PaymentRequirements) }))(response.body)
+    if (response.status !== 402 || challenge.accepts.length !== 1) throw new Error()
+    requirement = challenge.accepts[0]!
+    const cfg = loadChainConfig()
+    if (cfg.status !== "ready" || requirement.network !== cfg.caip2 || requirement.asset.toLowerCase() !== cfg.usdc.address.toLowerCase() ||
+        !address(requirement.payTo) || requirement.resource !== endpoint ||
+        !/^[1-9][0-9]{0,77}$/.test(requirement.amount) || BigInt(requirement.amount) >= 1n << 256n ||
+        requirement.maxTimeoutSeconds < 1 || requirement.maxTimeoutSeconds > 604900) throw new Error()
+    // Validate with the canonical schema, but echo the original requirements exactly.
+    original = (response.body as { accepts: Record<string, unknown>[] }).accepts[0]!
+  } catch { throw new Error("The payment challenge is unavailable or invalid; nothing was signed") }
+
+  let ensName: string | undefined
+  if (listing.ensName !== undefined && listing.ensName !== null) {
+    try {
+      if (typeof listing.ensName !== "string" || !/^[a-z0-9.-]+\.eth$/.test(listing.ensName)) throw new Error()
+      dnsNameOf(listing.ensName)
+      const resolved = await hubJson(`/names/${listing.ensName}`, { headers: { accept: "application/json" } })
+      const n = resolved.body as Record<string, unknown> | null
+      if (resolved.status !== 200 || !n || n["name"] !== listing.ensName || n["expired"] !== false ||
+          n["skillId"] !== skillId || !address(n["seller"]) || n["seller"].toLowerCase() !== listing.seller.toLowerCase() ||
+          n["endpoint"] !== endpoint || !address(n["payTo"]) || n["payTo"].toLowerCase() !== requirement.payTo.toLowerCase() ||
+          n["chain"] !== requirement.network) throw new Error()
+      ensName = listing.ensName
+    } catch { throw new Error("ENS resolution unavailable or inconsistent; nothing was signed") }
   }
-  if (res.status !== 402) {
-    throw new HubUnreachable(resource, `expected a 402 payment challenge, got HTTP ${res.status}`)
-  }
-  const body = (await res.json()) as {
-    accepts?: ReadonlyArray<Record<string, unknown>>
-  }
-  const req = body.accepts?.[0]
-  if (req === undefined) throw new HubUnreachable(resource, "402 carried no payment requirements")
   return {
     skillId: listing.id,
     seller: listing.seller,
-    amountAtomic: String(req["amount"]),
-    payTo: String(req["payTo"]),
-    asset: String(req["asset"]),
-    network: String(req["network"]),
+    amountAtomic: requirement.amount,
+    payTo: requirement.payTo,
+    asset: requirement.asset,
+    network: requirement.network,
     resource,
-    requirements: req
+    requirements: original,
+    ...(ensName === undefined ? {} : { ensName })
   }
 }
