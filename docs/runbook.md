@@ -574,10 +574,25 @@ reads. An extra paid receipt, missing evidence or failed cleanup makes the comma
 The printed temporary evidence directory is retained with public proof and local sqlite
 history, never keys. All child environments are allowlisted.
 
-**Live status, 2026-09-05:** pending the owner-provisioned funded `arcade-canary-key`.
-Nineteen offline script tests and a separate real-loopback scheduled recovery test on the
-simulated rail pass; neither is represented as live on-chain evidence. Append the two
-verified Arcscan links only after the live command succeeds.
+**Live PASS — independently verified at `2026-09-05T04:40:08.403Z` on Arc testnet
+(`eip155:5042002`).** The owner-provided dedicated canary
+`0x2890ccF322155641545c6B4482Ea896B479aa937` completed exactly two scheduled
+`usdc-flow-check` purchases through the splitter above:
+
+- Initial pass: **$0.01 (10,000 atomic)**,
+  [verified transaction](https://testnet.arcscan.app/tx/0xab8cd630b7e187eef9f788ae43d3fe08f6203a6789205e3940d2510d465eea03).
+- Paid recovery: **$0.01 (10,000 atomic)**,
+  [verified transaction](https://testnet.arcscan.app/tx/0x98a30e9aa65f4a237696755fc81c3e34ce020bbc65d9139d16ae5dc3b178dd5c).
+
+Total canary spending was **$0.02 plus facilitator gas**. Between these payments,
+three durable failed pay-tests had empty job IDs and no settlement. Both offline detail
+routes returned 404 and all four discovery surfaces omitted the listing; those are
+off-chain observations, not payment proofs. Reconnecting still showed the delisted
+explanation. Only the distinct new paid pass restored discovery. Both successful marked
+receipts were independently matched to actual ERC-20 transfers and childless `Settled`
+events. All owned services were confirmed stopped before PASS. The public `evidence.json`
+is retained; the private SQLite history stays local and is not published or dumped with
+the public proof.
 
 ## Plan D — ERC-8004 identity and settlement evidence
 
