@@ -1,7 +1,9 @@
 import { Database } from "bun:sqlite"
 import { Effect, Layer, Ref, Schema } from "effect"
-import { Job, Rating, Receipt } from "@arcade/core"
-import { StoreTag, makeStore, payTestKey, PAY_TEST_HISTORY, erc8004DocKey, validateErc8004DocBytes,
+import { Job, Rating, Receipt, Session, SessionId, SessionInvalid, SessionCapacity, SessionStorageUnavailable, SessionConflict } from "@arcade/core"
+import { sessionJson, sessionParse, sessionAuthorizationKey, transitionSession, validateSessionLedger, SESSION_EVIDENCE_BYTES,
+  normalizeSessionCommand, sessionReceiptEvidence, type SessionLedgerState, type SessionLedgerCall, type SessionCommand } from "./session-ledger.ts"
+import { StoreTag, makeStore, sessionStoreApi, payTestKey, PAY_TEST_HISTORY, erc8004DocKey, validateErc8004DocBytes,
   type Erc8004DocKind, type PayTestRow, type Store, type StoreState, type TreeRow } from "./store.ts"
 
 /**
@@ -22,13 +24,15 @@ import { StoreTag, makeStore, payTestKey, PAY_TEST_HISTORY, erc8004DocKey, valid
  * silently relist a dead skill when its runner reconnects. History belongs to the skill
  * and seller, independently of any live listing or runner record.
  *
- * **Write-through over the in-memory store, not a SQL reimplementation.** Reads keep the
+ * **Legacy write-through; session authority is separate.** Unrelated legacy reads keep the
  * existing implementation — including the percentile and stats logic that is already
  * tested — and every mutation is mirrored to sqlite. The tradeoff is stated rather than
  * hidden: the working set lives in memory, so this is a durable snapshot rather than a
  * database, and it is sized for a hub with thousands of receipts, not millions. Swapping
  * in a real SQL store later means replacing one Layer, which is the same shape as the
- * rails.
+ * rails. Session admissions, holds and terminal evidence instead query current disk
+ * under synchronous transactions, then publish only after commit. They are never
+ * authorized from this legacy cached working set.
  *
  * **Boot reaping.** `pipeline.ts` writes a job row exactly once, when the job finishes, so
  * before this change an interrupted job left NO row at all — and the poll endpoint
@@ -37,7 +41,8 @@ import { StoreTag, makeStore, payTestKey, PAY_TEST_HISTORY, erc8004DocKey, valid
  * written at dispatch, which is what makes the second half possible: on boot, any row
  * still in a non-terminal state belongs to a process that is gone, and is reaped to
  * `failed`. Nothing was settled, so the buyer was never charged and the receipt reads
- * `settled=false` for the same reason as any other failure path.
+ * `settled=false` for the same reason as any other failure path. Session-owned jobs
+ * are excluded: their durable held/settling/uncertain state is not a no-charge proof.
  *
  * The residual is the seller's: their runner may have burned inference on a job the hub
  * has now given up on, and will find its result dropped. That is the mirror of the
@@ -45,6 +50,17 @@ import { StoreTag, makeStore, payTestKey, PAY_TEST_HISTORY, erc8004DocKey, valid
  */
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY, buyer TEXT NOT NULL, budget_atomic TEXT NOT NULL, spent_atomic TEXT NOT NULL,
+  rail TEXT NOT NULL, network TEXT NOT NULL, opened_at_ms INTEGER NOT NULL, closed_at_ms INTEGER,
+  call_count INTEGER NOT NULL CHECK (call_count BETWEEN 0 AND 100), held_atomic TEXT NOT NULL, json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS session_calls (
+  job_id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id), authorization_key TEXT NOT NULL UNIQUE,
+  state TEXT NOT NULL CHECK (state IN ('reserved','settling','uncertain','settled','released')),
+  amount_atomic TEXT NOT NULL, created_at_ms INTEGER NOT NULL, settlement_key TEXT UNIQUE, json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS session_calls_session ON session_calls(session_id);
 CREATE TABLE IF NOT EXISTS erc8004_docs (
   job_id TEXT NOT NULL,
   kind TEXT NOT NULL,
@@ -119,20 +135,66 @@ export interface SqliteStore {
   readonly bootId: string
   readonly close: () => void
 }
+interface SessionHeaderRow {
+  id: string; buyer: string; budget_atomic: string; spent_atomic: string; rail: string; network: string
+  opened_at_ms: number; closed_at_ms: number | null; call_count: number; held_atomic: string; json: string
+}
+interface CallRow {
+  job_id: string; session_id: string; authorization_key: string; state: string; amount_atomic: string
+  created_at_ms: number; settlement_key: string | null; json: string
+}
+const settlementKey = (call: SessionLedgerCall): string | null => call.state === "settled"
+  ? JSON.stringify([call.binding.network, call.binding.rail, call.settleRef]) : null
+const callFromRow = (row: CallRow): SessionLedgerCall => {
+  const call = sessionParse(row.json) as SessionLedgerCall
+  if (row.job_id !== call.binding?.jobId || row.session_id !== call.binding.sessionId || row.authorization_key !== sessionAuthorizationKey(call.binding) ||
+    row.state !== call.state || row.amount_atomic !== String(call.binding.amountAtomic) || row.created_at_ms !== call.createdAtMs ||
+    row.settlement_key !== settlementKey(call)) throw new SessionStorageUnavailable()
+  return call
+}
+const headerFromRow = (row: SessionHeaderRow) => {
+  const envelope = sessionParse(row.json) as { session: unknown; callCount: unknown; heldAtomic: unknown }
+  if (envelope === null || typeof envelope !== "object" || Object.keys(envelope).sort().join(",") !== "callCount,heldAtomic,session") throw new SessionStorageUnavailable()
+  const s = Schema.decodeUnknownSync(Session, { onExcessProperty: "error" })(envelope.session)
+  if (!Number.isSafeInteger(envelope.callCount) || typeof envelope.callCount !== "number" || envelope.callCount < 0 || envelope.callCount > 100 ||
+    typeof envelope.heldAtomic !== "bigint" || envelope.heldAtomic < 0n || envelope.heldAtomic + s.spentAtomic > s.budgetAtomic ||
+    s.closedAtMs !== undefined && envelope.heldAtomic !== 0n || row.call_count !== envelope.callCount || row.held_atomic !== String(envelope.heldAtomic) ||
+    row.id !== s.id || row.buyer !== s.buyer || row.budget_atomic !== String(s.budgetAtomic) || row.spent_atomic !== String(s.spentAtomic) ||
+    row.rail !== s.rail || row.network !== s.network || row.opened_at_ms !== s.openedAtMs || row.closed_at_ms !== (s.closedAtMs ?? null)) throw new SessionStorageUnavailable()
+  return { session: s, callCount: envelope.callCount, heldAtomic: envelope.heldAtomic }
+}
 
 export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
   const db = new Database(path, { create: true })
   db.exec("PRAGMA journal_mode = WAL")
   // A completed document sink must be durable before its hash can be sent on chain.
   db.exec("PRAGMA synchronous = FULL")
+  db.exec("PRAGMA busy_timeout = 1000")
+  db.exec("PRAGMA foreign_keys = ON")
   db.exec(SCHEMA)
+
+  const countCalls = db.query<{ n: number }, [string]>("SELECT COUNT(*) AS n FROM session_calls WHERE session_id = ?")
+  const headerCountValid = (row: SessionHeaderRow) => {
+    const header = headerFromRow(row)
+    if (countCalls.get(row.id)?.n !== header.callCount) throw new SessionStorageUnavailable()
+    return header
+  }
+  const listSessionHeaders = () => {
+    const rows = db.query<SessionHeaderRow, []>("SELECT * FROM sessions ORDER BY id LIMIT 10001").all()
+    if (rows.length > 10000 || db.query("SELECT 1 FROM session_calls LEFT JOIN sessions ON sessions.id = session_calls.session_id WHERE sessions.id IS NULL LIMIT 1").get()) throw new SessionStorageUnavailable()
+    return rows.map(headerCountValid)
+  }
+  // This check must precede legacy reaping. Missing call rows cannot erase held
+  // money/tombstones and reclassify their still-queued jobs as ordinary failures.
+  try { db.transaction(listSessionHeaders).deferred() } catch { db.close(); throw new SessionStorageUnavailable() }
 
   // Anything non-terminal was left behind by a process that no longer exists. `boot_id`
   // makes that a fact on the row rather than something inferred from a timestamp, so the
   // log can name which boot abandoned the work.
   const stale = db
     .query<{ id: string; json: string; boot_id: string }, []>(
-      `SELECT id, json, boot_id FROM jobs WHERE status IN ('queued','running')`
+      `SELECT id, json, boot_id FROM jobs WHERE status IN ('queued','running')
+       AND NOT EXISTS (SELECT 1 FROM session_calls WHERE session_calls.job_id = jobs.id)`
     )
     .all()
 
@@ -150,13 +212,13 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
   }
 
   const jobs = new Map<string, Job>()
-  for (const row of db.query<{ json: string }, []>(`SELECT json FROM jobs`).all()) {
+  for (const row of db.query<{ json: string }, []>(`SELECT json FROM jobs WHERE NOT EXISTS (SELECT 1 FROM session_calls WHERE session_calls.job_id = jobs.id)`).all()) {
     const j = decodeJob(fromJson(row.json)) as Job
     jobs.set(j.id, j)
   }
 
   const receipts = db
-    .query<{ json: string }, []>(`SELECT json FROM receipts ORDER BY created_at_ms ASC`)
+    .query<{ json: string }, []>(`SELECT json FROM receipts WHERE NOT EXISTS (SELECT 1 FROM session_calls WHERE session_calls.job_id = receipts.job_id) ORDER BY created_at_ms ASC`)
     .all()
     .map((r) => decodeReceiptRow(fromJson(r.json)) as Receipt)
 
@@ -204,7 +266,9 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     ratings,
     trees,
     payTests,
-    erc8004Docs
+    erc8004Docs,
+    sessions: new Map(),
+    sessionCalls: new Map()
   }
 
   const ref = Effect.runSync(Ref.make(initial))
@@ -253,8 +317,116 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     if (getDoc.get(jobId, kind)?.bytes !== bytes) throw new Error("registry document already exists with different bytes")
   })
 
+  // New session authority always reads current disk in one transaction; legacy
+  // listing/runner and unrelated job behavior remains the existing memory seam.
+  const loadSessionState = (sessionId: string): SessionLedgerState => {
+    const sessions = new Map<string, Session>(), sessionCalls = new Map<string, SessionLedgerCall>()
+    const row = db.query<SessionHeaderRow, [string]>("SELECT * FROM sessions WHERE id = ?").get(sessionId)
+    const header = row === null ? undefined : headerCountValid(row)
+    if (header !== undefined) sessions.set(header.session.id, header.session)
+    const calls = db.query<CallRow, [string]>("SELECT * FROM session_calls WHERE session_id = ? LIMIT 101").all(sessionId)
+    if (calls.length > 100 || header === undefined && calls.length !== 0) throw new SessionStorageUnavailable()
+    for (const row of calls) sessionCalls.set(row.job_id, callFromRow(row))
+    const jobs = new Map<string, Job>()
+    for (const row of db.query<{ id: string; status: string; created_at_ms: number; json: string }, [string]>(
+      "SELECT jobs.* FROM session_calls JOIN jobs ON jobs.id = session_calls.job_id WHERE session_calls.session_id = ? LIMIT 101").all(sessionId)) {
+      const job = Schema.decodeUnknownSync(Job, { onExcessProperty: "error" })(sessionParse(row.json, SESSION_EVIDENCE_BYTES))
+      if (job.id !== row.id || job.status !== row.status || job.createdAtMs !== row.created_at_ms) throw new SessionStorageUnavailable()
+      jobs.set(job.id, job)
+    }
+    const receipts = db.query<{ job_id: string; accrual_id: string | null; created_at_ms: number; json: string }, [string]>(
+      "SELECT receipts.* FROM session_calls JOIN receipts ON receipts.job_id = session_calls.job_id WHERE session_calls.session_id = ? LIMIT 101").all(sessionId).map(row => {
+      const receipt = Schema.decodeUnknownSync(Receipt, { onExcessProperty: "error" })(sessionParse(row.json, SESSION_EVIDENCE_BYTES))
+      if (receipt.jobId !== row.job_id || (receipt.feeAccrualId ?? null) !== row.accrual_id || receipt.createdAtMs !== row.created_at_ms) throw new SessionStorageUnavailable()
+      return receipt
+    })
+    const result = { sessions, sessionCalls, jobs, receipts }
+    try { validateSessionLedger(result) } catch { throw new SessionStorageUnavailable() }
+    const held = [...sessionCalls.values()].reduce((sum, call) => sum + (["reserved", "settling", "uncertain"].includes(call.state) ? call.binding.amountAtomic : 0n), 0n)
+    if (header !== undefined && (header.callCount !== sessionCalls.size || header.heldAtomic !== held)) throw new SessionStorageUnavailable()
+    return result
+  }
+  const readSessions = db.transaction((id: string) => {
+    try { return loadSessionState(id) } catch { throw new SessionStorageUnavailable() }
+  })
+  const persistSession = db.query(`INSERT INTO sessions (id,buyer,budget_atomic,spent_atomic,rail,network,opened_at_ms,closed_at_ms,call_count,held_atomic,json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET spent_atomic=excluded.spent_atomic,closed_at_ms=excluded.closed_at_ms,call_count=excluded.call_count,held_atomic=excluded.held_atomic,json=excluded.json`)
+  const persistCall = db.query(`INSERT INTO session_calls (job_id,session_id,authorization_key,state,amount_atomic,created_at_ms,settlement_key,json)
+    VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(job_id) DO UPDATE SET state=excluded.state,settlement_key=excluded.settlement_key,json=excluded.json`)
+  const sessionForJob = (id: string) => db.query<{ session_id: string }, [string]>("SELECT session_id FROM session_calls WHERE job_id = ?").get(id)?.session_id
+  const ownedSessionJob = (id: string) => sessionForJob(id) !== undefined
+  const checkedId = (id: unknown): string => { try { return Schema.decodeUnknownSync(SessionId)(id) } catch { throw new SessionInvalid() } }
+  const mutateSession = db.transaction((command: SessionCommand) => {
+    const sessionId = checkedId(command.kind === "open" ? command.input.id : command.kind === "reserve" ? command.binding.sessionId : command.kind === "finish" ? command.terminal.sessionId : command.sessionId)
+    // Count-only global corruption guard, under the same writer lock. No money
+    // aggregation or unrelated evidence decoding; this is not authentication
+    // against an actor coordinating row deletion with counter rewrites.
+    const counts = db.query<{ call_count: number }, []>("SELECT call_count FROM sessions LIMIT 10001").all()
+    if (counts.length > 10000 || counts.some(row => !Number.isSafeInteger(row.call_count) || row.call_count < 0 || row.call_count > 100) ||
+      counts.reduce((sum, row) => sum + row.call_count, 0) !== db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM session_calls").get()!.n) throw new SessionStorageUnavailable()
+    let old: SessionLedgerState
+    try { old = loadSessionState(sessionId) } catch { throw new SessionStorageUnavailable() }
+    if (command.kind === "open" && !old.sessions.has(sessionId) && db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM sessions").get()!.n >= 10000) throw new SessionCapacity()
+    // Global claims use exact UNIQUE indexes; unrelated evidence is never loaded.
+    if (command.kind === "reserve") {
+      if (!old.sessionCalls.has(command.binding.jobId) && (db.query("SELECT 1 FROM jobs WHERE id = ?").get(command.binding.jobId) ||
+        db.query("SELECT 1 FROM receipts WHERE job_id = ?").get(command.binding.jobId) || ownedSessionJob(command.binding.jobId))) throw new SessionConflict()
+    }
+    const t = transitionSession(old, command)
+    for (const [id, call] of t.state.sessionCalls) if (old.sessionCalls.get(id) !== call) {
+      const owner = db.query<{ job_id: string }, [string]>("SELECT job_id FROM session_calls WHERE authorization_key = ?").get(sessionAuthorizationKey(call.binding))
+      const ref = settlementKey(call), previous = ref === null ? null : db.query<{ job_id: string }, [string]>("SELECT job_id FROM session_calls WHERE settlement_key = ?").get(ref)
+      if (owner !== null && owner.job_id !== id || previous !== null && previous.job_id !== id) throw new SessionConflict()
+    }
+    const held = (state: SessionLedgerState) => [...state.sessionCalls.values()].reduce((sum, call) => sum + (["reserved", "settling", "uncertain"].includes(call.state) ? call.binding.amountAtomic : 0n), 0n)
+    const heldAtomic = held(t.state), callCount = t.state.sessionCalls.size
+    for (const [id, s] of t.state.sessions) if (old.sessions.get(id) !== s || old.sessionCalls.size !== callCount || held(old) !== heldAtomic) {
+      persistSession.run(s.id, s.buyer, String(s.budgetAtomic), String(s.spentAtomic), s.rail, s.network, s.openedAtMs, s.closedAtMs ?? null,
+        callCount, String(heldAtomic), sessionJson({ session: s, callCount, heldAtomic }))
+    }
+    for (const [id, c] of t.state.sessionCalls) if (old.sessionCalls.get(id) !== c) persistCall.run(id, c.binding.sessionId, sessionAuthorizationKey(c.binding), c.state, String(c.binding.amountAtomic), c.createdAtMs, settlementKey(c), sessionJson(c))
+    for (const [id, j] of t.state.jobs) if (old.jobs.get(id) !== j) putJobStmt.run(j.id, j.status, bootId, j.createdAtMs, sessionJson(j, SESSION_EVIDENCE_BYTES))
+    for (const r of t.state.receipts) if (!old.receipts.includes(r)) db.query("INSERT INTO receipts (job_id,accrual_id,created_at_ms,json) VALUES (?,?,?,?)").run(r.jobId, r.feeAccrualId ?? null, r.createdAtMs, sessionJson(r, SESSION_EVIDENCE_BYTES))
+    return t
+  })
+  const sessionOps = sessionStoreApi(id => readSessions.deferred(checkedId(id)), command =>
+    mutateSession.immediate(normalizeSessionCommand(command)).result,
+    path === ":memory:" || path === "" ? "volatile" : "durable",
+    () => { try { return db.transaction(listSessionHeaders).deferred().map(header => header.session) } catch { throw new SessionStorageUnavailable() } })
+  // Existing inherently-global APIs intentionally enumerate terminal receipts.
+  // They validate each bounded row once, without loading its job or all siblings.
+  const currentReceipts = db.transaction(() => {
+    try {
+      const headers = new Map(listSessionHeaders().map(header => [header.session.id, header.session]))
+      const result = [...Effect.runSync(inner.allReceipts)]
+      const rows = db.query<CallRow & { receipt_json: string | null; receipt_id: string | null; accrual_id: string | null; receipt_at: number | null }, []>(
+        `SELECT session_calls.*, receipts.json AS receipt_json, receipts.job_id AS receipt_id, receipts.accrual_id, receipts.created_at_ms AS receipt_at
+         FROM session_calls LEFT JOIN receipts ON receipts.job_id = session_calls.job_id
+         WHERE session_calls.state IN ('settled','released') OR receipts.job_id IS NOT NULL`).all()
+      for (const row of rows) {
+        if (row.receipt_json === null) throw new SessionStorageUnavailable()
+        const call = callFromRow(row), session = headers.get(call.binding.sessionId)
+        if (session === undefined) throw new SessionStorageUnavailable()
+        const receipt = sessionReceiptEvidence(call, Schema.decodeUnknownSync(Receipt, { onExcessProperty: "error" })(sessionParse(row.receipt_json, SESSION_EVIDENCE_BYTES)), session)
+        if (receipt.jobId !== row.receipt_id || (receipt.feeAccrualId ?? null) !== row.accrual_id || receipt.createdAtMs !== row.receipt_at) throw new SessionStorageUnavailable()
+        result.push(receipt)
+      }
+      return result.sort((a, b) => a.createdAtMs - b.createdAtMs)
+    } catch { throw new SessionStorageUnavailable() }
+  })
+
   const store: Store = {
     ...inner,
+    ...sessionOps,
+    getJob: id => Effect.sync(() => {
+      try { const sessionId = sessionForJob(id); return sessionId !== undefined ? readSessions.deferred(sessionId).jobs.get(id) : Effect.runSync(inner.getJob(id)) }
+      catch { throw new SessionStorageUnavailable() }
+    }),
+    allReceipts: Effect.sync(() => currentReceipts.deferred()),
+    statsFor: skillId => Effect.sync(() => {
+      const state = Effect.runSync(Ref.get(ref)), receipts = currentReceipts.deferred()
+      return Effect.runSync(makeStore(Effect.runSync(Ref.make({ ...state, receipts }))).statsFor(skillId))
+    }),
     putErc8004Doc: (jobId, kind, bytes) => Effect.uninterruptible(Effect.sync(() => {
       erc8004DocKey(jobId, kind)
       validateErc8004DocBytes(bytes)
@@ -262,23 +434,16 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
       // No yielding or memory publication before the durable transaction commits.
       Effect.runSync(inner.putErc8004Doc(jobId, kind, bytes))
     })),
-    putJob: (job) =>
-      Effect.tap(inner.putJob(job), () =>
-        Effect.sync(() =>
-          putJobStmt.run(job.id, job.status, bootId, job.createdAtMs, toJson(job))
-        )
-      ),
-    putReceipt: (r) =>
-      Effect.tap(inner.putReceipt(r), () =>
-        Effect.sync(() =>
-          putReceiptStmt.run(
-            r.jobId,
-            r.feeAccrualId ?? null,
-            r.createdAtMs,
-            toJson(r)
-          )
-        )
-      ),
+    putJob: job => Effect.uninterruptible(Effect.sync(() => db.transaction(() => {
+      if (ownedSessionJob(job.id)) throw new SessionConflict()
+      Effect.runSync(inner.putJob(job))
+      putJobStmt.run(job.id, job.status, bootId, job.createdAtMs, toJson(job))
+    }).immediate())),
+    putReceipt: r => Effect.uninterruptible(Effect.sync(() => db.transaction(() => {
+      if (r.sessionId !== undefined || ownedSessionJob(r.jobId)) throw new SessionConflict()
+      Effect.runSync(inner.putReceipt(r))
+      putReceiptStmt.run(r.jobId, r.feeAccrualId ?? null, r.createdAtMs, toJson(r))
+    }).immediate())),
     putRating: (r) =>
       Effect.tap(inner.putRating(r), () =>
         Effect.sync(() => putRatingStmt.run(r.receiptJobId, toJson(r)))
@@ -310,6 +475,7 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
           const all = yield* inner.allReceipts
           yield* Effect.sync(() => {
             for (const r of all) {
+              if (r.sessionId !== undefined || ownedSessionJob(r.jobId)) continue
               putReceiptStmt.run(
                 r.jobId,
                 r.feeAccrualId ?? null,
@@ -356,5 +522,7 @@ const emptyState = (): StoreState => ({
   ratings: [],
   trees: new Map(),
   payTests: new Map(),
-  erc8004Docs: new Map()
+  erc8004Docs: new Map(),
+  sessions: new Map(),
+  sessionCalls: new Map()
 })

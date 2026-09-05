@@ -140,7 +140,23 @@ export class SecrecyViolation extends Data.TaggedError("SecrecyViolation")<{
   readonly field: string
 }> {}
 
+// Fixed session failures never contain SQL, provider or issued-authorization diagnostics.
+export class SessionNotFound extends Data.TaggedError("SessionNotFound")<{ readonly sessionId: string }> {}
+export class SessionClosed extends Data.TaggedError("SessionClosed")<{ readonly sessionId: string; readonly closedAtMs: number }> {}
+export class SessionBudgetExceeded extends Data.TaggedError("SessionBudgetExceeded")<{
+  readonly sessionId: string; readonly budgetAtomic: bigint; readonly spentAtomic: bigint; readonly requestedAtomic: bigint
+}> {}
+export class SessionRailUnavailable extends Data.TaggedError("SessionRailUnavailable")<{ readonly rail: string }> {}
+export class SessionInvalid extends Data.TaggedError("SessionInvalid")<{}> {}
+export class SessionConflict extends Data.TaggedError("SessionConflict")<{}> {}
+export class SessionStorageUnavailable extends Data.TaggedError("SessionStorageUnavailable")<{}> {}
+export class SessionCapacity extends Data.TaggedError("SessionCapacity")<{}> {}
+export class SessionPending extends Data.TaggedError("SessionPending")<{}> {}
+export type SessionError = SessionNotFound | SessionClosed | SessionBudgetExceeded | SessionRailUnavailable |
+  SessionInvalid | SessionConflict | SessionStorageUnavailable | SessionCapacity | SessionPending
+
 export type ArcadeError =
+  | SessionError
   | InputInvalid
   | PaymentRequired
   | InvalidSignature

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { Effect, Ref } from "effect"
 import { Bounds, PublicListing, Receipt } from "@arcade/core"
-import { makeStore } from "../src/store.ts"
+import { makeStore, type StoreState } from "../src/store.ts"
 
 /**
  * The store owns two things that show up in front of a judge: the fee-sweep backfill (which
@@ -9,7 +9,7 @@ import { makeStore } from "../src/store.ts"
  * back a listing's reputation. Both were untested.
  */
 
-const emptyState = () => ({
+const emptyState = (): StoreState => ({
   listings: new Map(),
   runners: new Map(),
   jobs: new Map(),
@@ -17,7 +17,9 @@ const emptyState = () => ({
   ratings: [],
   trees: new Map(),
   payTests: new Map(),
-  erc8004Docs: new Map()
+  erc8004Docs: new Map(),
+  sessions: new Map(),
+  sessionCalls: new Map()
 })
 
 const store = () => makeStore(Effect.runSync(Ref.make(emptyState())))
@@ -75,6 +77,7 @@ describe("store — fee sweep backfill", () => {
     await Effect.runPromise(s.backfillFeeSweep("acc_1", "0xSWEEP"))
 
     const [r] = await Effect.runPromise(s.allReceipts)
+    if (r === undefined) throw new Error("Expected persisted fixture receipt")
     expect(r?.settleTx).toBe("0xSETTLE")
     expect(r?.priceAtomic).toBe(250_000n)
     expect(r?.sellerAtomic + r!.feeAtomic).toBe(r!.priceAtomic)

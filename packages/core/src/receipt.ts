@@ -57,7 +57,7 @@ export class Receipt extends Schema.Class<Receipt>("Receipt")({
    */
   sellerCostUsd: Schema.optional(Schema.Number),
 
-  /** On-chain settlement of the seller's share. Absent when the job did not settle. */
+  /** Rail settlement reference; consult settleRefKind. A Gateway UUID is not a mined transaction. */
   settleTx: Schema.optional(Schema.String),
   /** Accrual bucket this receipt's fee belongs to. */
   feeAccrualId: Schema.optional(Schema.String),
@@ -90,7 +90,11 @@ export class Receipt extends Schema.Class<Receipt>("Receipt")({
   /** EIP-191 signature by the hub attester over the canonical receipt JSON. */
   receiptSignature: Schema.optional(Schema.String),
   /** A real hub-owned pay-test, not customer demand. Older receipts omit this marker. */
-  canary: Schema.optional(Schema.Boolean)
+  canary: Schema.optional(Schema.Boolean),
+  /** Private session correlation; public receipt projections must continue to omit it. */
+  sessionId: Schema.optional(Schema.String),
+  /** Gateway transfer acceptance is not evidence of a mined transaction or batch. */
+  settleRefKind: Schema.optional(Schema.Literal("onchain", "gateway-transfer", "gateway-batch", "test"))
 }) {}
 
 /** A rating can only be created by presenting a settled receipt — fake reviews cost real USDC. */

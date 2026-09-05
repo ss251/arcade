@@ -1,6 +1,8 @@
 import { Effect, Layer, Context, Ref } from "effect"
 import type { PublicListing, Receipt, Rating, ObjectiveStats, Job } from "@arcade/core"
-import { ListingNotFound } from "@arcade/core"
+import { ListingNotFound, Session, SessionConflict } from "@arcade/core"
+import { transitionSession, sessionSnapshot, validateSessionLedger, sessionError,
+  sessionJobCopy, sessionReceiptCopy, type SessionStore, type SessionLedgerState, type SessionCommand, type SessionTransition } from "./session-ledger.ts"
 
 /**
  * Hub state.
@@ -128,7 +130,7 @@ export interface TreeRow {
   state: "reserved" | "committed" | "released"
 }
 
-export interface StoreState {
+export interface StoreState extends SessionLedgerState {
   readonly listings: Map<string, ListingRecord>
   readonly runners: Map<string, RunnerRecord>
   readonly jobs: Map<string, Job>
@@ -147,7 +149,9 @@ const empty = (): StoreState => ({
   ratings: [],
   trees: new Map(),
   payTests: new Map(),
-  erc8004Docs: new Map()
+  erc8004Docs: new Map(),
+  sessions: new Map(),
+  sessionCalls: new Map()
 })
 
 export type Erc8004DocKind = "validation-request" | "validation-response" | "feedback"
@@ -166,7 +170,7 @@ export const validateErc8004DocBytes = (bytes: string): void => {
   if (doc === null || typeof doc !== "object" || Array.isArray(doc)) throw new Error("registry document must be a JSON object")
 }
 
-export interface Store {
+export interface Store extends SessionStore {
   /** Identical retries succeed; conflicting bytes fail before any registry write. */
   readonly putErc8004Doc: (jobId: string, kind: Erc8004DocKind, bytes: string) => Effect.Effect<void>
   readonly getErc8004Doc: (jobId: string, kind: Erc8004DocKind) => Effect.Effect<string | undefined>
@@ -231,7 +235,36 @@ const setTreeState = (s: StoreState, childJobId: string, state: TreeRow["state"]
   return { ...s, trees }
 }
 
+/** Synchronous adapters cannot yield between the transaction and publication. */
+export const sessionStoreApi = (
+  read: (sessionId?: string) => SessionLedgerState,
+  mutate: (command: SessionCommand) => SessionTransition["result"],
+  sessionStorage: SessionStore["sessionStorage"],
+  list?: () => ReadonlyArray<Session>
+): SessionStore => {
+  const safe = <A>(body: () => A) => Effect.uninterruptible(Effect.try({ try: body, catch: error => sessionError(error, sessionStorage === "durable") }))
+  const command = <A>(input: SessionCommand) => safe(() => mutate(input) as A)
+  return { sessionStorage,
+    openSession: input => command({ kind: "open", input }),
+    getSession: id => safe(() => sessionSnapshot(read(id), id)?.session),
+    getSessionSnapshot: id => safe(() => sessionSnapshot(read(id), id)),
+    allSessions: safe(() => { if (list !== undefined) return list(); const st = read(); validateSessionLedger(st); return [...st.sessions.values()].map(session => Session.make({ ...session })) }),
+    reserveSessionJob: (binding, job) => command({ kind: "reserve", binding, job }),
+    beginSessionSettlement: (sessionId, jobId) => command({ kind: "begin", sessionId, jobId }),
+    finishSessionJob: terminal => command({ kind: "finish", terminal }),
+    markSessionUncertain: (sessionId, jobId) => command({ kind: "uncertain", sessionId, jobId }),
+    closeSession: (sessionId, atMs) => command({ kind: "close", sessionId, atMs }) }
+}
 export const makeStore = (ref: Ref.Ref<StoreState>): Store => ({
+  ...sessionStoreApi(() => Effect.runSync(Ref.get(ref)), command => {
+    type Attempt = { readonly ok: true; readonly value: SessionTransition["result"] } | { readonly ok: false; readonly error: unknown }
+    const result = Effect.runSync(Ref.modify(ref, (st): readonly [Attempt, StoreState] => {
+      try { const t = transitionSession(st, command); return [{ ok: true as const, value: t.result }, { ...st, ...t.state }] as const }
+      catch (error) { return [{ ok: false as const, error }, st] as const }
+    }))
+    if (!result.ok) throw result.error
+    return result.value
+  }, "volatile"),
   putErc8004Doc: (jobId, kind, bytes) => Ref.update(ref, s => {
     const key = erc8004DocKey(jobId, kind)
     validateErc8004DocBytes(bytes)
@@ -321,15 +354,22 @@ export const makeStore = (ref: Ref.Ref<StoreState>): Store => ({
 
   putJob: (job) =>
     Ref.update(ref, (s) => {
+      if (s.sessionCalls.has(job.id)) throw new SessionConflict()
       const jobs = new Map(s.jobs)
       jobs.set(job.id, job)
       return { ...s, jobs }
     }),
 
-  getJob: (jobId) => Effect.map(Ref.get(ref), (s) => s.jobs.get(jobId)),
+  getJob: (jobId) => Effect.map(Ref.get(ref), (s) => {
+    const job = s.jobs.get(jobId)
+    return job !== undefined && s.sessionCalls.has(jobId) ? sessionJobCopy(job) : job
+  }),
 
-  putReceipt: (r) => Ref.update(ref, (s) => ({ ...s, receipts: [...s.receipts, r] })),
-  allReceipts: Effect.map(Ref.get(ref), (s) => s.receipts),
+  putReceipt: (r) => Ref.update(ref, (s) => {
+    if (r.sessionId !== undefined || s.sessionCalls.has(r.jobId)) throw new SessionConflict()
+    return { ...s, receipts: [...s.receipts, r] }
+  }),
+  allReceipts: Effect.map(Ref.get(ref), (s) => s.receipts.map(r => s.sessionCalls.has(r.jobId) ? sessionReceiptCopy(r) : r)),
 
   /**
    * Fee accrual sweep: one on-chain tx covers many receipts, and its hash is written back
@@ -339,7 +379,7 @@ export const makeStore = (ref: Ref.Ref<StoreState>): Store => ({
     Ref.modify(ref, (s) => {
       let n = 0
       const receipts = s.receipts.map((r) => {
-        if (r.feeAccrualId === accrualId && r.feeSweepTx === undefined) {
+        if (!s.sessionCalls.has(r.jobId) && r.sessionId === undefined && r.feeAccrualId === accrualId && r.feeSweepTx === undefined) {
           n++
           return Object.assign(Object.create(Object.getPrototypeOf(r)), r, { feeSweepTx: txHash }) as Receipt
         }

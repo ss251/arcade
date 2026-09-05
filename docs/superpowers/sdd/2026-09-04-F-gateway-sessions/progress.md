@@ -184,3 +184,50 @@ the exact root TypeScript options, zero diagnostics, and rechecked the three
 public report copies byte-exact. No source/test changed during the full gate.
 Only F4's eight source/test/fixture files and seven public-record/index files
 are selected for its atomic commit; no live action or GitHub push is performed.
+
+F4 subsequently committed independently as `a5a3f4e`, after its own reviewed gate.
+
+## September 6 — F5 publication preparation and corrected foundation
+
+The [current brief](task-5-brief.md) indexes the retained accounting readiness,
+independent design review, parent decisions, implementation brief, adversarial
+checklist, original author report, initial independent review, separate reference
+correction and final independent correction review. The
+[canonical ledger checkpoint](task-5-canonical-ledger-checkpoint.md) is an exact
+historical copy after its banner and one private-journal locator substitution;
+its older held/active statements are not the current status.
+
+The original foundation report remains historical and unchanged. Independent
+review reproduced actual offline TestRail completion rejection and the closed
+Gateway receipt's missing rail/category correlation. The
+[correction](task-5-reference-correction.md) now uses explicit simulated test
+references, EIP-only hash normalization and explicit canonical Gateway transfer
+UUIDs. No current terminal accepts a batch claim. Corrected-contract Reds and
+original Reds remain separately identified; neither mining nor recipient credit
+is inferred from a reference category.
+
+The author's corrected focused checkpoint is 77 Vitest tests / five files,
+65 Bun tests / 284 assertions / five files, two private regressions / five
+assertions and exact twelve-file-plus-private strict TypeScript with zero
+diagnostics. The final independent correction review is CLEAN, with its separate
+47 Vitest, two private Bun / five assertions, two actual TestRail memory/disk Bun /
+20 assertions and exact strict checks. The original independent 67/63 checks are
+earlier evidence, not a final 77/65 rerun. All original rollback, corruption,
+two-handle, counter, bounds, legacy-guard and owned death regressions are retained.
+
+See the [parent review](task-5-parent-review.md) for source/hash/strict review and
+full-gate chronology. The interrupted gate has no claimed result; a replacement
+launch initially failed two unchanged runner environment tests, then was corrected
+only to preserve existing non-secret environment fields. The complete rerun passed
+2,325 Vitest tests / 114 files, 374 Bun tests / 3,794 assertions / 33 files, and
+strict root/web TypeScript, final exit zero. That Bun total includes private
+regression files present in the worktree, not only clean-checkout public tests.
+Public-copy review and the atomic F5 commit remain parent-owned and pending; the
+publication preparer ran no tests, full suite, Git or network.
+
+This ships only durable local accounting foundation, not F6 service, F7 routes,
+F8 orchestration or live sessions. Root-only lineage, immutable nonce claims,
+held settling/uncertain funds and one-shot dispatch remain mandatory. F6 readiness
+has an additive explicit-test-category correction, but its source is held until
+F5's commit. Canonical priority is F5–12, then full F before G, H and I; G/H source
+is held. F1 approval is consumed, F13 has no new evidence and no push is authorized.

@@ -23,6 +23,8 @@ independently mined. F2–12 code work is unblocked; no extra live allowance is 
 - [Task 4 boot, discovery and per-job rail integration](task-4-integration-report.md)
 - [Task 4 discovery outcome-honesty correction](task-4-discovery-followup.md)
 - [Task 4 parent integration and publication review](task-4-parent-review.md)
+- [Task 5 current brief, evidence sequence and accounting limits](task-5-brief.md)
+- [Task 5 parent foundation/correction review and gate chronology](task-5-parent-review.md)
 - [Progress](progress.md)
 - [Gate evidence and owner prerequisites](../../../evidence/m6-gateway.md)
 
@@ -46,3 +48,12 @@ F4 registry, boot/discovery and internal per-job selection are independently
 reviewed, with parent focused checks and its own full test/strict gate passing.
 Its atomic commit is next. Constructed rails are not provider-support or funding proof; no session
 routing or durable session accounting ships in this checkpoint.
+
+F4 subsequently committed separately as `a5a3f4e`. F5's durable foundation and
+reference-category correction are frozen, with final independent correction review
+CLEAN and focused checks passing. Its [brief](task-5-brief.md) indexes the original
+reports, design decisions, genuine failures, corrected contract and retained
+canonical ledger checkpoint. The parent replacement full gate passed; public
+review and F5's commit remain pending. No session routes or live sessions ship here;
+F6 source remains held. Earlier test-to-onchain assumptions are historical and
+superseded by the explicit simulated test category. Full F precedes G, H and I.
