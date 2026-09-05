@@ -1,0 +1,60 @@
+{
+  "id": "loop-probe",
+  "version": "0.1.0",
+  "serviceName": "Lineage Loop Probe",
+  "description": "Buys a wallet risk note, then deliberately attempts a recursive hire so the receipt tree proves both successful delegation and lineage-cycle refusal.",
+  "tags": [
+    "arc",
+    "lineage",
+    "compose",
+    "evidence"
+  ],
+  "price": "$0.30",
+  "bounds": {
+    "timeoutSec": 60,
+    "maxSubSpendUsd": 0.25
+  },
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "address"
+    ],
+    "properties": {
+      "address": {
+        "type": "string",
+        "pattern": "^0x[a-fA-F0-9]{40}$",
+        "description": "EVM address to assess on Arc testnet"
+      }
+    },
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "ok",
+      "hired"
+    ],
+    "properties": {
+      "ok": {
+        "type": "boolean"
+      },
+      "hired": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "canaryInput": {
+    "address": "0x3600000000000000000000000000000000000000"
+  },
+  "engine": {
+    "adapter": "script",
+    "entry": "run.ts",
+    "capabilities": [
+      "hire-skills"
+    ]
+  }
+}

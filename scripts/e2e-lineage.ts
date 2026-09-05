@@ -233,9 +233,40 @@ Bun.serve = options => {
 };\n`
 /** Original seller programs are preserved byte-for-byte after a parent/deadline guard.
  * The private executable shell only execs Bun with dotenv explicitly disabled. */
-export const prepareLineageSkills = async (directory: string) => {
+export interface LineageSkillFiles {
+  readonly skill: "loop-probe" | "wallet-risk-note" | "usdc-flow-check"
+  readonly manifestBytes: string
+  readonly sourceBytes: string
+}
+const HISTORICAL_FIXTURE = join(ROOT, "scripts", "fixtures", "lineage-a9-2026-09-05")
+const HISTORICAL_HASHES = [
+  ["bfb1cf68e85d957935b81828aa72dbc30df786930545f791e86138f238491c3f", "e70ba39feba972bca6b06b2ca0bd7e8cf62f35595a6ecec1869be4e529d0bd19"],
+  ["1577e89bcf048a3a1f7851b2eec5072ad6555be043ac720851941713774466df", "a713128d33f8b56c9a55298f83afbb37b8d4165a0b00797fb442624eb3368b62"],
+  ["760df29360dba616e10aa51f075b07861368279556b1761c53b9334ba5a6230e", "2f605bd93956b753f7463fa7a24d898fba393cefd8cd5efafa79e136086e9f7b"]
+] as const
+const sha256 = async (value: string): Promise<string> => Array.from(new Uint8Array(
+  await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))
+)).map(byte => byte.toString(16).padStart(2, "0")).join("")
+const loadLineageSkillFiles = (base: string, sourceName: "run.ts" | "run.ts.txt"): Promise<ReadonlyArray<LineageSkillFiles>> =>
+  Promise.all(SKILLS.map(async skill => ({
+    skill,
+    manifestBytes: await readFile(join(base, skill, "arcade.json"), "utf8"),
+    sourceBytes: await readFile(join(base, skill, sourceName), "utf8")
+  })))
+export const verifyHistoricalLineageSourcesForTest = async (files: ReadonlyArray<LineageSkillFiles>): Promise<void> => {
+  insist(files.length === SKILLS.length, "historical A9 fixture bytes changed")
+  for (const [i, skill] of SKILLS.entries()) {
+    const file = files[i], expected = HISTORICAL_HASHES[i]!
+    insist(file !== undefined && file.skill === skill && await sha256(file.manifestBytes) === expected[0] &&
+      await sha256(file.sourceBytes) === expected[1], "historical A9 fixture bytes changed")
+  }
+}
+const buildLineageSkills = async (directory: string, files: ReadonlyArray<LineageSkillFiles>) => {
+  insist(files.length === SKILLS.length && files.every((file, i) => file.skill === SKILLS[i] &&
+    typeof file.manifestBytes === "string" && typeof file.sourceBytes === "string" && file.sourceBytes.length > 0),
+    "exactly three ordered lineage skill sources are required")
   const skillsDir = join(directory, "skills")
-  const manifests = assertCanonicalListings(await Promise.all(SKILLS.map(async skill => JSON.parse(await readFile(join(ROOT, "skills", skill, "arcade.json"), "utf8")))))
+  const manifests = assertCanonicalListings(files.map(file => JSON.parse(file.manifestBytes) as unknown))
   await mkdir(skillsDir, { recursive: true })
   // Inherit the actual workspace aliases so the copied canonical loop-probe resolves
   // @arcade/buyer/hire without changing its import or import.meta.main semantics.
@@ -244,11 +275,22 @@ export const prepareLineageSkills = async (directory: string) => {
   for (const [i, skill] of SKILLS.entries()) {
     const dir = join(skillsDir, skill); await mkdir(dir)
     const entry = join(dir, "guarded-run.ts")
-    await writeFile(entry, guardedSkillSource(await readFile(join(ROOT, "skills", skill, "run.ts"), "utf8")), { mode: 0o600 })
+    await writeFile(entry, guardedSkillSource(files[i]!.sourceBytes), { mode: 0o600 })
     await writeFile(join(dir, "guarded-run"), `#!/bin/sh\nexec ${quote(process.execPath)} --no-env-file run ${quote(entry)}\n`, { mode: 0o700 })
     await writeFile(join(dir, "arcade.json"), JSON.stringify({ ...manifests[i], engine: { ...record(manifests[i]!["engine"]), entry: "guarded-run" } }), { mode: 0o600 })
   }
   return { skillsDir, manifests }
+}
+/** Test seam only: callers supply bytes, but cannot bypass the live canonical listing guards. */
+export const prepareLineageSkillsFromSourcesForTest = buildLineageSkills
+/** Live loader: still selects only the current three canonical workspace listings. */
+export const prepareLineageSkills = async (directory: string) =>
+  buildLineageSkills(directory, await loadLineageSkillFiles(join(ROOT, "skills"), "run.ts"))
+/** Offline regression loader: fixed bytes, no CLI/argument/environment selector. */
+export const prepareHistoricalLineageSkillsForTest = async (directory: string) => {
+  const files = await loadLineageSkillFiles(HISTORICAL_FIXTURE, "run.ts.txt")
+  await verifyHistoricalLineageSourcesForTest(files)
+  return buildLineageSkills(directory, files)
 }
 /** One fresh bounded run. Every payment-capable CLI is launched once, never retried. */
 export const runLiveLineage = async (c: LineageConfig): Promise<void> => {

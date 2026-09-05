@@ -64,3 +64,27 @@ Task 11 review: fixed Gateway boot requiring an irrelevant local gas wallet and 
 Task 12: complete (commits 89e0930..f2b6700)
 Task 12 review: mainnet runbook includes isolated no-network refusal/success fixture, public receipt snapshots (no private job IDs), separate network stores/keys, browser rebuild and required pending-test fixture migration before ready activation. Gates: 604 Vitest + 29 Bun, tsc and 16 Forge tests pass; example schema/envelopes, shell syntax, links, verbatim warning and redaction checked. Mainnet remains pending; no mainnet command executed.
 OWNER ITEMS RESOLVED 2026-09-05 05:20: arcade-subbuy-key and arcade-canary-key minted (conductor, owner-approved) and faucet-funded 20 USDC each.
+
+## September 5 — historical test-input compatibility checkpoint
+
+The actual approved A9 live run already passed and its authority is consumed;
+this checkpoint does not replay it. G14's upcoming skill changes would otherwise
+alter A9's existing offline test inputs. All six pre-G14 manifests/programs are
+now versioned inert fixtures, with fixed byte fingerprints and a test-only loader.
+The live loader still reads current sources and the exact original guards refuse
+price/topology drift. No selector, key, role, price, verifier or live send changed.
+
+Parent independently read the complete change/report and compared the retained
+live prefix/suffix, protected shell wrapper and all six fixtures to base `381093e`:
+byte-identical PASS. The implementation's real missing-export Red preceded its
+19/19 offline tests / 206 assertions and strict TypeScript PASS. Parent repeat,
+public-copy validation and the separate full precommit gate follow. No new
+four-job proof, funded run, production change or Git push is claimed.
+
+Parent separately repeated all19Bun/206assertions and root/web strict TypeScript:
+PASS. Independent source/public review is CLEAN: retained live prefix/suffix and
+CLI hashes recomputed equal base, all six fixture bytes equal base, public report
+equals original plus banner, and37 local Markdown targets resolve. No privacy
+matches were found in the new public fixture/docs. The reviewer performed only
+read-only inspection and did not claim another test run. Scope is frozen for the
+separate full precommit test/type gate.

@@ -8,8 +8,10 @@ import { fileURLToPath } from "node:url"
 import { Database } from "bun:sqlite"
 import { treeHashOf } from "@arcade/core"
 import { readLineageConfig, lineageEnvironment, assertLineageEvidence, cycleObservation,
-  guardedSkillSource, lineagePreloadSource, assertCanonicalListings, prepareLineageSkills, lineageRunnerConfig, assertPublishedLineage, assertLineageChallenge,
-  type LineageConfig, type LineageBundle } from "./e2e-lineage.ts"
+  guardedSkillSource, lineagePreloadSource, assertCanonicalListings, prepareLineageSkillsFromSourcesForTest,
+  prepareHistoricalLineageSkillsForTest, verifyHistoricalLineageSourcesForTest, lineageRunnerConfig,
+  assertPublishedLineage, assertLineageChallenge, type LineageSkillFiles, type LineageConfig,
+  type LineageBundle } from "./e2e-lineage.ts"
 import { OwnedProcesses } from "./e2e-erc8004.ts"
 
 const roles = ["seller", "buyer", "facilitator", "subbuyer"] as const
@@ -210,6 +212,61 @@ describe("passive observation and canonical entry guards", () => {
 })
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url))
+const HISTORICAL = join(ROOT, "scripts", "fixtures", "lineage-a9-2026-09-05")
+const sourceFiles = async (base: string, program: "run.ts" | "run.ts.txt"): Promise<ReadonlyArray<LineageSkillFiles>> =>
+  Promise.all(skills.map(async skill => ({
+    skill,
+    manifestBytes: await readFile(join(base, skill, "arcade.json"), "utf8"),
+    sourceBytes: await readFile(join(base, skill, program), "utf8")
+  })))
+const sha256 = async (value: string): Promise<string> => Array.from(new Uint8Array(
+  await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))
+)).map(byte => byte.toString(16).padStart(2, "0")).join("")
+
+describe("immutable historical A9 skill inputs", () => {
+  it("pins every manifest and program byte to the 381093e checkpoint and rejects source mutation", async () => {
+    const files = await sourceFiles(HISTORICAL, "run.ts.txt")
+    const expected = [
+      ["bfb1cf68e85d957935b81828aa72dbc30df786930545f791e86138f238491c3f", "e70ba39feba972bca6b06b2ca0bd7e8cf62f35595a6ecec1869be4e529d0bd19"],
+      ["1577e89bcf048a3a1f7851b2eec5072ad6555be043ac720851941713774466df", "a713128d33f8b56c9a55298f83afbb37b8d4165a0b00797fb442624eb3368b62"],
+      ["760df29360dba616e10aa51f075b07861368279556b1761c53b9334ba5a6230e", "2f605bd93956b753f7463fa7a24d898fba393cefd8cd5efafa79e136086e9f7b"]
+    ] as const
+    const readme = await readFile(join(HISTORICAL, "README.md"), "utf8")
+    for (const [i, file] of files.entries()) {
+      expect(await sha256(file.manifestBytes)).toBe(expected[i]![0])
+      expect(await sha256(file.sourceBytes)).toBe(expected[i]![1])
+      expect(readme).toContain(expected[i]![0]); expect(readme).toContain(expected[i]![1])
+    }
+    await expect(verifyHistoricalLineageSourcesForTest(files)).resolves.toBeUndefined()
+    const changed = files.map((file, i) => i === 1 ? { ...file, sourceBytes: file.sourceBytes + "\n// drift" } : file)
+    await expect(verifyHistoricalLineageSourcesForTest(changed)).rejects.toThrow("historical A9 fixture bytes changed")
+  })
+
+  it("keeps the current live loader's shared builder closed to canonical manifest drift", async () => {
+    const files = await sourceFiles(join(ROOT, "skills"), "run.ts")
+    const wallet = JSON.parse(files[1]!.manifestBytes) as Record<string, unknown>
+    const changed = files.map((file, i) => i === 1
+      ? { ...file, manifestBytes: JSON.stringify({ ...wallet, price: "$0.15" }) }
+      : file)
+    const dir = await mkdtemp("/tmp/arcade-a9-drift-")
+    try {
+      await expect(prepareLineageSkillsFromSourcesForTest(dir, changed)).rejects.toThrow("canonical no-provider script/pricing changed")
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+
+  it("builds guarded executables from the frozen programs without changing their bytes", async () => {
+    const files = await sourceFiles(HISTORICAL, "run.ts.txt")
+    const dir = await mkdtemp("/tmp/arcade-a9-historical-")
+    try {
+      const { skillsDir, manifests } = await prepareHistoricalLineageSkillsForTest(dir)
+      expect(() => assertCanonicalListings(manifests)).not.toThrow()
+      for (const [i, skill] of skills.entries()) {
+        expect(await readFile(join(skillsDir, skill, "guarded-run.ts"), "utf8")).toBe(guardedSkillSource(files[i]!.sourceBytes))
+      }
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+})
+
 describe("actual isolated entry points", () => {
   it("offers import-safe help and refuses missing keys without inherited dotenv/injection or setup", () => {
     const run = (args: string[], extra = {}) => spawnSync("bash", ["scripts/e2e-lineage.sh", ...args], {
@@ -225,7 +282,7 @@ describe("actual isolated entry points", () => {
   it("runs a guarded canonical loop-probe copy as main with workspace imports and no automatic dotenv", async () => {
     const dir = await mkdtemp("/tmp/arcade-a9-entry-")
     try {
-      const { skillsDir, manifests } = await prepareLineageSkills(dir)
+      const { skillsDir, manifests } = await prepareHistoricalLineageSkillsForTest(dir)
       expect(() => assertCanonicalListings(manifests)).not.toThrow()
       expect(() => assertCanonicalListings(manifests.map((v, i) => i === 0 ? { ...v, price: "$0.20" } : v))).toThrow()
       const entry = join(skillsDir, "loop-probe", "guarded-run")
@@ -251,7 +308,7 @@ const offlineCycle = async (maxConcurrency: number) => {
     throw new Error(`offline lineage deadline: ${why}`)
   }
   try {
-    const { skillsDir } = await prepareLineageSkills(dir)
+    const { skillsDir } = await prepareHistoricalLineageSkillsForTest(dir)
     const flowPath = join(skillsDir, "usdc-flow-check", "guarded-run.ts")
     const flow = await readFile(flowPath, "utf8")
     await writeFile(flowPath, `// OFFLINE TEST ONLY: no network and no live payment evidence.\n
