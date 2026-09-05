@@ -252,3 +252,75 @@ export const pickAvailableLabel = async (candidates: ReadonlyArray<string>, isAv
   }
   throw new Error(`none of these .eth labels is verifiably available: ${labels.join(", ")}; owner must choose an available label`)
 }
+export interface SkillRecordInput {
+  readonly name: string; readonly endpoint: string; readonly payTo: string; readonly caip2: string
+  readonly priceAtomic: bigint; readonly webUrl: string; readonly mcpUrl?: string | undefined; readonly context: string
+  readonly agentRegistration?: { readonly chainId: number | bigint; readonly registry: string; readonly agentId: string | number }
+}
+const publicAddress = (value:string): `0x${string}` => {
+  const result=addressOf(value)
+  if(/^0x0{40}$/.test(result)) throw new Error("ENS: nonzero public address required")
+  return result
+}
+const publicUrl = (value:string):URL => {
+  if(value.length>2048 || /[\s\\%?#]/.test(value)) throw new Error("ENS: invalid public endpoint")
+  const url=new URL(value)
+  if(url.username||url.password||url.hash||url.search || !(url.protocol==="https:"||url.protocol==="http:"&&["localhost","127.0.0.1","[::1]"].includes(url.hostname))) throw new Error("ENS: public endpoint requires HTTPS or loopback")
+  return url
+}
+/** Exact integer payment facts; route seller and FeeSplitter payee are distinct fields. */
+export const skillTextRecords = (a:SkillRecordInput):ReadonlyArray<{readonly key:string;readonly value:string}> => {
+  const name=ensName(a.name), endpoint=publicUrl(a.endpoint)
+  const path=/^https?:\/\/[^/]+(\/x\/(0x[0-9a-fA-F]{40})\/([a-z0-9][a-z0-9-]*))$/.exec(a.endpoint)
+  if(!path||path[1]!==endpoint.pathname||component(path[3]!)!==name.split(".")[0]||name.split(".").length!==4) throw new Error("ENS: endpoint must match the skill name")
+  publicAddress(path[2]!);publicAddress(a.payTo);publicUrl(a.webUrl)
+  if(a.mcpUrl!==undefined) publicUrl(a.mcpUrl)
+  if(!/^eip155:[1-9][0-9]{0,15}$/.test(a.caip2)||!Number.isSafeInteger(Number(a.caip2.slice(7)))) throw new Error("ENS: invalid payment chain")
+  if(typeof a.priceAtomic!=="bigint"||a.priceAtomic<0n||a.priceAtomic>UINT256_MAX) throw new Error("ENS: price must be uint256")
+  if(a.context.length===0||new TextEncoder().encode(a.context).byteLength>2048||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(a.context)) throw new Error("ENS: invalid agent context")
+  const facts={name,endpoint:a.endpoint,payTo:a.payTo,chain:a.caip2,priceAtomic:a.priceAtomic.toString(),protocol:"x402",...(a.mcpUrl===undefined?{}:{mcp:a.mcpUrl})}
+  const records:Array<{key:string;value:string}>=[{key:ENS_TEXT_KEYS.endpoint,value:a.endpoint},{key:ENS_TEXT_KEYS.payTo,value:a.payTo},{key:ENS_TEXT_KEYS.chain,value:a.caip2},{key:ENS_TEXT_KEYS.priceAtomic,value:a.priceAtomic.toString()},{key:ENS_TEXT_KEYS.web,value:a.webUrl},...(a.mcpUrl===undefined?[]:[{key:ENS_TEXT_KEYS.mcp,value:a.mcpUrl}]),{key:ENS_TEXT_KEYS.context,value:`${a.context}\n\n${JSON.stringify(facts)}`}]
+  if(a.agentRegistration) records.push({key:agentRegistrationKey(a.agentRegistration.chainId,a.agentRegistration.registry,a.agentRegistration.agentId),value:"1"})
+  if(records.some(r=>new TextEncoder().encode(r.value).byteLength>4096)) throw new Error("ENS: record exceeds reader limit")
+  return Object.freeze(records.map(r=>Object.freeze(r)))
+}
+
+export interface EnsSkillState { readonly skillId:string;readonly label:string;readonly name:string;readonly priceAtomic:string }
+/** Public namespace state only. Runtime file IO is exported from @arcade/core/ens-state,
+ * never this browser-safe root module. Optional owner/daemon pin new setup provenance. */
+export interface EnsState {
+  readonly root:string;readonly sellerLabel:string;readonly seller:string;readonly deploymentSet:string
+  readonly universalResolver:string;readonly sellerRegistry:string;readonly skillRegistry:string;readonly resolver:string
+  readonly ttlSeconds:number;readonly skills:ReadonlyArray<EnsSkillState>;readonly owner?:string;readonly daemon?:string
+}
+const dataRecord = (input:unknown,allowed:readonly string[]):Record<string,unknown> => {
+  if(typeof input!=="object"||input===null||Array.isArray(input)||![Object.prototype,null].includes(Object.getPrototypeOf(input))) throw new Error("ENS: expected public state object")
+  const descriptors=Object.getOwnPropertyDescriptors(input), result:Record<string,unknown>={}
+  for(const key of Reflect.ownKeys(descriptors)) {
+    if(typeof key!=="string"||!allowed.includes(key)||!("value" in descriptors[key]!)) throw new Error("ENS: unexpected state field or accessor")
+    result[key]=descriptors[key]!.value
+  }
+  return result
+}
+/** Decode, validate hierarchy/deployment, reject secret-bearing fields and freeze. */
+export const decodeEnsState = (value:unknown):EnsState => {
+  const o=dataRecord(value,["root","sellerLabel","seller","deploymentSet","universalResolver","sellerRegistry","skillRegistry","resolver","ttlSeconds","skills","owner","daemon"])
+  const str=(key:string):string=>{if(typeof o[key]!=="string")throw new Error("ENS: missing state field");return o[key] as string}
+  const root=rootName(str("root")), sellerLabel=component(str("sellerLabel")), seller=publicAddress(str("seller"))
+  if(root!==o.root||sellerLabel!==o.sellerLabel)throw new Error("ENS: state names must be normalized")
+  const d=loadEnsDeployments().find(d=>d.set===o.deploymentSet)
+  if(!d||publicAddress(str("universalResolver"))!==d.universalResolver)throw new Error("ENS: state resolver must match deployment")
+  const addresses={sellerRegistry:publicAddress(str("sellerRegistry")),skillRegistry:publicAddress(str("skillRegistry")),resolver:publicAddress(str("resolver"))}
+  const ttl=o.ttlSeconds
+  if(typeof ttl!=="number"||!Number.isSafeInteger(ttl)||ttl<60||ttl>365*86400) throw new Error("ENS: unsupported state TTL")
+  if(!Array.isArray(o.skills)||o.skills.length<1||o.skills.length>64)throw new Error("ENS: state requires 1–64 skills")
+  const skills=o.skills.map((raw):EnsSkillState=>{
+    const s=dataRecord(raw,["skillId","label","name","priceAtomic"])
+    if(typeof s.skillId!=="string"||typeof s.label!=="string"||typeof s.name!=="string"||typeof s.priceAtomic!=="string"||s.skillId!==component(s.skillId)||s.label!==s.skillId||s.name!==arcadeSkillName({root,sellerLabel,skillId:s.skillId})||!/^(0|[1-9][0-9]{0,77})$/.test(s.priceAtomic)||BigInt(s.priceAtomic)>UINT256_MAX)throw new Error("ENS: invalid skill state")
+    return Object.freeze({skillId:s.skillId,label:s.label,name:s.name,priceAtomic:s.priceAtomic})
+  })
+  if(new Set(skills.map(s=>s.skillId)).size!==skills.length)throw new Error("ENS: duplicate skill state")
+  const owner=o.owner===undefined?undefined:publicAddress(str("owner")), daemon=o.daemon===undefined?undefined:publicAddress(str("daemon"))
+  if(daemon!==undefined&&(daemon===owner||daemon===seller))throw new Error("ENS: daemon must be a distinct scoped account")
+  return Object.freeze({root,sellerLabel,seller,deploymentSet:d.set,universalResolver:d.universalResolver,...addresses,ttlSeconds:ttl,skills:Object.freeze(skills),...(owner===undefined?{}:{owner}),...(daemon===undefined?{}:{daemon})})
+}

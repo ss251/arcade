@@ -1,6 +1,5 @@
 /** OWNER-gated ENSv2 Sepolia bootstrap. Importing this module never reads keys or starts IO. */
-import { createPublicClient, decodeEventLog, encodeAbiParameters, encodeEventTopics, encodeFunctionData, http, keccak256, parseAbi, type Abi, type Hex } from "viem"
-import { sepolia } from "viem/chains"
+import { decodeEventLog, encodeAbiParameters, encodeEventTopics, encodeFunctionData, keccak256, parseAbi, type Abi, type Hex } from "viem"
 import {
   ALL_ROLES, SELLER_SUBNAME_ROLES, ENS_SEPOLIA_CHAIN_ID, ETH_REGISTRAR_ABI, MOCK_USDC_ABI, PERMISSIONED_REGISTRY_ABI,
   PERMISSIONED_RESOLVER_ABI, USER_REGISTRY_INIT_ABI, VERIFIABLE_FACTORY_ABI, arcadeSellerName, ownedResolverSalt, userRegistrySalt,
@@ -341,11 +340,14 @@ export const main = async(argv:readonly string[]=process.argv.slice(2)):Promise<
   if(argv.length===1&&argv[0]==="--help") {console.log(HELP);return 0}
   try {
     const args=parseSetupArgs(argv)
-    // E4/E5 must replace this boundary only once all setup stages exist. Never mint or
-    // commit in a partial implementation merely to discover a later stub is incomplete.
-    insist(args.dryRun,"ENS setup: OWNER approval and complete registry/skill setup stages required; use --dry-run")
+    const {runEnsSetup,setupPublicClient}=await import("./ens-setup-runtime.ts")
+    if(!args.dryRun){
+      const state=await runEnsSetup(args)
+      console.log(JSON.stringify({complete:true,root:state.root,deploymentSet:state.deploymentSet,skills:state.skills.map(s=>s.name)},null,2))
+      return 0
+    }
     const rpc=safeUrl(process.env["ARCADE_ENS_RPC"]??"https://ethereum-sepolia-rpc.publicnode.com")
-    const client=createPublicClient({chain:sepolia,transport:http(rpc,{timeout:5000,retryCount:0})})
+    const client=setupPublicClient(rpc)
     const deployment=await resolveEnsDeployment(ensDeploymentReader(client))
     const proposed=await proposeParent(args,name=>client.readContract({address:deployment.ethRegistrar,abi:ETH_REGISTRAR_ABI,functionName:"isAvailable",args:[name]}))
     console.log(JSON.stringify({dryRun:true,deploymentSet:deployment.set,proposedParent:`${proposed}.eth`,seller:args.seller,skillIds:args.skillIds,ownerApprovalRequired:true},null,2))

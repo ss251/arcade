@@ -393,3 +393,5 @@ export const PRIVATE_FIELDS = [
 export const decodeManifest = Schema.decodeUnknown(SkillManifest)
 export const encodePublicListing = Schema.encode(PublicListing)
 export const decodePublicListing = Schema.decodeUnknown(PublicListing)
+/** Pure synchronous boundary for owner setup scripts that do not run an Effect runtime. */
+export const decodePublicListingSync = Schema.decodeUnknownSync(PublicListing)

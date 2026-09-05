@@ -37,6 +37,7 @@ export default defineConfig({
     // these through the workspace and package `exports` at runtime; vitest does not, which
     // is why they are listed twice.
     alias: {
+      "@arcade/core/ens-state": new URL("./packages/core/src/ens-state.ts", import.meta.url).pathname,
       "@arcade/buyer/hire": new URL("./packages/buyer/src/hire.ts", import.meta.url).pathname,
       "@arcade/runner/engines/types": new URL(
         "./packages/runner/src/engines/types.ts",
