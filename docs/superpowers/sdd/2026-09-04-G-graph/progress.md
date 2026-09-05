@@ -116,3 +116,19 @@ export. Parent removed only that blank line and directly compared the final byte
 exact original plus banner PASS. The audit otherwise found the brief/report CLEAN
 for scope, privacy and evidence claims; neither contains Markdown links. Source
 and staged scope remain frozen for the final G7 precommit gate.
+
+G13 and G7 committed separately after their own full gates. The later clean rebase
+onto main ec5cf74 preserved their atomic commits as c1cd66c and 4b3c800; preceding
+G1/G10/G11/G12 are now 57c58ff/eb7e1f6/f7fee77/28d8e51. Historical report hashes are
+not rewritten. No G merge ahead of full F occurred.
+
+G14's wallet composition is implemented with required nullable evidence, exact
+child accounting, conservative verdicts and a published 135-second bound. Genuine
+correlation and fixture-lifecycle regressions were fixed, retaining earlier reports.
+Independent final runtime checks passed 13 Vitest plus 11 Bun / 45 assertions;
+actual timeout was 32.048 seconds with one request. Parent's fixture-type follow-up
+passed all 13 Vitest and exact nested-test strict TypeScript with zero diagnostics;
+independent source review is CLEAN. Independent public review is also CLEAN: four
+exact bannered reports, 27 resolved local links and a targeted privacy scan. The
+separate full gate remains pending. No live Graph purchase, new nested profile or
+historical A9 replay is claimed.

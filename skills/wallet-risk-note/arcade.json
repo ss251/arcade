@@ -2,24 +2,18 @@
   "id": "wallet-risk-note",
   "version": "0.1.0",
   "serviceName": "Wallet Risk Note",
-  "description": "A short counterparty note on an Arc address: is it a contract, has it ever moved funds, does it hold enough to settle. Buys its on-chain facts from another listing on this marketplace rather than reading the chain itself, so each call settles twice.",
-  "tags": [
-    "arc",
-    "risk",
-    "diligence",
-    "compose"
-  ],
-  "price": "$0.05",
+  "description": "A bounded counterparty note for an Arc address. It conditionally settles up to two child purchases: Arc USDC flow facts and conservative ERC-8004 evidence from The Graph. Missing Graph evidence never becomes a clean allow.",
+  "tags": ["arc", "risk", "diligence", "compose"],
+  "price": "$0.15",
   "replaces": "$99/mo screening seat",
   "bounds": {
-    "timeoutSec": 60,
-    "maxSubSpendUsd": 0.02
+    "timeoutSec": 135,
+    "maxSubSpendUsd": 0.08
   },
   "inputSchema": {
     "type": "object",
-    "required": [
-      "address"
-    ],
+    "required": ["address"],
+    "additionalProperties": false,
     "properties": {
       "address": {
         "type": "string",
@@ -28,58 +22,64 @@
       },
       "minUsdc": {
         "type": "number",
-        "description": "Balance the counterparty must hold to be considered settle-capable. Defaults to 1.",
+        "minimum": 0,
+        "description": "Balance the counterparty must hold to be considered settle-capable. At most six decimal places; defaults to 1.",
         "default": 1
       }
     }
   },
   "outputSchema": {
     "type": "object",
-    "required": [
-      "address",
-      "verdict",
-      "findings",
-      "sourcedFrom"
-    ],
+    "additionalProperties": false,
+    "required": ["address", "verdict", "findings", "balanceUsdc", "isContract", "everTransacted", "counterparty", "sourcedFrom"],
     "properties": {
-      "address": {
-        "type": "string"
-      },
-      "verdict": {
-        "type": "string",
-        "enum": [
-          "ok",
-          "caution",
-          "unfunded"
-        ]
-      },
+      "address": { "type": "string", "pattern": "^0x[a-f0-9]{40}$" },
+      "verdict": { "type": "string", "enum": ["ok", "caution", "unfunded"] },
       "findings": {
         "type": "array",
-        "items": {
-          "type": "string"
+        "minItems": 3,
+        "maxItems": 11,
+        "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+      },
+      "balanceUsdc": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,77})\\.[0-9]{6}$" },
+      "isContract": { "type": "boolean" },
+      "everTransacted": { "type": "boolean" },
+      "counterparty": {
+        "type": ["object", "null"],
+        "additionalProperties": false,
+        "required": ["verdict", "contradictions", "attesterSettledCount"],
+        "properties": {
+          "verdict": { "type": "string", "enum": ["manual-review", "refuse"] },
+          "contradictions": {
+            "type": "array",
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": ["no-erc8004-identity", "validation-failed", "registration-inactive", "x402-unsupported", "wallet-differs-from-owner", "feedback-revoked", "self-attested", "unattested-no-proof-of-payment"]
+            }
+          },
+          "attesterSettledCount": { "type": "integer", "enum": [0] }
         }
-      },
-      "balanceUsdc": {
-        "type": "string"
-      },
-      "isContract": {
-        "type": "boolean"
-      },
-      "everTransacted": {
-        "type": "boolean"
       },
       "sourcedFrom": {
         "type": "object",
-        "description": "The skill this note bought its facts from, and what that cost.",
+        "additionalProperties": false,
+        "required": ["skillId", "paidUsdc", "budgetLeftUsd", "counterpartyGraph"],
+        "description": "Correlated broker settlements only; Graph query source costs are not child billing.",
         "properties": {
-          "skillId": {
-            "type": "string"
-          },
-          "paidUsdc": {
-            "type": "string"
-          },
-          "budgetLeftUsd": {
-            "type": "string"
+          "skillId": { "type": "string", "enum": ["usdc-flow-check"] },
+          "paidUsdc": { "type": "string", "enum": ["$0.0100"] },
+          "budgetLeftUsd": { "type": "string", "pattern": "^\\$(0|[1-9][0-9]*)\\.[0-9]{4}$" },
+          "counterpartyGraph": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["skillId", "paidUsdc", "evidenceUsed"],
+            "properties": {
+              "skillId": { "type": "string", "enum": ["counterparty-graph"] },
+              "paidUsdc": { "type": "string", "enum": ["$0.0500"] },
+              "evidenceUsed": { "type": "boolean", "enum": [true] }
+            }
           }
         }
       }
@@ -92,8 +92,6 @@
   "engine": {
     "adapter": "script",
     "entry": "run.ts",
-    "capabilities": [
-      "hire-skills"
-    ]
+    "capabilities": ["hire-skills"]
   }
 }
