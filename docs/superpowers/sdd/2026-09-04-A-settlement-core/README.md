@@ -42,6 +42,7 @@ These are historical sanitized copies, not a new execution or authorization. Lat
 - [work-order.md](work-order.md)
 - [A9 historical fixture compatibility brief](a9-historical-fixture-brief.md)
 - [A9 historical fixture implementation report](a9-historical-fixture-report.md)
+- [A9 inert fixture-mode follow-up](a9-fixture-mode-followup.md)
 - [Versioned source snapshot provenance](../../../../scripts/fixtures/lineage-a9-2026-09-05/README.md)
 
 ## Publication policy

@@ -88,3 +88,10 @@ equals original plus banner, and37 local Markdown targets resolve. No privacy
 matches were found in the new public fixture/docs. The reviewer performed only
 read-only inspection and did not claim another test run. Scope is frozen for the
 separate full precommit test/type gate.
+
+Historical fixture checkpoint ec5cf74 committed and fast-forwarded main; its own
+full gate and all-four main gates passed2145Vitest/108,301Bun/3386assertions/26,
+root/web TypeScript, web build and16Forge. A post-merge file-mode audit found one
+inherited executable bit on a .txt snapshot. A genuine failing mode assertion
+now passes after changing only that file to100644; all six source hashes and live
+guards remain unchanged. The separately reviewed mode/test follow-up gate follows.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { encodeAbiParameters, encodeEventTopics, encodeFunctionData, parseAbi, parseAbiParameters } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { spawnSync } from "node:child_process"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -236,6 +236,7 @@ describe("immutable historical A9 skill inputs", () => {
       expect(await sha256(file.manifestBytes)).toBe(expected[i]![0])
       expect(await sha256(file.sourceBytes)).toBe(expected[i]![1])
       expect(readme).toContain(expected[i]![0]); expect(readme).toContain(expected[i]![1])
+      expect((await stat(join(HISTORICAL, file.skill, "run.ts.txt"))).mode & 0o111).toBe(0)
     }
     await expect(verifyHistoricalLineageSourcesForTest(files)).resolves.toBeUndefined()
     const changed = files.map((file, i) => i === 1 ? { ...file, sourceBytes: file.sourceBytes + "\n// drift" } : file)
