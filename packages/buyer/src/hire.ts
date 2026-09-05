@@ -1,7 +1,9 @@
 import { request } from "node:http"
+import { normalize } from "viem/ens"
+import { looksLikeEnsName } from "./ens-policy.ts"
 
 /**
- * `hire` — one skill buying from another, mid-run.
+ * `hire` — one skill buying from another, mid-run, by skill ID or ENS name.
  *
  * This is what makes the marketplace an economy rather than a listing site. An API never
  * buys another API, so supply and demand there are separate populations that must both be
@@ -64,7 +66,7 @@ export const __resetSubSpend = (): void => {
 }
 
 export const hire = async (
-  skillId: string,
+  skillIdOrName: string,
   input: unknown,
   options: HireOptions = {}
 ): Promise<Hired> => {
@@ -81,12 +83,17 @@ export const hire = async (
     )
   }
 
+  // Classification/normalization is local. The runner alone resolves ENS and holds the
+  // payment authority; the sandbox cannot select a different hub for its parent token.
+  const byName = looksLikeEnsName(skillIdOrName)
+  const skillId = byName ? normalize(skillIdOrName) : skillIdOrName
+
   // `node:http` over the socket rather than `fetch`'s Bun-only `unix` option, so this is
   // the same code path under Bun and Node and can be tested against a real broker.
   const { status, text } = await new Promise<{ status: number; text: string }>(
     (resolve, reject) => {
       const payload = JSON.stringify({
-        skillId,
+        ...(byName ? { name: skillId } : { skillId }),
         input,
         ...(options.maxAmountUsd === undefined ? {} : { maxAmountUsd: options.maxAmountUsd })
       })

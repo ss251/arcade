@@ -2,7 +2,9 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto"
 import { createServer } from "node:http"
 import { unlinkSync } from "node:fs"
 import { privateKeyToAccount } from "viem/accounts"
+import { normalize } from "viem/ens"
 import { formatUsdc, parsePrice } from "@arcade/core"
+import { looksLikeEnsName } from "@arcade/buyer"
 
 /**
  * The hire broker — why the sub-purchase key never enters the sandbox.
@@ -42,6 +44,8 @@ export interface PurchaseArgs {
   readonly hubUrl: string
   readonly seller: string
   readonly skillId: string
+  /** When set, skillId is the canonical name and seller is an unused placeholder. */
+  readonly name?: string
   readonly input: unknown
   readonly privateKey: string
   readonly maxAmountAtomic: bigint
@@ -86,9 +90,9 @@ const defaultPurchase: PurchaseFn = async (args) => {
 
   const out = await Effect.runPromise(
     callSkill({
-      hubUrl: args.hubUrl,
-      seller: args.seller,
-      skillId: args.skillId,
+      ...(args.name === undefined
+        ? { hubUrl: args.hubUrl, seller: args.seller, skillId: args.skillId }
+        : { name: args.name, expectedHubUrl: args.hubUrl }),
       input: args.input,
       account: privateKeyToAccount(args.privateKey as `0x${string}`),
       maxAmountAtomic: args.maxAmountAtomic,
@@ -101,7 +105,7 @@ const defaultPurchase: PurchaseFn = async (args) => {
     jobId: out.jobId,
     settled,
     result: out.result,
-    fenced: fenceResult(out.result, args.seller),
+    fenced: fenceResult(out.result, args.name ?? args.seller),
     paidAtomic: settled ? parsePrice(String(receipt["price"] ?? "$0")) : 0n
   }
 }
@@ -154,17 +158,31 @@ export const startHireBroker = (options: HireBrokerOptions): HireBroker => {
         req.on("data", (c) => (acc += String(c)))
         req.on("end", () => resolve(acc))
       })
-      const body = ((): { skillId?: string; input?: unknown; maxAmountUsd?: number } => {
+      const body = ((): Record<string, unknown> => {
         try {
-          return JSON.parse(raw)
+          const parsed: unknown = JSON.parse(raw)
+          return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+            ? parsed as Record<string, unknown>
+            : {}
         } catch {
           return {}
         }
       })()
-      const skillId = body.skillId
-      if (typeof skillId !== "string" || skillId === "") {
-        return json({ error: "skillId is required" }, 400)
+      // Presence, not truthiness: even a null/empty second target makes the request
+      // ambiguous. Only broker-owned routing/lineage/key fields are passed to purchase.
+      const hasName = Object.hasOwn(body, "name")
+      const hasSkillId = Object.hasOwn(body, "skillId")
+      if (hasName === hasSkillId) {
+        return json({ error: "exactly one skillId or ENS name is required" }, 400)
       }
+      const target = hasName ? body["name"] : body["skillId"]
+      if (typeof target !== "string" || (hasName
+        ? !looksLikeEnsName(target)
+        : target.length > 64 || !/^[a-z0-9][a-z0-9-]*$/.test(target))) {
+        return json({ error: "invalid skillId or ENS name" }, 400)
+      }
+      const name = hasName ? normalize(target) : undefined
+      const skillId = name ?? target
 
       const remaining =
         ledger.budgetAtomic > ledger.spentAtomic ? ledger.budgetAtomic - ledger.spentAtomic : 0n
@@ -180,19 +198,29 @@ export const startHireBroker = (options: HireBrokerOptions): HireBroker => {
       }
 
       // A cap named by the sandbox may only narrow what the manifest allowed.
-      const requested =
-        typeof body.maxAmountUsd === "number" && body.maxAmountUsd > 0
-          ? parsePrice(String(body.maxAmountUsd))
-          : remaining
+      let requested = remaining
+      if (Object.hasOwn(body, "maxAmountUsd")) {
+        try {
+          const amount = body["maxAmountUsd"]
+          if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) throw new Error()
+          requested = parsePrice(String(amount))
+        } catch {
+          return json({ error: "maxAmountUsd must be a positive USDC amount with at most six decimal places" }, 400)
+        }
+      }
       const cap = requested < remaining ? requested : remaining
 
-      let seller: string
-      try {
-        const res = await fetch(`${options.hubUrl}/listings/${skillId}`)
-        if (!res.ok) return json({ error: `cannot hire "${skillId}": hub returned ${res.status}` }, 404)
-        seller = ((await res.json()) as { seller: string }).seller
-      } catch (e) {
-        return json({ error: `cannot reach the hub: ${String((e as Error)?.message ?? e)}` }, 502)
+      // ENS resolution happens exactly once in the buyer SDK. Its expectedHubUrl guard
+      // refuses foreign origins before any capability-bearing probe or signature.
+      let seller = ""
+      if (name === undefined) {
+        try {
+          const res = await fetch(`${options.hubUrl}/listings/${skillId}`)
+          if (!res.ok) return json({ error: `cannot hire "${skillId}": hub returned ${res.status}` }, 404)
+          seller = ((await res.json()) as { seller: string }).seller
+        } catch (e) {
+          return json({ error: `cannot reach the hub: ${String((e as Error)?.message ?? e)}` }, 502)
+        }
       }
 
       try {
@@ -200,7 +228,8 @@ export const startHireBroker = (options: HireBrokerOptions): HireBroker => {
           hubUrl: options.hubUrl,
           seller,
           skillId,
-          input: body.input ?? {},
+          ...(name === undefined ? {} : { name }),
+          input: body["input"] ?? {},
           privateKey: options.subBuyKey,
           maxAmountAtomic: cap,
           ...(ledger.hireCapability === undefined ? {} : { lineage: ledger.hireCapability })

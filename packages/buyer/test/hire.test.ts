@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { createServer } from "node:http"
 import { HireRefused, __resetSubSpend, hire, subSpendUsd } from "../src/hire.ts"
 
 /**
@@ -11,6 +12,34 @@ import { HireRefused, __resetSubSpend, hire, subSpendUsd } from "../src/hire.ts"
  */
 
 const saved = { ...process.env }
+let socketSequence = 0
+
+/** Capture the real wire request; no SDK or broker implementation is mocked. */
+const captureHire = async (target: string) => {
+  const socket = `/tmp/arcade-hire-client-${process.pid}-${socketSequence++}.sock`
+  let body: unknown
+  let token: string | undefined
+  const server = createServer((req, res) => {
+    let raw = ""
+    req.on("data", chunk => { raw += String(chunk) })
+    req.on("end", () => {
+      body = JSON.parse(raw)
+      token = req.headers["x-job-token"] as string | undefined
+      res.setHeader("content-type", "application/json")
+      res.end(JSON.stringify({ jobId: "job_child", settled: false, result: {}, fenced: "", costUsd: 0 }))
+    })
+  })
+  await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(socket, resolve) })
+  try {
+    process.env["ARCADE_HIRE_SOCKET"] = socket
+    process.env["ARCADE_JOB_ID"] = "job_parent"
+    process.env["ARCADE_JOB_TOKEN"] = "test-token"
+    const result = await hire(target, { query: "public input" }, { maxAmountUsd: 0.03, hubUrl: "https://untrusted.example" })
+    return { body, token, result }
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
+}
 
 beforeEach(() => {
   __resetSubSpend()
@@ -25,6 +54,19 @@ afterEach(() => {
 })
 
 describe("hire", () => {
+  it("sends a normalized ENS name as the only target over the real socket", async () => {
+    const captured = await captureHire("Wallet-Risk-Note.SAIL.ARCADE.ETH")
+    expect(captured.body).toEqual({ name: "wallet-risk-note.sail.arcade.eth", input: { query: "public input" }, maxAmountUsd: 0.03 })
+    expect(captured.token).toBe("test-token")
+    expect(captured.result.skillId).toBe("wallet-risk-note.sail.arcade.eth")
+  })
+
+  it("retains the legacy skill ID request without sandbox-controlled hub routing", async () => {
+    const captured = await captureHire("wallet-risk-note")
+    expect(captured.body).toEqual({ skillId: "wallet-risk-note", input: { query: "public input" }, maxAmountUsd: 0.03 })
+    expect(captured.result.skillId).toBe("wallet-risk-note")
+  })
+
   it("refuses when the capability was never granted", async () => {
     // No socket means the manifest did not declare `hire-skills`, or the runner has no
     // sub-purchase key. This fails inside a seller's own skill where there is nobody to

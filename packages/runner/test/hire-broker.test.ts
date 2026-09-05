@@ -3,7 +3,8 @@ import { request } from "node:http"
 import { hire, HireRefused, subSpendUsd, __resetSubSpend } from "@arcade/buyer/hire"
 import { ARC_CAIP2, HIRE_CAPABILITY_HEADER, USDC_ADDRESS } from "@arcade/core"
 import { HEADER_PAYMENT_SIGNATURE } from "@arcade/payments"
-import { startHireBroker, type HireBroker, type PurchaseFn } from "../src/hire-broker.ts"
+import * as ensPolicy from "../../buyer/src/ens-policy.ts"
+import { startHireBroker, type HireBroker, type PurchaseArgs, type PurchaseFn } from "../src/hire-broker.ts"
 
 /**
  * The broker is where `maxSubSpendUsd` is actually enforced, and that is the whole point:
@@ -60,7 +61,7 @@ const originalFetch = globalThis.fetch
 const call = (
   path: string,
   headers: Record<string, string>,
-  body?: Record<string, unknown>
+  body?: unknown
 ): Promise<{ status: number; body: Record<string, unknown> }> =>
   new Promise((resolve, reject) => {
     const payload = body === undefined ? undefined : JSON.stringify(body)
@@ -101,14 +102,196 @@ const ask = (jobId: string, token: string, body: Record<string, unknown> = {}) =
     ...body
   })
 
+const NAME = "wallet-risk-note.sail.arcade.eth"
+const NAME_HUB = "https://hub.test"
+const NAME_SELLER = "0x3b2Bbb840A9570223aDbF2172a33BB77fE8D21AF"
+const NAME_ENDPOINT = `${NAME_HUB}/x/${NAME_SELLER}/wallet-risk-note`
+const NAME_POLL = `${NAME_HUB}/jobs/job_child/result?token=${"ab".repeat(16)}`
+
+/** Only read-only ENS and HTTP are injected; the real SDK signs offline with KEY. */
+const defaultNameBroker = (changes: {
+  endpoint?: string; payTo?: string; missing?: boolean; unavailable?: boolean; cycle?: boolean
+} = {}) => {
+  const reads = vi.fn(async ({ key }: { name: string; key: string }) => {
+    if (changes.unavailable) throw new Error("PRIVATE_RPC_CREDENTIAL")
+    if (changes.missing) return null
+    return ({
+      "arcade.endpoint": changes.endpoint ?? NAME_ENDPOINT,
+      "arcade.payTo": changes.payTo ?? NAME_SELLER,
+      "arcade.chain": ARC_CAIP2,
+      "arcade.priceAtomic": "50000"
+    })[key] ?? null
+  })
+  vi.spyOn(ensPolicy, "sepoliaEnsReader").mockReturnValue({ getEnsText: reads })
+  const requests: Request[] = []
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const req = new Request(input, init)
+    requests.push(req)
+    if (req.url === NAME_POLL) {
+      return Response.json({ job_id: "job_child", status: "succeeded", result: { advice: "untrusted seller output" }, receipt: { settled: true, price: "$0.05" } })
+    }
+    if (req.url !== NAME_ENDPOINT) throw new Error("Unexpected outbound request")
+    if (changes.cycle) return Response.json({ error: "lineage_cycle", detail: "child is already an ancestor" }, { status: 402 })
+    if (req.headers.has(HEADER_PAYMENT_SIGNATURE)) {
+      return Response.json({ job_id: "job_child", poll_url: NAME_POLL }, { status: 202 })
+    }
+    return Response.json({ x402Version: 2, accepts: [{
+      scheme: "exact", network: ARC_CAIP2, amount: "50000", asset: USDC_ADDRESS,
+      payTo: NAME_SELLER, resource: req.url, mimeType: "application/json", maxTimeoutSeconds: 60, extra: {}
+    }] }, { status: 402 })
+  }) as typeof fetch
+  SOCK = `/tmp/arcade-hire-name-${process.pid}-${seq++}.sock`
+  broker = startHireBroker({ hubUrl: NAME_HUB, subBuyKey: KEY, socketPath: SOCK })
+  const token = broker.openJob("job_name_parent", 0.05, "cap.real-name-parent")
+  vi.stubEnv("ARCADE_HIRE_SOCKET", SOCK)
+  vi.stubEnv("ARCADE_JOB_ID", "job_name_parent")
+  vi.stubEnv("ARCADE_JOB_TOKEN", token)
+  __resetSubSpend()
+  return { broker, requests, reads }
+}
+
 afterEach(() => {
   broker?.stop()
   broker = undefined
   globalThis.fetch = originalFetch
+  vi.restoreAllMocks()
   vi.unstubAllEnvs()
 })
 
 describe("hire broker", () => {
+  it("pays by name through the real socket and SDK, retaining the parent capability and ceiling", async () => {
+    const fixture = defaultNameBroker()
+    const result = await hire(NAME.toUpperCase(), { question: "fixture" }, { maxAmountUsd: 0.05, hubUrl: "https://foreign.example" })
+    expect(result).toMatchObject({ skillId: NAME, jobId: "job_child", settled: true, costUsd: 0.05 })
+    expect(result.fenced).toContain(NAME)
+    expect(result.fenced).toContain("untrusted seller output")
+    expect(fixture.requests.map(request => request.url)).toEqual([NAME_ENDPOINT, NAME_ENDPOINT, NAME_POLL])
+    const [probe, paid, poll] = fixture.requests
+    expect(probe!.headers.get(HIRE_CAPABILITY_HEADER)).toBe("cap.real-name-parent")
+    expect(paid!.headers.get(HIRE_CAPABILITY_HEADER)).toBe("cap.real-name-parent")
+    expect(probe!.headers.has(HEADER_PAYMENT_SIGNATURE)).toBe(false)
+    expect(paid!.headers.has(HEADER_PAYMENT_SIGNATURE)).toBe(true)
+    expect(poll!.headers.has(HIRE_CAPABILITY_HEADER)).toBe(false)
+    for (const request of fixture.requests) {
+      expect(request.redirect).toBe("error")
+      expect(request.credentials).toBe("omit")
+      expect(request.headers.has("x-job-token")).toBe(false)
+      expect(request.headers.has("authorization")).toBe(false)
+    }
+    expect(await paid!.clone().json()).toEqual({ question: "fixture" })
+    // Four records, read once each. No hub listing lookup or second ENS resolution.
+    expect(fixture.reads).toHaveBeenCalledTimes(4)
+    expect(fixture.reads.mock.calls.every(([read]) => read.name === NAME)).toBe(true)
+    expect(fixture.broker.spentUsd("job_name_parent")).toBe(0.05)
+    expect(subSpendUsd()).toBe(0.05)
+    await expect(hire(NAME, {})).rejects.toThrow(/budget exhausted/)
+    expect(fixture.requests).toHaveLength(3)
+  })
+
+  it("carries an explicit narrower cap into the real by-name signer gate", async () => {
+    const fixture = defaultNameBroker()
+    await expect(hire(NAME, {}, { maxAmountUsd: 0.03 })).rejects.toThrow(/exceeds max-amount 30000/)
+    expect(fixture.requests).toHaveLength(1)
+    expect(fixture.requests[0]!.headers.get(HIRE_CAPABILITY_HEADER)).toBe("cap.real-name-parent")
+    expect(fixture.requests[0]!.headers.has(HEADER_PAYMENT_SIGNATURE)).toBe(false)
+    expect(fixture.broker.spentUsd("job_name_parent")).toBe(0)
+    expect(subSpendUsd()).toBe(0)
+  })
+
+  it.each(["https://foreign.example", "https://hub.test:8443"])(
+    "refuses a name resolving to %s before any parent-capability-bearing HTTP", async origin => {
+      const fixture = defaultNameBroker({ endpoint: `${origin}/x/${NAME_SELLER}/wallet-risk-note` })
+      await expect(hire(NAME, {})).rejects.toThrow(/issuing hub/)
+      expect(fixture.requests).toHaveLength(0)
+      expect(fixture.broker.spentUsd("job_name_parent")).toBe(0)
+    }
+  )
+
+  it("preserves a by-name lineage-cycle refusal without signing or charging", async () => {
+    const fixture = defaultNameBroker({ cycle: true })
+    await expect(hire(NAME, {})).rejects.toThrow(/lineage_cycle: child is already an ancestor/)
+    expect(fixture.requests).toHaveLength(1)
+    expect(fixture.requests[0]!.headers.get(HIRE_CAPABILITY_HEADER)).toBe("cap.real-name-parent")
+    expect(fixture.requests[0]!.headers.has(HEADER_PAYMENT_SIGNATURE)).toBe(false)
+    expect(fixture.broker.spentUsd("job_name_parent")).toBe(0)
+  })
+
+  it("refuses an ENS payee mismatch through the socket before a payment retry", async () => {
+    const fixture = defaultNameBroker({ payTo: `0x${"22".repeat(20)}` })
+    await expect(hire(NAME, {})).rejects.toThrow(/ens_payto_mismatch/)
+    expect(fixture.requests).toHaveLength(1)
+    expect(fixture.requests[0]!.headers.has(HEADER_PAYMENT_SIGNATURE)).toBe(false)
+    expect(fixture.broker.spentUsd("job_name_parent")).toBe(0)
+  })
+
+  it.each(["missing", "unavailable"] as const)("returns a safe %s ENS refusal without HTTP or payment", async mode => {
+    const fixture = defaultNameBroker({ [mode]: true })
+    const error = await hire(NAME, {}).catch((error: unknown) => error)
+    expect(error).toBeInstanceOf(HireRefused)
+    expect((error as Error).message).toContain(mode === "missing" ? "may be expired" : "rpc_unavailable")
+    expect((error as Error).message).not.toContain("PRIVATE")
+    expect(fixture.requests).toHaveLength(0)
+    expect(fixture.broker.spentUsd("job_name_parent")).toBe(0)
+  })
+
+  it("routes a normalized ENS target without discovery, preserving the trusted cap and lineage", async () => {
+    let captured: PurchaseArgs | undefined
+    const b = start(async args => { captured = args; return purchaseAt(0.02)(args) })
+    const discovery = vi.fn(async () => { throw new Error("name hires must not discover a listing") })
+    globalThis.fetch = discovery as unknown as typeof fetch
+    const token = b.openJob("job_name", 0.05, "cap.parent")
+    const result = await call("/hire", { "x-job-id": "job_name", "x-job-token": token }, {
+      name: "Wallet-Risk-Note.SAIL.ARCADE.ETH", input: { query: "test" }, maxAmountUsd: 0.03,
+      hubUrl: "https://attacker.example", lineage: "cap.forged", privateKey: "forged"
+    })
+    expect(result.status).toBe(200)
+    expect(captured).toEqual({
+      name: "wallet-risk-note.sail.arcade.eth", skillId: "wallet-risk-note.sail.arcade.eth", seller: "",
+      input: { query: "test" }, hubUrl: "http://hub.test", lineage: "cap.parent", privateKey: KEY, maxAmountAtomic: 30_000n
+    })
+    expect(discovery).not.toHaveBeenCalled()
+    expect(result.body["skillId"]).toBe("wallet-risk-note.sail.arcade.eth")
+    expect(b.spentUsd("job_name")).toBe(0.02)
+  })
+
+  it.each([
+    { name: "child.sail.arcade.eth", skillId: "child" },
+    { name: "child.sail.arcade.eth", skillId: null },
+    { name: null, skillId: "child" },
+    {}, null, [],
+    { name: "not-a-name" }, { name: "child.sail.arcade.eth." },
+    { name: `${"a".repeat(64)}.sail.arcade.eth` },
+    { name: `${"a.".repeat(130)}eth` },
+    { name: " child.sail.arcade.eth" }, { name: {} },
+    { skillId: "../child" }, { skillId: "child?secret=private" }, { skillId: "" },
+    { skillId: "a".repeat(65) }
+  ].map(body => [body] as const))("refuses malformed or ambiguous targets before discovery or purchase: %j", async body => {
+    const purchase = vi.fn(purchaseAt(0.01))
+    const b = start(purchase)
+    const discovery = vi.fn(async () => new Response(JSON.stringify({ seller: "0xSeller" })))
+    globalThis.fetch = discovery as unknown as typeof fetch
+    const token = b.openJob("job_target", 0.05)
+    const result = await call("/hire", { "x-job-id": "job_target", "x-job-token": token }, body)
+    expect(result.status).toBe(400)
+    expect(result.body["error"]).not.toContain("private")
+    expect(purchase).not.toHaveBeenCalled()
+    expect(discovery).not.toHaveBeenCalled()
+  })
+
+  it.each([0, -1, null, "0.01", 0.0000001, 0.1234567, Number.MAX_VALUE])(
+    "refuses an invalid explicit sandbox cap (%s), never silently widening it", async maxAmountUsd => {
+      const purchase = vi.fn(purchaseAt(0.01))
+      const b = start(purchase)
+      const discovery = vi.fn(async () => new Response(JSON.stringify({ seller: "0xSeller" })))
+      globalThis.fetch = discovery as unknown as typeof fetch
+      const token = b.openJob("job_cap", 0.05)
+      const result = await ask("job_cap", token, { maxAmountUsd })
+      expect(result.status).toBe(400)
+      expect(purchase).not.toHaveBeenCalled()
+      expect(discovery).not.toHaveBeenCalled()
+    }
+  )
+
   it("refuses a job it never opened", async () => {
     const b = start(purchaseAt(0.01))
     const r = await ask("job_unknown", "anything")
@@ -267,8 +450,9 @@ describe("hire broker", () => {
       const req = new Request(input, init)
       const url = new URL(req.url)
       if (url.pathname.startsWith("/listings/")) return json({ seller })
-      if (url.pathname === "/jobs/child") {
-        return json({ jobId: "job_child", status: "settled", result: { ok: true }, receipt: { settled: true, price: "$0.05" } })
+      if (url.pathname === "/jobs/job_child/result") {
+        expect(url.search).toBe(`?token=${"ab".repeat(16)}`)
+        return json({ job_id: "job_child", status: "succeeded", result: { ok: true }, receipt: { settled: true, price: "$0.05" } })
       }
       requests.push(req)
       if (url.pathname === `/x/${seller}/loop-probe`) {
@@ -276,7 +460,7 @@ describe("hire broker", () => {
       }
       if (url.pathname !== `/x/${seller}/wallet-risk-note`) throw new Error(`unexpected request: ${url.pathname}`)
       if (req.headers.has(HEADER_PAYMENT_SIGNATURE)) {
-        return json({ job_id: "job_child", poll_url: "http://hub.test/jobs/child" }, 202)
+        return json({ job_id: "job_child", poll_url: `http://hub.test/jobs/job_child/result?token=${"ab".repeat(16)}` }, 202)
       }
       return json({
         x402Version: 2,
