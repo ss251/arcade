@@ -1,8 +1,9 @@
-import { Context, Data, Effect, Layer } from "effect"
+import { Cause, Context, Data, Effect, Layer, Schema } from "effect"
 import { createPublicClient, createWalletClient, http, type Abi } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import { ARCADE_FEEDBACK_TAG1, ARCADE_VALIDATION_TAG, IDENTITY_REGISTRY_ABI, REPUTATION_REGISTRY_ABI,
-  VALIDATION_REGISTRY_ABI, RECEIPT_POLL_INTERVAL_MS, loadChainConfig, toViemChain } from "@arcade/core"
+  VALIDATION_REGISTRY_ABI, RECEIPT_POLL_INTERVAL_MS, loadChainConfig, toViemChain,
+  AgentAnnouncement, MAX_AGENT_ANNOUNCEMENTS } from "@arcade/core"
 
 /** No provider cause is carried here: it can contain credentials or private RPC URLs. */
 export class Erc8004Failed extends Data.TaggedError("Erc8004Failed")<{
@@ -241,3 +242,59 @@ export const Erc8004FromEnv = (registries?: Registries): Layer.Layer<Erc8004Tag>
       operator: wallets[0]!, validator: wallets[1]!, attester: wallets[2]! }))
   } catch { return disabled("invalid ERC-8004 configuration") }
 }
+
+/**
+ * Read ownership, not self-reported reputation. Wrong owners are dropped; unavailable
+ * reads remain explicitly unverified. registrationTx is an announcement, not a fact
+ * checked by ownerOf. Callers filter to this Hello's actual listing IDs before invoking.
+ */
+export const verifyAgentClaims = (
+  erc8004: Erc8004,
+  seller: string,
+  claims: ReadonlyArray<AgentAnnouncement>
+): Effect.Effect<ReadonlyMap<string, { agentId: string; registrationTx: string; agentVerified: boolean }>> => Effect.gen(function* () {
+  type Verified = { agentId: string; registrationTx: string; agentVerified: boolean }
+  const out = new Map<string, Verified>()
+  if (!erc8004.armed || !address(seller) || !Array.isArray(claims) || claims.length > MAX_AGENT_ANNOUNCEMENTS) return out
+  const own = (value: unknown, key: string): unknown => {
+    if (typeof value !== "object" || value === null) return undefined
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    return descriptor !== undefined && Object.hasOwn(descriptor, "value") ? descriptor.value : undefined
+  }
+  const decoded: AgentAnnouncement[] = []
+  const seen = new Set<string>(), duplicates = new Set<string>()
+  // Validate the full bounded batch first; never invoke getters on injected objects.
+  for (let index = 0; index < claims.length; index++) {
+    const value = own(claims, String(index))
+    const parsed = Schema.decodeUnknownEither(AgentAnnouncement)({ skillId: own(value, "skillId"),
+      agentId: own(value, "agentId"), registrationTx: own(value, "registrationTx") })
+    if (parsed._tag === "Left") return out
+    if (seen.has(parsed.right.skillId)) duplicates.add(parsed.right.skillId)
+    seen.add(parsed.right.skillId)
+    decoded.push(parsed.right)
+  }
+  const byAgent = new Map<string, AgentAnnouncement[]>()
+  for (const claim of decoded) {
+    if (duplicates.has(claim.skillId)) continue
+    out.set(claim.skillId, { agentId: claim.agentId, registrationTx: claim.registrationTx, agentVerified: false })
+    const group = byAgent.get(claim.agentId) ?? []
+    group.push(claim); byAgent.set(claim.agentId, group)
+  }
+  const checks = Effect.gen(function* () {
+    // Sequential reads, one per unique agent and at most sixteen; unqueried entries stay
+    // unverified. Neither a large batch nor a stalled RPC may delay Hello for minutes.
+    for (const [agentId, group] of [...byAgent].slice(0, 16)) {
+      const owner = yield* Effect.suspend(() => erc8004.ownerOf(agentId)).pipe(
+        Effect.timeoutFail({ duration: 1000, onTimeout: () => failure("ownerOf", "claim read deadline exceeded") }),
+        Effect.catchAllCause(cause => Cause.isInterrupted(cause) ? Effect.interrupt : Effect.succeed(undefined))
+      )
+      if (!address(owner)) continue
+      for (const claim of group) {
+        if (!same(owner, seller)) out.delete(claim.skillId)
+        else out.set(claim.skillId, { agentId: claim.agentId, registrationTx: claim.registrationTx, agentVerified: true })
+      }
+    }
+  })
+  yield* checks.pipe(Effect.timeoutOption(5000))
+  return out
+}).pipe(Effect.catchAllCause(cause => Cause.isInterrupted(cause) ? Effect.interrupt : Effect.succeed(new Map())))

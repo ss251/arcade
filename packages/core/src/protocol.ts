@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { PublicListing } from "./manifest.ts"
+import { PublicListing, SkillId } from "./manifest.ts"
 import { JobOutcome } from "./job.ts"
 
 /**
@@ -11,6 +11,15 @@ import { JobOutcome } from "./job.ts"
  */
 
 // ── runner → hub ────────────────────────────────────────────────────────────
+
+export const MAX_AGENT_ANNOUNCEMENTS = 64
+/** Public claims only. Ownership is checked on chain; helloDigest stays at v2. */
+export class AgentAnnouncement extends Schema.Class<AgentAnnouncement>("AgentAnnouncement")({
+  skillId: SkillId,
+  agentId: Schema.String.pipe(Schema.filter(id => /^(0|[1-9][0-9]{0,77})$/.test(id) && BigInt(id) < 2n ** 256n)),
+  /** Announced mint hash, not independently verified by the ownership lookup. */
+  registrationTx: Schema.String.pipe(Schema.pattern(/^0x[0-9a-fA-F]{64}$/))
+}) {}
 
 export class Hello extends Schema.TaggedClass<Hello>()("Hello", {
   runnerId: Schema.String,
@@ -30,6 +39,8 @@ export class Hello extends Schema.TaggedClass<Hello>()("Hello", {
    * to stop.
    */
   feeSplitter: Schema.optional(Schema.String),
+  /** Optional for compatibility with older runners. */
+  agents: Schema.optional(Schema.Array(AgentAnnouncement).pipe(Schema.maxItems(MAX_AGENT_ANNOUNCEMENTS))),
   /** Only public projections — the runner never sends a full manifest. */
   listings: Schema.Array(PublicListing),
   maxConcurrency: Schema.Int.pipe(Schema.positive()),

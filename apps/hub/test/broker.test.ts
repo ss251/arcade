@@ -129,6 +129,25 @@ describe("broker", () => {
     expect(await Effect.runPromise(broker.runnerFor("beta"))).toBeUndefined()
   })
 
+  it("replaces a runner's declared routes on refresh without disturbing other runners or pending jobs", async () => {
+    const broker = makeBroker(Effect.runSync(Ref.make(emptyState())))
+    const sent: Array<HubMessage> = []
+    await Effect.runPromise(broker.register(fakeConn("r1", sent), ["removed", "shared"]))
+    await Effect.runPromise(broker.register(fakeConn("r2"), ["shared"]))
+    const pending = Effect.runPromise(broker.dispatch({ jobId: "refresh-job", skillId: "removed",
+      skillVersion: "1", input: {}, timeoutSec: 5 }))
+    await sleep(20)
+    expect(sent).toHaveLength(1)
+    await Effect.runPromise(broker.register(fakeConn("r1", sent), ["added"]))
+    try {
+      expect(await Effect.runPromise(broker.runnerFor("removed"))).toBeUndefined()
+      expect(await Effect.runPromise(broker.runnerFor("shared"))).toBe("r2")
+      expect(await Effect.runPromise(broker.runnerFor("added"))).toBe("r1")
+      expect(await Effect.runPromise(broker.runnerForJob("refresh-job"))).toBe("r1")
+    } finally { await Effect.runPromise(broker.complete("refresh-job", outcome)) }
+    await expect(pending).resolves.toMatchObject({ status: "succeeded" })
+  })
+
   it("keeps serving a skill when one of two runners drops", async () => {
     const broker = makeBroker(Effect.runSync(Ref.make(emptyState())))
     await Effect.runPromise(broker.register(fakeConn("r1"), ["demo"]))

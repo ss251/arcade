@@ -59,6 +59,14 @@ export const makeBroker = (ref: Ref.Ref<BrokerState>): Broker => {
       const conns = new Map(s.conns)
       conns.set(conn.runnerId, conn)
       const routes = new Map(s.routes)
+      // Hello is a complete serving snapshot, not an additive subscription. Keep other
+      // runners and this socket's in-flight assignments while removing withdrawn skills.
+      for (const [id, runners] of routes) {
+        const next = new Set(runners)
+        next.delete(conn.runnerId)
+        if (next.size === 0) routes.delete(id)
+        else routes.set(id, next)
+      }
       for (const id of skillIds) {
         const set = new Set(routes.get(id) ?? [])
         set.add(conn.runnerId)

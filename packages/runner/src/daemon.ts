@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect"
 import {
   HEARTBEAT_INTERVAL_MS,
+  MAX_AGENT_ANNOUNCEMENTS,
   JobOutcome,
   PublicListing,
   SkillManifest,
@@ -28,6 +29,13 @@ import type { RunnerConfig } from "./config.ts"
 export interface DaemonArgs {
   readonly config: RunnerConfig
   readonly skillsDir: string
+}
+
+/** Only identities for currently serving listings, never the rest of local config. */
+export const agentAnnouncementsFor = (agents: RunnerConfig["agents"] | undefined, listings: ReadonlyArray<Pick<PublicListing, "id">>) => {
+  const announced = new Set(listings.map(listing => listing.id))
+  return Object.entries(agents ?? {}).filter(([skillId]) => announced.has(skillId)).slice(0, MAX_AGENT_ANNOUNCEMENTS)
+    .map(([skillId, identity]) => ({ skillId, agentId: identity.agentId, registrationTx: identity.registrationTx }))
 }
 
 export const startDaemon = (args: DaemonArgs) =>
@@ -141,6 +149,7 @@ export const startDaemon = (args: DaemonArgs) =>
               ...(feeSplitter === undefined ? {} : { feeSplitter })
             })
             const signature = await sellerAccount.signMessage({ message: digest })
+            const agents = agentAnnouncementsFor(args.config.agents, listings)
 
             ws.send(
               JSON.stringify({
@@ -153,6 +162,7 @@ export const startDaemon = (args: DaemonArgs) =>
                 agentVersion: "0.1.0",
                 nonce,
                 ...(feeSplitter === undefined ? {} : { feeSplitter }),
+                ...(agents.length === 0 ? {} : { agents }),
                 signature
               })
             )

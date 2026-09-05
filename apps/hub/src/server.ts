@@ -37,7 +37,7 @@ import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
 import { StoreTag } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
-import { Erc8004FromEnv, Erc8004Tag } from "./erc8004.ts"
+import { Erc8004FromEnv, Erc8004Tag, verifyAgentClaims } from "./erc8004.ts"
 import { agentRegistrationFor } from "./agent-registration.ts"
 import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
@@ -416,6 +416,11 @@ const main = Effect.gen(function* () {
     req.headers.get("x-job-token") ?? url.searchParams.get("token")
 
   const sockets = new Map<object, { runnerId?: string }>()
+  const socketHellos = new WeakMap<object, { sequence: number }>()
+  const latestHellos = new Map<string, { token: { sequence: number }; socket: object; seller: string }>()
+  const currentSockets = new Map<string, object>()
+  const registrationLock = yield* Effect.makeSemaphore(1)
+  let helloSequence = 0
 
   const server = Bun.serve<{ runnerId?: string; seller?: string }, never>({
     port: PORT,
@@ -435,6 +440,16 @@ const main = Effect.gen(function* () {
 
         switch (msg._tag) {
           case "Hello": {
+            if (ws.data.runnerId !== undefined && ws.data.runnerId !== msg.runnerId) {
+              ws.send(JSON.stringify({ _tag: "Ack", ok: false, detail: "socket already authenticated as another runner" }))
+              ws.close()
+              return
+            }
+            const token = { sequence: ++helloSequence }
+            socketHellos.set(ws.data, token)
+            const socketIsCurrent = () => sockets.has(ws.data) && ws.readyState === 1 && socketHellos.get(ws.data) === token
+            const helloIsCurrent = () => socketIsCurrent() && latestHellos.get(msg.runnerId)?.token === token
+            const abandon = () => { if (socketHellos.get(ws.data) === token && ws.readyState === 1) ws.close() }
             // The connection is anonymous until proven otherwise. `seller` decides where
             // every buyer's money goes, so it cannot be self-asserted: without this, anyone
             // could re-announce an existing skill id with their own address and collect.
@@ -470,6 +485,7 @@ const main = Effect.gen(function* () {
               ws.close()
               return
             }
+            if (!socketIsCurrent()) return
 
             // Listing ids are first-claimed. A different seller re-announcing an existing
             // id is the payout-redirection attack, so it is refused rather than merged.
@@ -493,6 +509,22 @@ const main = Effect.gen(function* () {
               ws.close()
               return
             }
+
+            // Reserve freshness only after signature/listing ownership checks. A slow
+            // older verification cannot replace a more recent authenticated Hello.
+            const currentRunner = await run(store.getRunner(msg.runnerId))
+            if (!socketIsCurrent()) return
+            const previous = latestHellos.get(msg.runnerId)
+            if ((currentRunner !== undefined && currentRunner.seller.toLowerCase() !== msg.seller.toLowerCase()) ||
+                (previous !== undefined && previous.seller !== msg.seller.toLowerCase())) {
+              ws.send(JSON.stringify({ _tag: "Ack", ok: false, detail: "runner id already claimed" }))
+              ws.close()
+              return
+            }
+            if (previous !== undefined && previous.token.sequence > token.sequence) { abandon(); return }
+            // One pending entry per socket, even if it sent overlapping Hello messages.
+            for (const [runnerId, pending] of latestHellos) if (pending.socket === ws.data) latestHellos.delete(runnerId)
+            latestHellos.set(msg.runnerId, { token, socket: ws.data, seller: msg.seller.toLowerCase() })
 
             // A splitter's `feeBps` is immutable, while receipts are computed from the
             // hub's `ARCADE_FEE_BPS`. Nothing tied them together, so they could drift and
@@ -573,16 +605,32 @@ const main = Effect.gen(function* () {
               }
             }
 
-            ws.data.runnerId = msg.runnerId
-            ws.data.seller = msg.seller
+            const announced = new Set(msg.listings.map(listing => listing.id))
+            const agentClaims = await run(verifyAgentClaims(erc8004, msg.seller,
+              (msg.agents ?? []).filter(claim => announced.has(claim.skillId))))
+            if (!helloIsCurrent()) { abandon(); return }
             const conn: RunnerConn = {
               runnerId: msg.runnerId,
               seller: msg.seller,
               send: (m: HubMessage) => ws.send(JSON.stringify(m)),
               close: () => ws.close()
             }
-            await run(
-              Effect.gen(function* () {
+            const accepted = await run(
+              registrationLock.withPermits(1)(Effect.gen(function* () {
+                if (!helloIsCurrent()) return false
+                // Ownership may have changed while the RPC was awaited. Recheck inside
+                // the same critical section as registration and socket-specific teardown.
+                const records = yield* store.allListings
+                if (records.some(record => announced.has(record.listing.id) && record.seller.toLowerCase() !== msg.seller.toLowerCase())) return false
+                const previousSocket = currentSockets.get(msg.runnerId)
+                const continuing = previousSocket === ws.data ? yield* store.getRunner(msg.runnerId) : undefined
+                ws.data.runnerId = msg.runnerId
+                ws.data.seller = msg.seller
+                currentSockets.set(msg.runnerId, ws.data)
+                // A replacement cannot inherit jobs assigned to another connection. A
+                // same-socket refresh retains those jobs but replaces its serving set.
+                if (previousSocket !== undefined && previousSocket !== ws.data) yield* broker.unregister(msg.runnerId)
+                yield* store.removeListingsForRunner(msg.runnerId)
                 yield* broker.register(conn, msg.listings.map((l) => l.id))
                 yield* store.putRunner({
                   runnerId: msg.runnerId,
@@ -591,12 +639,13 @@ const main = Effect.gen(function* () {
                   maxConcurrency: msg.maxConcurrency,
                   connectedAtMs: Date.now(),
                   lastSeenMs: Date.now(),
-                  activeJobs: 0
+                  activeJobs: continuing?.activeJobs ?? 0
                 })
                 for (const listing of msg.listings) {
                   yield* store.putListing({
                     listing,
                     seller: msg.seller,
+                    ...agentClaims.get(listing.id),
                     // Carried per listing from the signed handshake, never from a global.
                     ...(msg.feeSplitter === undefined ? {} : { feeSplitter: msg.feeSplitter }),
                     ...(splitterInfo === undefined
@@ -610,8 +659,10 @@ const main = Effect.gen(function* () {
                     publishedAtMs: Date.now()
                   })
                 }
-              })
+                return true
+              }))
             )
+            if (!accepted) { abandon(); return }
             console.log(
               `[hub] runner ${msg.runnerId} online (${msg.seller}) skills=[${msg.listings
                 .map((l) => l.id)
@@ -624,20 +675,25 @@ const main = Effect.gen(function* () {
             // Only the runner the job was assigned to may complete it. Without this any
             // connected socket could forge an outcome for someone else's job — settling a
             // fabricated success, or failing a competitor's work.
-            const owner = await run(broker.runnerForJob(msg.jobId))
-            if (owner === undefined || owner !== ws.data.runnerId) {
-              console.error(
-                `[hub] dropped JobResult for ${msg.jobId} from ${ws.data.runnerId ?? "anonymous"} (assigned to ${owner ?? "nobody"})`
-              )
-              break
-            }
-            await run(broker.complete(msg.jobId, msg.outcome))
+            await run(registrationLock.withPermits(1)(Effect.gen(function* () {
+              const rid = ws.data.runnerId
+              // Runner IDs survive reconnects; authority to finish jobs does not.
+              if (rid === undefined || currentSockets.get(rid) !== ws.data || !sockets.has(ws.data)) return
+              const owner = yield* broker.runnerForJob(msg.jobId)
+              if (owner === undefined || owner !== rid) {
+                console.error(`[hub] dropped JobResult for ${msg.jobId} from ${rid} (assigned to ${owner ?? "nobody"})`)
+                return
+              }
+              yield* broker.complete(msg.jobId, msg.outcome)
+            })))
             break
           }
           case "Heartbeat": {
             // Same principle: a socket may only speak for the runner it authenticated as.
-            if (ws.data.runnerId !== msg.runnerId) break
-            await run(store.touchRunner(msg.runnerId, msg.activeJobs))
+            await run(registrationLock.withPermits(1)(Effect.gen(function* () {
+              if (ws.data.runnerId !== msg.runnerId || currentSockets.get(msg.runnerId) !== ws.data || !sockets.has(ws.data)) return
+              yield* store.touchRunner(msg.runnerId, msg.activeJobs)
+            })))
             break
           }
           case "JobLog": {
@@ -647,14 +703,24 @@ const main = Effect.gen(function* () {
         }
       },
       async close(ws) {
+        // Mark closed BEFORE awaiting cleanup, so a pending ownerOf cannot resurrect it.
+        sockets.delete(ws.data)
+        socketHellos.delete(ws.data)
+        for (const [runnerId, pending] of latestHellos) if (pending.socket === ws.data) latestHellos.delete(runnerId)
         const rid = ws.data.runnerId
         if (rid !== undefined) {
           await run(
-            Effect.zipRight(broker.unregister(rid), Effect.zipRight(store.dropRunner(rid), store.removeListingsForRunner(rid)))
+            registrationLock.withPermits(1)(Effect.gen(function* () {
+              // The old socket may close after its replacement has registered this ID.
+              if (currentSockets.get(rid) !== ws.data) return
+              currentSockets.delete(rid)
+              yield* broker.unregister(rid)
+              yield* store.dropRunner(rid)
+              yield* store.removeListingsForRunner(rid)
+              console.log(`[hub] runner ${rid} offline`)
+            }))
           )
-          console.log(`[hub] runner ${rid} offline`)
         }
-        sockets.delete(ws.data)
       }
     },
 
