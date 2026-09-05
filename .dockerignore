@@ -38,6 +38,9 @@ out/
 .next/
 *.tsbuildinfo
 
+# Subgraph codegen — regenerable from the manifest and ABI.
+subgraph/generated/
+
 # Test / coverage
 coverage/
 .nyc_output/
@@ -71,6 +74,9 @@ skills/*/.npm/
 skills/*/.config/
 
 # ── docker-only, beyond what git excludes ───────────────────────────────────
+
+# Subgraph Studio owns this separate AssemblyScript toolchain, not the hub image.
+subgraph/
 
 # History is bulk and carries every past state of the tree. The image needs the working
 # tree, never how it got there.

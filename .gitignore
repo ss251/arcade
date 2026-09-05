@@ -22,6 +22,9 @@ out/
 .next/
 *.tsbuildinfo
 
+# Subgraph codegen — regenerable from the manifest and ABI.
+subgraph/generated/
+
 # Test / coverage
 coverage/
 .nyc_output/

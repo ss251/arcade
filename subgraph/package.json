@@ -1,0 +1,19 @@
+{
+  "name": "arcade-subgraph",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "codegen": "graph codegen subgraph.yaml",
+    "build": "graph build subgraph.yaml",
+    "test": "graph test",
+    "test:scaffold": "bun --no-env-file test ./checks/scaffold.bun.test.ts",
+    "deploy": "graph deploy arcade-ledger-arc-testnet subgraph.yaml"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.98.1",
+    "@graphprotocol/graph-ts": "0.38.2"
+  },
+  "devDependencies": {
+    "matchstick-as": "0.6.0"
+  }
+}

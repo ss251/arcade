@@ -1,0 +1,24 @@
+specVersion: 1.0.0
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: FeeSplitterSmoke
+    network: arc-testnet
+    source:
+      address: "0xf95c8afefae677fdcfc7bd5b8aaaf3702db99206"
+      abi: FeeSplitter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/smoke.ts
+      entities:
+        - Settlement
+      abis:
+        - name: FeeSplitter
+          file: ./abis/FeeSplitter.json
+      eventHandlers:
+        - event: Settled(indexed address,uint256,uint256,uint256,indexed bytes32)
+          handler: handleSettled
