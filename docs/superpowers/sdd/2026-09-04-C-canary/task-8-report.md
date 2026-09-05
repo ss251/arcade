@@ -1,0 +1,13 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# C8 — Opt-in buyer, bounded target selection and canary loop
+
+Exact planned interfaces are implemented. Real callSkill SDK performs challenge/sign/retry/poll; no pipeline bypass. Target merge preserves case-insensitive seller+skill history and missing runners, stops probing absent delisted targets, and allows recovery after reconnect. Per-store attempt timestamps prevent rapid repurchasing when durable recording fails; public evidence remains derived solely from persisted results. Buy/store/logger defects are isolated with fixed diagnostics; shutdown interruption is preserved.
+
+TDD missing-module Red04:05:38. Initial safe-limit test incorrectly expected a short declared value violating minLength to be skipped; corrected fixture to actual oversized unsupported input, preserving exact seller-mismatch failures.53 C8+57 C2 green04:09:55. Root reviewed full source/tests and found offline-target snapshot could actually settle after reconnect but be mislabeled failure, and tick floor could exceed explicitly subsecond interval. Three genuine Reds04:11:22 ->57 C8+57 C2 green04:11:49; tsc/diffcheck green. Zero cap already refused by parsePrice. Shared receipt classifier and correct tick clamp resolve both.
+
+Tests use ephemeral unfunded accounts and in-process transport with real SDK plus real in-memory rail. Finite threefailures/offline/reconnect/pass cycle debits exactly10,000 atomic once, retains tx/job on recovery and never debits failed or above-cap calls. The default buyer requires settled===true and a nonempty transaction hash for a pass; arbitrary response/receipt errors are not logged or persisted. Explicit input mismatch is failure; unsupported bounded validation is skip. No owner key or live chain used.
+
+Integration adds @arcade/buyer workspace dependency and offline-generated lock entry. Durations must be positive safe whole milliseconds ≤2,147,483,647; explicit subsecond intervals remain possible and carry the operator's intended spending cadence. Full gate/commit recorded on completion.
+
+Completionadfaf8b, exact subject/trailer and4 intended files. Full04:14:19 gate passed1,220 Vitest+37 Bun, tsc/diffcheck. Lock diff exactlyone workspace dependency entry; no package upgrades or pushes.

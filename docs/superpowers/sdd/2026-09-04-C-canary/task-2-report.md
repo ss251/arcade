@@ -1,0 +1,13 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# C2 — Safe representative pay-test inputs
+
+Implemented exact Example, exampleFromSchema, canaryInputFor and payTestSkipReason interfaces. Seller-declared JSON wins; otherwise choose and validate examples/example/default/const/primitive enum or construct required objects, bounded strings/numbers and empty arrays. Candidate values are checked with the existing validateJson contract. Unsafe or unsupported automatic derivation explains why without revealing values. Price cap is checked with bigint parsePrice.
+
+TDD missing-module Red03:39:57 IST;49 initial focused cases and57 final cases at03:44:55 passed. Root reviewed complete helper and tests; TypeScript narrowing errors were corrected with a declared never-returning function, not casts. All eight declared inputs pass. loop-probe remains $0.30 and correctly skips at the default $0.25 cap; no canonical price or budget altered.
+
+Safety: own JSON data properties only; no accessors/prototype inheritance, cycles, undefined/nonfinite values or sparse arrays. Bounded depth32, nodes2048, keys256, strings4096 and totaltext65536; derived-node count and deduplicated required keys prevent amplification. Patterned/formatted values are not invented; explicit validation allows only a conservative fixed-repeat regex subset because the existing validator's RegExp is synchronous. Complex patterns produce an inability-to-validate reason, not a seller-invalid verdict. Object enum comparisons are refused because the current hub uses reference identity and could not accept them after JSON transport. This does not claim full JSON Schema validation or alter the existing input gate.
+
+Task8 classification contract: only actual declared mismatch has exact why `the declared canaryInput does not satisfy this listing's own inputSchema`; unsafe/unsupported/complexity limitations have distinct reasons and must be skipped, not counted as proof of failure. Literal plan did not distinguish these and incorrectly skipped actual seller-invalid declarations; resolve in Task8.
+
+Deviations: bound and validate before construction; fix maxLength0, fractional integer minimum, impossible intervals/lengths; preserve every first-party listing instead of weakening the stale blanketcap assertion. No live calls, keys, dependencies or push. Full gates and commit recorded in progress.md.
