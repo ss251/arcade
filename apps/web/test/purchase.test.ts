@@ -32,7 +32,8 @@ const stubHub = (priceAtomic: string, skillId = "diff-triage") =>
     vi.fn(async (input: string | URL | Request) => {
       const url = String(input)
       if (url.includes("/listings/")) {
-        return new Response(JSON.stringify({ id: skillId, seller: SELLER, price: "$0.12" }))
+        return new Response(JSON.stringify({ id: skillId, seller: SELLER, price: "$0.12", version: "0.1.0",
+          serviceName: "Diff Triage", description: "Public fixture", tags: [], inputSchema: {}, outputSchema: {}, bounds: { timeoutSec: 30 } }))
       }
       if (url.includes("/x/")) {
         return new Response(

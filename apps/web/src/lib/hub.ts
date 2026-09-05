@@ -17,46 +17,11 @@ import { dnsNameOf, loadChainConfig } from "@arcade/core"
 import { PaymentRequirements } from "@arcade/payments"
 import { hubJson, hubOrigin } from "./hub-http.ts"
 import { purchaseInput } from "./purchase-input.ts"
-
-export interface ListingSummary {
-  readonly id: string
-  readonly version: string
-  readonly serviceName: string
-  readonly description: string
-  readonly tags?: ReadonlyArray<string>
-  readonly price: string
-  readonly replaces?: string
-  readonly seller: string
-}
-
-export interface ListingDetail extends ListingSummary {
-  /** Advertised only; quote verifies it before publishing it as provenance. */
-  readonly ensName?: string
-  readonly inputSchema: unknown
-  readonly outputSchema: unknown
-  readonly bounds?: Record<string, unknown>
-  readonly stats?: {
-    readonly calls: number
-    readonly settled: number
-    readonly successRate: number
-    readonly p50LatencyMs: number
-    readonly p95LatencyMs: number
-  }
-  readonly ratings?: { readonly count: number; readonly average: number | null }
-}
-
-export interface ReceiptRow {
-  readonly skillId: string
-  readonly priceAtomic: string
-  readonly sellerAtomic: string
-  readonly feeAtomic: string
-  readonly feeBps: number
-  readonly settleTx?: string
-  readonly latencyMs: number
-  readonly settled: boolean
-  readonly reason: string
-  readonly createdAtMs: number
-}
+import { addressOk, decodeListing, decodeListings, decodeName, decodeReceipts, decodeSellerSummary, decodeStats,
+  decodeTree, nameOk, rootIdOk, skillIdOk } from "./hub-decode.ts"
+import type { ListingDetail, ListingSummary, MarketStats, PublicReceiptRow, ResolvedName, SellerSummary, TreeView } from "./hub-decode.ts"
+export type { ListingDetail, ListingSummary, ListingStats, PayTest, ReceiptRow, PublicReceiptRow, PublicReceiptChild,
+  MarketStats, SellerListingRow, SellerSummary, TreeNode, TreeView, TreeEvidenceFlag, ResolvedName } from "./hub-decode.ts"
 
 export class HubUnreachable extends Error {
   readonly _tag = "HubUnreachable"
@@ -65,22 +30,62 @@ export class HubUnreachable extends Error {
   }
 }
 
-const get = async <T>(path: string): Promise<T> => {
+const get = async <T>(path: string, decode: (body: unknown) => T, init: RequestInit = {}, timeoutMs = 10_000): Promise<T> => {
   try {
-    const res = await hubJson(path, { headers: { accept: "application/json" } })
-    if (res.status < 200 || res.status >= 300) throw new Error()
-    return res.body as T
+    const res = await hubJson(path, { method: "GET", headers: { accept: "application/json" }, ...init }, timeoutMs)
+    if (res.status !== 200) throw new Error()
+    return decode(res.body)
   } catch { throw new HubUnreachable(path, "request unavailable or invalid") }
 }
 
 export const listSkills = (): Promise<ReadonlyArray<ListingSummary>> =>
-  get<ReadonlyArray<ListingSummary>>("/listings")
+  get("/listings", decodeListings)
 
-export const describeSkill = (skillId: string): Promise<ListingDetail> =>
-  get<ListingDetail>(`/listings/${encodeURIComponent(skillId)}`)
+export const describeSkill = async (skillId: string): Promise<ListingDetail> => {
+  if (!skillIdOk(skillId)) throw new HubUnreachable("/listings", "invalid identifier")
+  // Detail alone can perform D's sequential bounded 5s ownership + 16s evidence reads.
+  // Paid probes and all other feeds retain the existing ten-second transport deadline.
+  return get(`/listings/${skillId}`, body => decodeListing(body, skillId), {}, 25_000)
+}
 
-export const receipts = (): Promise<ReadonlyArray<ReceiptRow>> =>
-  get<ReadonlyArray<ReceiptRow>>("/receipts")
+export const receipts = (): Promise<ReadonlyArray<PublicReceiptRow>> => get("/receipts", decodeReceipts)
+export const stats = (): Promise<MarketStats> => get("/stats", decodeStats)
+export const listingReceipts = async (skillId: string, limit = 20): Promise<ReadonlyArray<PublicReceiptRow>> => {
+  if (!skillIdOk(skillId)) throw new HubUnreachable("/listings", "invalid identifier")
+  const count = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.min(100, Math.trunc(limit))) : 20
+  return get(`/listings/${skillId}/receipts?limit=${count}`, body => decodeReceipts(body, skillId, count))
+}
+export const sellerSummary = async (seller: string): Promise<SellerSummary> => {
+  if (!addressOk(seller)) throw new HubUnreachable("/sellers", "invalid identifier")
+  return get(`/sellers/${seller}/summary`, body => decodeSellerSummary(body, seller))
+}
+export const tree = async (rootJobId: string, token: string): Promise<TreeView> => {
+  if (!rootIdOk(rootJobId) || typeof token !== "string" || !/^[0-9a-f]{32}$/.test(token)) {
+    throw new HubUnreachable("/trees", "invalid capability or identifier")
+  }
+  return get(`/trees/${rootJobId}`, body => decodeTree(body, rootJobId), {
+    headers: { accept: "application/json", "x-job-token": token }, cache: "no-store", referrerPolicy: "no-referrer"
+  })
+}
+/** Only the hub's exact typed 404 is expiry. An outage is not evidence of expiry. */
+export class EnsNameExpired extends Error {
+  readonly _tag = "EnsNameExpired"
+  constructor() { super("ENS name is expired") }
+}
+export const resolveName = async (name: string): Promise<ResolvedName> => {
+  if (!nameOk(name)) throw new HubUnreachable("/names", "invalid name")
+  const path = `/names/${name}`
+  try {
+    const response = await hubJson(path, { method: "GET", headers: { accept: "application/json" } })
+    if (response.status === 404 && response.body !== null && typeof response.body === "object" &&
+        !Array.isArray(response.body) && Object.getOwnPropertyDescriptor(response.body, "error")?.value === "ens_name_expired") throw new EnsNameExpired()
+    if (response.status !== 200) throw new Error()
+    return decodeName(response.body, name, hubOrigin())
+  } catch (error) {
+    if (error instanceof EnsNameExpired) throw error
+    throw new HubUnreachable(path, "request unavailable or invalid")
+  }
+}
 
 export interface Quote {
   /** Checked via /names against this quote, not copied from an advertised listing. */

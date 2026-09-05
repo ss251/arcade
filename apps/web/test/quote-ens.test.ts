@@ -17,7 +17,8 @@ const names = () => ({
   name: NAME, skillId: ID, seller: SELLER, endpoint: HUB + RESOURCE,
   payTo: PAYEE, chain: "eip155:5042002", priceAtomic: "99999", expired: false
 })
-const listing = () => ({ id: ID, seller: SELLER, price: "$0.01", ensName: NAME })
+const listing = () => ({ id: ID, seller: SELLER, price: "$0.01", ensName: NAME, version: "0.1.0",
+  serviceName: "USDC Flow Check", description: "Public fixture", tags: [], inputSchema: {}, outputSchema: {}, bounds: { timeoutSec: 30 } })
 type StubOptions = {
   listing?: Record<string, unknown>; names?: Record<string, unknown>; requirements?: Record<string, unknown>
   namesStatus?: number; challengeStatus?: number
@@ -109,7 +110,9 @@ describe("the web quote verifies ENS provenance before offering a signature", ()
   it("bounds the complete streamed quote body and cancels stalled reads", async () => {
     vi.useFakeTimers()
     const cancel = vi.fn()
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(new ReadableStream({ cancel }))))
+    // Keep this on the unsigned 402 body, not D's separately bounded listing detail.
+    vi.stubGlobal("fetch", vi.fn(async (url: string | URL | Request) => String(url).includes("/listings/")
+      ? Response.json(listing()) : new Response(new ReadableStream({ cancel }))))
     const { quote } = await import("../src/lib/hub.ts")
     const outcome = quote(ID, INPUT).then(() => "accepted", () => "refused")
     await vi.advanceTimersByTimeAsync(10_001)

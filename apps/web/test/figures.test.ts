@@ -42,7 +42,8 @@ describe("figures handed to a model are exact strings", () => {
     stub({ accepts: [{ amount: "120000", payTo: "0xabc", asset: "0x36", network: "eip155:5042002" }] })
     const listingFetch = vi.fn(async (input: string | URL | Request) =>
       String(input).includes("/listings/")
-        ? new Response(JSON.stringify({ id: "diff-triage", seller: `0x${"1".repeat(40)}`, price: "$0.12" }))
+        ? new Response(JSON.stringify({ id: "diff-triage", seller: `0x${"1".repeat(40)}`, price: "$0.12", version: "0.1.0",
+            serviceName: "Diff Triage", description: "Public fixture", tags: [], inputSchema: {}, outputSchema: {}, bounds: { timeoutSec: 30 } }))
         : new Response(
             JSON.stringify({
               x402Version: 2,
@@ -77,7 +78,10 @@ describe("figures handed to a model are exact strings", () => {
         sellerAtomic: "9500",
         feeAtomic: "500",
         feeBps: 500,
-        settleTx: "0x63",
+        settleTx: `0x${"3".repeat(64)}`,
+        skillVersion: "0.1.0", seller: `0x${"1".repeat(40)}`, rail: "eip3009", network: "eip155:5042002",
+        price: "$0.01", sellerShare: "$0.0095", fee: "$0.0005", hop: 0, children: [],
+        explorer: `https://testnet.arcscan.app/tx/0x${"3".repeat(64)}`,
         latencyMs: 2471,
         settled: true,
         reason: "ok",
@@ -100,7 +104,7 @@ describe("figures handed to a model are exact strings", () => {
   it("keeps the catalogue price outside the fence and exact", async () => {
     // A price the seller cannot write is the hub's own voice, so it stays quotable. If it
     // were inside the fence the model would be told to treat it as an untrusted claim.
-    stub([{ id: "diff-triage", serviceName: "D", description: "x", price: "$0.12", seller: "0xs" }])
+    stub([{ id: "diff-triage", version: "0.1.0", serviceName: "D", description: "x", price: "$0.12", seller: `0x${"1".repeat(40)}` }])
     const out = (await arcade_list_skills.execute!({}, opts)) as {
       skills: ReadonlyArray<{ price: string }>
       text: string
@@ -114,7 +118,9 @@ describe("figures handed to a model are exact strings", () => {
     // The general form. A number that reaches JSON is a number a model may reformat.
     stub([
       {
-        skillId: "s",
+        skillId: "sample-skill",
+        skillVersion: "0.1.0", seller: `0x${"1".repeat(40)}`, rail: "eip3009", network: "eip155:5042002",
+        price: "$0.01", sellerShare: "$0.0095", fee: "$0.0005", hop: 0, children: [], explorer: null,
         priceAtomic: "10000",
         sellerAtomic: "9500",
         feeAtomic: "500",

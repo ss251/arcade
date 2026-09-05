@@ -76,3 +76,16 @@ the banner, local links resolve and no private material was exported. H3's own
 full gate passed 2,237 Vitest tests / 111 files, 316 Bun tests / 3,630 assertions /
 29 files, and strict root/web TypeScript. Source scope remains frozen for its
 separate local commit; H4 source work has not started.
+
+H1–3 were committed separately and rebased without patch changes onto main0e5d03c:
+e09e368, d746f56 and 46d8e1a. The earlier hashes above retain their chronology.
+At 18:12:27 IST, H4's twelve source/test files were frozen after 153 focused Vitest
+tests, three actual owned-loopback Bun tests / 26 assertions, root/web and explicit
+nested strict TypeScript checks, and web build passed. Parent read the complete
+source/new tests and six approved fixture diffs; source review is CLEAN. Two exact
+bannered reports, brief and integration are published here. Independent public
+copy checks passed: exact reports, 23 local links and targeted privacy review.
+Parent also independently repeated 153 Vitest, three Bun / 26 assertions, and
+both exact nested TypeScript checks with zero diagnostics. The separate full
+test/type/web gate follows. No live hub,
+browser proof, new payment or H merge ahead of the remaining F implementation.

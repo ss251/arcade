@@ -3,7 +3,8 @@
 H1's read-only public feeds are committed. H2 seller accounting and its read-only
 route are implemented and independently reviewed, with the full gate passed.
 H3's private-tree projection and authenticated route are implemented and reviewed;
-their full gate passed. Web consumers and live browser evidence remain pending.
+their full gate passed. H4's bounded read-only web client and pure formatters are
+implemented and source-reviewed; their full gate and live browser evidence remain pending.
 The full F shared-file dependency remains held, with the explicit H1-before-G8
 stats handoff preserved. No H merge or production deployment is claimed here.
 
@@ -25,6 +26,10 @@ stats handoff preserved. No H merge or production deployment is claimed here.
 - [Task 3 unresolved-reservation follow-up](task-3-followup.md)
 - [Task 3 authenticated-route report](task-3-route-report.md)
 - [Progress](progress.md)
+- [Task 4 brief](task-4-brief.md)
+- [Task 4 original implementation report](task-4-report.md)
+- [Task 4 compatibility follow-up](task-4-compatibility.md)
+- [Task 4 parent integration](task-4-integration.md)
 
 Only reviewed execution records are published. Private research, owner handoffs,
 runtime state and keys remain excluded. Original reports retain their dated

@@ -15,7 +15,8 @@ const request = (body: unknown, path = "quote") => new Request(`https://web.exam
 const stub = (paid?: { status: number; body: unknown }, pollBody: unknown = { job_id: "job_1", status: "succeeded", receipt: receipt() }) => {
   const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const u = String(url)
-    if (u.includes("/listings/")) return Response.json({ id: ID, seller: SELLER, ensName: NAME })
+    if (u.includes("/listings/")) return Response.json({ id: ID, seller: SELLER, ensName: NAME, version: "0.1.0",
+      serviceName: "USDC Flow Check", description: "Public fixture", tags: [], price: "$0.01", inputSchema: {}, outputSchema: {}, bounds: { timeoutSec: 30 } })
     if (u.includes("/names/")) return Response.json({ name: NAME, skillId: ID, seller: SELLER, endpoint: HUB + RESOURCE, payTo: PAYEE, chain: REQ.network, expired: false })
     if (u.includes("/x/")) {
       if (new Headers(init?.headers).has("payment-signature")) return Response.json(paid?.body ?? { job_id: "job_1", status: "succeeded", receipt: receipt() }, { status: paid?.status ?? 200 })

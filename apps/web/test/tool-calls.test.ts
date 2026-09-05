@@ -22,6 +22,7 @@ process.env["ARCADE_HUB"] = HUB
 
 const LISTING = {
   id: "diff-triage",
+  version: "0.1.0",
   serviceName: "Diff Triage",
   description: "Triage a code diff.",
   price: "$0.12",
@@ -58,14 +59,16 @@ const modelCalling = (toolName: string, input: unknown) => {
                 input: JSON.stringify(input)
               }
             ],
-            finishReason: "tool-calls" as const,
-            usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+            finishReason: { unified: "tool-calls" as const, raw: "tool-calls" },
+            usage: { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+              outputTokens: { total: 1, text: 1, reasoning: 0 } },
             warnings: []
           }
         : {
             content: [{ type: "text" as const, text: "Two skills are listed." }],
-            finishReason: "stop" as const,
-            usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+            finishReason: { unified: "stop" as const, raw: "stop" },
+            usage: { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+              outputTokens: { total: 1, text: 1, reasoning: 0 } },
             warnings: []
           }
     }
