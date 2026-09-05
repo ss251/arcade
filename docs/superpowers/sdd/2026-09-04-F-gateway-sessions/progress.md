@@ -324,3 +324,34 @@ supplement is not in that collected total. Initial public review was CLEAN for
 four exact copies, two literal substitutions and 69 valid local links. Five
 historical copies are now prepared with seven total locator substitutions;
 final review-copy/index delta and atomic F7 commit remain pending.
+
+## F7 commit and F8 paid-session integration — September 6, 2026
+
+F7 committed as `61fe5ca` after final independent publication review was CLEAN:
+five exact copies, seven literal substitutions, nine public files and73 resolving
+local links. Its full gate and source-review counts above remain unchanged.
+
+F8's [brief](task-8-brief.md) indexes the retained readiness, decisions and
+independent execution reviews. The new paid executor keeps the ordinary pipeline
+unchanged and uses F5 atomic terminal authority. Genuine early corrections include
+mixed-case authorization correlation, early key-byte allocation bounds, duplicate
+owner cleanup, child-evidence categories, bounded uncertainty cleanup and captured
+execution options. Later review reproduced the memory receipt-read/Job-read gap;
+the terminal-bundle correction returns both from one validated selected read.
+No independent whole-F8 acceptance or complete gate is inferred from the separately
+passing slices. F9–12/F14 remain before full F integration into main.
+
+F12 live remains NOT RUN under no-new-spend; F13 fallback remains not triggered.
+F1's consumed approval is not replayed, and no push or production action occurs.
+
+### F8 complete gate
+
+Frozen full repository checks passed2,529Vitest/119files and409Bun/4,170assertions/
+36files, followed by root/web strict typing, exit0. Initial slice reviews are
+CLEAN; final router and public-copy reviews remain separate before commit.
+
+Final independent router review is CLEAN145Vitest/fivefiles,21actualBun/306
+assertions/twofiles, exact7strict0 plus separate5cases/40assertions. Author308
+assertions remains its own run; pending polling accounts for variable counts.
+All13source hashes still match. Public review reached12exactcopies/16paths/95links;
+the final router copy/current summaries receive the final audit before commit.

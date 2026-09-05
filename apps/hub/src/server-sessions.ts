@@ -20,19 +20,22 @@ export const sessionToken = (secret: string, id: string): string => {
 export const sessionTokenOk = (secret: string, id: string, presented: string | null): boolean =>
   ID.test(id) && typeof presented === "string" && TOKEN.test(presented) && timingSafeTokenOk(sessionToken(secret, id), presented)
 
-const json = (body: unknown, status = 200): Response => new Response(
+export const sessionJsonResponse = (body: unknown, status = 200): Response => new Response(
   JSON.stringify(body, (_key, value) => typeof value === "bigint" ? value.toString() : value),
   { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store" } })
-const refusal = (error: string, status: number) => json({ error }, status)
+const json = sessionJsonResponse
+export const sessionRefusal = (error: string, status: number) => json({ error }, status)
+const refusal = sessionRefusal
 class InvalidBody extends Data.TaggedError("InvalidSessionBody")<{}> {}
 const invalid = (): never => { throw new InvalidBody() }
-const discard = (req: Request) => { if (req.body !== null && !req.body.locked) void req.body.cancel().catch(() => {}) }
+export const discardSessionBody = (req: Request) => { if (req.body !== null && !req.body.locked) void req.body.cancel().catch(() => {}) }
+const discard = discardSessionBody
 
 /** The deadline covers the entire body, not each chunk. Cancellation never admits a late write. */
-const readBody = async (req: Request): Promise<string> => {
+export const readSessionBody = async (req: Request, maxBytes: 16384 | 1048576 = BODY_BYTES): Promise<string> => {
   if (req.signal.aborted) return invalid()
   const length = req.headers.get("content-length")
-  if (length !== null && (!/^(0|[1-9][0-9]{0,4})$/.test(length) || Number(length) > BODY_BYTES)) return invalid()
+  if (length !== null && (!/^(0|[1-9][0-9]{0,6})$/.test(length) || Number(length) > maxBytes)) return invalid()
   const reader = req.body?.getReader()
   if (reader === undefined) { if (length !== null && length !== "0") return invalid(); return "" }
   const deadline = performance.now() + BODY_MS
@@ -51,7 +54,7 @@ const readBody = async (req: Request): Promise<string> => {
       if (req.signal.aborted || performance.now() >= deadline) return invalid()
       if (next.done) break
       bytes += next.value.byteLength
-      if (bytes > BODY_BYTES) return invalid()
+      if (bytes > maxBytes) return invalid()
       // Empty chunks must neither grow retained metadata nor evade the elapsed
       // deadline by continually queueing microtasks ahead of the timer callback.
       if (next.value.byteLength !== 0) chunks.push(next.value.slice())
@@ -71,6 +74,7 @@ const readBody = async (req: Request): Promise<string> => {
     reader.releaseLock()
   }
 }
+const readBody = readSessionBody
 const object = (text: string): Record<string, unknown> => {
   let value: unknown
   try { value = JSON.parse(text) } catch { return invalid() }

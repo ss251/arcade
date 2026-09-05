@@ -45,6 +45,8 @@ import { runJob } from "./pipeline.ts"
 import { RailsTag, railsLayerFrom } from "./rails.ts"
 import { makeSessions } from "./sessions.ts"
 import { makeSessionRoutes, timingSafeTokenOk } from "./server-sessions.ts"
+import { makeSessionCallRoutes } from "./server-session-calls.ts"
+import { sessionRefusal } from "./server-sessions.ts"
 import { inputGate } from "./input-gate.ts"
 import { payTestSkipReason } from "./canary-input.ts"
 import { canaryFromEnv, canaryLoop } from "./canary.ts"
@@ -459,6 +461,9 @@ const main = Effect.gen(function* () {
   const jobTokenOk = (jobId: string, presented: string | null): boolean => timingSafeTokenOk(jobToken(jobId), presented)
   const sessions = makeSessions({ store, rails, chain: chainConfig })
   const handleSessionRoute = makeSessionRoutes({ sessions, rails, sessionStorage: store.sessionStorage, hubSecret, configuredHubSecret })
+  const attester = yield* AttestTag
+  const handleSessionCall = makeSessionCallRoutes({ store, broker, sessions, rails, chain: chainConfig, hubSecret,
+    configuredHubSecret, publicOrigin, canaryAddress, attester, attestationArmed: erc8004.armed })
   const tokenFrom = (req: Request, url: URL): string | null =>
     req.headers.get("x-job-token") ?? url.searchParams.get("token")
 
@@ -700,7 +705,9 @@ const main = Effect.gen(function* () {
                       : {
                           treasuryIsSeller: splitterInfo.treasuryIsSeller,
                           splitterVerified: true,
-                          splitterVersion: splitterInfo.version
+                          splitterVersion: splitterInfo.version,
+                          splitterFeeBps: splitterInfo.feeBps,
+                          splitterNetwork: chainConfig.caip2
                         }),
                     runnerId: msg.runnerId,
                     publishedAtMs: Date.now()
@@ -777,6 +784,8 @@ const main = Effect.gen(function* () {
 
       const sessionResponse = await handleSessionRoute(req)
       if (sessionResponse !== undefined) return sessionResponse
+      const sessionCallResponse = await handleSessionCall(req)
+      if (sessionCallResponse !== undefined) return sessionCallResponse
 
       if (path === "/ws") {
         const data = {}
@@ -993,7 +1002,7 @@ const main = Effect.gen(function* () {
       const jobMatch = /^\/jobs\/([A-Za-z0-9_]+)$/.exec(path)
       if (jobMatch !== null && req.method === "GET") {
         const jobId = jobMatch[1]!
-        if (!jobTokenOk(jobId, tokenFrom(req, url))) return json({ error: "not_found" }, 404)
+        if (!jobTokenOk(jobId, tokenFrom(req, url))) return sessionRefusal("not_found", 404)
         const job = await run(store.getJob(jobId))
         if (job === undefined) return json({ error: "not_found" }, 404)
         // `input` is deliberately absent: the buyer already has it, and nobody else should.
@@ -1246,7 +1255,7 @@ const main = Effect.gen(function* () {
       const resultMatch = /^\/jobs\/([A-Za-z0-9_]+)\/result$/.exec(path)
       if (resultMatch !== null && req.method === "GET") {
         const jobId = resultMatch[1]!
-        if (!jobTokenOk(jobId, tokenFrom(req, url))) return json({ error: "not_found" }, 404)
+        if (!jobTokenOk(jobId, tokenFrom(req, url))) return sessionRefusal("not_found", 404)
         const deadline = Date.now() + 120_000
         while (Date.now() < deadline) {
           const receipts = await run(store.allReceipts)

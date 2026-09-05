@@ -34,6 +34,7 @@ independently mined. F2–12 code work is unblocked; no extra live allowance is 
 - [Task 7 implementation and actual-router evidence](task-7-report.md)
 - [Task 7 parent review and gate chronology](task-7-parent-review.md)
 - [Task 7 final independent source/runtime review](task-7-independent-review.md)
+- [Task 8 private paid-session integration and review index](task-8-brief.md)
 - [Progress](progress.md)
 - [Gate evidence and owner prerequisites](../../../evidence/m6-gateway.md)
 
@@ -99,3 +100,16 @@ F7's final independent source review is CLEAN: 101 focused Vitest, 11 actual Bun
 385 Bun / 3,978 assertions / 34 files and root/web strict typing. Initial public
 review is CLEAN; the final independent-report copy and index delta are reviewed
 before the atomic commit. Earlier pending checkpoints remain historical.
+
+F7 subsequently committed as `61fe5ca`, after the final CLEAN publication delta
+(five exact copies, seven literal substitutions, nine public files and73 local
+links). F8's separate paid-session integration and terminal-bundle correction
+are now under combined review. Its [brief](task-8-brief.md) distinguishes original
+receipt-only evidence from the later same-read output-authority correction.
+No further live payment, funding, withdrawal or Gateway mining proof is claimed.
+
+F8's final independent router and slice reviews are CLEAN. The complete gate
+passed2,529Vitest/119files,409Bun/4,170assertions/36files and root/web strict typing.
+All13source hashes remain frozen. Final public-copy audit and the atomic commit
+follow; F9 supplies the buyer client next. See the [parent review](task-8-parent-review.md)
+for exact independent counts and preserved correction chronology.

@@ -1,6 +1,6 @@
 import { Effect, Layer, Context, Ref } from "effect"
 import type { PublicListing, Receipt, Rating, ObjectiveStats, Job } from "@arcade/core"
-import { ListingNotFound, Session, SessionConflict } from "@arcade/core"
+import { ListingNotFound, Session, SessionConflict, SessionInvalid, SessionNotFound, SessionStorageUnavailable } from "@arcade/core"
 import { transitionSession, sessionSnapshot, validateSessionLedger, sessionError,
   sessionJobCopy, sessionReceiptCopy, type SessionStore, type SessionLedgerState, type SessionCommand, type SessionTransition } from "./session-ledger.ts"
 
@@ -96,6 +96,9 @@ export interface ListingRecord {
    * SERVES — the listing still sells, the unbacked claim is simply withheld.
    */
   readonly splitterVerified?: boolean | undefined
+  /** Observed at a successful splitter handshake, not inferred from later boot configuration. */
+  readonly splitterFeeBps?: number | undefined
+  readonly splitterNetwork?: string | undefined
   /**
    * The announced splitter's contract version, read at handshake via `version()` (added in
    * v2). `1` covers both "genuinely v1" and "reverted" — v1 has no `version()` selector at
@@ -244,10 +247,36 @@ export const sessionStoreApi = (
 ): SessionStore => {
   const safe = <A>(body: () => A) => Effect.uninterruptible(Effect.try({ try: body, catch: error => sessionError(error, sessionStorage === "durable") }))
   const command = <A>(input: SessionCommand) => safe(() => mutate(input) as A)
+  const getSessionTerminal: SessionStore["getSessionTerminal"] = (sessionId, jobId) => safe(() => {
+      // Exact scalar lengths and suffix alphabets precede even the selected
+      // backend read; whitespace and coercible objects are not identifiers.
+      if (typeof sessionId !== "string" || sessionId.length !== 36 || !/^ses_[0-9a-f]{32}$/.test(sessionId) ||
+        typeof jobId !== "string" || !jobId.startsWith("job_") || jobId.length < 20 || jobId.length > 132 ||
+        /[^A-Za-z0-9]/.test(jobId.slice(4))) throw new SessionInvalid()
+      let state: SessionLedgerState
+      try { state = read(sessionId); validateSessionLedger(state) }
+      catch { throw new SessionStorageUnavailable() }
+      const call = state.sessionCalls.get(jobId)
+      if (!state.sessions.has(sessionId) || call === undefined || call.binding.sessionId !== sessionId) {
+        throw new SessionNotFound({ sessionId })
+      }
+      if (call.state === "reserved" || call.state === "settling" || call.state === "uncertain") return undefined
+      // The ledger validates the actual persisted Job/Receipt digests and all
+      // terminal relationships. Never reconstruct evidence from the call row.
+      try {
+        const receipt = state.receipts.find(row => row.jobId === jobId), job = state.jobs.get(jobId)
+        if (receipt === undefined || job === undefined) throw new SessionStorageUnavailable()
+        // Both copies belong to this validated read. A later global Job read
+        // would not retain this snapshot's terminal digest authority.
+        return { job: sessionJobCopy(job), receipt: sessionReceiptCopy(receipt) }
+      } catch { throw new SessionStorageUnavailable() }
+    })
   return { sessionStorage,
     openSession: input => command({ kind: "open", input }),
     getSession: id => safe(() => sessionSnapshot(read(id), id)?.session),
     getSessionSnapshot: id => safe(() => sessionSnapshot(read(id), id)),
+    getSessionTerminal,
+    getSessionReceipt: (sessionId, jobId) => getSessionTerminal(sessionId, jobId).pipe(Effect.map(pair => pair?.receipt)),
     allSessions: safe(() => { if (list !== undefined) return list(); const st = read(); validateSessionLedger(st); return [...st.sessions.values()].map(session => Session.make({ ...session })) }),
     reserveSessionJob: (binding, job) => command({ kind: "reserve", binding, job }),
     beginSessionSettlement: (sessionId, jobId) => command({ kind: "begin", sessionId, jobId }),

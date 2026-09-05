@@ -111,6 +111,8 @@ export interface SessionStore {
   readonly getSession: (id: string) => Effect.Effect<Session | undefined, SessionError>
   readonly allSessions: Effect.Effect<ReadonlyArray<Session>, SessionError>
   readonly getSessionSnapshot: (id: string) => Effect.Effect<SessionSnapshot | undefined, SessionError>
+  readonly getSessionReceipt: (sessionId: string, jobId: string) => Effect.Effect<Receipt | undefined, SessionError>
+  readonly getSessionTerminal: (sessionId: string, jobId: string) => Effect.Effect<{ readonly job: Job; readonly receipt: Receipt } | undefined, SessionError>
   readonly reserveSessionJob: (binding: SessionBinding, queued: Job) => Effect.Effect<{ created: boolean; jobId: string }, SessionError>
   readonly beginSessionSettlement: (sessionId: string, jobId: string) => Effect.Effect<{ claimed: boolean }, SessionError>
   readonly finishSessionJob: (terminal: SessionTerminal) => Effect.Effect<void, SessionError>
