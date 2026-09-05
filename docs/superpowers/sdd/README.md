@@ -10,6 +10,7 @@ These are sanitized copies of the execution records for ARCADE's ETHOnline conti
 | D — ERC-8004 | [Reports and preparation](2026-09-04-D-erc8004/README.md) | Complete; approved identity, settlement and validation proof passed. |
 | E — ENS namespaces | [Reports and preparation](2026-09-04-E-ens/README.md) | Complete; approved isolated live continuation passed. Production URLs remain pending. |
 | F — Gateway sessions | [Gate brief, report and progress](2026-09-04-F-gateway-sessions/README.md) | F1 single live gate passed acceptance/debit checks; recipient credit pending batch. F2–12 code work unblocked; session live evidence remains separate. |
+| H — Web and public APIs | [Briefs, reports and progress](2026-09-04-H-web/README.md) | H1 read-only feeds implemented/reviewed; H2/H3 pure preparations and full gates remain separately tracked. No web/live completion claim. |
 
 Plans F–I have [committed implementation plans](../plans/2026-09-04-02-execution-index.md); their execution records are published as that work progresses. This index does not claim those plans are complete.
 

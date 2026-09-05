@@ -199,6 +199,8 @@ export interface Store extends SessionStore {
 
   readonly putReceipt: (r: Receipt) => Effect.Effect<void>
   readonly allReceipts: Effect.Effect<ReadonlyArray<Receipt>>
+  /** Provenance seam: changing this requires changing the statistics' actual data source. */
+  readonly statsSource: Effect.Effect<"subgraph" | "hub">
   readonly backfillFeeSweep: (accrualId: string, txHash: string) => Effect.Effect<number>
 
   readonly putRating: (r: Rating) => Effect.Effect<void>
@@ -394,11 +396,17 @@ export const makeStore = (ref: Ref.Ref<StoreState>): Store => ({
     return job !== undefined && s.sessionCalls.has(jobId) ? sessionJobCopy(job) : job
   }),
 
+  // One current receipt per job, matching SQLite's primary-key/upsert contract.
+  // Preserve its original array position and remove any legacy duplicate of that job.
   putReceipt: (r) => Ref.update(ref, (s) => {
     if (r.sessionId !== undefined || s.sessionCalls.has(r.jobId)) throw new SessionConflict()
-    return { ...s, receipts: [...s.receipts, r] }
+    const index = s.receipts.findIndex(existing => existing.jobId === r.jobId)
+    const receipts = index < 0 ? [...s.receipts, r] : s.receipts.flatMap((existing, i) =>
+      existing.jobId === r.jobId ? i === index ? [r] : [] : [existing])
+    return { ...s, receipts }
   }),
   allReceipts: Effect.map(Ref.get(ref), (s) => s.receipts.map(r => s.sessionCalls.has(r.jobId) ? sessionReceiptCopy(r) : r)),
+  statsSource: Effect.succeed("hub" as const),
 
   /**
    * Fee accrual sweep: one on-chain tx covers many receipts, and its hash is written back

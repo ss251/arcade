@@ -52,7 +52,9 @@ import { canaryFromEnv, canaryLoop } from "./canary.ts"
 import { claimedPayerOf, delistRefusal } from "./delisted.ts"
 export { claimedPayerOf, delistRefusal } from "./delisted.ts"
 import { ceilingAtomicFor, maxHopFromEnv, resolveLineage } from "./lineage.ts"
-import { publicReceipt } from "./receipts-feed.ts"
+import { scrubReceipt } from "./receipts-feed.ts"
+export { scrubReceipt, type PublicReceiptRow, type PublicReceiptChild } from "./receipts-feed.ts"
+import { listingReceiptFeed, publicStats, receiptLimit } from "./public-feeds.ts"
 import { receiptChildExplorer, receiptExplorer } from "./receipt-reference.ts"
 import { chainCheck, chainMetadataCheck, chainStartupRefusal } from "./chain-check.ts"
 import { createChainRpc } from "./chain-rpc.ts"
@@ -971,6 +973,21 @@ const main = Effect.gen(function* () {
           payTestHistory: await run(store.payTestHistory(res.right.listing.id, res.right.seller)) })
       }
 
+      const listingReceipts = /^\/listings\/([a-z0-9-]+)\/receipts$/.exec(path)
+      if (listingReceipts !== null && req.method === "GET") {
+        const limit = receiptLimit(url.searchParams)
+        if (limit === null) return json({ error: "ambiguous_limit" }, 400)
+        // Historical receipt evidence survives listing disconnection; no job tokens,
+        // private output or reconstructed parent/child edges are exposed here.
+        return json(listingReceiptFeed(await run(store.allReceipts), listingReceipts[1]!, limit))
+      }
+
+      if (path === "/stats" && req.method === "GET") {
+        const source = await run(store.statsSource)
+        const stats = publicStats(await run(store.allListings), await run(store.allReceipts), source)
+        return stats === undefined ? json({ error: "stats_unavailable" }, 503) : json(stats)
+      }
+
       if (path === "/runners" && req.method === "GET") {
         const runners = await run(store.allRunners)
         return json(
@@ -983,9 +1000,8 @@ const main = Effect.gen(function* () {
 
       if (path === "/receipts" && req.method === "GET") {
         const receipts = await run(store.allReceipts)
-        // See `publicReceipt` for exactly what this withholds and why (job ids at any
-        // depth, buyer address, the settlement's authorization nonce).
-        return json(receipts.map(publicReceipt))
+        // The same explicit privacy whitelist as the per-listing feed.
+        return json(receipts.map(scrubReceipt))
       }
 
       // Public hash-only documents survive runner disconnection and hub restart. Never

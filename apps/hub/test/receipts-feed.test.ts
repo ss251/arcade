@@ -10,6 +10,8 @@ import { publicReceipt } from "../src/receipts-feed.ts"
 
 const ROOT_JOB_ID = "job_root000000000000"
 const CHILD_JOB_ID = "job_child00000000000"
+const ROOT_TX = `0x${"a".repeat(64)}`
+const CHILD_TX = `0x${"b".repeat(64)}`
 
 const receipt = Receipt.make({
   jobId: ROOT_JOB_ID,
@@ -21,8 +23,8 @@ const receipt = Receipt.make({
   sellerAtomic: 237_500n,
   feeAtomic: 12_500n,
   feeBps: 500,
-  settleTx: "0xdeadbeef",
-  rail: "test",
+  settleTx: ROOT_TX,
+  rail: "eip3009",
   network: "eip155:5042002",
   latencyMs: 42,
   settled: true,
@@ -40,7 +42,7 @@ const receipt = Receipt.make({
       skillId: "child",
       priceAtomic: 10_000n,
       settled: true,
-      settleTx: "0xchildtx"
+      settleTx: CHILD_TX
     })
   ]
 })
@@ -76,9 +78,10 @@ describe("publicReceipt", () => {
       {
         skillId: "child",
         priceAtomic: "10000",
+        price: "$0.01",
         settled: true,
-        settleTx: "0xchildtx",
-        explorer: null
+        settleTx: CHILD_TX,
+        explorer: `https://testnet.arcscan.app/tx/${CHILD_TX}`
       }
     ])
   })
@@ -88,10 +91,10 @@ describe("publicReceipt", () => {
     expect(pub.priceAtomic).toBe("250000")
     expect(pub.sellerAtomic).toBe("237500")
     expect(pub.feeAtomic).toBe("12500")
-    expect(pub.explorer).toBeNull()
+    expect(pub.explorer).toBe(`https://testnet.arcscan.app/tx/${ROOT_TX}`)
   })
 
-  it("omits children/treeCeilingAtomic/treeCommittedAtomic when the receipt has none (a plain child receipt)", () => {
+  it("keeps empty children and omits absent tree budgets (a plain child receipt)", () => {
     const child = Receipt.make({
       jobId: CHILD_JOB_ID,
       skillId: "child",
@@ -114,7 +117,7 @@ describe("publicReceipt", () => {
       ancestors: ["parent"]
     })
     const pub = publicReceipt(child)
-    expect(pub).not.toHaveProperty("children")
+    expect(pub.children).toEqual([])
     expect(pub).not.toHaveProperty("treeCeilingAtomic")
     expect(pub).not.toHaveProperty("treeCommittedAtomic")
     expect(pub).not.toHaveProperty("jobId")
