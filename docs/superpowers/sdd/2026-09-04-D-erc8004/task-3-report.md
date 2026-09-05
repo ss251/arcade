@@ -1,0 +1,9 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# D3 — seller-owned identity registration
+
+All plan exports preserved, with optional onBroadcast/resumeTxHash recovery seams and honest IdentityFailed union for unavailable gas. Only actual native-balance reads establish funding. One broadcast, bounded known-hash receipt retries, registry-emitted mint-only logs, verified current owner and exact tokenURI are required for success. Real adapter uses ready Arc testnet ChainConfig, network preflight, redirect refusal, matching transaction hash and fixed private diagnostics. Full ERC721 transfer authority is documented for later CLI warning.
+
+Root read complete source and52-test suite. Detailed implementation report remains locally ignored at internal/task3-implementation.md; never staged. Genuine Reds04:44:34 missing module;04:49:56 URI/redirect/privacy/hash checks;04:50:42 forged decoded args. All52 focused green04:52:41 with TypeScript/diff clean. Root discovered/resolved the same URI/redirect boundaries during review. Transient broad-patch failure during first parallel fullgate was corrected and final fullgate repeated before any commit (ledger).
+
+No key or live network operation; fixed unfunded fixtures and stubbed HTTP only. D4/D6 must save intent before send, public hash in onBroadcast, confirmed registration before approval, and refuse unknown pending outcomes instead of minting again. Module alone does not claim cross-process idempotency.

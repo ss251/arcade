@@ -1,0 +1,9 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# D5 — public identity metadata routes
+
+Implements the exact four ListingRecord fields, always-provided Erc8004 environment layer, GET /erc8004 public projection, and GET /listings/:id/agent-registration.json. Registry absence and unknown listings return404; unarmed registry signing does not disable supported public registration documents. Compact docBytes are served with max-age30. Liveness requires the exact current runner id, seller, announced skill and fresh bounded heartbeat, and canary delisting forces inactive.
+
+Helper resides in agent-registration.ts rather than inflating the chain service file. Current ERC services/registrations and compatibility aliases come from D1; no nonexistent HTTP /mcp endpoint is advertised. Metadata excludes private engine/provider/runner data. API projection cannot leak service clients or signing keys.
+
+TDD missing helper05:06:08; actual missing HTTP routes05:07:04.15 focused tests green05:08:23 (12 helper,3 actual HTTP), tsc/diff green. Offline HTTP fixtures seed a real Store and run the real router while refusing external fetch, with fake public metadata only; they terminate/await only their own child. Initial sandbox bind denial was not a product failure and the identical approved loopback run captured the genuine route Red. Root read complete source, tests, fixture and diff; review clean. Executor detail in task5-implementation.md. Fullgate/commit in ledger.

@@ -1,0 +1,11 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# D11 — current ownership and settlement evidence on detail pages
+
+On-chain identity section keeps the project's settlement-paper style: sans quantities, monospace IDs/hashes, neutral underlined links and scoped responsive grid. Valid announced registration hashes link through selected-chain explorer; copy explicitly distinguishes ownership checking from verifying a mint transaction. Missing identity omits section; unverified/stale/malformed counts are withheld, never substituted with zeros. Simulated rails assert no chain evidence.
+
+Shared listingEvidence helper fresh-checks ownerOf before reading bounded/cached registry counts; transfers cannot reuse the old seller's cached counts. Previously unreadable claims may become verified only after a fresh successful ownership read. Unarmed/test/mismatched-registry contexts do no RPC. Counts must be safe, nonnegative, passes<=reads<=20 and feedback<=4096. Five-second owner and16-second evidence bounds contain private defects and preserve cancellation.
+
+Server requests identity data only for the selected detail page. Catalogue/feed and unknown detail paths cause zero ownership/evidence RPCs. Actual HTTP regression missing section Red06:01:33 ->58 UI/helper/HTTP tests green06:02:00 with tsc. Independent helper review CLEAN, root server/test review CLEAN. UI TDD19 tests; earlier actual desktop1280/mobile390 browser checks verified maxuint256 wrapping, selected counts fonts, no nested links and stale/unverified withholding. Browser preview exposed an existing overflowing footer endpoint and unclosed receipt tape; wrapping and closing markup fixed via regression. Browser tab/viewport and owned preview process cleaned up; no owner session affected.
+
+frontend-design/web-design skills guided preserving existing design, provenance typography and mobile verification. No apps/web source changed, no live evidence invented. Ordered fullgate/commit recorded in ledger.

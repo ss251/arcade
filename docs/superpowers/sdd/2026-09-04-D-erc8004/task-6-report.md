@@ -1,0 +1,9 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# D6 — seller-owned identity CLI
+
+Implemented register/status as additive commands with explicit full-scope ERC-721 operator approval consent. Metadata is bounded, own-data validated, selected-chain pinned, and restricted to safe origins. Syntax/status paths are offline; identity registration validates local skill, seller key/address, hub roles, gas and existing journal/provenance before a single mint attempt. Known broadcasts resume confirmation; uncertain broadcasts cannot silently remint. Confirmed registration is durably recorded before approval, whose failures retain the identity. Existing identities require fresh owner/tokenURI confirmation before approval. Diagnostics expose no provider or key material.
+
+Root read the complete implementation, tests, and subsequent guard diff; no remaining actionable findings. Executor's task6-implementation.md records genuine missing-module, actual CLI, privacy/defect and metadata-guard Red checkpoints, followed by 67 unit +17 real offline CLI tests; 205 focused compatibility checks passed05:24:49. Actual CLI tests use isolated ARCADE_CONFIG_PATH, not owner HOME or Keychain.
+
+Full test + Bun durability suite + TypeScript + diff gate passed05:37 IST before ordered commit. No live registration or key access occurred. ts-testing informed boundary, crash-journal, privacy and subprocess coverage. Exact six D6 files only are committed; prepared D7–D11 remain separate.

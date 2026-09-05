@@ -1,0 +1,9 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# D12 — matching API and buyer settlement evidence
+
+GET /listings/:id reuses the D11 fresh ownership/bounded counts projection; absent identity omits erc8004, stale/unverified identity carries no counts. Actual HTTP regression missing field Red06:06:48 ->81 combined API/helper/MCP tests Green06:07:28 with TypeScript. Exact fields and no private extras verified across fresh, transferred, stale, unreadable, recovered-unverified and absent identities.
+
+Buyer implementation adds exact Erc8004Evidence/renderErc8004Evidence and Listing field. Network responses are own-data validated, selected ready-chain and registry pinned, agent IDs remain full canonical uint256 strings, and only exact hash links use the configured HTTPS explorer. Both text and structuredContent.skill.erc8004 share the sanitized projection. Counts require strict verified=true/stale=false and safe bounded consistent integers; bad/foreign evidence has no links or counts. Announced mint hash is explicitly not independently verified. No synthetic ranking terminology even in negation. Existing seller untrusted-text fencing, tool schemas and purchase code remain intact.
+
+Executor39 new tests +25 existing MCP tests Green05:58:26 after37 genuine missing formatter/unsafe output Reds05:57:20. Tests include actual SDK Client/server via InMemoryTransport, no network/socket/key access. Root full source/test review CLEAN and independent second-agent review CLEAN. Details task12-buyer-implementation.md. Ordered fullgate/commit pending in ledger.

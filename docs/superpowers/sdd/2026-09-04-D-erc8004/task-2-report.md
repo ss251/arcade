@@ -1,0 +1,11 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# D2 — three-key registry service
+
+Exact Erc8004/AgentEvidence/tag/layer interfaces retained. Missing/bad/colliding role keys disable only this feature. Public addresses and ChainConfig registries remain separate from secret account closures. Writes return only successful confirmed matching receipts, never a broadcast hash alone. Unknown send/confirmation failures are fixed tagged errors with retryable:false; no automatic repeated broadcast. This extends the error interface safely for D8 to avoid duplicate feedback after uncertain confirmation.
+
+Evidence is filtered by agent/validator/tag/answered state and attester/tag/value/decimals/revocation, never getSummary. Recent status reads cap20 unique hashes, unpaginated results cap4,096 rows/1MiB transport, snapshot cache128/60s with four concurrent reads, bounded per-read/overall deadlines. Wrong/unreadable chain cannot supply Arc ownership or counts. Failures become stale evidence, not fabricated zero facts; callers must withhold stale/unverified counts.
+
+TDD missing-module04:39:06; response bound/unpinned-registry true Reds04:42:44;29 Green04:47:40 after D1 availability. Independent review found production reader omitted its own chain check (public boot normally blocks, local or bypassed boot may continue). Actual viem transport under stubbed HTTP reproduced Right ownership from chain1 at04:53:24; reader guard fixed,30 Green04:53:37. Independent final rerun/review CLEAN30 at04:54:05; TypeScript/diff checks passed. Full ordered precommit gates recorded in ledger.
+
+No real keys read/generated, no live RPC/payment, no .env/config/deploy/push. Plan literal receipt-error swallowing and raw-provider-error interpolation intentionally removed; registry read snapshots prefer bounded best-effort stale fallback over retries that amplify a page poll. Production receipt polling uses a single known hash, never waitForTransactionReceipt.

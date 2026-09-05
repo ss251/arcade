@@ -1,0 +1,9 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# D7 — verified bounded Hello identity announcements
+
+Exact optional AgentAnnouncement contract with canonical uint256 and32-byte hash, capped64; runner projects only serving skill identities. Ownership checks are bounded16 unique sequential reads,1 second each/5 seconds batch; wrong owners and duplicates are dropped, unavailable/excess claims explicitly unverified. Registration hash remains announced metadata, not a verified mint receipt. Core helloDigest stays v2.
+
+Root read source and executor evidence, then independent review found retained withdrawn listings/routes after replacement. Root also identified stale-socket JobResult/Heartbeat authority. Five genuine reconnect Reds05:42:22 reproduced retained detail/route/pendingjob and stale output. Broker replaces the serving snapshot; registration/teardown/result/heartbeat checks serialize through one lock. True replacement fails old pending jobs; same-socket refresh preserves them.74/74 focused green05:45:05. Detailed reports task7-implementation.md and task7-reconnect-review-fix.md. Root follow-up source review clean.
+
+Initial fullgate1568Vitest+55Bun+tsc green before the independent finding; no D7 commit followed that gate. Final fullgate required again after fix. D9 new HTTP regression genuinely failed3 cases05:45:22 and is temporarily parked under .superpowers until ordered D7/D8 commits so it does not mask their gates. No external network, registry transaction or real key operation; all WebSocket tests use owned loopback processes and offline signing fixtures.

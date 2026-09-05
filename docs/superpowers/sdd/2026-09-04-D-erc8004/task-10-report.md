@@ -1,0 +1,9 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# D10 — immutable durable commitment documents
+
+Store methods validate bounded keys/kinds and exact JSON object bytes, enforce write-once identity (identical retries allowed; conflicts fail), and persist WAL/FULL SQLite transactions before memory publication. Independent store review CLEAN,7 durability tests plus rollback/UTF-8/boundary probes. Cached read handles follow existing single-hub ownership; concurrent handles compare writes against disk.
+
+processOne computes every public hash-only document, verifies current ownership, then persists ALL applicable docBytes before ANY registry broadcast. Defects, synchronous throws, timeout or immutable conflicts cause no broadcast; cancellation is preserved. Production AttestLive always receives the same shared StoreLayer instance used by the hub. Helper sinks remain optional for backward compatibility. Three bounded GET routes return exact stored bytes with immutable JSON caching, independent of live runners/listings.
+
+8 genuine Reds05:56:42 showed missing sink and404 routes.41 compatibility tests green05:58:13; expanded10 document tests +7 durability tests green05:59:15 include production-layer sharing, five-second stalled sink, cancellation, actual SQLite restart, exact hashes/byte lengths and preserved Unicode/whitespace. Independent sink/routes review CLEAN. Fullgate1650Vitest+83Bun+tsc/diff passed06:04:17 before orderedcommit. Root staged D10 snapshot before D11 server edits; no D11/UI files in this commit. No live registry/key access.
