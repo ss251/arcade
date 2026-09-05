@@ -35,7 +35,7 @@ import { createHmac, timingSafeEqual } from "node:crypto"
 import { createPublicClient, http, recoverMessageAddress } from "viem"
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
-import { StoreTag } from "./store.ts"
+import { StoreTag, type ListingRecord } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
 import { Erc8004FromEnv, Erc8004Tag, verifyAgentClaims } from "./erc8004.ts"
 import { agentRegistrationFor } from "./agent-registration.ts"
@@ -60,6 +60,8 @@ import {
 } from "./ui.ts"
 import { buildAgentSkill, buildOpenApi, buildWellKnownX402 } from "./openapi.ts"
 import { splitterRefusal } from "./splitter.ts"
+import { sepoliaEnsReader } from "@arcade/buyer"
+import { handleNames, makeEnsWatch, parseEnsSellerLabels, type EnsListingSnapshot } from "./ens.ts"
 
 /**
  * ARCADE hub.
@@ -372,6 +374,31 @@ const main = Effect.gen(function* () {
   const broker = yield* BrokerTag
   const rail = yield* RailTag
   const erc8004 = yield* Erc8004Tag
+
+  // One read-only observer per hub lifetime. Discovery may use the observation;
+  // no ENS lookup is awaited by the paid or settlement paths below.
+  const ensReader = sepoliaEnsReader()
+  const ensRoot = process.env["ARCADE_ENS_ROOT"]
+  const ensIntervalMs = Number(process.env["ARCADE_ENS_CHECK_MS"] ?? 5 * 60_000)
+  if (ensRoot !== undefined && ensRoot !== "" &&
+    (!Number.isSafeInteger(ensIntervalMs) || ensIntervalMs < 1000 || ensIntervalMs > 2_147_483_647)) {
+    throw new Error("ARCADE_ENS_CHECK_MS must be a whole number from 1000 to 2147483647")
+  }
+  const sameEnsPublication = (rec: ListingRecord, snapshot: EnsListingSnapshot): boolean =>
+    rec.listing.id === snapshot.id && rec.seller.toLowerCase() === snapshot.seller.toLowerCase() &&
+    rec.runnerId === snapshot.runnerId && rec.publishedAtMs === snapshot.publishedAtMs
+  const ensWatch = makeEnsWatch({ root: ensRoot, reader: ensReader, log: line => console.log(line),
+    sellerLabels: parseEnsSellerLabels(ensRoot ? process.env["ARCADE_ENS_SELLER_LABELS"] : undefined),
+    isCurrent: snapshot => run(store.getListing(snapshot.id).pipe(Effect.either)).then(current =>
+      current._tag === "Right" && sameEnsPublication(current.right, snapshot)),
+    onResolved: (snapshot, name, isActive) => run(Effect.gen(function* () {
+      // Keep the final read/check/write in one synchronous Store Effect sequence.
+      // Never spread a pre-RPC record over newer canary, runner or identity evidence.
+      const current = yield* store.getListing(snapshot.id).pipe(Effect.either)
+      if (!isActive() || current._tag === "Left" || !sameEnsPublication(current.right, snapshot) || current.right.ensName === name) return
+      yield* store.putListing({ ...current.right, ensName: name })
+    }))
+  })
 
   const canaryMaxPrice = (() => {
     try { return parsePrice(process.env["ARCADE_CANARY_MAX_PRICE"] ?? "$0.25") }
@@ -854,8 +881,15 @@ const main = Effect.gen(function* () {
 
       if (path === "/listings" && req.method === "GET") {
         const all = (await run(store.allListings)).filter((record) => record.delisted !== true)
-        return json(all.map((r) => ({ ...r.listing, seller: r.seller })))
+          .filter(record => !ensWatch.isExpired(record.listing.id, record.seller))
+        return json(all.map(r => {
+          const ensName = ensWatch.nameFor({ id: r.listing.id, seller: r.seller })
+          return { ...r.listing, seller: r.seller, ...(ensName === undefined ? {} : { ensName }) }
+        }))
       }
+
+      const nameMatch = /^\/names\/([^/]+)$/.exec(path)
+      if (nameMatch !== null && req.method === "GET") return handleNames(ensReader, nameMatch[1]!)
 
       // Explicit public projection: no signing keys, provider configuration, or clients.
       if (path === "/erc8004" && req.method === "GET") {
@@ -903,6 +937,8 @@ const main = Effect.gen(function* () {
         const identity = await run(listingEvidence(res.right, erc8004, chainConfig, rail.name))
         return json({ ...res.right.listing, seller: res.right.seller, stats, ratings: { count: ratings.length, average: avg },
           ...(identity === undefined ? {} : { erc8004: identity }),
+          ensName: ensWatch.nameFor({ id: res.right.listing.id, seller: res.right.seller }) ?? null,
+          ensExpired: ensWatch.isExpired(res.right.listing.id, res.right.seller),
           delisted: res.right.delisted === true, payTested: res.right.payTested ?? null,
           payTestHistory: await run(store.payTestHistory(res.right.listing.id, res.right.seller)) })
       }
@@ -1255,7 +1291,13 @@ const main = Effect.gen(function* () {
     }
   })
 
-  yield* Effect.addFinalizer(() => Effect.sync(() => server.stop(true)))
+  let stopEns = () => {}
+  yield* Effect.addFinalizer(() => Effect.sync(() => { stopEns(); server.stop(true) }))
+  if (ensRoot !== undefined && ensRoot !== "") {
+    stopEns = ensWatch.start(ensIntervalMs, () => run(store.allListings).then(all => all.map(rec => ({
+      id: rec.listing.id, seller: rec.seller, runnerId: rec.runnerId, publishedAtMs: rec.publishedAtMs
+    }))))
+  }
   // Use the actual bound port, including PORT=0, unless the operator advertises a public
   // origin. The buyer uses ordinary HTTP and remains within this application's scope.
   const canary = (() => {
