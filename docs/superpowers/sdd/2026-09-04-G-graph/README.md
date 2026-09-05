@@ -18,6 +18,9 @@ This worktree must not merge ahead of Plan F.
 - [Task 12 client report](task-12-client-report.md)
 - [Task 12 runner report](task-12-run-report.md)
 - [Task 12 integration and unsigned observation](task-12-integration.md)
+- [Task 13 brief](task-13-brief.md)
+- [Task 13 implementation report](task-13-report.md)
+- [Counterparty skill guide](../../../../skills/counterparty-graph/SKILL.md)
 - [Progress](progress.md)
 - [Subgraph operator notes](../../../../subgraph/README.md)
 

@@ -78,3 +78,16 @@ the reviewed seven documents resolve, with no personal/temp paths or private
 clickable targets. Reviewer accepted the two documented test-only follow-ups,
 without claiming another test run or paid network evidence. Source and staged
 scope are frozen for the final precommit gate.
+
+## September 5 — G13 local documentation checkpoint
+
+G12 committed separately as `3e8fe23` after its final frozen gate passed:
+2,325 Vitest tests / 114 files, 265 Bun tests / 1,456 assertions / 25 files,
+and strict TypeScript exit zero. G7 and G13 remain separately scoped.
+
+G13's public guide and seven failure-first documentation contract tests are
+frozen and independently reviewed CLEAN against the actual G10–12 runtime.
+The public brief/report, two local guide links and shell-fence syntax were
+reviewed; no shell command from the guide was executed. The separate staged
+G13 whole-repository test/type gate follows this checkpoint. No paid Base query,
+Studio deployment, production change or F-before-G merge exception is claimed.
