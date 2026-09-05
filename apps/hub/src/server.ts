@@ -39,6 +39,7 @@ import { StoreTag } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
 import { Erc8004FromEnv, Erc8004Tag, verifyAgentClaims } from "./erc8004.ts"
 import { agentRegistrationFor } from "./agent-registration.ts"
+import { listingEvidence } from "./listing-evidence.ts"
 import { AttestLive, AttestTag } from "./attest.ts"
 import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
@@ -744,19 +745,28 @@ const main = Effect.gen(function* () {
       // ---- the marketplace page ----------------------------------------------
       // Statistics are computed per listing rather than stored, so the page cannot show a
       // number the receipts do not support.
-      const pageData = async () => {
+      const pageData = async (evidenceForSkill?: string) => {
         const records = await run(store.allListings)
         const receipts = await run(store.allReceipts)
         const listings = await Promise.all(
-          records.map(async ({ listing, seller, treasuryIsSeller, splitterVerified, feeSplitter, payTested, delisted }) => {
+          records.map(async rec => {
+            const { listing, seller, treasuryIsSeller, splitterVerified, feeSplitter, payTested, delisted } = rec
             const stats = await run(store.statsFor(listing.id))
             const ratings = await run(store.ratingsFor(listing.id))
+            // Only a requested detail page needs identity evidence. The catalogue/feed
+            // must not fan out ownerOf/evidence reads across every listing on each poll.
+            const identity = evidenceForSkill === listing.id ? await run(listingEvidence(rec, erc8004, chainConfig, rail.name)) : undefined
             return {
               listing,
               seller,
               treasuryIsSeller,
               splitterVerified,
               feeSplitter,
+              agentId: rec.agentId,
+              registrationTx: rec.registrationTx,
+              agentVerified: identity?.verified === true,
+              evidence: identity?.stale === false ? { validationPasses: identity.validationPasses!,
+                validationsRead: identity.validationsRead!, settlementFeedback: identity.settlementFeedback!, stale: false } : undefined,
               ...(payTested === undefined ? {} : { payTested }),
               delisted: delisted === true,
               ...(() => {
@@ -805,7 +815,7 @@ const main = Effect.gen(function* () {
 
       const skillPage = /^\/skill\/([a-z0-9-]+)$/.exec(path)
       if (skillPage !== null) {
-        const d = await pageData()
+        const d = await pageData(skillPage[1])
         const view = d.listings.find((l) => l.listing.id === skillPage[1])
         if (view === undefined) return new Response("no such listing", { status: 404 })
         return new Response(

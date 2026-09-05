@@ -1,5 +1,6 @@
 import { explorerTxUrl, formatPrice, type ObjectiveStats, type PublicListing, type Receipt, type ReceiptChild } from "@arcade/core"
 import type { ListingRecord, PayTest } from "./store.ts"
+import type { AgentEvidence } from "./erc8004.ts"
 
 /**
  * The public marketplace page — "settlement paper".
@@ -61,6 +62,10 @@ export interface ListingView {
    * argument is "every statistic is computed" cannot print one that isn't.
    */
   readonly splitterVerified?: boolean | undefined
+  readonly agentId?: string | undefined
+  readonly registrationTx?: string | undefined
+  readonly agentVerified?: boolean | undefined
+  readonly evidence?: AgentEvidence | undefined
   readonly payTested?: PayTest | undefined
   readonly delisted?: boolean | undefined
   /** Why this listing has no pay-test evidence; never presented as a successful test. */
@@ -372,6 +377,11 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:8px 20px;margin:14px 0 0;
   font:13px/1.5 var(--mono)}
 dt{color:var(--slate)}
 dd{margin:0;font-variant-numeric:tabular-nums}
+.identity-evidence dl{grid-template-columns:minmax(0,1fr) minmax(0,3fr);font-family:var(--sans)}
+.identity-evidence dd{min-width:0;overflow-wrap:anywhere}
+.identity-evidence .agent-id,.identity-evidence a{font-family:var(--mono)}
+.identity-evidence dl + .note{margin-top:12px}
+footer code{overflow-wrap:anywhere}
 details{margin:14px 0 0;border-top:1px solid var(--line);padding-top:12px}
 summary{cursor:pointer;font:12px/1 var(--sans);color:var(--slate);text-transform:uppercase;
   letter-spacing:.08em}
@@ -513,6 +523,37 @@ export const renderMeta = (data: PageData): string => {
 
 // ── detail ──────────────────────────────────────────────────────────────────
 
+/** Counts describe our own tagged, answered registry records, never a composite grade. */
+const renderIdentity = (view: ListingView, simulated: boolean): string => {
+  if (view.agentId === undefined) return ""
+  const ev = view.evidence
+  const checked = !simulated && view.agentVerified === true
+  const readable = ev !== undefined && ev.stale === false &&
+    [ev.validationPasses, ev.validationsRead, ev.settlementFeedback].every(n => Number.isSafeInteger(n) && n >= 0) &&
+    ev.validationPasses <= ev.validationsRead && ev.validationsRead <= 20 && ev.settlementFeedback <= 4096
+  const counts = !checked
+    ? '<p class="note">Ownership is unverified; counts are withheld.</p>'
+    : !readable
+      ? '<p class="note">The registries could not be read reliably just now; counts are withheld.</p>'
+      : `<dl><dt>validations passed</dt><dd>${ev.validationPasses} of ${ev.validationsRead} answered by this hub's validator</dd>
+          <dt>settlements vouched</dt><dd>${ev.settlementFeedback} — from this hub's attester only, each naming a settlement transaction</dd></dl>
+         <p class="note">Validation counts cover our tagged, answered entries among the latest 20 unique requests. Feedback counts include only this hub's tagged, unrevoked settlement records.</p>`
+  const tx = view.registrationTx
+  const registration = tx !== undefined && /^0x[0-9a-fA-F]{64}$/.test(tx)
+    ? `<a href="${esc(explorerTxUrl(tx))}" target="_blank" rel="noreferrer">${esc(tx.slice(0, 10))}…</a>`
+    : '<span class="unrated">not recorded</span>'
+  return `<section class="identity-evidence" aria-labelledby="identity-heading">
+    <h2 id="identity-heading">On-chain identity</h2>
+    <p class="note">ERC-8004 on Arc — <strong>settlement evidence</strong>. ${simulated
+      ? "This hub uses simulated payments; no chain evidence is asserted here."
+      : checked ? "The registry check confirmed this seller owns the agent."
+        : "The runner announced this agent, but ownership could not be read or confirmed on chain."}</p>
+    <dl><dt>agent</dt><dd class="agent-id">#${esc(view.agentId)}</dd><dt>registration (announced)</dt><dd>${registration}</dd></dl>
+    <p class="note">The registration transaction is supplied by the runner; an ownership check does not verify that transaction.</p>
+    ${counts}
+  </section>`
+}
+
 export const renderListingPage = (
   view: ListingView,
   receipts: ReadonlyArray<Receipt>,
@@ -564,6 +605,8 @@ export const renderListingPage = (
           "a splitter is announced but could not be read on chain, so neither the split nor the payee is verified — the fee shown on receipts is what this hub computed rather than something checked against the contract, and nothing confirmed the splitter pays this seller"
   }</p>
 
+  ${renderIdentity(view, data.rail === "test")}
+
   <h2>Bounds</h2>
   <p class="note">the seller's declared ceilings for one call — a buyer can read these against the price</p>
   <dl>
@@ -591,6 +634,7 @@ export const renderListingPage = (
     <tbody>${renderReceiptRows(receipts, 25)}</tbody>
   </table>
 
+  </div>
   <footer>${view.delisted === true
     ? "This listing is hidden and ordinary paid calls are refused. Only the hub's canary may buy it to prove recovery."
     : `Call it: <code>POST /x/${esc(seller)}/${esc(listing.id)}</code> — you will receive a 402 with payment requirements.`}
