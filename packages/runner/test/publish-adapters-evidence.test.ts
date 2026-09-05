@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -117,6 +117,25 @@ describe("publish adapter evidence", () => {
 })
 
 describe("evidence entry points", () => {
+  it("the real shell never reloads repository dotenv through a nested package script", () => {
+    const dir = scratch()
+    mkdirSync(join(dir, "scripts"), { recursive: true })
+    mkdirSync(join(dir, "packages/runner/src"), { recursive: true })
+    writeFileSync(join(dir, "scripts/e2e-publish-adapters.sh"), readFileSync(join(repo, "scripts/e2e-publish-adapters.sh")))
+    const pkg = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { scripts: { arcade: string } }
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ scripts: { arcade: pkg.scripts.arcade } }))
+    writeFileSync(join(dir, ".env"), "EVIDENCE_UNDECLARED=DOTENV_SENTINEL\nANTHROPIC_AUTH_TOKEN=DOTENV_SENTINEL\n")
+    const fixture = `if (process.env.EVIDENCE_UNDECLARED || process.env.ANTHROPIC_AUTH_TOKEN) { console.error("dotenv reloaded"); process.exit(71); } console.log("isolated fixture");\n`
+    writeFileSync(join(dir, "packages/runner/src/cli.ts"), fixture)
+    writeFileSync(join(dir, "scripts/e2e-publish-adapters.ts"), fixture)
+    const result = spawnSync("/bin/bash", [join(dir, "scripts/e2e-publish-adapters.sh")], {
+      cwd: dir, env: { PATH: process.env["PATH"] ?? "", HOME: dir }, encoding: "utf8", timeout: 10_000
+    })
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout.match(/isolated fixture/g)).toHaveLength(6)
+    expect(result.stderr).not.toContain("dotenv reloaded")
+  })
+
   it.each(["missing", "failed", "incomplete"])("the real wrapper exits nonzero for %s from any cwd", (mode) => {
     const dir = scratch()
     const resolver = createRequire(import.meta.url).resolve
@@ -149,7 +168,8 @@ mock.module(${JSON.stringify(fileURLToPath(new URL("../src/exec.ts", import.meta
     const calls = join(dir, "calls")
     writeFileSync(join(dir, "bun"), `#!/bin/sh
 printf '%s\\n' "cwd=$PWD" "$*" >> "$EVIDENCE_CALLS_FILE"
-if [ "$EVIDENCE_FAIL_PREVIEW" = "yes" ] && [ "$*" = "run arcade publish skills/diff-triage" ]; then
+if [ "\${1-}" = "--no-env-file" ]; then shift; fi
+if [ "$EVIDENCE_FAIL_PREVIEW" = "yes" ] && [ "$*" = "run packages/runner/src/cli.ts publish skills/diff-triage" ]; then
   exit 23
 fi
 printf '%s\\n' 'offline command fixture'
@@ -160,6 +180,9 @@ printf '%s\\n' 'offline command fixture'
       encoding: "utf8", timeout: 10_000
     })
     const commands = readFileSync(calls, "utf8")
+    const invocations = commands.split("\n").filter((line) => line !== "" && !line.startsWith("cwd="))
+    expect(invocations.length).toBeGreaterThan(0)
+    expect(invocations.every((line) => line.startsWith("--no-env-file run "))).toBe(true)
     expect(commands.split("\n").filter((line) => line.startsWith("cwd="))).not.toHaveLength(0)
     expect(commands.split("\n").filter((line) => line.startsWith("cwd=")).every((line) => line === `cwd=${repo.replace(/\/$/, "")}`)).toBe(true)
     if (fail) {

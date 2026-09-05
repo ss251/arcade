@@ -66,7 +66,7 @@ describe("entryless adapter spawning", () => {
         manifest: skill, skillDir: "/tmp/skill", jobId: "entryless", input: {}
       })))
       expect(spawn).toHaveBeenCalledWith(
-        ["bun", "run", expect.stringContaining("/engines/harness.ts"), "-"],
+        ["bun", "--no-env-file", "run", expect.stringContaining("/engines/harness.ts"), "-"],
         expect.objectContaining({ cwd: "/tmp/skill", env: expect.objectContaining({ UPSTREAM_KEY: "upstream-secret-marker" }) })
       )
       expect(write).toHaveBeenCalledOnce()
@@ -98,6 +98,17 @@ const withPollutedEnv = <T>(fn: () => T): T => {
 }
 
 describe("runner env scrub", () => {
+  it("forwards the API base only when explicitly declared alongside the key", () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "dummy-explicit-key")
+    vi.stubEnv("ANTHROPIC_BASE_URL", "http://127.0.0.1:8317")
+    try {
+      expect(buildEnv(manifest({ secrets: ["ANTHROPIC_API_KEY"] }), "/tmp/skill")["ANTHROPIC_BASE_URL"]).toBeUndefined()
+      const env = buildEnv(manifest({ secrets: ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"] }), "/tmp/skill")
+      expect(env["ANTHROPIC_BASE_URL"]).toBe("http://127.0.0.1:8317")
+      expect(env["ANTHROPIC_API_KEY"]).toBe("dummy-explicit-key")
+    } finally { vi.unstubAllEnvs() }
+  })
+
   it("passes NO seller secret through when the manifest declares none", () => {
     withPollutedEnv(() => {
       const env = buildEnv(manifest(), "/tmp/skill")

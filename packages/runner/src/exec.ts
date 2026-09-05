@@ -188,7 +188,7 @@ const commandFor = (manifest: SkillManifest, skillDir: string): ReadonlyArray<st
   // Entryless adapters still use the harness. Reserve its entry argv slot without
   // resolving an absent entry into the skill directory itself.
   if (manifest.engine.adapter === "mcp" || manifest.engine.adapter === "openapi") {
-    return ["bun", "run", HARNESS, "-", ...extra]
+    return ["bun", "--no-env-file", "run", HARNESS, "-", ...extra]
   }
   // Absolute, because the child is spawned with `cwd: skillDir`. A relative skills
   // directory would otherwise be applied twice — once as the cwd and again inside the
@@ -197,10 +197,11 @@ const commandFor = (manifest: SkillManifest, skillDir: string): ReadonlyArray<st
   const entry = resolve(skillDir, manifest.engine.entry ?? "")
   if (manifest.engine.adapter === "script") {
     return entry.endsWith(".ts") || entry.endsWith(".js")
-      ? ["bun", "run", entry, ...extra]
+      ? ["bun", "--no-env-file", "run", entry, ...extra]
       : [entry, ...extra]
   }
-  return ["bun", "run", HARNESS, entry, ...extra]
+  // Bun must not refill the scrubbed environment from the skill directory's .env.
+  return ["bun", "--no-env-file", "run", HARNESS, entry, ...extra]
 }
 
 export const execSkill = (args: ExecArgs) =>

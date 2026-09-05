@@ -129,8 +129,8 @@ const skills = await Effect.runPromise(loadSkills(${JSON.stringify(join(dir, "ge
 if (skills.length !== 1) throw new Error("wrong listing count");
 const originalSpawn = Bun.spawn.bind(Bun);
 Bun.spawn = (cmd, options) => {
-  if (cmd[0] !== "bun" || cmd[1] !== "run" || !cmd[2].endsWith("/engines/harness.ts")) throw new Error("unexpected subprocess");
-  return originalSpawn([cmd[0], cmd[1], ${JSON.stringify(`--preload=${preload}`)}, ...cmd.slice(2)], options);
+  if (cmd[0] !== "bun" || cmd[1] !== "--no-env-file" || cmd[2] !== "run" || !cmd[3].endsWith("/engines/harness.ts")) throw new Error("unexpected subprocess");
+  return originalSpawn([...cmd.slice(0, 3), ${JSON.stringify(`--preload=${preload}`)}, ...cmd.slice(3)], options);
 };
 const skill = skills[0];
 const outcome = await Effect.runPromise(execSkill({ manifest: skill.manifest, skillDir: skill.dir, jobId: "openapi-roundtrip",
