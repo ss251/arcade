@@ -242,3 +242,13 @@ export const resolveEnsDeployment = async (reader: EnsChainReader, sets: Readonl
   }
   throw new Error(`no consistent ENSv2 deployment on Sepolia: ${findings.join("; ")}. Update config/ens/sepolia.json from the official ENS deployments; beta addresses may change.`)
 }
+
+/** Propose only; a returned fallback is not owner consent to register that name. */
+export const pickAvailableLabel = async (candidates: ReadonlyArray<string>, isAvailable: (label: string) => Promise<boolean>): Promise<string> => {
+  if (!Array.isArray(candidates) || candidates.length < 1 || candidates.length > 16) throw new Error("ENS: invalid label candidates")
+  const labels = [...new Set(candidates.map(component))]
+  for (const label of labels) {
+    try { if (await readDeadline(() => isAvailable(label)) === true) return label } catch { /* Unreadable is never free. */ }
+  }
+  throw new Error(`none of these .eth labels is verifiably available: ${labels.join(", ")}; owner must choose an available label`)
+}
