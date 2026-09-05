@@ -18,6 +18,11 @@ independently mined. F2–12 code work is unblocked; no extra live allowance is 
 - [Task 3 brief and process-local settlement limits](task-3-brief.md)
 - [Task 3 implementation and transport evidence](task-3-report.md)
 - [Task 3 parent source review and independent focused reruns](task-3-parent-review.md)
+- [Task 4 brief and constructed-inventory limits](task-4-brief.md)
+- [Task 4 pure registry checkpoint](task-4-registry-report.md)
+- [Task 4 boot, discovery and per-job rail integration](task-4-integration-report.md)
+- [Task 4 discovery outcome-honesty correction](task-4-discovery-followup.md)
+- [Task 4 parent integration and publication review](task-4-parent-review.md)
 - [Progress](progress.md)
 - [Gate evidence and owner prerequisites](../../../evidence/m6-gateway.md)
 
@@ -33,6 +38,11 @@ authorization/request-boundary evidence, not another payment or batch proof.
 
 F3 source and public-copy review are CLEAN within the process-local rail scope,
 with focused worker and parent checks passing. Its own full repository test and
-strict gate passed; the atomic commit is next, after F2. Gateway UUIDs identify accepted transfers, not
+strict gate passed; F3 is committed as `f2292f2`. Gateway UUIDs identify accepted transfers, not
 mined transactions or withdrawable credit. Durable reservations and held uncertain
 outcomes remain F5–8 work before live sessions.
+
+F4 registry, boot/discovery and internal per-job selection are independently
+reviewed, with parent focused checks and its own full test/strict gate passing.
+Its atomic commit is next. Constructed rails are not provider-support or funding proof; no session
+routing or durable session accounting ships in this checkpoint.

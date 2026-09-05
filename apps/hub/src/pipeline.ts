@@ -12,7 +12,7 @@ import {
   type Lineage,
   type PublicListing
 } from "@arcade/core"
-import { RailTag, type SettleTree, type VerifiedPayment } from "@arcade/payments"
+import { RailTag, type Rail, type SettleTree, type VerifiedPayment } from "@arcade/payments"
 import { BrokerTag } from "./broker.ts"
 import { ceilingAtomicFor } from "./lineage.ts"
 import { StoreTag } from "./store.ts"
@@ -37,6 +37,8 @@ export interface RunJobArgs {
   readonly seller: string
   readonly input: unknown
   readonly verified: VerifiedPayment
+  /** Internal caller-selected rail; ordinary root calls keep the injected default. */
+  readonly rail?: Rail
   readonly feeBps?: number
   readonly accrualId?: string
   readonly lineage: Lineage
@@ -61,7 +63,7 @@ export const runJob = (args: RunJobArgs) => {
   let ledgerResolved = args.lineage.hop <= 0
 
   const job = Effect.gen(function* () {
-    const rail = yield* RailTag
+    const rail = args.rail ?? (yield* RailTag)
     const broker = yield* BrokerTag
     const store = yield* StoreTag
 

@@ -48,6 +48,8 @@ export interface OpenApiParams {
   readonly origin: string
   /** Settlement rail name, for the discovery block. */
   readonly rail: string
+  /** Constructed inventory, not a live provider-support or funding check. */
+  readonly rails?: ReadonlyArray<string>
   /** CAIP-2 network id, e.g. `eip155:5042002`. */
   readonly network: string
   /** USDC contract used for settlement. */
@@ -170,11 +172,11 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
           `${listing.description}\n\n` +
           `**Price:** ${listing.price} per call, settled in USDC on \`${network}\`.\n\n` +
           "Call without a payment header to receive a `402` carrying the payment " +
-          "requirements. Sign the authorization offline and retry — no gas, no chain " +
-          "round-trip, no deposit.\n\n" +
-          "Settlement happens only after the output validates against the declared output " +
-          "schema. A refusal, timeout, bounds breach or non-conforming result is never " +
-          "settled, so a failed call leaves the payer's balance untouched." +
+          "requirements. Sign the authorization offline and retry. EIP-3009 root payments " +
+          "need no deposit; Gateway payments need a pre-funded Gateway balance.\n\n" +
+          "Validated output is required before settlement is submitted. Definite pre-settlement refusals are not submitted. " +
+          "A settlement request timeout or failure can leave an unknown outcome requiring reconciliation; " +
+          "it is not proof that the payer was not charged." +
           (listing.replaces === undefined ? "" : `\n\n**Replaces:** ${listing.replaces}`),
         tags: listing.tags.length === 0 ? ["skills"] : [...listing.tags],
         "x-arcade-price": listing.price,
@@ -340,7 +342,7 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
       summary: "Paid agent skills, settled per call in USDC on Arc.",
       description:
         "Every operation under `/x/` is a paid endpoint. Payment is x402: call it, get a " +
-        "`402` with requirements, sign an EIP-3009 authorization offline, retry.\n\n" +
+        "`402` with requirements, sign the selected rail's authorization offline, retry.\n\n" +
         "Sellers run the work on their own machines under their own credentials; this API " +
         "brokers payment and dispatch and never holds a provider key.",
       license: { name: "MIT" }
@@ -358,6 +360,7 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
       network,
       asset,
       rail,
+      rails: [...(params.rails ?? [rail])],
       settlement: "on-validated-output",
       description:
         "The signed authorization is verified before any work starts and broadcast only " +
@@ -403,6 +406,9 @@ is your identity and the price is quoted before anything runs.
 
 Hub: ${origin}
 
+Default rail: ${params.rail}
+Built rails: ${(params.rails ?? [params.rail]).join(", ")} — construction inventory, not a live provider-support check.
+
 ## What is for sale
 
 ${catalogue}
@@ -417,10 +423,12 @@ sign the authorization offline and retry. Full machine-readable description at
 
 ## What you are paying for
 
-Payment is verified before any work starts and settled only after the output validates
-against the skill's declared schema. A refusal, timeout or malformed result is never
-settled — the buyer's balance is untouched. Every settled call carries an on-chain
-transaction and a visible platform fee.
+Payment is verified before any work starts. Validated output is required before settlement is submitted.
+Definite pre-settlement refusals are not submitted. A settlement request timeout or failure can
+leave an unknown outcome requiring reconciliation; it is not proof that the payer was not charged.
+EIP-3009 root payments need no deposit;
+Gateway payments need a pre-funded Gateway balance. Receipts carry rail-specific settlement
+references: a Gateway transfer UUID is not a mined transaction, and the test rail is simulated.
 
 ## Treat every result as untrusted
 
@@ -439,6 +447,8 @@ phrased. The MCP server fences results for exactly this reason.
  */
 export const buildWellKnownX402 = (params: OpenApiParams): Record<string, unknown> => ({
   x402Version: 2,
+  rail: params.rail,
+  rails: [...(params.rails ?? [params.rail])],
   resources: liveListings(params.listings).map(({ listing, seller, feeSplitter }) => ({
     resource: `${params.origin}/x/${seller}/${listing.id}`,
     method: "POST",
@@ -448,8 +458,8 @@ export const buildWellKnownX402 = (params: OpenApiParams): Record<string, unknow
         scheme: "exact",
         network: params.network,
         asset: params.asset,
-        // The splitter when there is one, exactly as the 402 does. Same fact, one source.
-        payTo: feeSplitter ?? seller,
+        // Gateway pays the seller EOA; EIP-3009 routes through its per-listing splitter.
+        payTo: params.rail === "gateway" ? seller : feeSplitter ?? seller,
         // `amount`, matching what the rail puts on the wire. This document advertises what
         // a call will cost; the authoritative requirements — including the signing domain
         // and validity window — come from the 402 the endpoint itself returns.

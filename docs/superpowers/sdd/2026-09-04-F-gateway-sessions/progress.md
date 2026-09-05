@@ -141,3 +141,46 @@ public-record/index paths belong to this commit. Source/tests stayed unchanged,
 no live operation was repeated, and no push occurred. The parent rechecked the
 complete public brief and the two exact historical report copies before selecting
 the task's atomic commit.
+
+F3 was committed independently as `f2292f2`; only its eleven reviewed source,
+test and public-record paths were included. No F4 source or GitHub push.
+
+## September 5 — F4 preparation and independent integration review
+
+The [brief](task-4-brief.md), [pure registry report](task-4-registry-report.md),
+[integration report](task-4-integration-report.md),
+[discovery follow-up](task-4-discovery-followup.md) and
+[parent review](task-4-parent-review.md) preserve separate checkpoints. The three
+historical report copies are byte-exact after the standard banner.
+
+The parent authored ten pure registry Reds/Greens; another agent independently
+reviewed that registry with ten passing Vitest cases and exact strict TypeScript.
+The integration worker passed 78 Vitest and initially eight Bun cases / 95
+assertions. Parent review identified the false uncharged-timeout description;
+the worker then reproduced it with a genuine test failure. The follow-up passed nine Bun cases / 108 assertions and repeated
+57 Vitest cases, with the earlier 21 retained as earlier Green.
+
+The parent independently reran all 78 focused cases and all nine actual-router
+Bun cases / 108 assertions on the final source. Source/integration/public-copy
+review is CLEAN. The public preparer resolved fourteen links and a clean scoped
+privacy scan. F4's own exact strict and full repository gate are next, before
+its atomic commit after F2/F3.
+
+Built inventory is not live support. Gateway discovery names its seller payee;
+EIP discovery keeps per-listing splitters. The pipeline fixture's named Gateway
+is a simulated TestRail, not Circle balance proof. The discovery descriptions
+distinguish definite pre-settlement refusal from uncertain dispatched outcomes.
+An exact-root-options TypeScript program explicitly targeting all eight final
+source/test/fixture files also passed with zero diagnostics. No session routing, durable accounting, live allowance or no-charge guarantee
+after a settlement timeout is introduced.
+
+### F4 full repository gate
+
+F4's own full gate passed 2,278 Vitest cases / 112 files, 331 Bun cases /
+3,601 assertions / 31 files, and strict root/web TypeScript, final exit zero.
+The preserved two private F2 regressions are included in that Bun total.
+The parent separately verified all eight final source/test/fixture files under
+the exact root TypeScript options, zero diagnostics, and rechecked the three
+public report copies byte-exact. No source/test changed during the full gate.
+Only F4's eight source/test/fixture files and seven public-record/index files
+are selected for its atomic commit; no live action or GitHub push is performed.

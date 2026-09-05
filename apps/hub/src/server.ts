@@ -42,6 +42,7 @@ import { agentRegistrationFor } from "./agent-registration.ts"
 import { listingEvidence } from "./listing-evidence.ts"
 import { AttestLive, AttestTag } from "./attest.ts"
 import { runJob } from "./pipeline.ts"
+import { RailsTag, railsLayerFrom } from "./rails.ts"
 import { inputGate } from "./input-gate.ts"
 import { payTestSkipReason } from "./canary-input.ts"
 import { canaryFromEnv, canaryLoop } from "./canary.ts"
@@ -94,6 +95,10 @@ const onHostingPlatform = (): boolean => Object.keys(process.env).some(
  * than run misconfigured somewhere a judge is looking.
  */
 const preflight = (): void => {
+  if (RAIL !== "eip3009" && RAIL !== "gateway" && RAIL !== "test") {
+    console.error("[hub] refusing to start: invalid ARCADE_RAIL")
+    process.exit(2)
+  }
   const unavailable = chainStartupRefusal(chainConfig, RAIL)
   if (unavailable !== undefined) {
     console.error(`[hub] refusing to start: ${unavailable}`)
@@ -223,10 +228,17 @@ const facilitator = (): ReturnType<typeof privateKeyToAccount> => {
   return facilitatorAccount
 }
 
-const railLayer = () => {
-  switch (RAIL) {
+const railLayer = (name: string) => {
+  switch (name) {
     case "gateway":
-      return GatewayLive({})
+      // Equality assertions bind construction to the same selected snapshot as boot.
+      // Constructing a rail makes no support, deposit or provider-network request.
+      return GatewayLive({
+        facilitatorUrl: chainConfig.gateway!.facilitatorUrl,
+        wallet: chainConfig.gateway!.wallet,
+        chainId: chainConfig.chainId,
+        minValiditySeconds: chainConfig.gateway!.minValiditySeconds
+      })
     case "test":
       // Seed unlisted payers so a real `arcade-buy` can reach settlement on this rail —
       // it is what makes the marketplace page demonstrable without a funded chain.
@@ -275,7 +287,13 @@ if (RAIL !== "test" && process.env["ARCADE_CHAIN_CHECK"] !== "0") {
 
 const Erc8004Layer = Erc8004FromEnv(chainConfig.erc8004)
 const StoreLayer = StoreFromEnv()
-const AppLive = Layer.mergeAll(StoreLayer, BrokerLive, railLayer(), Erc8004Layer,
+const RailsLayer = Layer.unwrapEffect(Effect.gen(function* () {
+  const fallback = yield* RailTag.pipe(Effect.provide(railLayer(RAIL)))
+  const others = chainConfig.status === "ready" && chainConfig.gateway !== null && RAIL !== "gateway"
+    ? [yield* RailTag.pipe(Effect.provide(railLayer("gateway")))] : []
+  return railsLayerFrom(fallback, others)
+}))
+const AppLive = Layer.mergeAll(StoreLayer, BrokerLive, RailsLayer, Erc8004Layer,
   AttestLive.pipe(Layer.provide(Layer.merge(StoreLayer, Erc8004Layer))))
 
 const json = (body: unknown, status = 200) =>
@@ -368,11 +386,12 @@ const splitterFacts = async (address: string): Promise<SplitterFacts | undefined
 }
 
 const main = Effect.gen(function* () {
-  const runtime = yield* Effect.runtime<StoreTag | BrokerTag | RailTag | Erc8004Tag | AttestTag>()
+  const runtime = yield* Effect.runtime<StoreTag | BrokerTag | RailTag | RailsTag | Erc8004Tag | AttestTag>()
   const run = Runtime.runPromise(runtime)
   const store = yield* StoreTag
   const broker = yield* BrokerTag
   const rail = yield* RailTag
+  const rails = yield* RailsTag
   const erc8004 = yield* Erc8004Tag
 
   // One read-only observer per hub lifetime. Discovery may use the observation;
@@ -767,7 +786,7 @@ const main = Effect.gen(function* () {
         return new Response("expected websocket", { status: 400 })
       }
 
-      if (path === "/healthz") return json({ ok: true, rail: rail.name, network: ARC_CAIP2 })
+      if (path === "/healthz") return json({ ok: true, rail: rail.name, rails: rails.names, network: ARC_CAIP2 })
 
       // ---- the marketplace page ----------------------------------------------
       // Statistics are computed per listing rather than stored, so the page cannot show a
@@ -866,6 +885,7 @@ const main = Effect.gen(function* () {
           listings,
           origin: publicOrigin(url),
           rail: rail.name,
+          rails: rails.names,
           network: ARC_CAIP2,
           asset: USDC_ADDRESS
         }
