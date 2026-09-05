@@ -15,11 +15,12 @@ import { Effect } from "effect"
  * re-imported per test file run.
  */
 
-const HUB = "http://hub.test"
+const HUB = "https://hub.test"
 const SELLER = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 const BUYER_KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 
 process.env["ARCADE_HUB"] = HUB
+process.env["ARCADE_NETWORK"] = "arc-testnet"
 process.env["ARCADE_BUYER_KEY"] = BUYER_KEY
 process.env["ARCADE_MAX_CALL_USD"] = "$0.50"
 process.env["ARCADE_SESSION_BUDGET_USD"] = "$1.00"
@@ -63,7 +64,8 @@ const stubFetch = () =>
       const id = url.split("/").pop()!
       const listing = listingsBody.find((l) => l.id === id)!
       const atomic = Math.round(Number(listing.price.replace("$", "")) * 1e6)
-      return jsonResponse({ x402Version: 2, error: "payment required", accepts: [{ amount: String(atomic) }] }, 402)
+      return jsonResponse({ x402Version: 2, error: "payment required", accepts: [{ scheme: "exact", network: "eip155:5042002", amount: String(atomic),
+        asset: "0x3600000000000000000000000000000000000000", payTo: SELLER, resource: url, maxTimeoutSeconds: 604900 }] }, 402)
     }
     if (url.endsWith("/receipts")) return jsonResponse([])
     throw new Error(`unexpected fetch: ${url}`)
@@ -110,10 +112,12 @@ describe("tool surface", () => {
     const call = TOOLS.find((t) => t.name === "arcade_call_skill")!
     expect(Object.keys(call.inputSchema.properties ?? {})).toEqual([
       "skillId",
+      "name",
       "input",
       "maxAmountUsd"
     ])
-    expect(call.inputSchema.required).toEqual(["skillId", "input"])
+    expect(call.inputSchema.required).toEqual(["input"])
+    expect(call.inputSchema.allOf).toEqual([{ oneOf: [{ required: ["skillId"] }, { required: ["name"] }] }])
   })
 
   it("marks exactly one tool as non-read-only — the one that spends money", async () => {
@@ -274,7 +278,8 @@ describe("spend control", () => {
           jobId: "job_1",
           status: "succeeded",
           result: { ok: true },
-          receipt: { settled: true, sellerShare: "$0.114", fee: "$0.006" },
+          receipt: { settled: true, price: "$0.12", sellerShare: "$0.114", fee: "$0.006" },
+          authorizedAmountAtomic: 120000n,
           fencedResult: "fenced"
         })) as never
     )
@@ -321,7 +326,8 @@ describe("seller output is untrusted — THE safety property", () => {
           jobId: "job_3",
           status: "succeeded",
           result: MALICIOUS,
-          receipt: { settled: true, sellerShare: "$0.114", fee: "$0.006" },
+          receipt: { settled: true, price: "$0.12", sellerShare: "$0.114", fee: "$0.006" },
+          authorizedAmountAtomic: 120000n,
           fencedResult: `<<<UNTRUSTED-abc123>>>\n${JSON.stringify(MALICIOUS)}\n<<<END-abc123>>>`
         })) as never
     )
