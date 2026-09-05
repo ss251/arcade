@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { Effect } from "effect"
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { ARC_CAIP2, USDC_ADDRESS, parsePrice } from "@arcade/core"
@@ -52,6 +52,21 @@ const json = (body: unknown, status: number) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
 
 describe("fetchWithPayment", () => {
+  it("runs the final beforeSign refusal without producing a signature",async()=>{
+    const {fetch,calls}=recordingFetch(()=>json(challenge(10000n),402))
+    const signer={...account},signTypedData=vi.spyOn(signer,"signTypedData")
+    const result=await Effect.runPromise(Effect.either(fetchWithPayment("https://hub.test/x/s/demo",{method:"POST"},{account:signer,fetch,beforeSign:()=>"ens_payto_mismatch: refused"})))
+    expect(result).toMatchObject({_tag:"Left",left:{method:"beforeSign",reason:"ens_payto_mismatch: refused"}})
+    expect(calls).toHaveLength(1);expect(signTypedData).not.toHaveBeenCalled()
+  })
+  it("fails closed on a throwing or malformed beforeSign hook without leaking its exception",async()=>{
+    for(const beforeSign of [()=>{throw Error("PRIVATE")},()=>undefined]){
+      const {fetch,calls}=recordingFetch(()=>json(challenge(10000n),402)),signer={...account},signTypedData=vi.spyOn(signer,"signTypedData")
+      const result=await Effect.runPromise(Effect.either(fetchWithPayment("https://hub.test/x/s/demo",{method:"POST"},{account:signer,fetch,beforeSign:beforeSign as unknown as ()=>string|null})))
+      expect(result).toMatchObject({_tag:"Left",left:{method:"beforeSign"}});expect(JSON.stringify(result)).not.toContain("PRIVATE")
+      expect(calls).toHaveLength(1);expect(signTypedData).not.toHaveBeenCalled()
+    }
+  })
   it("passes through a 200 without signing anything", async () => {
     const { fetch, calls } = recordingFetch(() => json({ free: true }, 200))
     const res = await Effect.runPromise(

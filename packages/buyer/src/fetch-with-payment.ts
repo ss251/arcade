@@ -28,6 +28,8 @@ export interface PayFetchOptions {
   /** Hub-issued opaque capability proving this purchase is a child of a running job. */
   readonly lineage?: string
   readonly fetch?: typeof globalThis.fetch
+  /** Final gate before a signature exists. Only an explicit null permits signing. */
+  readonly beforeSign?: (requirements: PaymentRequirements) => string | null
 }
 
 export interface PaidResponse {
@@ -61,7 +63,7 @@ export const fetchWithPayment = (
     }
 
     const probe = yield* Effect.tryPromise({
-      try: () => doFetch(String(input), { ...init, headers }),
+      try: () => doFetch(String(input), { ...init, headers, redirect: "error", credentials: "omit" }),
       catch: (e) => new RpcFailure({ method: "fetch", reason: String((e as Error)?.message ?? e) })
     })
 
@@ -97,6 +99,17 @@ export const fetchWithPayment = (
       })
     }
 
+    const refusal = yield* Effect.try({
+      try: () => {
+        if (options.beforeSign === undefined) return null
+        const value = options.beforeSign(requirements)
+        if (value !== null && (typeof value !== "string" || value.length > 2048)) throw Error()
+        return value
+      },
+      catch: () => new RpcFailure({ method: "beforeSign", reason: "Payment authority check failed. Nothing was signed." })
+    })
+    if (refusal !== null) return yield* new RpcFailure({ method: "beforeSign", reason: refusal })
+
     // Offline. No gas, no chain round-trip — measured at ~5ms during G-1.
     const signed = yield* signAuthorization({
       account: options.account,
@@ -119,7 +132,7 @@ export const fetchWithPayment = (
     retryHeaders.set(HEADER_PAYMENT_SIGNATURE, encodeHeader(payload))
 
     const paidRes = yield* Effect.tryPromise({
-      try: () => doFetch(String(input), { ...init, headers: retryHeaders }),
+      try: () => doFetch(String(input), { ...init, headers: retryHeaders, redirect: "error", credentials: "omit" }),
       catch: (e) => new RpcFailure({ method: "fetch(paid)", reason: String((e as Error)?.message ?? e) })
     })
 

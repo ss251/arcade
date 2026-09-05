@@ -248,9 +248,9 @@ const fakeHub = () => {
       const verified = await Effect.runPromise(rail.verify(payload, requirements))
       tx = settled ? (await Effect.runPromise(rail.settle(verified))).txHash : undefined
       job++
-      return json({ job_id: `job_${job}`, poll_url: `https://hub.test/jobs/job_${job}` }, 202)
+      return json({ job_id: `job_${job}`, poll_url: `https://hub.test/jobs/job_${job}/result?token=${"ab".repeat(16)}` }, 202)
     }
-    return json({ jobId: `job_${job}`, status: "completed", result: { ok: true },
+    return json({ job_id: `job_${job}`, status: settled ? "succeeded" : "failed", result: settled ? { ok: true } : null,
       receipt: { settled, ...(tx === undefined ? {} : { settleTx: tx }), reason: "PRIVATE_RECEIPT_REASON" } })
   })
   return { calls, state, setSettled: (value: boolean) => { settled = value }, setOffline: (value: boolean) => { offline = value } }
