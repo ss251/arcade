@@ -36,6 +36,7 @@ independently mined. F2–12 code work is unblocked; no extra live allowance is 
 - [Task 7 final independent source/runtime review](task-7-independent-review.md)
 - [Task 8 private paid-session integration and review index](task-8-brief.md)
 - [Task 9 captured buyer session SDK and review index](task-9-brief.md)
+- [Task 10 captured MCP sessions and review index](task-10-brief.md)
 - [Progress](progress.md)
 - [Gate evidence and owner prerequisites](../../../evidence/m6-gateway.md)
 
@@ -127,3 +128,10 @@ temporal regressions. Its complete frozen gate passed2,571Vitest/120files,
 433Bun/4,254assertions/37files and root/web strict typing. All eight source hashes
 still match. The final historical-report copies and publication audit precede
 the atomic commit; F10 remains a separate MCP integration step.
+
+F9 subsequently committed as `6d3222b` after its final CLEAN publication audit.
+F10 is now implemented and independently CLEAN after two genuine queued-lane
+corrections. Its [brief](task-10-brief.md) separates actual SDK/protocol tests from
+live evidence. The full frozen gate passed2608 Vitest/121 files,433 Bun/4254
+assertions/37 files and root/web strict typing; all source hashes match. Final
+public audit and the atomic MCP commit follow. F11 funding remains separate.

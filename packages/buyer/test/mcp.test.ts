@@ -120,10 +120,22 @@ describe("tool surface", () => {
     expect(call.inputSchema.allOf).toEqual([{ oneOf: [{ required: ["skillId"] }, { required: ["name"] }] }])
   })
 
-  it("marks exactly one tool as non-read-only — the one that spends money", async () => {
+  it("marks purchases and both session lifecycle mutations as non-read-only", async () => {
     const { TOOLS } = await load()
     const writers = TOOLS.filter((t) => t.annotations?.readOnlyHint !== true)
-    expect(writers.map((t) => t.name)).toEqual(["arcade_call_skill"])
+    expect(writers.map((t) => t.name)).toEqual(["arcade_call_skill", "arcade_open_session", "arcade_close_session"])
+  })
+
+  it("advertises canonical session budgets and non-spending non-idempotent lifecycle", async () => {
+    const { TOOLS } = await load()
+    const open = TOOLS.find(t => t.name === "arcade_open_session"), close = TOOLS.find(t => t.name === "arcade_close_session")
+    expect(open).toBeDefined(); expect(close).toBeDefined()
+    expect(open?.inputSchema.properties).toHaveProperty("budgetUsd")
+    expect(open?.inputSchema.required).toEqual(["budgetUsd"])
+    for (const tool of [open, close]) {
+      expect(tool?.annotations?.idempotentHint).toBe(false)
+      expect(tool?.description).toMatch(/spends nothing/i); expect(tool?.description).not.toMatch(/one batch|one batched|zero.*fee/i)
+    }
   })
 
   it("declares the spending tool non-idempotent, because each call is a new purchase", async () => {

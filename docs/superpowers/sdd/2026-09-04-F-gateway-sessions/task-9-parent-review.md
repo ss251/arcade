@@ -78,3 +78,10 @@ Original report prefixes and all eight source hashes independently match. Parent
 read the complete audit; no private research, handoff, journal or credential is
 selected. The atomic commit contains only the eight source/test and fourteen
 public execution-record paths; no live action or push accompanies it.
+
+## Post-commit line-count clarification
+
+F9 committed as `6d3222b`. The historical parent HTTP note says172 source lines;
+the file at its unchanged pinned hash has169. This is a line-count transcription
+error, not a different source version or test run. Hashes and all reported test
+results above are unchanged; the original note is preserved for provenance.

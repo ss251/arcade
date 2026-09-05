@@ -384,3 +384,25 @@ Parent's frozen complete gate beginning03:15:37IST passed2,571Vitest/120files,
 hashes matched afterward. Ten historical execution copies are now prepared with
 13 explicit locator substitutions; final public audit and atomic F9 commit are
 next. No live session, funding, approval replay or GitHub push occurred.
+
+## September 6 — F10 captured MCP integration
+
+F9 committed as `6d3222b`, with ten exact historical copies,13 locator substitutions
+and92 resolving public links. A separately noted historical source-line count is
+corrected without changing its pinned source or test results.
+
+F10 adds open/close lifecycle tools, captured actual-input quotes/calls/budget,
+and a cancellation-preserving queue. Independent review reproduced two queued
+intent switches into an ordinary or replacement-session lane; the unchanged
+private fixture now passes2/2 with8 assertions, independently repeated by parent.
+The [brief](task-10-brief.md) indexes preserved source/author/reviewer chronology.
+
+Final author175 focused Vitest/6 files and independent62 MCP Vitest/2 files pass,
+with exact nested strict checks. Parent's frozen complete gate beginning
+03:54:24IST passed2608 Vitest/121 files,433 Bun/4254 assertions/37 files and
+root/web strict typing, exit0. All three F10 and eight F9 hashes matched afterward.
+The private two-case fixture is a separate run, not part of those full totals.
+
+Six historical execution copies have ten literal locator substitutions. Final
+public audit and atomic F10 commit are next. No live session, funding, approval
+replay, production change or push; F12 live remains NOT RUN and F13 not triggered.
