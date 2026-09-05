@@ -151,3 +151,57 @@ H5's own full gate passed 2,317 Vitest tests / 115 files, 322 Bun tests /
 3,678 assertions / 30 files, root/web strict and an actual keyless Vite client
 and SSR build. See the [parent review](task-5-parent-review.md). The scoped
 checkpoint is ready for an atomic commit, not a main merge or future-page claim.
+
+## September 5: H6 marketplace and catalogue projection
+
+H5 committed as `031d6c9`. H6 replaces its `/` shell with the read-only marketplace,
+preserving H4's one-parallel-list/stats read boundary and independent partial
+states. Store-derived catalogue pay-test metadata is additive and privacy-limited:
+absent remains unknown for old hubs, explicit null means no history, and the
+compatibility jobId is redacted to an empty string. Bare references receive no
+guessed explorer authority; ENS annotations and recorded totals are not independent
+resolution, mining or customer-demand claims. Filtering and chat/ENS/payment
+behavior are unchanged. See the [H6 brief](task-6-brief.md).
+
+The [web author](task-6-web-report.md) retained actual missing-component/zero-read
+route Reds and a browser-discovered long-content grid failure before correction.
+Its final focused checkpoint passed 245 web tests / 19 files, exact nested strict
+and actual client/SSR build. Isolated author observations cover desktop/mobile,
+light/dark, keyboard focus and populated/partial/failed/empty/long states. Parent
+inspected the eight images and all seven web files, but did not repeat the browser
+keyboard/detail-click sequence. Screenshots and runtime state remain private;
+their report hashes are historical identifiers, not additional test runs.
+
+The [root hub report](task-6-hub-report.md) separately records two genuine router
+Reds and its final three Bun tests / 57 assertions. The
+[independent hub review](task-6-hub-review.md) is CLEAN with a final independent
+3/57 repeat; its earlier 3/56 observation is retained. The extra failed-reference
+absence assertion passed immediately and is coverage, not a new production Red.
+
+The reports' “H9 detail page” wording is historical: the approved plan names the
+listing-detail page Task 8 and browser token storage Task 9. Both remain future
+work; the observed detail link reached the existing not-found page. No fabricated
+route or completed buying flow is implied.
+
+Parent reported H6's own full gate passed: 2,331 Vitest tests / 117 files,
+325 Bun tests / 3,735 assertions / 31 files, root/web strict TypeScript and actual
+client/SSR builds (475 ms / 152 ms). Earlier pending statements in copied reports
+remain unchanged. Parent final exact nested/hash/public review and the atomic
+commit remain separate; no H merge, deployment, provider call or payment is claimed.
+
+Public artifacts preserve three original reports with historical banners; only
+eight explicit private runtime strings change in the web copy. The private audit
+records exact substitutions, original/public hashes, nine source fingerprints,
+local links and targeted privacy checks. No image, profile, journal or owner
+handoff is published. This publication does not expand authority or bypass F.
+
+### H6 final parent review
+
+Parent final source/evidence/public review is clean. All9source and8image hashes
+match; exact final nested hub/web strict checks passed. The first ad-hoc web
+programs omitted configFilePath and failed type resolution; corrected exact
+configuration passed without source or option changes. Parent verified all three
+exact projected report copies and repeated43local-file-link/privacy checks.
+See [final review](task-6-parent-review.md). The separate full test/types/client+
+SSR gate above applies to these frozen source bytes. Ready for atomic local
+commit; no H merge, future-page completion or new live authority is implied.

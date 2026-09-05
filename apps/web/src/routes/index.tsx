@@ -1,9 +1,45 @@
 import { createFileRoute } from "@tanstack/react-router"
+import { createServerFn } from "@tanstack/react-start"
 import { Nav } from "~/components/nav.tsx"
+import { Counters, ListingCard } from "~/components/listing-card.tsx"
+import * as hub from "~/lib/hub.ts"
 
-export const Route = createFileRoute("/")({ component: Market })
+/** Each H4 read owns its existing finite deadline. Neither failure erases the other feed. */
+export const marketData = createServerFn({ method: "GET" }).handler(async () => {
+  const [listings, stats] = await Promise.allSettled([hub.listSkills(), hub.stats()])
+  return {
+    listings: listings.status === "fulfilled" ? listings.value : null,
+    stats: stats.status === "fulfilled" ? stats.value : null,
+    listingsError: listings.status === "rejected" ? "listings_unavailable" as const : null,
+    statsError: stats.status === "rejected" ? "stats_unavailable" as const : null,
+    observedAtMs: Date.now()
+  }
+})
 
-// H6 supplies the marketplace; this increment only establishes its route shell.
+export const Route = createFileRoute("/")({
+  component: Market,
+  // Cancels the router's server-function request, not the independently bounded hub reads.
+  loader: ({ abortController }) => marketData({ signal: abortController.signal })
+})
+
 function Market() {
-  return <main className="wrap"><Nav here="market" /></main>
+  const data = Route.useLoaderData()
+  return (
+    <main className="wrap market">
+      <Nav here="market" />
+      <h1 className="market-title">Skills, prices, and recorded outcomes.</h1>
+      {data.stats === null ? <p className="market-notice" role="status">Totals are unavailable right now.</p> : <Counters stats={data.stats} />}
+      <p className="market-provenance">
+        Source: the hub's public catalogue and recorded totals. Records can include test and hub-owned canary traffic;
+        these are not independent on-chain or customer-demand measurements. Catalogue names and pay-test annotations
+        are reported by the hub, not independently verified here.
+      </p>
+      {data.listings === null ? <p className="market-notice" role="status">Listings are unavailable right now.</p>
+        : data.listings.length === 0 ? <p className="market-notice">No eligible listings were returned by this catalogue.</p>
+        : <section className="market-cards" aria-label="Available catalogue listings">
+            {data.listings.map(listing => <ListingCard key={`${listing.seller.toLowerCase()}:${listing.id}`}
+              listing={listing} observedAtMs={data.observedAtMs} />)}
+          </section>}
+    </main>
+  )
 }

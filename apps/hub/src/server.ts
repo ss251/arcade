@@ -916,7 +916,17 @@ const main = Effect.gen(function* () {
           .filter(record => !ensWatch.isExpired(record.listing.id, record.seller))
         return json(all.map(r => {
           const ensName = ensWatch.nameFor({ id: r.listing.id, seller: r.seller })
-          return { ...r.listing, seller: r.seller, ...(ensName === undefined ? {} : { ensName }) }
+          const test = r.payTested
+          const reference = test?.settleTx
+          const publicReference = test?.ok === true && typeof reference === "string" &&
+            /^0x[0-9a-fA-F]{64}$/.test(reference) && !/^0x0{64}$/.test(reference) ? reference : undefined
+          // Catalogue evidence is store-derived, not a new pay-test. Null means no
+          // recorded history; older hubs can still omit this metadata entirely.
+          // Redact the job ID; this summary carries no locator or explorer authority.
+          const payTested = test === undefined ? null : { atMs: test.atMs, ok: test.ok, jobId: "",
+            ...(publicReference === undefined ? {} : { settleTx: publicReference }) }
+          return { ...r.listing, seller: r.seller, payTested, delisted: r.delisted === true,
+            ...(ensName === undefined ? {} : { ensName }) }
         }))
       }
 

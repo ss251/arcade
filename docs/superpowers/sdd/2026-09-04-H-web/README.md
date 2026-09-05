@@ -7,8 +7,11 @@ their full gate passed. H4's bounded read-only web client and pure formatters ar
 committed as `d1f89f6` after their full test/type/web-build gate passed; this is not
 live hub or browser evidence. H5's `/chat` move, native-anchor navigation and `/`
 shell are implemented and source-reviewed with author-run isolated browser checks;
-the separate H5 full test/type/client-and-SSR-build gate passed. Seller, buyer and
-publish pages are future work.
+the separate H5 full test/type/client-and-SSR-build gate passed. H6 fills that shell
+with the read-only marketplace and additive safe catalogue pay-test projection;
+its separate full test/type/client-and-SSR-build gate passed. Final publication
+review and the atomic H6 commit remain parent-owned. Listing-detail (Task 8),
+buyer, seller and publish pages remain future work.
 The full F shared-file dependency remains held, with the explicit H1-before-G8
 stats handoff preserved. No H merge or production deployment is claimed here.
 
@@ -37,6 +40,11 @@ stats handoff preserved. No H merge or production deployment is claimed here.
 - [Task 5 brief and review boundary](task-5-brief.md)
 - [Task 5 historical author report](task-5-report.md)
 - [Task 5 parent review and full gate](task-5-parent-review.md)
+- [Task 6 brief and evidence boundaries](task-6-brief.md)
+- [Task 6 historical web author report](task-6-web-report.md)
+- [Task 6 historical root hub report](task-6-hub-report.md)
+- [Task 6 independent hub review](task-6-hub-review.md)
+- [Task 6 parent review and final gates](task-6-parent-review.md)
 
 Only reviewed execution records are published. Private research, owner handoffs,
 runtime state and keys remain excluded. Original reports retain their dated
