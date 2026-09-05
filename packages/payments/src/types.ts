@@ -96,11 +96,14 @@ export interface VerifiedPayment {
   readonly requirements: PaymentRequirements
 }
 
-/** Result of settling. `txHash` is what lands on the receipt and in the explorer link. */
+/** Result of settlement acceptance. `txHash` is a rail-specific reference, not always a mined transaction. */
 export interface SettledPayment {
   readonly txHash: string
   readonly payer: string
   readonly amountAtomic: bigint
+  /** Gateway UUIDs are accepted transfers, not mined batches or withdrawable credit.
+   * A future gateway-batch reference remains unverified; onchain requires actual chain evidence. */
+  readonly settlementKind?: "onchain" | "gateway-transfer" | "gateway-batch"
 }
 
 export const ARC_DEFAULTS = {

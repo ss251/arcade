@@ -241,22 +241,27 @@ describe("settle(verified, tree) — the arg is accepted by every rail", () => {
     const req = await Effect.runPromise(
       rail.challenge({ priceAtomic: PRICE, resource: "/x/ss251/demo", payTo: SELLER })
     )
-    const payload = await makePayload(undefined, req)
-    const verified: VerifiedPayment = {
-      payer: buyer.address,
-      payTo: SELLER,
-      amountAtomic: PRICE,
-      network: ARC_CAIP2,
-      payload,
-      requirements: req
-    }
+    const now = BigInt(Math.floor(Date.now() / 1000))
+    const authorization = { from: buyer.address, to: SELLER, value: PRICE.toString(),
+      validAfter: String(now - 600n), validBefore: String(now + 604900n), nonce: `0x${"ab".repeat(32)}` }
+    const { TRANSFER_TYPES } = await import("../src/eip3009.ts")
+    const signature = await buyer.signTypedData({
+      domain: { name: "GatewayWalletBatched", version: "1", chainId: chain.chainId,
+        verifyingContract: chain.gateway!.wallet }, types: TRANSFER_TYPES, primaryType: "TransferWithAuthorization",
+      message: { from: authorization.from as `0x${string}`, to: authorization.to as `0x${string}`,
+        value: BigInt(authorization.value), validAfter: BigInt(authorization.validAfter),
+        validBefore: BigInt(authorization.validBefore), nonce: authorization.nonce as `0x${string}` }
+    })
+    const payload = PaymentPayload.make({ x402Version: 2, accepted: req, payload: { authorization, signature } })
+    const transferId = "8f2c1f4e-0a11-4a3d-9f1e-2b6c7d8e9f00"
 
     const originalFetch = globalThis.fetch
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input)
+      if (url.endsWith("/v1/x402/verify")) return Response.json({ isValid: true, payer: buyer.address })
       if (url.endsWith("/v1/x402/settle")) {
         return new Response(
-          JSON.stringify({ success: true, transaction: "0xgatewaysettletx", payer: buyer.address }),
+          JSON.stringify({ success: true, transaction: transferId, payer: buyer.address, network: chain.caip2 }),
           { status: 200, headers: { "content-type": "application/json" } }
         )
       }
@@ -264,8 +269,10 @@ describe("settle(verified, tree) — the arg is accepted by every rail", () => {
     }) as typeof fetch
 
     try {
+      const verified = await Effect.runPromise(rail.verify(payload, req))
       const settled = await Effect.runPromise(rail.settle(verified, A_TREE))
-      expect(settled.txHash).toBe("0xgatewaysettletx")
+      expect(settled.txHash).toBe(transferId)
+      expect(settled.settlementKind).toBe("gateway-transfer")
     } finally {
       globalThis.fetch = originalFetch
     }

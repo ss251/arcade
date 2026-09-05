@@ -101,3 +101,43 @@ Only F2's exact source/test/public-artifact paths are selected for its commit.
 No source changed during the gate, no live action was repeated, and nothing was
 pushed. The Vitest summary count was not retained in the bounded output, so no
 unverified total is supplied for that phase.
+
+F2 was committed separately as `02b6921`, with only its fifteen exact source,
+test and public-artifact files. Independent public review also resolved all 32
+then-current local links and found the historical copies byte-exact and private
+material excluded. No F3/F4 source was included and no GitHub push occurred.
+
+## September 5 — F3 public preparation and parent review
+
+F3 source/tests are frozen and parent source review is CLEAN within the
+process-local Gateway rail scope. See the [brief](task-3-brief.md), [worker
+report](task-3-report.md) and [parent independent review](task-3-parent-review.md).
+Both report bodies retain their original checkpoints after the standard banner;
+the parent read the complete brief and verified both copies byte-exact. The
+public preparer checked 31 local links and a clean scoped privacy scan.
+
+Worker focused verification passed 58 Vitest tests, six Bun HTTP cases / 20
+assertions and exact-root-options strict TypeScript. Parent independently passed
+54 rail/conformance tests, then the correct four-test chain file, plus six Bun
+cases / 20 assertions and exact strict TypeScript. Its initially named nonexistent
+test file is documented, not counted. F3's own full repository gate is next.
+
+The two-field body follows full local signature/domain/requirements binding.
+Frozen original-handle provenance and a bounded process-local nonce map refuse
+duplicate dispatch. Post-dispatch uncertainty never permits automatic retry.
+Durable money holds across crashes and unknown outcomes remain F5–8 work, not
+an F3 accomplishment. Gateway emits transfer UUIDs only, never inferred mined
+transaction or batch proof. Reports preserve failed legacy socket observations
+and the later native abort/drain evidence; local cancellation cannot undo payment.
+F1's approval remains consumed, with no new live allowance or F13 claim.
+
+### F3 full repository gate
+
+F3's own subsequent complete gate passed 2,278 Vitest cases / 112 files and
+331 Bun cases / 3,601 assertions / 31 files, then strict root and web TypeScript;
+final exit zero. This gate included the frozen F4 work and the two preserved
+private F2 Bun regressions; only the six F3 source/test paths and five associated
+public-record/index paths belong to this commit. Source/tests stayed unchanged,
+no live operation was repeated, and no push occurred. The parent rechecked the
+complete public brief and the two exact historical report copies before selecting
+the task's atomic commit.
