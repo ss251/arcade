@@ -1,0 +1,10 @@
+> Sanitized historical execution artifact. Statements reflect their recorded checkpoint and may be superseded. Historical commands are not current instructions. See the [current runbook](../../../runbook.md) for current behavior, approvals and operator commands. Personal/runtime locations and private artifact links may be redacted; public evidence and test distinctions are preserved.
+
+# Task 11 report
+
+- Commit: `622ea1c feat(skills): publish the public Arc Docs MCP server as two paid listings`.
+- CLI generated search-arc-docs and query-docs-filesystem-arc-docs directly from current public Arc Docs MCP discovery with price$0.02. Neither file was hand-edited. Both exactly equal generator outputs from the earlier captured tool metadata fixture.
+- TDD: five new assertions failed on absent listings at03:11:42 while four existing skill cases and explicit no-write-tool case passed. Live CLI generation then resolved those failures. One extra assertion incorrectly banned the raw tool name from public display text; corrected to distinguish intended public serviceName fallback (query tool has no title) from private engine/tool/url fields. Plan itself explicitly defines that fallback and only checks raw-string absence for the titled search tool.
+- Both listings select exactly one HTTPS tool, credential none, no secrets, hostname egress docs.arc.io. Input schemas are copied metadata, output is adapter text projection. Public projection excludes engine, URL, tool binding, credential, secrets and egress fields. No submit-feedback listing or directory exists.
+- Live command: `bun run arcade publish mcp://docs.arc.io/mcp --price '$0.02' --yes --out skills`. Three tools found, two selected, feedback skipped; exactly two arcade.json files written. Only discovery metadata was requested; no tools/call or feedback submission.
+- Verification: ten demo tests (six new), full987 Vitest +29 Bun, bunx tsc --noEmit and git diff --check pass. Root reviewed both generated files and independent test author confirmed schema/privacy behavior. No payments, web/contracts changes or push.
