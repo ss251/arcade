@@ -1,5 +1,5 @@
 import { Data, Effect, Schedule } from "effect"
-import { createPublicClient, createWalletClient, http, isAddress, parseEventLogs, zeroAddress, type Log } from "viem"
+import { createPublicClient, createWalletClient, formatUnits, http, isAddress, parseEventLogs, zeroAddress, type Log } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import { IDENTITY_REGISTRY_ABI, loadChainConfig, RECEIPT_POLL_INTERVAL_MS, toViemChain } from "@arcade/core"
 
@@ -260,3 +260,62 @@ export const makeViemIdentityClient = (a: { privateKey: string; rpcUrl?: string 
     }
   }
 }
+
+export interface HubErc8004 {
+  readonly armed: boolean
+  readonly registries?: { identity: string; reputation: string; validation: string }
+  readonly operator?: string
+  readonly validator?: string
+  readonly attester?: string
+  readonly caip2?: string
+}
+
+/** Only own data fields from a JSON document count; prototype/getter claims do not. */
+const ownValue = (value: object, name: string): unknown => Object.getOwnPropertyDescriptor(value, name)?.value
+
+export const hubErc8004Refusal = (h: unknown, hubUrl: string): string | undefined => {
+  let label = "The configured hub"
+  try { label = new URL(hubUrl).origin } catch { /* Never echo an invalid URL or credentials. */ }
+  try {
+    if (h === null || typeof h !== "object" || Array.isArray(h) || typeof ownValue(h, "armed") !== "boolean") {
+      return `${label} did not answer with an ERC-8004 document.`
+    }
+    if (ownValue(h, "armed") !== true) return `${label} reports ERC-8004 unarmed. Nothing has been registered or approved.`
+    const roles = ["operator", "validator", "attester"] as const
+    const addresses: string[] = []
+    for (const role of roles) {
+      const address = ownValue(h, role)
+      if (!addressOk(address)) return `${label} named no valid nonzero ERC-8004 ${role} address.`
+      addresses.push(address.toLowerCase())
+    }
+    if (new Set(addresses).size !== roles.length) return `${label} must use distinct operator, validator, and attester addresses.`
+    const config = loadChainConfig()
+    if (config.id !== "arc-testnet" || config.status !== "ready" || config.erc8004 === undefined) {
+      return "ERC-8004 registration requires ready Arc testnet configuration; mainnet/pending networks are disabled."
+    }
+    if (ownValue(h, "caip2") !== config.caip2) return `${label} reported a different ERC-8004 chain/network.`
+    if (Object.hasOwn(h, "chainId") && (!Number.isSafeInteger(ownValue(h, "chainId")) || ownValue(h, "chainId") !== config.chainId)) {
+      return `${label} reported an invalid or contradictory numeric ERC-8004 chain id.`
+    }
+    const registries = ownValue(h, "registries")
+    if (registries === null || typeof registries !== "object" || Array.isArray(registries)) return `${label} named no ERC-8004 registries.`
+    for (const registry of ["identity", "reputation", "validation"] as const) {
+      const address = ownValue(registries, registry)
+      if (!addressOk(address) || !sameAddress(address, config.erc8004[registry])) {
+        return `${label} does not use the pinned Arc testnet ${registry} registry.`
+      }
+    }
+    return undefined
+  } catch { return "Could not validate the hub's ERC-8004 document against the selected chain configuration." }
+}
+
+export const skillRefusal = (skillId: string, known: ReadonlyArray<string>): string | undefined =>
+  known.includes(skillId) ? undefined :
+    `No skill "${skillId.replace(/[\x00-\x1f\x7f]/g, "?").slice(0, 128)}" on this machine.\nAvailable: ${known.length ? known.join(", ") : "(none — check --skills)"}`
+
+export const unfundedMessage = (e: UnfundedSeller, faucet: string): string =>
+  `${e.address} is below the registration gas preflight threshold.\n` +
+  `  balance    ${formatUnits(e.balanceWei, 18)} USDC\n` +
+  `  threshold  ${formatUnits(MIN_GAS_WEI, 18)} USDC (a preflight threshold, not a guarantee of total transaction cost)\n` +
+  `Gas on Arc is USDC, the same token as earnings, measured here in 18-decimal native units.\n` +
+  `If needed, fund this seller with testnet USDC: ${faucet}\nNothing was broadcast by this attempt.`

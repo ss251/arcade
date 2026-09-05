@@ -25,6 +25,7 @@ import {
   resolveSellerKey
 } from "./wallet.ts"
 import { checkHub, fetchBalanceAtomic, planIdentity } from "./onboard.ts"
+import { runIdentityCommand } from "./identity-cli.ts"
 import { mkdir, readFile } from "node:fs/promises"
 import { dirname, basename, resolve } from "node:path"
 import {
@@ -93,6 +94,11 @@ const usage = () => {
     --force              overwrite existing generated files
     --json               directory preview as one JSON object, without prose
     Put all arcade options before --; arguments after it belong to the server.
+
+  arcade identity status                          recorded agents and pending registration (offline)
+  arcade identity register <skill>                 mint/resume this skill's ERC-8004 identity
+       --approve-operator ADDRESS                 REQUIRED: consent to the hub operator's full
+       [--skills DIR]                             ERC-721 transfer authority over all your identities
 
   arcade wallet import 0x<key>                     store an existing payout key in the keychain
   arcade wallet export                             print the payout key, to back it up
@@ -747,6 +753,15 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
         2
       )
     )
+    return
+  }
+
+  if (cmd === "identity") {
+    const result = yield* Effect.either(runIdentityCommand(rawArgs.slice(1), { skillsDirDefault, faucet: FAUCET }))
+    if (result._tag === "Left") {
+      console.error(result.left.message)
+      process.exitCode = result.left.exitCode
+    }
     return
   }
 
