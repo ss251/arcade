@@ -12,22 +12,38 @@ settles the useful work. The root costs $0.30 and permits $0.25 of descendant pu
 The root receipt lists all descendants; individual child receipts carry their hop and
 ancestor skill ids. The refused cycle creates no job or payment.
 
-With the hub and runner already running on Arc testnet and the three listings published:
+The current harness starts its own loopback hub, private SQLite database and isolated
+three-skill runner (`maxConcurrency=3`). It never edits saved runner configuration or
+uses an existing hub. After direct approval for the three testnet purchases and gas:
 
 ```bash
-ARCADE_BUYER_KEY=$(security find-generic-password -s arcade-buyer-key -w) \
-  bash scripts/e2e-lineage.sh
+ARCADE_BUYER_KEY="$(security find-generic-password -s arcade-buyer-key -w)" \
+ARCADE_SUBBUY_KEY="$(security find-generic-password -s arcade-subbuy-key -w)" \
+ARCADE_SELLER_KEY="$(security find-generic-password -s arcade-deployer-key -w)" \
+ARCADE_FACILITATOR_KEY="$(security find-generic-password -s arcade-deployer-key -w)" \
+ARCADE_FEE_SPLITTER=0x9e304ec13dd862c81ee8caa8fd262dac426fbedf \
+ARCADE_NETWORK=arc-testnet bash scripts/e2e-lineage.sh
 ```
 
-Set `ARCADE_HUB` to select the running hub. The runner needs a funded `ARCADE_SUBBUY_KEY`
-distinct from its payout key. The script buys with a $0.35 ceiling, waits for the private
-result through the buyer CLI, then verifies the public receipt tree using settlement
-transaction hashes. It exits nonzero for a missing cycle refusal, unsuccessful output,
-unsettled work, a stale receipt, or descendants that do not belong to this purchase.
+Supply the existing distinct buyer/subbuyer keys; these public roles and the seller's
+splitter are checked before purchase. Overrides for an existing hub, other input, rail,
+network or payment RPC are refused. Canonical unsigned challenges must route the exact
+$0.30/$0.05/$0.01 amounts through this V2 splitter. The buyer launches once with a $0.35
+ceiling: total buyer/subbuyer expenditure is $0.36 plus facilitator gas. No funding or
+uncertain-send retries occur. Canonical flow reads use Arc's alternate public RPC;
+payments and independent proof use `https://rpc.testnet.arc.io`.
 
-Live lineage evidence is pending as of 2026-09-05: the distinct funded sub-buy key is an
-owner prerequisite. The unit and script checks do not count as live settlement evidence;
-append the verified root and descendant transaction hashes here after the live run.
+The harness stops its spending-capable processes before checking three actual receipts,
+two committed reservations, exact payer deltas, a root-only `SettledTree`, two ordinary
+child `Settled` events, their USDC transfers, nonces and rebuilt tree hash. A passive
+observer must also capture the actual unsigned HTTP402 `lineage_cycle` refusal, with no
+fourth job or payment. PASS requires successful cleanup. Private checkpoints are retained;
+reconcile them and the chain before any manual rerun after uncertainty.
+
+Live evidence remains pending as of 2026-09-05. The distinct sub-buy wallet has been
+owner-provisioned, but direct execution approval is still required. The real local
+three-hop regression uses simulated payment/RPC and does not count as live evidence;
+append independently verified root/descendant transaction hashes only after a live run.
 
 ## Plan B — Evidence: publish adapters
 
