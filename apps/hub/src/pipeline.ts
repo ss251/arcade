@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import {
   DEFAULT_FEE_BPS,
   Job,
@@ -17,6 +17,7 @@ import { BrokerTag } from "./broker.ts"
 import { ceilingAtomicFor } from "./lineage.ts"
 import { StoreTag } from "./store.ts"
 import { validateOutput } from "./validate.ts"
+import { AttestTag } from "./attest.ts"
 
 /**
  * THE PIPELINE: verify → execute → validate → settle.
@@ -42,6 +43,14 @@ export interface RunJobArgs {
   readonly hireCapability?: string
   /** Set by the server from the verified payer, never from buyer input or seller output. */
   readonly canary?: boolean
+  /** Optional public registry context. It never participates in a settlement decision. */
+  readonly attest?: {
+    readonly agentId?: string | undefined
+    readonly payTo: string
+    readonly origin: string
+    readonly chainId: number
+    readonly identityRegistry: string
+  } | undefined
 }
 
 export const runJob = (args: RunJobArgs) => {
@@ -137,6 +146,23 @@ export const runJob = (args: RunJobArgs) => {
           authorizationNonce: args.verified.payload.payload.authorization.nonce
         })
         yield* store.putReceipt(receipt)
+        const context = args.attest
+        if (context !== undefined && rail.name !== "test") {
+          const attest = yield* Effect.serviceOption(AttestTag)
+          if (Option.isSome(attest)) {
+            // Downstream of durable receipt storage. Suspend also catches a service
+            // which throws BEFORE returning an Effect; bound even a broken queue's
+            // enqueue operation. No RPC write is awaited by the real queue here.
+            yield* Effect.suspend(() => attest.value.onTerminal({
+              jobId: args.jobId, agentId: context.agentId, skillId: args.listing.id,
+              skillVersion: args.listing.version, seller: args.seller, buyer: args.verified.payer,
+              payTo: context.payTo, origin: context.origin, input: args.input, output: outcome.output,
+              outputSchema: args.listing.outputSchema, status: outcome.status, stopReason: outcome.stopReason,
+              settled, reason, priceAtomic, ...(settleTx === undefined ? {} : { settleTx }),
+              createdAtMs: receipt.createdAtMs, chainId: context.chainId, identityRegistry: context.identityRegistry
+            })).pipe(Effect.timeoutOption("50 millis"), Effect.asVoid, Effect.catchAllCause(() => Effect.void))
+          }
+        }
         return { outcome, receipt }
       })
 

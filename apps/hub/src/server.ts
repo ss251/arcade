@@ -39,6 +39,7 @@ import { StoreTag } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
 import { Erc8004FromEnv, Erc8004Tag, verifyAgentClaims } from "./erc8004.ts"
 import { agentRegistrationFor } from "./agent-registration.ts"
+import { AttestLive, AttestTag } from "./attest.ts"
 import { runJob } from "./pipeline.ts"
 import { inputGate } from "./input-gate.ts"
 import { payTestSkipReason } from "./canary-input.ts"
@@ -269,7 +270,9 @@ if (RAIL !== "test" && process.env["ARCADE_CHAIN_CHECK"] !== "0") {
   }
 }
 
-const AppLive = Layer.mergeAll(StoreFromEnv(), BrokerLive, railLayer(), Erc8004FromEnv(chainConfig.erc8004))
+const Erc8004Layer = Erc8004FromEnv(chainConfig.erc8004)
+const AppLive = Layer.mergeAll(StoreFromEnv(), BrokerLive, railLayer(), Erc8004Layer,
+  AttestLive.pipe(Layer.provide(Erc8004Layer)))
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2), {
@@ -361,7 +364,7 @@ const splitterFacts = async (address: string): Promise<SplitterFacts | undefined
 }
 
 const main = Effect.gen(function* () {
-  const runtime = yield* Effect.runtime<StoreTag | BrokerTag | RailTag | Erc8004Tag>()
+  const runtime = yield* Effect.runtime<StoreTag | BrokerTag | RailTag | Erc8004Tag | AttestTag>()
   const run = Runtime.runPromise(runtime)
   const store = yield* StoreTag
   const broker = yield* BrokerTag
@@ -1125,6 +1128,13 @@ const main = Effect.gen(function* () {
             feeBps: FEE_BPS,
             accrualId,
             lineage,
+            // Only ownership-verified, real-rail jobs may become registry evidence.
+            // The asynchronous worker rechecks current ownership before broadcasting.
+            ...(rail.name === "test" || !erc8004.armed || found.right.agentVerified !== true ||
+                found.right.agentId === undefined || chainConfig.erc8004 === undefined ? {} : {
+              attest: { agentId: found.right.agentId, payTo: found.right.feeSplitter ?? seller,
+                origin: publicOrigin(url), chainId: chainConfig.chainId, identityRegistry: chainConfig.erc8004.identity }
+            }),
             ...(isCanary ? { canary: true } : {}),
             ...(hireCapability === undefined ? {} : { hireCapability })
           }).pipe(
