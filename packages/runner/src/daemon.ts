@@ -7,8 +7,12 @@ import {
   SkillManifest,
   decodeHubMessage,
   helloDigest,
+  decodeEnsState,
+  parsePrice,
+  type EnsState,
   toPublicListing
 } from "@arcade/core"
+import { ensStatePath, readEnsState } from "./ens-state.ts"
 import { execSkill } from "./exec.ts"
 import { loadSkills } from "./skills.ts"
 import { dispatchMap, gate } from "./publishable.ts"
@@ -16,6 +20,8 @@ import { privateKeyToAccount } from "viem/accounts"
 import { resolveSellerKey } from "./wallet.ts"
 import { startHireBroker } from "./hire-broker.ts"
 import type { RunnerConfig } from "./config.ts"
+import { makeEnsLiveness, viemEnsWriter, type EnsWriter } from "./ens.ts"
+import { ensJournalPath } from "./ens-journal.ts"
 
 /**
  * Seller daemon.
@@ -29,6 +35,47 @@ import type { RunnerConfig } from "./config.ts"
 export interface DaemonArgs {
   readonly config: RunnerConfig
   readonly skillsDir: string
+  /** Public IO seam for offline lifecycle tests; ordinary callers use ensTickerFor. */
+  readonly ensTickerFactory?: typeof ensTickerFor
+}
+
+export interface EnsTicker { readonly tick: () => Promise<void>; readonly stop: () => void }
+/** Missing state is normal. Malformed state is an explicit fixed diagnostic, not
+ * evidence of expiry. No private key is inspected until a served namespace exists. */
+export const ensTickerFor = async (a: {
+  readonly skills: ReadonlyArray<{ readonly manifest: { readonly id: string; readonly price: string } }>
+  readonly log?: (line: string) => void
+  readonly env?: Readonly<Record<string, string | undefined>>
+  readonly expectedSeller?: string
+  readonly isActive?: () => boolean
+  readonly readState?: () => Promise<EnsState | undefined>
+  readonly writerFor?: (key: string, state: EnsState) => EnsWriter
+}): Promise<EnsTicker | undefined> => {
+  const log = (line: string) => { try { (a.log ?? console.log)(line) } catch {} }
+  const env = a.env ?? process.env
+  let state: EnsState
+  try {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let raw: EnsState | undefined
+    try { raw = await Promise.race([Promise.resolve().then(a.readState ?? (() => readEnsState(ensStatePath(env)))), new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(Error()), 2000) })]) }
+    finally { if (timer !== undefined) clearTimeout(timer) }
+    if (raw === undefined) return undefined
+    state = decodeEnsState(raw)
+  } catch { log("[ens] Namespace state is unavailable or invalid; no ENS writes are enabled. No expiry was inferred."); return undefined }
+  const served = new Map(a.skills.map(s => [s.manifest.id, s.manifest.price]))
+  if (!state.skills.some(s => served.has(s.skillId))) return undefined
+  try {
+    if (a.expectedSeller !== undefined && state.seller !== a.expectedSeller.toLowerCase()) throw Error()
+    if (env.ARCADE_ENS_ROOT !== undefined && env.ARCADE_ENS_ROOT !== state.root) throw Error()
+    const key = env.ARCADE_ENS_DAEMON_KEY
+    if (key === undefined || key === "") { log("[ens] ARCADE_ENS_DAEMON_KEY is not set; this runner will not renew names. Exact expiry must be checked on Sepolia."); return undefined }
+    if (!/^0x[0-9a-fA-F]{64}$/.test(key)) throw Error()
+    const signer = privateKeyToAccount(key as `0x${string}`).address.toLowerCase()
+    if (signer === state.seller || signer === state.owner || state.daemon !== undefined && signer !== state.daemon) throw Error()
+    const prices = new Map([...served].map(([id, price]) => [id, parsePrice(price)]))
+    const writer = a.writerFor ? a.writerFor(key, state) : viemEnsWriter(key, env.ARCADE_ENS_RPC, { state, journalPath: ensJournalPath(env), ...(a.isActive === undefined ? {} : { isActive: a.isActive }) })
+    return makeEnsLiveness({ state, writer, priceAtomicFor: id => prices.get(id), log, ...(a.isActive === undefined ? {} : { isActive: a.isActive }) })
+  } catch { log("[ens] Scoped daemon identity or namespace configuration is invalid; no ENS writes are enabled."); return undefined }
 }
 
 /** Only identities for currently serving listings, never the rest of local config. */
@@ -125,11 +172,34 @@ export const startDaemon = (args: DaemonArgs) =>
       let activeJobs = 0
       let heartbeat: ReturnType<typeof setInterval> | undefined
       let closed = false
+      let connected = false
+      let socket: WebSocket | undefined
+      let reconnect: ReturnType<typeof setTimeout> | undefined
+      let ensTimer: ReturnType<typeof setInterval> | undefined
+      let ensTicker: EnsTicker | undefined
+      const active = () => connected && !closed
+      const runEns = () => { if (active()) void Promise.resolve().then(() => ensTicker?.tick()).catch(() => {}) }
+      const startEns = () => {
+        if (!active() || !ensTicker || ensTimer !== undefined) return
+        runEns(); ensTimer = setInterval(runEns, HEARTBEAT_INTERVAL_MS)
+      }
+      // One lifetime ticker retains the renewal throttle across websocket reconnects.
+      // Optional setup and every tick remain outside the job/settlement effect.
+      void Promise.resolve().then(() => (args.ensTickerFactory ?? ensTickerFor)({ skills: gated.sellable, expectedSeller: args.config.sellerAddress, isActive: active })).then(ticker => {
+        if (closed) { ticker?.stop(); return }
+        ensTicker = ticker; startEns()
+      }).catch(() => { console.error("[ens] Optional ticker initialization failed; ordinary serving remains available.") })
 
       const connect = () => {
+        if (closed) return
+        reconnect = undefined
         const ws = new WebSocket(args.config.hubWsUrl)
+        socket = ws
 
         ws.addEventListener("open", () => {
+          if (closed || socket !== ws) { ws.close(); return }
+          connected = true
+          startEns()
           console.log(`[runner] connected to ${args.config.hubWsUrl}`)
           void (async () => {
             // Prove control of the payout address. The hub cannot take `seller` on trust:
@@ -151,6 +221,8 @@ export const startDaemon = (args: DaemonArgs) =>
             const signature = await sellerAccount.signMessage({ message: digest })
             const agents = agentAnnouncementsFor(args.config.agents, listings)
 
+            if (closed || socket !== ws || ws.readyState !== WebSocket.OPEN) return
+
             ws.send(
               JSON.stringify({
                 _tag: "Hello",
@@ -166,7 +238,7 @@ export const startDaemon = (args: DaemonArgs) =>
                 signature
               })
             )
-          })()
+          })().catch(() => { if (!closed && socket === ws) ws.close() })
           heartbeat = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(
@@ -182,6 +254,7 @@ export const startDaemon = (args: DaemonArgs) =>
         })
 
         ws.addEventListener("message", (ev) => {
+          if (closed || socket !== ws) return
           void Effect.runPromise(
             Effect.gen(function* () {
               const msg = yield* decodeHubMessage(JSON.parse(String(ev.data)))
@@ -275,11 +348,16 @@ export const startDaemon = (args: DaemonArgs) =>
         })
 
         ws.addEventListener("close", () => {
+          if (socket !== ws) return
+          connected = false
           if (heartbeat !== undefined) clearInterval(heartbeat)
+          heartbeat = undefined
+          if (ensTimer !== undefined) clearInterval(ensTimer)
+          ensTimer = undefined
           if (closed) return
           // Exponential-ish reconnect: a laptop seller sleeps, loses wifi, moves network.
           console.log("[runner] disconnected — reconnecting in 3s")
-          setTimeout(connect, 3000)
+          reconnect = setTimeout(connect, 3000)
         })
 
         ws.addEventListener("error", () => {
@@ -291,7 +369,13 @@ export const startDaemon = (args: DaemonArgs) =>
 
       return Effect.sync(() => {
         closed = true
+        connected = false
         if (heartbeat !== undefined) clearInterval(heartbeat)
+        if (ensTimer !== undefined) clearInterval(ensTimer)
+        if (reconnect !== undefined) clearTimeout(reconnect)
+        ensTicker?.stop()
+        socket?.close()
+        broker?.stop()
         resume(Effect.void as never)
       })
     })
