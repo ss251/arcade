@@ -3,7 +3,7 @@ import {createPublicClient,http,keccak256,parseAbi,stringToHex,type Hex} from "v
 import {privateKeyToAccount} from "viem/accounts"
 import {sepolia} from "viem/chains"
 import {arcadeSellerName,decodeEnsState,ensDeploymentReader,ETH_REGISTRAR_ABI,PERMISSIONED_REGISTRY_ABI,labelId,resolveEnsDeployment,type EnsDeployment,type EnsState} from "@arcade/core"
-import {ensStatePath,readEnsState,writeEnsState} from "@arcade/core/ens-state"
+import {ensStatePath,readEnsState,writeEnsState} from "../packages/runner/src/ens-state.ts"
 import {deployUserRegistry,deployResolver,registerParent,wireParent,registerSeller,type SetupArgs} from "./ens-setup.ts"
 import {openSetupSession,type SetupSession} from "./ens-setup-driver.ts"
 import {prepareSkillRecords,publicSetupJson,registerSkills,type EnsSkillPlan} from "./ens-setup-skills.ts"

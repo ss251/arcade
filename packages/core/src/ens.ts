@@ -286,7 +286,7 @@ export const skillTextRecords = (a:SkillRecordInput):ReadonlyArray<{readonly key
 }
 
 export interface EnsSkillState { readonly skillId:string;readonly label:string;readonly name:string;readonly priceAtomic:string }
-/** Public namespace state only. Runtime file IO is exported from @arcade/core/ens-state,
+/** Public namespace state only. Runtime file IO lives in packages/runner/src/ens-state.ts,
  * never this browser-safe root module. Optional owner/daemon pin new setup provenance. */
 export interface EnsState {
   readonly root:string;readonly sellerLabel:string;readonly seller:string;readonly deploymentSet:string

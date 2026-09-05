@@ -1,7 +1,7 @@
 import { describe,expect,it } from "bun:test"
 import { mkdtemp,readFile,stat,writeFile,symlink,rm } from "node:fs/promises"
 import { join } from "node:path"
-import { loadEnsDeployments } from "../src/ens.ts"
+import { loadEnsDeployments } from "@arcade/core"
 import { ensStatePath,readEnsState,writeEnsState } from "../src/ens-state.ts"
 
 const state=()=>({root:"arcade.eth",sellerLabel:"seller",seller:`0x${"11".repeat(20)}`,deploymentSet:"A",universalResolver:loadEnsDeployments()[0]!.universalResolver,sellerRegistry:`0x${"33".repeat(20)}`,skillRegistry:`0x${"44".repeat(20)}`,resolver:`0x${"55".repeat(20)}`,ttlSeconds:3600,skills:[{skillId:"flow",label:"flow",name:"flow.seller.arcade.eth",priceAtomic:"50000"}]})

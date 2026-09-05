@@ -1,8 +1,8 @@
-/** Server/Bun-only IO entry point. Deliberately not re-exported by the browser-safe core. */
+/** Server/Bun-only runtime state IO. Core contains only pure state validation. */
 import { constants } from "node:fs"
 import { mkdir,open,rename,rmdir,unlink } from "node:fs/promises"
 import { dirname,isAbsolute,normalize,basename } from "node:path"
-import { decodeEnsState,type EnsState } from "./ens.ts"
+import { decodeEnsState,type EnsState } from "@arcade/core"
 
 const LIMIT=262144
 const failed=()=>new Error("ENS state unavailable or unsafe; inspect configuration and retained files before retrying")
