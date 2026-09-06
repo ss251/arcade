@@ -1,5 +1,6 @@
 import { DEFAULT_MODEL, parseModel, SUPPORTED_PROVIDERS } from "./lib/model.ts"
 import { SPENDING_TOOLS } from "./lib/tools.ts"
+import { publishOnPlatform } from "./lib/publish-policy.ts"
 
 /**
  * Refuse to serve the chat against a hub that isn't there.
@@ -57,9 +58,11 @@ export const preflightWeb = (
     (k) => k.startsWith("RAILWAY_") || k.startsWith("FLY_") || k.startsWith("RENDER_")
   )
   const hub = env["ARCADE_HUB"] ?? DEFAULT_HUB
-  if (!onPlatform) return { onPlatform, problems: [], hub }
-
   const problems: Array<string> = []
+  if (env["ARCADE_PUBLISH_LOCAL"] === "1" && publishOnPlatform(env)) {
+    problems.push("ARCADE_PUBLISH_LOCAL must be disabled on hosted deployments; CLI previews belong on an explicitly enabled loopback listener.")
+  }
+  if (!onPlatform) return { onPlatform, problems, hub }
   if (env["ARCADE_HUB"] === undefined || env["ARCADE_HUB"] === "") {
     problems.push(
       `ARCADE_HUB — unset, so this would fall back to ${DEFAULT_HUB}, and nothing listens ` +

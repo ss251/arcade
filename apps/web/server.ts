@@ -15,6 +15,7 @@ import { existsSync, statSync } from "node:fs"
 import { join, normalize } from "node:path"
 import handler from "./dist/server/server.js"
 import { partition, preflightWeb } from "./src/preflight.ts"
+import { localPublishHostname } from "./src/lib/publish-binding.ts"
 
 // Before anything binds. A chat pointed at a hub that isn't there passes every health
 // check there is and fails only at the thing it exists to do, in prose.
@@ -48,8 +49,10 @@ const staticFile = (pathname: string): string | null => {
   return resolved
 }
 
+const hostname = localPublishHostname(process.env)
 Bun.serve({
   port: PORT,
+  ...(hostname === undefined ? {} : { hostname }),
   idleTimeout: 60,
   fetch: async (request) => {
     const { pathname } = new URL(request.url)

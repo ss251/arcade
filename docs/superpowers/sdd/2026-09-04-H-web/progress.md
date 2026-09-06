@@ -1,5 +1,17 @@
 # SDD ledger — Plan H
 
+2026-09-06 19:16 IST: H12b2 sole66574 gate exit0:4111Vitest179/54.21s,
+834Bun54/6091assert/164.40s,rootwebstrict0,client347msSSR161ms. No fullrepeat,
+source change or concurrent job. Final publication audit/atomic commit next,
+then H12b3 route/UI/native proof. H remains unmerged, no keys/spend/push.
+
+2026-09-06 19:12 IST: H12b2 frozen after6bf0831: actual snapshot CLI and owned
+bounded child, fetch endpoint guard, production/Vite loopback binding.40focused/5
+and14exactstrict0; source bytes, snapshot removal, parent/child PID cleanup and
+one real ephemeral Bun socket closure proven. Stub SSR only, not native full UI.
+Thirteen new pins/39H11/6H12b1/H12a historical preservation PASS. One full max4
+sequential dot-reporter gate next; no route/UI, browser, keys, spend or push.
+
 2026-09-06 18:36 IST: H12b1 sole25795 gate exit0:4081Vitest175/52.93s,
 834Bun54/6093assert/163.61s,rootwebstrict0,client355msSSR181ms. No repeat or
 source change. Pure parser/policy only; H12b2 actual binding/runtime follows.

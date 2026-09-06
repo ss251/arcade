@@ -1,5 +1,11 @@
 # Plan H — execution records
 
+Current task: [H12b2 local runtime](task-12b2-brief.md) after6bf0831.
+The [parent report](task-12b2-parent-report.md) records real snapshot CLI/process
+cleanup, actual Vite config and an ephemeral Bun entrypoint socket with stub SSR.
+40 focused checks and14-root strict pass. Sole full gate passed4,111 Vitest/834
+Bun, root/web strict and client/SSR builds. No route/UI enabled; H12b3 follows.
+
 Current task: [H12b1 bounded validation](task-12b1-brief.md) after28ce88a.
 The [parent report](task-12b1-parent-report.md) records63 focused checks, actual
 fresh-import regressions and six-root strict0. These are pure JSON/target/request
