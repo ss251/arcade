@@ -10,13 +10,14 @@ Spec: `../specs/2026-09-04-ethonline-continuity-design.md`. Nine plans, one per 
 | 1 | Sept 5–6 | **A** settlement core + ChainConfig (critical path) | `feat/a-settlement-core` | `main` |
 | 2 | from Sept 7, after A merges | **B** adapters · **C** canary · **D** ERC-8004 · **E** ENS · **G** Graph (skill + Studio smoke) | `feat/b-*`, `feat/c-*`, `feat/d-*`, `feat/e-*`, `feat/g-*` | `main` (post-A) |
 | 3 | from Sept 8 | **F** Gateway sessions · **G** subgraph + hub reads · **H** web | `feat/f-*`, `feat/g-*` (cont.), `feat/h-*` | `main` after **E** lands — H needs C's and D's fields *and* rebases onto E's `apps/web` edits (E Task 13) before its own Task 5 `git mv` of the chat page |
-| 4 | Sept 10–11 | integration merges in the canonical order **A → B → C → D → E → F → G → H → I**, e2e evidence scripts, **I** README/diagram/interop | `main` | — |
+| 4 | Sept 10–11 | integration merges in the canonical order **A → B → C → D → E → F → G → H → J → I**, e2e evidence scripts, **I** README/diagram/interop | `main` | — |
+| 4b | after H merges (added 2026-09-06) | **J** Arc-native settlement: dual-accept 402 + registry-shaped discovery, Circle CLI agent-wallet buyer, Unified Balance delegate funding, ERC-8183 escrow rail (`2026-09-06-J-arc-native.md`, spec `../specs/2026-09-06-arc-native-settlement-design.md`) | `feat/j-arc-native` | `main` after **H** |
 | 5 | Sept 12–13 AM | **I** capture, narration, submission | `main` | — |
 | 6 | Sept 16 | **I** mainnet flip, evidence appended | `main` | — |
 
 ## Merge order for shared files (from the cross-plan review, 2026-09-04)
 
-The canonical order is **A → B → C → D → E → F → G → H → I** — later letters rebase onto
+The canonical order is **A → B → C → D → E → F → G → H → J → I** (J added 2026-09-06; it rebases onto H and lands before I) — later letters rebase onto
 earlier ones — with **two recorded exceptions**, each written into the affected tasks' *Merge
 notes*:
 
