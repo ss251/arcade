@@ -70,6 +70,7 @@ const main = Effect.gen(function* () {
 
   const r = out.receipt as Record<string, string | boolean | null>
   console.log(`\nreceipt`)
+  if (out.authorizedRail !== undefined) console.log(`  authorization rail ${out.authorizedRail} (local choice, not settlement proof)`)
   console.log(`  price        ${r["price"]}`)
   console.log(`  seller share ${r["sellerShare"]}`)
   console.log(`  platform fee ${r["fee"]}`)

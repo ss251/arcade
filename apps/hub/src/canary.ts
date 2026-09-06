@@ -2,6 +2,7 @@ import { Cause, Effect } from "effect"
 import type { Account } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import { formatPrice, parsePrice, type PublicListing } from "@arcade/core"
+import type { Rail } from "@arcade/payments"
 import { callSkill, type SkillResult } from "@arcade/buyer"
 import { StoreTag, payTestKey, type ListingRecord, type PayTestState, type Store } from "./store.ts"
 import { canaryInputFor } from "./canary-input.ts"
@@ -20,6 +21,8 @@ export type BuyResult = { readonly ok: boolean; readonly jobId: string; readonly
 export type BuyFn = (t: CanaryTarget) => Effect.Effect<BuyResult | null>
 
 export interface CanaryConfig {
+  /** Keep the operator's configured default, never auto-upgrade paid health checks. */
+  readonly rail?: "test" | "gateway" | "eip3009"
   readonly hubUrl: string
   readonly account: Account
   readonly intervalMs: number
@@ -33,7 +36,8 @@ const MAX_TIMER_MS = 2_147_483_647
 const UNITS: Record<string, number> = { ms: 1, s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }
 const durationIsSafe = (ms: number): boolean => Number.isSafeInteger(ms) && ms > 0 && ms <= MAX_TIMER_MS
 const configIsSafe = (cfg: Omit<CanaryConfig, "buy">): boolean =>
-  durationIsSafe(cfg.intervalMs) && durationIsSafe(cfg.tickMs) && typeof cfg.maxPriceAtomic === "bigint" && cfg.maxPriceAtomic > 0n
+  durationIsSafe(cfg.intervalMs) && durationIsSafe(cfg.tickMs) && typeof cfg.maxPriceAtomic === "bigint" && cfg.maxPriceAtomic > 0n &&
+  (cfg.rail === undefined || ["test", "gateway", "eip3009"].includes(cfg.rail))
 const timestampIsSafe = (ms: number): boolean => Number.isSafeInteger(ms) && ms >= 0
 
 /** Bare numbers are seconds. Reject zero/overflow rather than let timers become hot loops. */
@@ -100,7 +104,9 @@ const diagnostic = (message: string): Effect.Effect<void> => Effect.sync(() => {
 /** The ordinary buyer SDK performs the real probe, offline signature, retry and polling. */
 export const buyViaCallSkill = (cfg: Omit<CanaryConfig, "buy">): BuyFn => (t) => Effect.gen(function* () {
   if (!configIsSafe(cfg)) return null
+  const preferRail = [cfg.rail === "gateway" ? "gateway" : "eip3009"] as const
   if (t.listing !== undefined) {
+    if (t.listing.rails !== undefined && !t.listing.rails.includes(preferRail[0])) return null
     let amount: bigint
     try { amount = parsePrice(t.listing.price) } catch { return null }
     if (amount > cfg.maxPriceAtomic) return null
@@ -110,7 +116,7 @@ export const buyViaCallSkill = (cfg: Omit<CanaryConfig, "buy">): BuyFn => (t) =>
     if (!durationIsSafe(maxWaitMs)) return null
     const out = yield* callSkill({
       hubUrl: cfg.hubUrl, seller: t.seller, skillId: t.skillId, input: input.value, account: cfg.account,
-      maxAmountAtomic: amount, pollIntervalMs: 1_000, maxWaitMs
+      maxAmountAtomic: amount, pollIntervalMs: 1_000, maxWaitMs, preferRail
     })
     return verdictOf(out)
   }
@@ -118,7 +124,7 @@ export const buyViaCallSkill = (cfg: Omit<CanaryConfig, "buy">): BuyFn => (t) =>
   // A missing runner has no usable schema. Ask the hub and let its actual 404 be evidence.
   const out = yield* callSkill({
     hubUrl: cfg.hubUrl, seller: t.seller, skillId: t.skillId, input: {}, account: cfg.account,
-    maxAmountAtomic: cfg.maxPriceAtomic, pollIntervalMs: 1_000, maxWaitMs: 30_000
+    maxAmountAtomic: cfg.maxPriceAtomic, pollIntervalMs: 1_000, maxWaitMs: 30_000, preferRail
   })
   // A runner can reconnect after the target snapshot. If this ordinary paid call
   // actually settled, preserve its passing evidence instead of inventing an offline failure.
@@ -174,7 +180,9 @@ export const canaryLoop = (cfg: CanaryConfig): Effect.Effect<never, never, Store
 )
 
 /** Opt-in only. Configuration failures reveal the field name, never its contents. */
-export const canaryFromEnv = (hubUrl: string): CanaryConfig | undefined => {
+export const canaryFromEnv = (hubUrl: string, rail: Rail["name"] = "eip3009"): CanaryConfig | undefined => {
+  // No escrow canary lifecycle or automatic new spending policy is enabled.
+  if (rail === "erc8183") return undefined
   const key = process.env["ARCADE_CANARY_KEY"]
   if (key === undefined || key === "") return undefined
   let account: Account
@@ -188,7 +196,7 @@ export const canaryFromEnv = (hubUrl: string): CanaryConfig | undefined => {
   try { maxPriceAtomic = parsePrice(process.env["ARCADE_CANARY_MAX_PRICE"] ?? "$0.25") } catch {
     throw new Error("ARCADE_CANARY_MAX_PRICE must be a valid positive USDC price")
   }
-  const base = { hubUrl, account, intervalMs, tickMs, maxPriceAtomic }
+  const base = { hubUrl, account, intervalMs, tickMs, maxPriceAtomic, rail }
   try { console.log(`[canary] on — buyer ${account.address}, every ${intervalMs}ms per listing, cap ${formatPrice(maxPriceAtomic)}`) } catch { /* best effort */ }
   return { ...base, buy: buyViaCallSkill(base) }
 }

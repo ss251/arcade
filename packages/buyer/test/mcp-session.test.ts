@@ -54,6 +54,14 @@ function fakeSession() {
 }
 
 describe("MCP session lifecycle and local authority", () => {
+  it("cannot override an active session's fixed rail through ordinary call arguments", async () => {
+    const f = fakeSession()
+    expect((await invoke("arcade_open_session", { budgetUsd: "1", rail: "test" })).isError).not.toBe(true)
+    vi.mocked(fetch).mockClear()
+    const out = await invoke("arcade_call_skill", { skillId: "flow", input: {}, rail: "gateway" })
+    expect(out.isError).toBe(true); expect(text(out)).toContain("session_rail_mismatch")
+    expect(f.call).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled()
+  })
   it("opens once, captures the buyer, and routes actual-input quote through the session", async () => {
     const f = fakeSession(), first = await invoke("arcade_open_session", { budgetUsd: "1", rail: "test" })
     expect(first.isError).not.toBe(true); expect(first.structuredContent).toMatchObject({ sessionId: sid, rail: "test" })

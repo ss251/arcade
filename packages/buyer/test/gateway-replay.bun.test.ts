@@ -9,6 +9,8 @@ import { fetchWithPayment } from "../src/fetch-with-payment.ts"
 
 const account = privateKeyToAccount(`0x${"01".repeat(32)}`)
 const endpoint = "https://fixture.invalid/x/seller/fixture", MAX = 1_048_576
+const offlineBalance = (input: RequestInfo | URL): Response | undefined => String(input) === "https://gateway-api-testnet.circle.com/v1/balances"
+  ? Response.json({ token: "USDC", balances: [{ depositor: account.address, domain: 26, balance: "1.000000" }] }) : undefined
 const challenge = (gateway = true) => Response.json({ x402Version: 2, accepts: [{
   scheme: "exact", network: ARC_CAIP2, asset: USDC_ADDRESS,
   payTo: `0x${"2".repeat(40)}`, amount: "1000", resource: endpoint,
@@ -19,6 +21,7 @@ const challenge = (gateway = true) => Response.json({ x402Version: 2, accepts: [
 test("Gateway transport diagnostics never reflect the actual issued authorization", async () => {
   let calls = 0, signature = ""
   const fetcher = Object.assign(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const balance = offlineBalance(_input); if (balance) return balance
     calls++
     const header = new Headers(init?.headers).get("payment-signature")
     if (header === null) return challenge()
@@ -56,6 +59,7 @@ test("native file-backed Blob is eagerly copied before probe and beforeSign muta
     const expectedType = body.type
     expect(body instanceof Blob).toBe(true)
     const fetcher = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const balance = offlineBalance(input); if (balance) return balance
       const request = new Request(input, init)
       // Snapshot native auto-generated headers before consuming Bun's lazy body.
       contentTypes.push(request.headers.get("content-type")); bodies.push(await request.text())
@@ -97,6 +101,7 @@ async function streamCase(mode: "stall" | "abort" | "error" | "growth" | "trunca
   } })
   try {
     const fetcher = Object.assign(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const balance = offlineBalance(_input); if (balance) return balance
       calls++
       if (mode === "chunks") chunks.push((await (init?.body as Blob).arrayBuffer()).byteLength)
       return calls === 1 ? challenge() : Response.json({ ok: true })

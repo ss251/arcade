@@ -36,8 +36,13 @@ async function fixture(mode: "repeat402" | "redirect" | "signer-failure") {
       return mode === "redirect" ? new Response(null, { status: 307, headers: { location: `${foreign.url}untrusted` } }) : Response.json(challenge(req.url), { status: 402 })
     } })
     servers.push(hub); url = `${hub.url}x/seller/fixture`
+    const offlineFetch: typeof fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
+      if (String(input) === "https://gateway-api-testnet.circle.com/v1/balances") return Response.json({ token: "USDC",
+        balances: [{ depositor: account.address, domain: 26, balance: "1.000000" }] })
+      return fetch(input, init)
+    }, { preconnect() { throw Error("No preconnect") } })
     result = await Effect.runPromise(Effect.either(fetchWithPayment(url, { method: "POST", body: "original-input", signal: controller.signal },
-      { account: signer, maxAmountAtomic: 1000n, lineage: "cap.loopback-fixture" })).pipe(Effect.timeout("3 seconds")))
+      { account: signer, fetch: offlineFetch, maxAmountAtomic: 1000n, lineage: "cap.loopback-fixture" })).pipe(Effect.timeout("3 seconds")))
   } finally {
     controller.abort(); clearTimeout(timer)
     await Promise.all(servers.map(server => server.stop(true)))

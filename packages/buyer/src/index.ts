@@ -1,10 +1,12 @@
 import { Effect, Schedule } from "effect"
-import { ARC_CAIP2, USDC_ADDRESS, fenceResult } from "@arcade/core"
+import { ARC_CAIP2, USDC_ADDRESS, fenceResult, type ListingRail } from "@arcade/core"
 import type { Account } from "viem"
 import { RpcFailure } from "@arcade/core"
 
 export * from "./fetch-with-payment.ts"
+export * from "./accept-selection.ts"
 import { fetchWithPayment } from "./fetch-with-payment.ts"
+import { captureRailPreference } from "./accept-selection.ts"
 import { resolveEnsListing, ensRefusal, parseArcadeEndpoint, sepoliaEnsReader, type EnsReader, type EnsListing } from "./ens-policy.ts"
 import type { PaymentRequirements } from "@arcade/payments"
 export * from "./ens-policy.ts"
@@ -22,6 +24,7 @@ interface CallSkillBase {
   readonly input: unknown
   readonly account: Account
   readonly maxAmountAtomic?: bigint
+  readonly preferRail?: readonly ListingRail[]
   readonly lineage?: string
   readonly pollIntervalMs?: number
   readonly maxWaitMs?: number
@@ -45,6 +48,8 @@ export interface SkillResult {
   readonly receipt: Record<string, unknown>
   /** Local signing provenance, never read from hub JSON; not proof of settlement. */
   readonly authorizedAmountAtomic?: bigint
+  /** Local chosen wire authorization rail, not the hub-reported settlement rail. */
+  readonly authorizedRail?: "gateway" | "eip3009"
   /**
    * The result, wrapped so it can be handed to a model without becoming an instruction.
    *
@@ -63,6 +68,8 @@ export interface SkillResult {
 
 export const callSkill = (args: CallSkillArgs) =>
   Effect.gen(function* () {
+    const preference = yield* Effect.try({ try: () => captureRailPreference(args.preferRail),
+      catch: () => new RpcFailure({ method: "402", reason: "Unsupported payment preferences. Nothing was signed." }) })
     const pollInterval = args.pollIntervalMs ?? 1000
     const maxWait = args.maxWaitMs ?? 15 * 60_000
     if(!Number.isSafeInteger(pollInterval)||pollInterval<1||!Number.isSafeInteger(maxWait)||maxWait<1||maxWait>15*60_000||
@@ -101,6 +108,7 @@ export const callSkill = (args: CallSkillArgs) =>
       {
         account: args.account,
         ...(args.maxAmountAtomic === undefined ? {} : { maxAmountAtomic: args.maxAmountAtomic }),
+        preferRail: preference,
         ...(args.lineage === undefined ? {} : { lineage: args.lineage }),
         fetch: doFetch,
         ...(ens === undefined ? {} : { beforeSign: (req:PaymentRequirements):string|null => {
@@ -147,9 +155,9 @@ export const callSkill = (args: CallSkillArgs) =>
         typeof wire.receipt!=="object"||wire.receipt===null||Array.isArray(wire.receipt))return yield* new RpcFailure({method:"poll",reason:"Mismatched or invalid terminal job response; reconcile any signed payment."})
       // Fenced here, at the protocol edge, so every caller gets it whether or not they
       // thought about it.
-      const {authorizedAmountAtomic:_untrustedAmount,...publicWire}=wire
+      const {authorizedAmountAtomic:_untrustedAmount,authorizedRail:_untrustedRail,...publicWire}=wire
       return { ...publicWire, jobId:accepted.job_id,status:wire.status,result:wire.result,receipt:wire.receipt as Record<string,unknown>,fencedResult: fenceResult(wire.result, seller),
-        ...(paid.paid?{authorizedAmountAtomic:paid.amountAtomic}:{}) } satisfies SkillResult
+        ...(paid.paid?{authorizedAmountAtomic:paid.amountAtomic,authorizedRail:paid.authorizedRail}:{}) } satisfies SkillResult
     })
 
     return yield* poll.pipe(

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { Cause, Deferred, Effect, Exit, Fiber, Ref, Schema } from "effect"
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { Bounds, PublicListing } from "@arcade/core"
-import { HEADER_PAYMENT_SIGNATURE, PaymentPayload, decodeHeaderJson, makeTestRail, makeTestState } from "@arcade/payments"
+import { HEADER_PAYMENT_SIGNATURE, PaymentPayload, decodeHeaderJson, makeTestRail, makeTestState, makeGatewayRail } from "@arcade/payments"
 import { StoreLive, StoreTag, payTestStateOf, type ListingRecord, type PayTestRow } from "../src/store.ts"
 import { buyViaCallSkill, canaryFromEnv, canaryLoop, canaryTick, dueTargets, mergeTargets, parseInterval,
   type BuyFn, type CanaryConfig, type CanaryTarget } from "../src/canary.ts"
@@ -30,6 +30,15 @@ beforeEach(() => { vi.spyOn(console, "log").mockImplementation(() => {}); vi.spy
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 
 describe("parseInterval and opt-in configuration", () => {
+  it.each(["test", "gateway", "eip3009"] as const)("captures the hub's explicit %s default without widening", rail => {
+    vi.stubEnv("ARCADE_CANARY_KEY", generatePrivateKey())
+    expect(canaryFromEnv("https://hub.test", rail)?.rail).toBe(rail)
+  })
+  it("does not acquire or parse a canary key for an unsupported escrow default", () => {
+    vi.stubEnv("ARCADE_CANARY_KEY", "PRIVATE_INVALID")
+    expect(canaryFromEnv("https://hub.test", "erc8183")).toBeUndefined()
+    expect(console.log).not.toHaveBeenCalled()
+  })
   it.each([["45s", 45_000], ["10m", 600_000], ["24h", 86_400_000], ["1d", 86_400_000],
     ["600", 600_000], ["250ms", 250], [" 1s ", 1_000], ["2147483647ms", 2_147_483_647]])(
     "reads %s without timer coercion", (text, ms) => { expect(parseInterval(String(text))).toBe(ms) }
@@ -257,6 +266,29 @@ const fakeHub = () => {
 }
 
 describe("buyViaCallSkill", () => {
+  it("keeps the configured exact rail when discovery starts advertising Gateway first", async () => {
+    const hub = fakeHub(); hub.setSettled(true)
+    const original = globalThis.fetch
+    let reads = 0
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/v1/balances")) { reads++; throw Error("No Gateway lookup for exact canary") }
+      const response = await original(input, init)
+      if (response.status !== 402) return response
+      const body = await response.json() as { accepts: unknown[] }
+      const gateway = Effect.runSync(makeGatewayRail().challenge({ priceAtomic: 10000n, payTo: SELLER, resource: String(input) }))
+      return Response.json({ ...body, x402Version: 2, accepts: [gateway, ...body.accepts] }, { status: 402 })
+    })
+    const out = await Effect.runPromise(buyViaCallSkill(config())(target()))
+    expect(out?.ok).toBe(true); expect(reads).toBe(0)
+    const paid = hub.calls.find(r => r.headers.has(HEADER_PAYMENT_SIGNATURE))!
+    const payload = decodeHeaderJson(paid.headers.get(HEADER_PAYMENT_SIGNATURE)!) as { accepted: { extra: { name?: string } } }
+    expect(payload.accepted.extra.name).not.toBe("GatewayWalletBatched")
+  })
+  it("skips a listing that excludes the configured canary rail without a seller failure", async () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch)
+    const out = await Effect.runPromise(buyViaCallSkill(config())(target(listing({ rails: ["gateway"] }))))
+    expect(out).toBeNull(); expect(fetch).not.toHaveBeenCalled()
+  })
   it("runs a finite failure/delist/reconnect/pass cycle through the ordinary signed buyer path", async () => {
     const hub = fakeHub()
     const cfg = config(); const buy = buyViaCallSkill(cfg)

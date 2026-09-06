@@ -1,5 +1,22 @@
 # Plan J progress
 
+2026-09-07 03:34 IST — Task3B COMPLETE WITH_CONCERNS: sole79007 retained
+4,678VitestPASS/3FAIL/208/66.40s, all failures from the ENS/Gateway fixture's
+missing balance branch. Targeted correction59214:22PASS/1.12s,16-rootstrict0;
+15 original source/test hashes unchanged. Only unreached80534 thenPASS:
+855Bun/56/6,316assert/167.59s,root/webstrict,client389ms/SSR208ms. Final21-path
+audit/atomic commit/exactFFmain next. J4 installed-CLI read-only source/help
+preflight confirms Gateway uses backing EOA and paid202 needs private polling;
+do not assert SCA payer/immediate200. No J4 wallet/payment/funding invoked yet.
+
+2026-09-07 03:27 IST — Task3A merged519a244/exactoneFFclean. Task3B ordinary
+SDK/MCP/canary integration implemented;302focused/8/2.70s,32native/3/
+359assert/11.55s and15-rootstrict0PASS. Initial behavior Reds and fixture/type
+corrections retained in report. Receipt-side local provenance is exposed/printed
+with caller-controlled persistence, not an automatic durable journal or proof
+of settlement. Source freeze/audit/sole sequential full gate next. No live
+balance, key, payment, funding, deployment, agent or push.
+
 2026-09-07 03:07 IST — Task3A sole79816PASS:4,649Vitest206/64.92s,
 855Bun56/6,316assert/167.40s,root/webstrict+client352ms/SSR266ms. Fivepins
 frozen,10paths/16links/privacy0beforegate. Finalaudit/atomiccommit/oneFFmain
@@ -58,8 +75,8 @@ notrun; later escrow-state/Circlepayer/queued202 assumptions explicitly flagged.
   No live Circle/escrow claim.
 - Task2 MERGED c447759 WITH_CONCERNS: registry-shaped discovery and Graph
   compatibility; original failures and split verification retained.
-- Task3 IN_PROGRESS:3A leaf foundations COMPLETE after sole full gate; atomic
-  commit/merge next.3B actual buyer/MCP/canary integration unimplemented.
+- Task3 COMPLETE:3A MERGED519a244;3B WITH_CONCERNS for recorded split gate,
+  final audit/atomic commit/merge next. No live-payment claim.
 - Task4 NOT_RUN: Circle CLI inspect/estimate/bounded testnet pay proof.
 - Task5 NOT_STARTED: Unified Balance delegate funding and separate live proof.
 - Task6 NOT_STARTED: pinned escrow contracts/hook; one approved deployment unused.

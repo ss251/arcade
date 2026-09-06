@@ -111,6 +111,7 @@ describe("tool surface", () => {
     const { TOOLS } = await load()
     const call = TOOLS.find((t) => t.name === "arcade_call_skill")!
     expect(Object.keys(call.inputSchema.properties ?? {})).toEqual([
+      "rail",
       "skillId",
       "name",
       "input",

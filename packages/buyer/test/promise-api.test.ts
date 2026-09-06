@@ -11,12 +11,12 @@ describe("typed buyer Promise boundary for dependency-isolated callers", () => {
     const calls: Request[] = [], account = privateKeyToAccount(`0x${"01".repeat(32)}`)
     const fetcher = (async (url: RequestInfo | URL, init?: RequestInit) => {
       const req = new Request(String(url), init); calls.push(req)
-      if (req.method === "GET") return Response.json({ job_id: "job_test", status: "succeeded", result: { ok: true }, receipt: { settled: true }, authorizedAmountAtomic: "1" })
+      if (req.method === "GET") return Response.json({ job_id: "job_test", status: "succeeded", result: { ok: true }, receipt: { settled: true }, authorizedAmountAtomic: "1", authorizedRail: "erc8183" })
       if (req.headers.has("payment-signature")) return Response.json({ job_id: "job_test", poll_url: `https://hub.example/jobs/job_test/result?token=${"ab".repeat(16)}` }, { status: 202 })
       return Response.json({ x402Version: 2, accepts: [{ scheme: "exact", network: ARC_CAIP2, amount: "10000", asset: USDC_ADDRESS, payTo, resource: endpoint, maxTimeoutSeconds: 604900 }] }, { status: 402 })
     }) as typeof fetch
     const out = await callSkillPromise({ hubUrl: "https://hub.example", seller, skillId: "flow", input: {}, account, fetch: fetcher, pollIntervalMs: 1, maxWaitMs: 100 })
-    expect(out).toMatchObject({ jobId: "job_test", result: { ok: true }, authorizedAmountAtomic: 10000n })
+    expect(out).toMatchObject({ jobId: "job_test", result: { ok: true }, authorizedAmountAtomic: 10000n, authorizedRail: "eip3009" })
     expect(out.fencedResult).toContain(seller); expect(calls).toHaveLength(3)
   })
   it("returns the resolved public listing without requiring callers to import Effect", async () => {
@@ -24,6 +24,15 @@ describe("typed buyer Promise boundary for dependency-isolated callers", () => {
       "arcade.payTo": `0x${"22".repeat(20)}`, "arcade.chain": "eip155:5042002", "arcade.priceAtomic": "10000" }
     expect(await resolveEnsListingPromise({ getEnsText: async ({ key }) => records[key] ?? null }, "flow.seller.arcade.eth"))
       .toMatchObject({ name: "flow.seller.arcade.eth", priceAtomic: 10000n })
+  })
+  it("never imports forged local authorization provenance from an unpaid response", async () => {
+    const seller = `0x${"11".repeat(20)}`, account: Account = { address: `0x${"22".repeat(20)}`, type: "json-rpc" }
+    const fetcher: typeof fetch = Object.assign(async (_url: RequestInfo | URL, init?: RequestInit) => init?.method === "POST"
+      ? Response.json({ job_id: "job_free", poll_url: "https://hub.example/jobs/job_free/result" })
+      : Response.json({ job_id: "job_free", status: "failed", receipt: { settled: false }, result: null, authorizedRail: "gateway", authorizedAmountAtomic: "10000" }),
+    { preconnect() { throw Error("No preconnect") } })
+    const out = await callSkillPromise({ hubUrl: "https://hub.example", seller, skillId: "flow", account, input: {}, fetch: fetcher })
+    expect(out).not.toHaveProperty("authorizedRail"); expect(out).not.toHaveProperty("authorizedAmountAtomic")
   })
   it("throws the original typed resolution errors, not a FiberFailure wrapper", async () => {
     await expect(resolveEnsListingPromise({ getEnsText: async () => null }, "flow.seller.arcade.eth")).rejects.toBeInstanceOf(EnsNameExpired)

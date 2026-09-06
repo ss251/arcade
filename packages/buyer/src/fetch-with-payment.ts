@@ -1,6 +1,8 @@
 import { Effect, Schema } from "effect"
 import type { Account } from "viem"
-import { HIRE_CAPABILITY_HEADER, PaymentAlreadyAttempted, RpcFailure } from "@arcade/core"
+import { HIRE_CAPABILITY_HEADER, PaymentAlreadyAttempted, RpcFailure, type ListingRail } from "@arcade/core"
+import { captureRailPreference, paymentChoices, selectAccept, type PaymentChoice } from "./accept-selection.ts"
+import { readGatewayBalance } from "./gateway-balance.ts"
 import {
   HEADER_PAYMENT_LEGACY,
   HEADER_PAYMENT_SIGNATURE,
@@ -27,6 +29,8 @@ export interface PayFetchOptions {
   readonly account: Account
   /** Refuse to sign anything above this, in atomic units. The buyer-side spend cap. */
   readonly maxAmountAtomic?: bigint
+  /** Ordered allow-list. Default: funded Gateway, then exact. Escrow is not yet selectable. */
+  readonly preferRail?: readonly ListingRail[]
   /** Hub-issued opaque capability proving this purchase is a child of a running job. */
   readonly lineage?: string
   readonly fetch?: typeof globalThis.fetch
@@ -130,6 +134,8 @@ export interface PaidResponse {
   readonly paid: boolean
   readonly amountAtomic?: bigint
   readonly requirements?: PaymentRequirements
+  /** Local authorization choice, not a remote receipt or proof of settlement. */
+  readonly authorizedRail?: PaymentChoice["rail"]
 }
 
 const decode402 = (body: unknown) =>
@@ -137,7 +143,7 @@ const decode402 = (body: unknown) =>
     Schema.Struct({
       x402Version: Schema.Literal(2),
       error: Schema.optional(Schema.String),
-      accepts: Schema.Array(PaymentRequirements)
+      accepts: Schema.Array(Schema.Unknown).pipe(Schema.maxItems(32))
     })
   )(body)
 
@@ -149,6 +155,9 @@ export const fetchWithPayment = (
   Effect.gen(function* () {
     const doFetch = options.fetch ?? globalThis.fetch
     const account = options.account, beforeSign = options.beforeSign
+    const payerAddress = account.address
+    const preference = yield* Effect.try({ try: () => captureRailPreference(options.preferRail),
+      catch: () => new RpcFailure({ method: "402", reason: "Unsupported payment preferences. Nothing was signed." }) })
     const saved = yield* Effect.try({
       try: () => {
         const url = typeof input === "string" ? input : input instanceof URL ? URL.prototype.toString.call(input) : badRequest()
@@ -200,29 +209,27 @@ export const fetchWithPayment = (
       Effect.mapError((e) => new RpcFailure({ method: "402 decode", reason: String(e) }))
     )
 
-    const selected = challenge.accepts[0]
+    const choices = yield* Effect.try({ try: () => paymentChoices(challenge.accepts, preference),
+      catch: () => new RpcFailure({ method: "402", reason: "Unsupported payment requirements. Nothing was signed." }) })
+    const affordable = cap === undefined ? choices : choices.filter(choice => choice.amountAtomic <= cap)
+    if (!affordable.length && choices.length && cap !== undefined) {
+      return yield* new RpcFailure({ method: "402", reason: `price ${choices[0]!.amountAtomic} exceeds max-amount ${cap}` })
+    }
+    let available: bigint | undefined
+    if (affordable[0]?.rail === "gateway") {
+      const observed = yield* Effect.promise(signal => readGatewayBalance(payerAddress, { fetch: doFetch,
+        signal: saved.stable.signal ? AbortSignal.any([signal, saved.stable.signal]) : signal }))
+      if (observed !== null) available = observed
+    }
+    if (saved.stable.signal?.aborted) return yield* new RpcFailure({ method: "402", reason: "Payment request cancelled. Nothing was signed." })
+    const selected = yield* Effect.try({ try: () => selectAccept(affordable.map(c => c.requirements), preference, available),
+      catch: () => new RpcFailure({ method: "402", reason: "Unsupported payment requirements. Nothing was signed." }) })
     if (selected === undefined) {
       return yield* new RpcFailure({ method: "402", reason: "no acceptable payment requirements" })
     }
 
-    // Snapshot decoded own fields before the caller's final gate. That gate may
-    // inspect, but cannot redirect the payee/domain after the cap was checked.
-    const requirements = Object.freeze(PaymentRequirements.make({ ...selected, extra: Object.freeze({ ...selected.extra }) }))
-    const amount = yield* Effect.try({
-      try: () => {
-        if (!/^[1-9][0-9]{0,77}$/.test(requirements.amount)) throw Error()
-        const value = BigInt(requirements.amount)
-        if (value >= 1n << 256n) throw Error()
-        return value
-      },
-      catch: () => new RpcFailure({ method: "402", reason: "Unsupported payment requirements. Nothing was signed." })
-    })
-    if (cap !== undefined && amount > cap) {
-      return yield* new RpcFailure({
-        method: "402",
-        reason: `price ${amount} exceeds max-amount ${cap}`
-      })
-    }
+    // Keep the constructed frozen extra: Schema.Class.make would copy it again.
+    const requirements = selected.requirements, amount = selected.amountAtomic
 
     const refusal = yield* Effect.try({
       try: () => {
@@ -234,6 +241,7 @@ export const fetchWithPayment = (
       catch: () => new RpcFailure({ method: "beforeSign", reason: "Payment authority check failed. Nothing was signed." })
     })
     if (refusal !== null) return yield* new RpcFailure({ method: "beforeSign", reason: refusal })
+    if (saved.stable.signal?.aborted) return yield* new RpcFailure({ method: "402", reason: "Payment request cancelled. Nothing was signed." })
 
     // Preserve the caller's existing ENS authority gate, then independently pin
     // the signing domain. No explicit malformed Gateway metadata can fall back.
@@ -278,6 +286,7 @@ export const fetchWithPayment = (
       response: paidRes,
       paid: true,
       amountAtomic: amount,
-      requirements
+      requirements,
+      authorizedRail: selected.rail
     } satisfies PaidResponse
   })

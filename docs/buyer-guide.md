@@ -59,7 +59,7 @@ An uncertain paid outcome remains exposure until correlated evidence resolves it
 
 ```
 POST /x/:seller/:skill              →  402 + payment requirements
-sign EIP-3009 authorization         →  offline, ~5ms, ZERO gas
+select rail and sign authorization  →  offline signature, no buyer settlement gas
 POST again with PAYMENT-SIGNATURE   →  202 { job_id, poll_url }
 GET  poll_url                       →  200 { result, receipt }
 ```
@@ -105,6 +105,55 @@ const out = await callSkillPromise({
 `callSkillPromise` handles the probe, 402, one signed paid retry and polling.
 `callSkill` is the Effect equivalent. These are ordinary calls; opt into the
 captured session lifecycle explicitly below.
+
+### Ordinary-call rail selection
+
+The default is funded Gateway, then vanilla exact (EIP-3009). Escrow is reserved
+but not selectable until its buyer lifecycle ships. SDK `preferRail` is an
+ordered allow-list: `preferRail: ["eip3009"]` forces exact without a Gateway
+balance request, while `["gateway"]` refuses when available funding cannot be
+confirmed. It never silently broadens the caller's choice.
+
+Caps filter choices before funding inspection. If Gateway is the first remaining
+choice, the buyer makes one anonymous, bounded request to the pinned Arc-testnet
+Gateway balances endpoint through the supplied `fetch` transport. Merchant
+headers, cookies, signatures and lineage are not forwarded. Observed available
+funds must cover the price; a wallet balance or pending batch is not Gateway
+credit. Missing, insufficient or unavailable observations may select an offered
+exact alternative before signing. No deposit is automatic, and this observation
+is not a reservation or guarantee that settlement will succeed.
+
+Unknown schemes are skipped; malformed known Gateway terms refuse instead of
+being downgraded to exact. The final cap/domain/ENS checks remain in force.
+After issuing an authorization there is no second-rail fallback: reconcile an
+uncertain paid outcome before trying again.
+
+SDK results and ordinary MCP call results expose `authorizedRail` from the
+local signing path, never from hub JSON. The CLI prints it beside the receipt.
+It is authorization provenance, **not settlement proof**. No durable file is
+automatically written; callers that need a receipt-side journal should persist
+this projection to a fresh, private, owned destination:
+
+```ts
+const journalLine = JSON.stringify({
+  jobId: out.jobId,
+  authorizedRail: out.authorizedRail,
+  authorizedAmountAtomic: out.authorizedAmountAtomic?.toString(),
+  receipt: out.receipt
+})
+// Persist using your application's journal writer; do not commit raw job data.
+```
+
+MCP `arcade_call_skill` accepts an optional single `rail`. Its paying preflight
+reserves the maximum price among eligible offers without reading a key or
+checking Gateway funding. The advisory `arcade_quote` is not a funding check.
+All eligible offers must satisfy an ENS name's bound payee and chain; when rails
+use different payees, explicitly select the matching rail. A per-call override
+cannot change an active session's fixed rail.
+
+Hub canaries stay on the configured default rail (test mode uses the exact wire
+shape), skip listings excluding that rail and do not start for an escrow default.
+This does not enable new scheduled spending or auto-upgrade existing canaries.
 
 ## Sessions
 

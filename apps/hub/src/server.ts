@@ -1458,7 +1458,7 @@ const main = Effect.gen(function* () {
   // Use the actual bound port, including PORT=0, unless the operator advertises a public
   // origin. The buyer uses ordinary HTTP and remains within this application's scope.
   const canary = (() => {
-    try { return canaryFromEnv(process.env["ARCADE_PUBLIC_URL"] ?? `http://127.0.0.1:${server.port}`) }
+    try { return canaryFromEnv(process.env["ARCADE_PUBLIC_URL"] ?? `http://127.0.0.1:${server.port}`, rail.name) }
     catch (error) {
       // canaryFromEnv errors contain only fixed field-specific diagnostics, never values.
       console.error(`[hub] refusing to start: ${error instanceof Error ? error.message : "invalid canary configuration"}`)

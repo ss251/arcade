@@ -15,10 +15,12 @@ import {
   NON_SETTLING,
   RpcFailure,
   SessionReceipt,
+  ListingRail,
   type JobStatus,
   type ChainConfig
 } from "@arcade/core"
-import { PaymentRequirements } from "@arcade/payments"
+import { paymentRequirementsKind } from "@arcade/payments"
+import { paymentChoices } from "./accept-selection.ts"
 import { checkedGraphEvidence, graphEvidenceLine } from "./graph-evidence.ts"
 export { graphEvidenceLine, type GraphEvidence } from "./graph-evidence.ts"
 import { callSkill, openSession, BuyerSessionFailure, type BuyerSession, type BuyerSessionStatus, type SessionReceiptJson } from "./index.ts"
@@ -345,20 +347,25 @@ const publicJson = async (url: string, status: number, input?: unknown, signal?:
   } catch { throw quoteFailure() }
   finally { clearTimeout(timer); signal?.removeEventListener("abort", cancel); if (abort) controller.signal.removeEventListener("abort", abort); controller.abort(); void reader?.cancel().catch(() => {}) }
 }
-const quoteAt = async (endpoint: string, input: unknown, ens?: EnsListing, signal?: AbortSignal): Promise<bigint> => {
-  let requirements: PaymentRequirements
+const quoteAt = async (endpoint: string, input: unknown, ens?: EnsListing, signal?: AbortSignal, preferRail?: readonly ListingRail[]): Promise<bigint> => {
   try {
     parseArcadeEndpoint(endpoint)
-    const decoded = Schema.decodeUnknownSync(Schema.Struct({ x402Version: Schema.Literal(2), accepts: Schema.Array(PaymentRequirements) }))(await publicJson(endpoint, 402, input, signal))
-    if (decoded.accepts.length !== 1) throw quoteFailure()
-    requirements = decoded.accepts[0]!
+    const decoded = Schema.decodeUnknownSync(Schema.Struct({ x402Version: Schema.Literal(2), accepts: Schema.Array(Schema.Unknown).pipe(Schema.maxItems(32)) }))(await publicJson(endpoint, 402, input, signal))
+    const choices = paymentChoices(decoded.accepts, preferRail)
+    if (!choices.length) throw quoteFailure()
     const config = loadChainConfig()
-    if (config.status !== "ready" || requirements.network !== config.caip2 || requirements.asset.toLowerCase() !== config.usdc.address.toLowerCase() ||
-      requirements.resource !== endpoint || !publicAddress(requirements.payTo) || !atomicAmount(requirements.amount) ||
-      !Number.isSafeInteger(requirements.maxTimeoutSeconds) || requirements.maxTimeoutSeconds < 1 || requirements.maxTimeoutSeconds > 604900) throw quoteFailure()
+    let maximum = 0n
+    for (const { requirements, amountAtomic } of choices) {
+      if (config.status !== "ready" || requirements.network !== config.caip2 || requirements.asset.toLowerCase() !== config.usdc.address.toLowerCase() ||
+        requirements.resource !== endpoint || !publicAddress(requirements.payTo) || !atomicAmount(requirements.amount)) throw quoteFailure()
+      paymentRequirementsKind(requirements)
+      // No key or funding query during quotes. All eligible choices must respect
+      // ENS; callers may explicitly narrow to its bound payee's matching rail.
+      if (ens && ensRefusal(ens, requirements)) throw quoteFailure()
+      if (amountAtomic > maximum) maximum = amountAtomic
+    }
+    return maximum // Conservative reservation ceiling, not the selected rail's final price.
   } catch { throw quoteFailure() }
-  if (ens) { const refusal = ensRefusal(ens, requirements); if (refusal) throw new Error(`${refusal.code}: ${refusal.message}`) }
-  return BigInt(requirements.amount)
 }
 const findPurchaseListing = async (skillId: string, signal?: AbortSignal): Promise<Listing> => {
   const url = new URL(HUB)
@@ -442,6 +449,7 @@ const SkillIdArgs = Schema.Struct({
 })
 
 const CallArgs = Schema.Struct({
+  rail: Schema.optional(ListingRail.annotations({ title: "rail", description: "Optional single-rail constraint, never automatic fallback outside it. Gateway requires available balance; escrow is unavailable until its buyer lifecycle ships. Active sessions keep their fixed rail." })),
   skillId: Schema.optional(Schema.String.pipe(
     Schema.pattern(/^[a-z0-9][a-z0-9-]{1,63}$/),
     Schema.annotations({ title: "skillId", description: "Skill id, from arcade_list_skills. Pass this OR name." })
@@ -552,7 +560,8 @@ export const TOOLS: ReadonlyArray<Tool> = [
       "A remote failure response cannot cancel an issued authorization. Skills take seconds to minutes; " +
       "this waits for completion. Call arcade_quote first if the price matters. Pass skillId " +
       "for this hub or name for an ARCADE ENS name; the name's payee and chain are checked " +
-      "before signing. Unconfirmed paid outcomes retain their session reservation until reconciled.",
+      "before signing. Optional rail narrows selection; otherwise funded Gateway is preferred, then exact. " +
+      "Unconfirmed paid outcomes retain their session reservation until reconciled.",
     inputSchema: toolInput(CallArgs),
     annotations: {
       title: "Buy and run a skill",
@@ -716,6 +725,7 @@ const sessionQuote = async (args: unknown, signal?: AbortSignal): Promise<CallTo
 }
 const sessionCall = async (args: unknown, signal?: AbortSignal): Promise<CallToolResult> => {
   const a = sessionArgs(CallArgs, args), ctx = activeSession()
+  if (a.rail !== undefined && a.rail !== ctx.handle.rail) throw new SessionToolFailure("session_rail_mismatch")
   if (a.name !== undefined || a.skillId === undefined) throw new SessionToolFailure("session_ens_unsupported")
   const requested = a.maxAmountUsd === undefined ? MAX_CALL_ATOMIC : sessionAtomic(String(a.maxAmountUsd))
   const cap = [requested, MAX_CALL_ATOMIC, remainingAtomic()].reduce((x, y) => x < y ? x : y)
@@ -917,7 +927,8 @@ const dispatch = async (toolName: string, rawArgs: unknown, signal?: AbortSignal
     }
 
     case "arcade_call_skill": {
-      const { skillId, name, input, maxAmountUsd } = decodeArgs(CallArgs, rawArgs, toolName)
+      const { skillId, name, input, maxAmountUsd, rail } = decodeArgs(CallArgs, rawArgs, toolName)
+      const preference = rail === undefined ? undefined : [rail]
       const reader = name === undefined ? undefined : sepoliaEnsReader()
       let ens: EnsListing | undefined
       if (name !== undefined) {
@@ -932,7 +943,7 @@ const dispatch = async (toolName: string, rawArgs: unknown, signal?: AbortSignal
       const listing = ens === undefined ? await findPurchaseListing(skillId!, signal) : undefined
       const endpoint = ens?.endpoint ?? `${HUB}/x/${listing!.seller}/${skillId!}`
       const label = ens?.name ?? skillId!
-      const price = await quoteAt(endpoint, input, ens, signal)
+      const price = await quoteAt(endpoint, input, ens, signal, preference)
       checkSignal(signal)
 
       // The agent's cap never *raises* the server's: an argument in a prompt must not be
@@ -976,7 +987,7 @@ const dispatch = async (toolName: string, rawArgs: unknown, signal?: AbortSignal
         const completed = await Effect.runPromise(Effect.either(Effect.suspend(() => callSkillImpl({
           ...(ens === undefined ? { hubUrl: HUB, seller: listing!.seller, skillId: skillId! } :
             { name: ens.name, expectedHubUrl: parseArcadeEndpoint(endpoint).hubUrl, ensReader: reader! }),
-          input, account, maxAmountAtomic: price
+          input, account, maxAmountAtomic: price, ...(preference === undefined ? {} : { preferRail: preference })
         }))), { signal })
         if (completed._tag === "Left") {
           const error = completed.left
@@ -1027,6 +1038,7 @@ const dispatch = async (toolName: string, rawArgs: unknown, signal?: AbortSignal
             status: out.status,
             settled,
             pricePaidUsdc: settled ? formatUsdc(paid) : "0",
+            ...(out.authorizedRail === "gateway" || out.authorizedRail === "eip3009" ? { authorizedRail: out.authorizedRail } : {}),
             ...(tx === undefined ? {} : { settleTx: tx }),
             result: out.result as Record<string, unknown>
           }

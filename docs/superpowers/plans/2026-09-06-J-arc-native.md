@@ -99,9 +99,15 @@ SDK/MCP/canary behavior. See [Task3 brief](../sdd/2026-09-06-J-arc-native/task-3
 Escrow remains unselectable until its Task9 lifecycle exists; an explicit rail
 preference is an ordered allow-list, not authority to silently broaden it.
 
-- [ ] `fetch-with-payment.ts`: replace `accepts[0]` with `selectAccept(accepts, preferRail)`; default preference `["gateway","eip3009","erc8183"]`; the Gateway path requires a Gateway balance and falls through otherwise; log which accept was chosen in the receipt-side journal. MCP `arcade_call_skill` gains `rail?`.
-- [ ] Tests: three-accept 402 → picks Gateway when funded, exact otherwise; unknown scheme is skipped; empty → refusal unchanged.
-- [ ] Commit: `feat(buyer): choose among 402 accepts by rail preference`.
+Task3A merged519a244. Task3B is complete with recorded split verification;
+its atomic commit/merge follows the final audit. Receipt-side provenance
+is a local SDK/MCP field and CLI line, with an explicit caller-controlled private
+journal example, not an automatic durable file or hub-derived settlement proof.
+See the [Task3B report](../sdd/2026-09-06-J-arc-native/task-3b-report.md).
+
+- [x] `fetch-with-payment.ts`: replace `accepts[0]` with bounded selection; default preference `["gateway","eip3009","erc8183"]`; Gateway requires observed available balance. Local receipt-side provenance and caller journal example, MCP `rail?`, fixed-session and canary policies.
+- [x] Tests: multiple accepts → funded Gateway or exact before signing; unknown scheme skipped; empty/refused choices never sign. Original ENS authority, caps and no post-signature fallback are retained.
+- [x] Commit checkpoints: `feat(buyer): add bounded rail selection and balance observation` then `feat(buyer): choose funded rails across SDK and MCP calls`; split results documented above.
 
 ### Task 4: Live proof — Circle CLI inspects and pays (J1 + J2)
 

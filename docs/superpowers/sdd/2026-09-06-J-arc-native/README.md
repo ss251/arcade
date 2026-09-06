@@ -10,7 +10,8 @@ evidence remain separate open work; this index does not mark them accepted.
   [challenge/dispatch checkpoint](task-1b-report.md).
 - [Task 2 brief](task-2-brief.md), [discovery record](task-2-report.md),
   [discovery contract](../../../circle-discovery.md).
-- [Task 3 brief](task-3-brief.md), [selection/balance foundations](task-3a-report.md).
+- [Task 3 brief](task-3-brief.md), [selection/balance foundations](task-3a-report.md),
+  [SDK/MCP/canary integration](task-3b-report.md).
 - [Progress ledger](progress.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per

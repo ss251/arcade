@@ -42,6 +42,9 @@ const recordingFetch = (
 ): { fetch: typeof globalThis.fetch; calls: Array<Request> } => {
   const calls: Array<Request> = []
   const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    // Explicit offline funding observation, separate from the original hub wire.
+    if (String(input) === "https://gateway-api-testnet.circle.com/v1/balances") return Response.json({ token: "USDC",
+      balances: [{ depositor: account.address, domain: 26, balance: "1.000000" }] })
     const req = new Request(String(input), init)
     calls.push(req)
     return responder(calls.length, req)
