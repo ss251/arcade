@@ -1,5 +1,12 @@
 # Plan H — execution records
 
+Current task: [H10b2 rail-correct browser signing boundary](task-10b2-brief.md),
+after H10b1 `ef44e50`. Its [parent report](task-10b2-parent-report.md) records
+the null-deadline regression/fix, separate fixture corrections,164 focused tests,
+exact strict and the sole full gate. This is not active UI integration or native
+wallet proof. Single-threaded self-review only; H remains unmerged. Earlier
+checkpoints remain below.
+
 Current task: [H10b1 single-use approval foundation](task-10b1-brief.md), after
 H10a `e8ea873`. Parent-written pure approval capture/consumption passed44 focused
 tests, exact strict checks and its sole four-worker-bounded full gate. The

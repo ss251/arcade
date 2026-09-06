@@ -371,3 +371,31 @@ Final single-threaded audit passed: the new exact bannered copy/original hash
 both frozen source pins, all nine prior H10a copies,18 prior source pins and14
 retained H8/H9/F/Pages pins. Index links resolve (86 prior-document local links
 plus the two new documents); selected privacy-pattern findings were zero.
+
+## H10b2 — rail-correct browser signing boundary
+
+H10b1 committed `ef44e50`. Parent adds an explicit bounded browser signer using
+the actual shared classification/domain/types with action-local imports. Captured
+terms, pre/post account and chain checks, immutable JSON-RPC data, canonical low-s
+recovery and monotonic lifetime prevent a late or mismatched signature from being
+released. Gateway uses its own pinned domain and actual backdated validity.
+No retries, HTTP, storage, connect/switch or active Chat/relay mutation.
+
+First51 tests passed on initial implementation. Self-review reproduced one
+null-deadline validation defect; after separate test-cache/table fixture repairs,
+the unchanged production source still failed that one case. Explicit undefined
+defaulting fixed it. Final164 focused/4files and exact two-root strict0 passed.
+No independent review claim under the owner no-fan-out restriction.
+
+The sole bounded sequential full gate passed3,714 Vitest/154 (48.53s),
+834 Bun/54/6,091 assertions (162.71s), root/web strict and client310ms/SSR161ms.
+No repeated/overlapping gate or new spend/key/live authority/production change/push.
+Public audit and the six-path local commit follow. Native browser integration,
+direct paid transport/recovery, buyer/session UI and H11–14 remain separate;
+H remains unmerged. A signature can exist after cancellation or uncertainty.
+
+Final single-threaded audit passed: new exact bannered report with original hash
+`97225adb061fdf3635d3de8ccf59fb08512b26146418e2607f767b42868ef766`,
+both frozen signer pins, retained H10b1 copy/two source pins and all prior H10a
+copies/18 source pins/14 H8/H9/F/Pages pins. The index links resolve (88 prior-
+document links plus the new documents), with zero selected privacy findings.
