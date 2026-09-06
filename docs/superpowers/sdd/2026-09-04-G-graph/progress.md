@@ -425,3 +425,18 @@ both match the exact CID with no indexing errors. Still below A9 block60523612.
 The sole evidence-commit gate passed2941 Vitest/131 files,829 Bun/51 files/
 5770 assertions and root/web strict. The [parent evidence review](task-6-live-parent-review.md)
 preserves its limited acceptance; final publication audit/local commit follow.
+
+## September 6 — selected historical SDD gaps
+
+G6 partial-live evidence committed `993915f` after its sole passing full gate
+and CLEAN independent publication review. Seven previously uncopied historical
+readiness/decision/checkpoint records now have bannered public copies, with
+exact EOF/body preservation and only four G15 literal scrubs. See the
+[archive manifest](archive-completeness-brief.md). Originals and their order,
+old commit hashes and historical pending states are preserved. Separate archive
+gate/audit/commit follow; implementation and live acceptance are unchanged.
+
+The sole archive full gate exited0:2941 Vitest/131 files,829 Bun/51 files/
+5770 assertions and root/web strict. Independent initial archive audit CLEAN:
+7 exact historical copies,4 approved substitutions,83 valid local links.
+Final gate-note audit/atomic commit follow; no unchanged gate repeat.

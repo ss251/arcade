@@ -157,3 +157,16 @@ The later [parent evidence review](task-6-live-parent-review.md) records the sol
 evidence-commit gate PASS:2941 Vitest,829 Bun/5770 assertions, root/web strict.
 Metadata at04:22:41UTC reached16005110 with the exact CID/no indexing errors,
 still below A9. Final publication audit/local evidence commit follow.
+
+## September 6 — historical archive gap closure
+
+The G6 partial-live checkpoint committed as `993915f`. The
+[archive completeness brief](archive-completeness-brief.md) adds seven previously
+uncopied readiness/decision/local-ledger artifacts with exact source/public
+fingerprints. Six have no substitutions; G15 has four approved literal privacy
+replacements. Originals remain untouched and historical decisions remain dated,
+not current authority. The archive's full gate and independent audit follow;
+this does not complete G6 indexing, G8/G9, G15 or the G→H integration.
+
+Later archive gate PASS:2941 Vitest/131 files,829 Bun/51 files/5770 assertions,
+root/web strict0. Initial independent copy/privacy/link audit CLEAN (83 links).
