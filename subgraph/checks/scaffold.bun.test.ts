@@ -31,7 +31,10 @@ describe("G1 offline smoke scaffold", () => {
   test("binds the sole smoke source to the runbook pilot and exact event handler", () => {
     const address = "0xf95c8afefae677fdcfc7bd5b8aaaf3702db99206"
     expect(text("../../docs/runbook.md")).toContain(address)
-    expect(Bun.YAML.parse(renderManifest(text("../subgraph.template.yaml"), json("../../config/chains/arc-testnet.json"), json("../splitters.json")))).toEqual({
+    const manifest = Bun.YAML.parse(renderManifest(text("../subgraph.template.yaml"), json("../../config/chains/arc-testnet.json"), json("../splitters.json"))) as { templates: Array<{ name: string }> }
+    // Keep the complete G4 pilot/V2 snapshot exact; separately bound the additive templates.
+    const historicalShape: unknown = { ...manifest, templates: manifest.templates.slice(0, 1) }
+    expect(historicalShape).toEqual({
       specVersion: "1.0.0", indexerHints: { prune: "never" }, schema: { file: "./schema.graphql" },
       dataSources: [{ kind: "ethereum", name: "FeeSplitterSmoke", network: "arc-testnet",
         source: { address, abi: "FeeSplitter", startBlock: 0 },
@@ -52,6 +55,9 @@ describe("G1 offline smoke scaffold", () => {
         }
       }]
     })
+    expect(manifest.templates.map((entry) => entry.name)).toEqual([
+      "FeeSplitterV2", "IdentityRegistry", "ReputationRegistry", "ValidationRegistry"
+    ])
   })
 
   test("preserves immutable atomic-money fields and transaction/log event identity", () => {

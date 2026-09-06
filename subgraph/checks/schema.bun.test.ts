@@ -10,6 +10,10 @@ const text = (path: string): string => readFileSync(new URL(path, import.meta.ur
 const current = (): string => text("../schema.graphql")
 
 const expected: Readonly<Record<string, { readonly immutable: boolean; readonly fields: Readonly<Record<string, string>> }>> = {
+  RegistryEvent: { immutable: true, fields: {
+    id: "Bytes!", registry: "Bytes!", kind: "String!", disposition: "String!",
+    txHash: "Bytes!", blockNumber: "BigInt!", timestamp: "BigInt!", logIndex: "BigInt!"
+  } },
   Marketplace: { immutable: false, fields: {
     id: "ID!", settlementCount: "BigInt!", treeCount: "BigInt!", settledVolumeAtomic: "BigInt!",
     feeAtomic: "BigInt!", childTotalAtomic: "BigInt!", agentCount: "BigInt!", feedbackCount: "BigInt!",
@@ -113,7 +117,7 @@ const realQuery = (name: string): string => {
 }
 
 describe("G2 ledger schema contract (offline)", () => {
-  test("defines exactly the planned eight entities plus immutable occurrences and claims", () => {
+  test("defines exactly the planned eight entities plus immutable occurrences, claims and registry events", () => {
     expect(violations(current())).toEqual([])
   })
 
@@ -133,8 +137,11 @@ describe("G2 ledger schema contract (offline)", () => {
     ["childCount: BigInt!", "childCount: Int!", "TreeOccurrence.childCount"],
     ["type TreeOccurrence @entity(immutable: true)", "type TreeOccurrence @entity(immutable: false)", "TreeOccurrence: immutable"],
     ["type ListingClaim @entity(immutable: true)", "type ListingClaim @entity(immutable: false)", "ListingClaim: immutable"],
+    ["type RegistryEvent @entity(immutable: true)", "type RegistryEvent @entity(immutable: false)", "RegistryEvent: immutable"],
+    ["kind: String!", "kind: Bytes!", "RegistryEvent.kind"],
+    ["disposition: String!", "disposition: String", "RegistryEvent.disposition"],
     ["owner: Bytes!", "owner: Bytes", "Agent.owner"],
-    ["registry: Bytes!", "registry: String!", "Agent.registry"],
+    ["agentId: BigInt!\n  registry: Bytes!", "agentId: BigInt!\n  registry: String!", "Agent.registry"],
     ["listing: Listing\n", "listing: Listing!\n", "Splitter.listing"],
     ["agent: Agent!", "agent: String!", "Listing.agent"],
     ["@derivedFrom(field: \"splitter\")", "@derivedFrom(field: \"buyer\")", "Splitter.settlements: derivedFrom"]
@@ -179,10 +186,11 @@ describe("G2 ledger schema contract (offline)", () => {
   test("declares pilot entities and the real inactive tree mapping without registry coverage", () => {
     const manifest = Bun.YAML.parse(renderManifest(text("../subgraph.template.yaml"), JSON.parse(text("../../config/chains/arc-testnet.json")), JSON.parse(text("../splitters.json"))))
     expect(manifest).toMatchObject({ dataSources: [{ mapping: { entities: ["Settlement", "Splitter"] } }] })
-    expect(manifest).toHaveProperty("templates", [expect.objectContaining({
+    expect(manifest).toHaveProperty("templates.0", expect.objectContaining({
       name: "FeeSplitterV2",
       mapping: expect.objectContaining({ entities: ["Settlement", "Splitter", "Tree", "TreeOccurrence"] })
-    })])
+    }))
+    expect(manifest).toHaveProperty("templates.length", 4)
   })
 
   test("labels local schema evolution separately from deployed G1 and unavailable aggregates", () => {

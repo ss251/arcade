@@ -2,6 +2,32 @@
 
 Plan: [2026-09-04-G-graph](../../plans/2026-09-04-G-graph.md).
 
+## Latest local checkpoint — September 6, G5 in progress
+
+G3 committed e00cd89 and G4 committed f66fb5a after their separate complete gates
+and publication audits. G5 now adds bounded registry fact handlers and immutable
+replay memory, with three inactive templates. The exact historical preparation
+and integrator results are linked from the [G5 brief](task-5-brief.md). Mapping
+runtime/independent review and the parent's complete gate remain pending here;
+later dated records will supersede this checkpoint without rewriting history.
+
+Main includes A–F. G6 is next; G8/G9 retain the documented H-before-G8 shared-file
+exception. New owner-approved Base query funding is a separate queued live-evidence
+step, not a G5 test result or permission for another Arc purchase. No paid query
+has run at this checkpoint, and G1's consumed smoke deployment is not repeated.
+
+### Later G5 parent acceptance
+
+Final fourteen-path source and independent review are CLEAN. Author/reviewer each
+passed 61 real AS cases (27 G4, 34 G5), 135 focused Bun /289 expect calls and exact
+four-root strict. Parent's single complete gate exited zero: Vitest succeeded,
+698 Bun /47 files /5,197 expect calls, root/web strict and actual Graph build.
+The captured Vitest aggregate was truncated, so its count is omitted rather than
+retested. Source hashes stayed fixed. Six exact historical copies (four literal
+location substitutions total), brief/index and this progress record await final
+publication audit and the separate G5 commit; earlier pending statements remain
+dated history. No new indexing, spending or canonical-attribution proof is claimed.
+
 - September 5, 2026: Task 1 local scaffold implemented in its isolated worktree.
   Genuine six-test Red preceded six-test Green / 31 assertions. Actual pinned
   Graph codegen and WASM build passed, as did frozen-lock reinstall, seven focused

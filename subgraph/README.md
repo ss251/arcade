@@ -320,3 +320,52 @@ final actual WASM build and commit; none is inferred from codegen or an earlier
 historical build. No Matchstick run proves live graph-node/Studio persistence or
 indexing. No upload, deployment, query, key access, signing or spending is performed
 for G4, and the consumed G1 deployment must not be replayed.
+
+## September 6, 2026 — G5 inactive registry integration
+
+G4 committed before this local integration was released. The static pilot and
+existing inactive FeeSplitterV2 template remain exact. Three additional
+**inactive** IdentityRegistry, ReputationRegistry and ValidationRegistry templates
+declare their real local handlers and staged ABIs. They have no address, start
+block or context; no handler instantiates a template. RegistryEvent adds eight
+required fields for immutable transaction/log replay memory. Neither these
+declarations nor local generated types activate registry indexing or change the
+acknowledged G1 deployment.
+
+The registry policy supports canonical Graph event order plus exact replay, not
+arbitrary first-delivery ordering. Accepted events and prerequisite/conflict skips
+are remembered before a later replay can fabricate backfill. Agent creation needs
+the pinned emitter and an actual nonzero Registered owner. Transfers clear the
+optional wallet; an unsupported known-Agent transfer to zero aborts before writes
+because the required-owner schema cannot represent a burn truthfully. Operator URI
+updates do not establish ownership. Unknown agents remain absent, not placeholders.
+
+Only four bounded, typed metadata claims are recorded: arcade.listingId,
+arcade.feeSplitter, arcade.priceAtomic and arcade.endpoint. They do not create a
+canonical Listing, bind a Splitter, authorize discovery or fetch a URL. Unsupported
+wallet metadata is ignored. UTF-8 text is bounded and rejects controls; indexed
+metadata/tag hashes must match the retained unindexed values. Invalid tag1 is a
+remembered skip, while invalid optional feedback text can be omitted independently.
+
+Feedback preserves signed values, decimals and full-width indices. Counters cover
+accepted/observed bounded registry records, not all feedback, external payers or
+verified service payments. Revocation and validation pass-count changes are
+replay-safe deltas. Validation retains its request binding; PASSED means the local
+response policy of 50..100, not validator trust or payment proof. No Marketplace
+row, aggregate coverage or independent settlement proof is invented here.
+
+The schema and manifest checks retain the complete G4 pilot/V2 snapshot, compare
+all registry event signatures with the staged ABIs, and reject activation fields,
+changed layouts, missing replay entities or missing local mapping/ABI assets.
+CLI failure preserves prior output. These TypeScript/Bun checks are distinct from
+the mapping author's actual AssemblyScript store tests and the parent's final
+WASM build/full gate. G6 still owns source activation and documented observed
+epochs: current implementation corroboration does not prove pre-upgrade history.
+No network, registry write, new payment, key access, upload or deployment is
+performed by this integration; do not replay the consumed smoke deployment.
+
+The integrator's selection passed **135 focused Bun tests / 289 expect calls**
+and its exact four-root TypeScript strict check. One coordinated local codegen
+generated RegistryEvent and the three inactive template event modules after all
+four real registry source drafts existed. These results do not claim mapping
+runtime acceptance, a complete gate, registry activation or a new deployment.

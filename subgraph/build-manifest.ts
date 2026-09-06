@@ -83,11 +83,43 @@ function activeManifest(address: string, startBlock: number) {
           { event: "SettledTree(indexed address,uint256,uint256,uint256,indexed bytes32,indexed bytes32,uint32,uint256)", handler: "handleSettledTree" }
         ]
       }
+    }, { kind: "ethereum", name: "IdentityRegistry", network: "arc-testnet",
+      source: { abi: "IdentityRegistry" },
+      mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
+        file: "./src/identity.ts", entities: ["Agent","ListingClaim","RegistryEvent"],
+        abis: [{ name: "IdentityRegistry", file: "./abis/IdentityRegistry.json" }],
+        eventHandlers: [
+          { event: "Registered(indexed uint256,string,indexed address)", handler: "handleRegistered" },
+          { event: "URIUpdated(indexed uint256,string,indexed address)", handler: "handleURIUpdated" },
+          { event: "MetadataSet(indexed uint256,indexed string,string,bytes)", handler: "handleMetadataSet" },
+          { event: "Transfer(indexed address,indexed address,indexed uint256)", handler: "handleTransfer" }
+        ]
+      }
+    }, { kind: "ethereum", name: "ReputationRegistry", network: "arc-testnet",
+      source: { abi: "ReputationRegistry" },
+      mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
+        file: "./src/reputation.ts", entities: ["Agent","Feedback","RegistryEvent"],
+        abis: [{ name: "ReputationRegistry", file: "./abis/ReputationRegistry.json" }],
+        eventHandlers: [
+          { event: "NewFeedback(indexed uint256,indexed address,uint64,int128,uint8,indexed string,string,string,string,string,bytes32)", handler: "handleNewFeedback" },
+          { event: "FeedbackRevoked(indexed uint256,indexed address,indexed uint64)", handler: "handleFeedbackRevoked" }
+        ]
+      }
+    }, { kind: "ethereum", name: "ValidationRegistry", network: "arc-testnet",
+      source: { abi: "ValidationRegistry" },
+      mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
+        file: "./src/validation.ts", entities: ["Agent","Validation","RegistryEvent"],
+        abis: [{ name: "ValidationRegistry", file: "./abis/ValidationRegistry.json" }],
+        eventHandlers: [
+          { event: "ValidationRequest(indexed address,indexed uint256,string,indexed bytes32)", handler: "handleValidationRequest" },
+          { event: "ValidationResponse(indexed address,indexed uint256,indexed bytes32,uint8,string,bytes32,string)", handler: "handleValidationResponse" }
+        ]
+      }
     }]
   }
 }
 
-/** G4: one pilot, one never-instantiated V2 template; no registry or listing authority. */
+/** G5: one pilot and four inactive templates; no registry activation or listing authority. */
 export function renderManifest(template: string, chainConfig: unknown, splitters: unknown): string {
   try {
     if (canonical(chainConfig) !== CHAIN) return fail()
@@ -142,8 +174,12 @@ export async function buildManifest(paths: ManifestPaths): Promise<void> {
     }
     const [source, chain, list] = await Promise.all([read(template), read(chainConfig), read(splitters)])
     const rendered = renderManifest(source, JSON.parse(chain), JSON.parse(list))
-    // The real shared mapping and inactive template must have their local inputs present.
-    for (const relative of ["./schema.graphql", "./src/fee-splitter.ts", "./src/ids.ts", "./abis/FeeSplitter.json", "./abis/FeeSplitterV2.json"]) {
+    // All declared real mappings, shared helpers and inactive-template ABIs are required.
+    for (const relative of [
+      "./schema.graphql", "./src/fee-splitter.ts", "./src/ids.ts", "./abis/FeeSplitter.json", "./abis/FeeSplitterV2.json",
+      "./src/identity.ts", "./src/reputation.ts", "./src/validation.ts", "./src/registry.ts",
+      "./abis/IdentityRegistry.json", "./abis/ReputationRegistry.json", "./abis/ValidationRegistry.json"
+    ]) {
       if (!(await stat(new URL(relative, output))).isFile()) return fail()
     }
     temporary = new URL(`.subgraph-${randomUUID()}.tmp`, output)

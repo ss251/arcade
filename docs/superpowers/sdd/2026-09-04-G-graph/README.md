@@ -101,3 +101,26 @@ retained private fixtures; the 27 native AS cases are separate. The
 [G4 parent review](task-4-parent-review.md) is now the sixth exact historical copy,
 with no body substitutions. These results supersede the preceding pending gate;
 final publication audit and commit follow, with source hashes unchanged.
+
+## September 6 — G5 bounded registry checkpoint
+
+G4 subsequently committed as `f66fb5ab1d7ca70cc633e216c52513e6f776ea80`.
+The [G5 brief](task-5-brief.md) records the released registry fact/replay contract
+and links the exact readiness, parent decisions and integrator report. The
+integrator passed 135 focused Bun tests /289 expect calls, exact four-root strict
+checking and one coordinated codegen after real source drafts existed.
+
+Mapping runtime and final independent review remain in progress at this
+checkpoint, followed by the parent's one complete gate and actual Graph build.
+The three registry templates stay inactive; no Marketplace or canonical listing
+attribution is claimed. No deployment or paid query is performed for G5.
+
+### Later G5 frozen acceptance
+
+Author and independent mapping acceptance each passed 61 actual AS/store cases
+(27 unchanged G4 plus 34 G5). Independent focused Bun/strict checks passed. The
+sole parent complete command then exited zero: Vitest, 698 Bun /47 files /5,197
+expect calls, root/web strict and actual Graph WASM compilation. The truncated
+Vitest display is not used to invent a new aggregate count or rerun the gate.
+The [parent review](task-5-parent-review.md) and brief preserve this later result;
+final public audit/atomic commit follow, with no live or canonical-link claim.

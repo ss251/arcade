@@ -13,12 +13,133 @@ const pilot = "0xf95c8afefae677fdcfc7bd5b8aaaf3702db99206"
 const list = () => ({ splitters: [{ address: pilot, startBlock: 0 }] })
 const render = () => renderManifest(template(), chain(), list())
 const invalid = "Invalid staged subgraph manifest"
+const requiredAssets = [
+  "schema.graphql", "src/fee-splitter.ts", "src/ids.ts", "abis/FeeSplitter.json", "abis/FeeSplitterV2.json",
+  "src/identity.ts", "src/reputation.ts", "src/validation.ts", "src/registry.ts",
+  "abis/IdentityRegistry.json", "abis/ReputationRegistry.json", "abis/ValidationRegistry.json"
+]
+
+const registryTemplates = [
+  {
+    "kind": "ethereum",
+    "name": "IdentityRegistry",
+    "network": "arc-testnet",
+    "source": {
+      "abi": "IdentityRegistry"
+    },
+    "mapping": {
+      "kind": "ethereum/events",
+      "apiVersion": "0.0.9",
+      "language": "wasm/assemblyscript",
+      "file": "./src/identity.ts",
+      "entities": [
+        "Agent",
+        "ListingClaim",
+        "RegistryEvent"
+      ],
+      "abis": [
+        {
+          "name": "IdentityRegistry",
+          "file": "./abis/IdentityRegistry.json"
+        }
+      ],
+      "eventHandlers": [
+        {
+          "event": "Registered(indexed uint256,string,indexed address)",
+          "handler": "handleRegistered"
+        },
+        {
+          "event": "URIUpdated(indexed uint256,string,indexed address)",
+          "handler": "handleURIUpdated"
+        },
+        {
+          "event": "MetadataSet(indexed uint256,indexed string,string,bytes)",
+          "handler": "handleMetadataSet"
+        },
+        {
+          "event": "Transfer(indexed address,indexed address,indexed uint256)",
+          "handler": "handleTransfer"
+        }
+      ]
+    }
+  },
+  {
+    "kind": "ethereum",
+    "name": "ReputationRegistry",
+    "network": "arc-testnet",
+    "source": {
+      "abi": "ReputationRegistry"
+    },
+    "mapping": {
+      "kind": "ethereum/events",
+      "apiVersion": "0.0.9",
+      "language": "wasm/assemblyscript",
+      "file": "./src/reputation.ts",
+      "entities": [
+        "Agent",
+        "Feedback",
+        "RegistryEvent"
+      ],
+      "abis": [
+        {
+          "name": "ReputationRegistry",
+          "file": "./abis/ReputationRegistry.json"
+        }
+      ],
+      "eventHandlers": [
+        {
+          "event": "NewFeedback(indexed uint256,indexed address,uint64,int128,uint8,indexed string,string,string,string,string,bytes32)",
+          "handler": "handleNewFeedback"
+        },
+        {
+          "event": "FeedbackRevoked(indexed uint256,indexed address,indexed uint64)",
+          "handler": "handleFeedbackRevoked"
+        }
+      ]
+    }
+  },
+  {
+    "kind": "ethereum",
+    "name": "ValidationRegistry",
+    "network": "arc-testnet",
+    "source": {
+      "abi": "ValidationRegistry"
+    },
+    "mapping": {
+      "kind": "ethereum/events",
+      "apiVersion": "0.0.9",
+      "language": "wasm/assemblyscript",
+      "file": "./src/validation.ts",
+      "entities": [
+        "Agent",
+        "Validation",
+        "RegistryEvent"
+      ],
+      "abis": [
+        {
+          "name": "ValidationRegistry",
+          "file": "./abis/ValidationRegistry.json"
+        }
+      ],
+      "eventHandlers": [
+        {
+          "event": "ValidationRequest(indexed address,indexed uint256,string,indexed bytes32)",
+          "handler": "handleValidationRequest"
+        },
+        {
+          "event": "ValidationResponse(indexed address,indexed uint256,indexed bytes32,uint8,string,bytes32,string)",
+          "handler": "handleValidationResponse"
+        }
+      ]
+    }
+  }
+]
 
 async function fixture(run: (paths: ManifestPaths, root: string) => Promise<void>): Promise<void> {
   const root = await mkdtemp(join(tmpdir(), "arcade-g3-manifest-"))
   try {
     for (const directory of ["subgraph/src", "subgraph/abis", "config/chains", "elsewhere"]) await mkdir(join(root, directory), { recursive: true })
-    for (const path of ["subgraph/build-manifest.ts", "subgraph/subgraph.template.yaml", "subgraph/splitters.json", "subgraph/schema.graphql", "subgraph/src/fee-splitter.ts", "subgraph/src/ids.ts", "subgraph/abis/FeeSplitter.json", "subgraph/abis/FeeSplitterV2.json", "config/chains/arc-testnet.json"]) {
+    for (const path of ["subgraph/build-manifest.ts", "subgraph/subgraph.template.yaml", "subgraph/splitters.json", ...requiredAssets.map((asset) => `subgraph/${asset}`), "config/chains/arc-testnet.json"]) {
       await copyFile(new URL(`../../${path}`, import.meta.url), join(root, path))
     }
     await run({
@@ -39,7 +160,7 @@ async function child(root: string, args: string[]) {
   } finally { clearTimeout(timer); if (childProcess.exitCode === null) { childProcess.kill(); await childProcess.exited } }
 }
 
-describe("G3 manifest boundary with the approved G4 mapping transition", () => {
+describe("G3 manifest boundary with G4 mappings and inactive G5 registries", () => {
   test("retains indexed event history explicitly", () => {
     expect(Bun.YAML.parse(render())).toHaveProperty("indexerHints.prune", "never")
   })
@@ -75,8 +196,9 @@ describe("G3 manifest boundary with the approved G4 mapping transition", () => {
           { event: "Settled(indexed address,uint256,uint256,uint256,indexed bytes32)", handler: "handleSettled" },
           { event: "SettledTree(indexed address,uint256,uint256,uint256,indexed bytes32,indexed bytes32,uint32,uint256)", handler: "handleSettledTree" }
         ] }
-    }])
-    expect(source).not.toMatch(/Registry|Marketplace|listing|context/)
+    }, ...registryTemplates])
+    expect(JSON.stringify((parsed as { dataSources: unknown }).dataSources)).not.toMatch(/Registry|Marketplace|listing|context/)
+    expect(source).not.toMatch(/Marketplace|\blisting\b|context/)
   })
 
   test("normalizes the pilot address without mutating input", () => {
@@ -84,6 +206,19 @@ describe("G3 manifest boundary with the approved G4 mapping transition", () => {
     const before = JSON.stringify(input)
     expect(renderManifest(template(), chain(), input)).toBe(render())
     expect(JSON.stringify(input)).toBe(before)
+  })
+
+  test("registry handler signatures preserve the staged ABI order, widths and indexed parameters", () => {
+    const parsed = Bun.YAML.parse(render()) as { templates: typeof registryTemplates }
+    for (const entry of parsed.templates.slice(1)) {
+      const abi = JSON.parse(text(`../abis/${entry.name}.json`)) as Array<{
+        type: string; name: string; inputs: Array<{ type: string; indexed: boolean }>
+      }>
+      expect(entry.source).toEqual({ abi: entry.name })
+      expect(entry.mapping.eventHandlers.map(({ event }) => event)).toEqual(abi
+        .filter((item) => item.type === "event")
+        .map((item) => `${item.name}(${item.inputs.map((input) => `${input.indexed ? "indexed " : ""}${input.type}`).join(",")})`))
+    }
   })
 
   for (const [label, value] of [
@@ -131,6 +266,17 @@ describe("G3 manifest boundary with the approved G4 mapping transition", () => {
     ["extra root", (source: string) => `${source}templates: []\n`],
     ["wrong schema path", (source: string) => source.replace("./schema.graphql", "../other.graphql")],
     ["pruning", (source: string) => source.replace("prune: never", "prune: auto")],
+    ["missing registry template", (source: string) => source.slice(0, source.indexOf("  - kind: ethereum\n    name: ValidationRegistry"))],
+    ["registry static address", (source: string) => source.replace("      abi: IdentityRegistry", `      abi: IdentityRegistry\n      address: ${pilot}`)],
+    ["registry start block", (source: string) => source.replace("      abi: IdentityRegistry", "      abi: IdentityRegistry\n      startBlock: 1")],
+    ["registry context", (source: string) => source.replace("    name: IdentityRegistry", "    name: IdentityRegistry\n    context:\n      listingId:\n        type: String\n        data: not-authority")],
+    ["wrong registry ABI", (source: string) => source.replace("./abis/IdentityRegistry.json", "./abis/ReputationRegistry.json")],
+    ["wrong registry mapping", (source: string) => source.replace("./src/identity.ts", "./src/smoke.ts")],
+    ["wrong registry handler", (source: string) => source.replace("handler: handleRegistered", "handler: handleTransfer")],
+    ["extra registry entity", (source: string) => source.replace("        - ListingClaim", "        - ListingClaim\n        - Marketplace")],
+    ["missing replay entity", (source: string) => source.replace("        - RegistryEvent\n", "")],
+    ["unindexed metadata key", (source: string) => source.replace("MetadataSet(indexed uint256,indexed string", "MetadataSet(indexed uint256,string")],
+    ["unsigned feedback", (source: string) => source.replace("uint64,int128,uint8", "uint64,uint128,uint8")],
     ["malformed YAML", (source: string) => `${source}[\n`],
     ["control byte", (source: string) => `${source}\u0000`]
   ] as const) {
@@ -154,16 +300,18 @@ describe("G3 manifest boundary with the approved G4 mapping transition", () => {
     for (const value of values) expect(() => renderManifest(template(), chain(), value)).toThrow(new Error(invalid))
   })
 
-  test("writes a complete owned-temp output without requiring inactive registry ABIs", async () => {
+  test("writes a complete owned-temp output with all inactive registry inputs present", async () => {
     await fixture(async (paths) => {
       await buildManifest(paths)
       expect(await readFile(paths.output, "utf8")).toBe(render())
-      expect((await readdir(new URL("./abis/", paths.output))).sort()).toEqual(["FeeSplitter.json", "FeeSplitterV2.json"])
+      expect((await readdir(new URL("./abis/", paths.output))).sort()).toEqual([
+        "FeeSplitter.json", "FeeSplitterV2.json", "IdentityRegistry.json", "ReputationRegistry.json", "ValidationRegistry.json"
+      ])
     })
   })
 
-  for (const asset of ["schema.graphql", "src/fee-splitter.ts", "src/ids.ts", "abis/FeeSplitter.json", "abis/FeeSplitterV2.json"]) {
-    test(`missing active ${asset} preserves prior output`, async () => {
+  for (const asset of requiredAssets) {
+    test(`missing required ${asset} preserves prior output`, async () => {
       await fixture(async (paths) => {
         await writeFile(paths.output, "prior output\n")
         await rm(new URL(asset, paths.output))

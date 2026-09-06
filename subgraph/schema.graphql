@@ -2,6 +2,20 @@
 # Canonical relationships require independently trusted bindings. Metadata claims
 # alone do not establish a hub listing, settlement provenance or current owner.
 
+type RegistryEvent @entity(immutable: true) {
+  "Transaction hash plus log index, scoped to the three explicitly pinned registries."
+  id: Bytes!
+  registry: Bytes!
+  "Fixed handler event category, not provider prose."
+  kind: String!
+  "Fixed accepted/skipped disposition; replay memory is not payment or trust proof."
+  disposition: String!
+  txHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  logIndex: BigInt!
+}
+
 type Marketplace @entity(immutable: false) {
   "Singleton arcade. Absent while the temporary smoke cannot supply full coverage."
   id: ID!
