@@ -170,3 +170,15 @@ this does not complete G6 indexing, G8/G9, G15 or the G→H integration.
 
 Later archive gate PASS:2941 Vitest/131 files,829 Bun/51 files/5770 assertions,
 root/web strict0. Initial independent copy/privacy/link audit CLEAN (83 links).
+
+## September 6 — G6 indexed A9 match
+
+The separately selected keyless read at05:07:47.534UTC accepted the exact deployed
+CID, indexed block60694598/no errors, all three historical A9 settlement occurrences
+and the unambiguous root tree (2 children/60000 atomic USDC). Actual Marketplace
+was null and queried registry/canonical tables empty, not whole-market zero.
+The [indexed-match brief](task-6-indexed-match-brief.md) records request/body hashes,
+exact occurrence values and the earlier failed/startup/progress observations.
+No redeploy, new purchase, wallet key or paid query occurred. Independent retained
+record review and the sole evidence-commit full gate follow. Main merge and
+H-dependent G8/G9 remain separate; the Base cost-of-goods proof is still pending.

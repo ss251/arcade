@@ -440,3 +440,26 @@ The sole archive full gate exited0:2941 Vitest/131 files,829 Bun/51 files/
 5770 assertions and root/web strict. Independent initial archive audit CLEAN:
 7 exact historical copies,4 approved substitutions,83 valid local links.
 Final gate-note audit/atomic commit follow; no unchanged gate repeat.
+
+## September 6 — G6 indexed A9 match
+
+The separately selected keyless read at05:07:47.534UTC accepted the exact deployed
+CID, indexed block60694598/no errors, all three historical A9 settlement occurrences
+and the unambiguous root tree (2 children/60000 atomic USDC). Actual Marketplace
+was null and queried registry/canonical tables empty, not whole-market zero.
+The [indexed-match brief](task-6-indexed-match-brief.md) records request/body hashes,
+exact occurrence values and the earlier failed/startup/progress observations.
+No redeploy, new purchase, wallet key or paid query occurred. Independent retained
+record review and the sole evidence-commit full gate follow. Main merge and
+H-dependent G8/G9 remain separate; the Base cost-of-goods proof is still pending.
+
+### Final parent indexed-match acceptance
+
+Independent retained-evidence review is CLEAN:117 local assertions, exact
+three occurrences and tree/money/nonce agreement, with no extra live request.
+Parent fully read that report and the frozen verifier; the public review copy is
+exact original plus the historical banner, with no body substitutions.
+The sole evidence-commit gate exited0:2941 Vitest/131 files,829 Bun/51 files/
+5770 assertions, root/web strict0. Source, schema and mappings are unchanged.
+Final publication audit and atomic commit follow; the separate main merge does
+not complete H-dependent G8/G9 or the funded-but-unperformed Base evidence step.

@@ -1,6 +1,6 @@
 # ARCADE ledger
 
-Latest status: [G6 deployment acknowledged, indexing pending](#september-6-2026--g6-deployment-acknowledged-indexing-pending).
+Latest status: [G6 indexed A9 match](#september-6-2026--g6-indexed-a9-match).
 The dated local/G1 sections below are historical checkpoints. Neither a successful
 build nor an acknowledgment proves the later indexed-event acceptance gate.
 
@@ -472,3 +472,18 @@ block **10795110**, hash
 and `hasIndexingErrors:false`. Indexing has started; this supersedes the startup
 absence, not the missing A9 proof. The required historical height is60523612.
 The read does not establish current-head/Studio-Synced status or event contents.
+
+## September 6, 2026 — G6 indexed A9 match
+
+The keyless read at **05:07:47.534 UTC** returned the exact v0.1.0 CID above,
+indexed block **60694598** and `hasIndexingErrors: false`. The unchanged strict
+verifier matched all three existing A9 settlement occurrences and one unambiguous
+root tree: **2 children /60000 atomic USDC**, tree ID
+`0x87cb3b5b32d849ebb6d5777ac247bdbdb15aa532b226fb86a591c491fa8f4a28`.
+Actual `marketplace: null` and empty registry/canonical tables remain unavailable
+coverage, not zero marketplace totals. See the [exact evidence and limitations](../docs/superpowers/sdd/2026-09-04-G-graph/task-6-indexed-match-brief.md).
+
+This satisfies the selected historical indexed-match requirement, not dashboard
+Synced/current-head status, complete marketplace coverage or canonical per-skill
+attribution. No deployment/upload, A9 purchase or paid Base query was repeated.
+Independent retained-record review, final evidence gate and G merge are separate.

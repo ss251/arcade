@@ -1432,3 +1432,23 @@ matches the exact G6 CID and reports block10795110, hash
 with no indexing errors. This is progress, not the required A9 block60523612
 event/tree match or current-head synchronization. Marketplace was not queried
 in this metadata-only observation; no value is invented for it.
+
+### G6 indexed A9 proof — September 6, 05:07 UTC
+
+The earlier pending statements are historical. At **05:07:47.534 UTC**, one
+keyless request to the exact v0.1.0 endpoint above passed the unchanged strict
+verifier: exact CID, block **60694598** /no indexing errors, all three A9
+settlement occurrences, and the root's tree/count **2** /child-total **60000**.
+Its tree ID matches the A9 Arc transaction above. Actual marketplace document:
+
+```json
+null
+```
+
+All queried registry/canonical tables were empty; absent coverage must not become
+zero-valued marketplace or per-skill statistics. The [indexed-match record](superpowers/sdd/2026-09-04-G-graph/task-6-indexed-match-brief.md)
+contains full transaction links, occurrence IDs, money values, response hash and
+the separate local-review/gate status. No dashboard Synced/current-head status,
+complete marketplace coverage or independently revalidated chain timestamps is
+claimed. G1/G6 deployments and A9 purchases remain consumed; no new wallet key,
+paid query or operation was needed for this historical readback.
