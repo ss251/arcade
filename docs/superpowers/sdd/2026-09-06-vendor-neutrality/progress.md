@@ -1,5 +1,18 @@
 # Vendor-neutrality progress
 
+2026-09-06 23:48 IST — Task2 evidence-only gate31253 PASS:4368Vitest196/64.61s,
+839Bun55/6116assert/166.04s,rootwebstrict0,client363ms/SSR268ms. Fourdocspaths,
+sevensourcepins unchanged,fiveaddedlinks/privacy/emptyindexPASS. No newlivecall.
+Scoped evidence commit and exact1FFmain next; Task2 complete after that merge.
+
+2026-09-06 23:42 IST — Task2 liveproof PASS on43d8ba4: one approved free API
+request/one in-process keyread,18:09:40.377–18:10:11.334UTC,HTTP200/tool_calls/
+end_turn,1930tokens,1633B,schemaValid/core-localpredicate true. No actual payment.
+Historical c6f6676 folder/public listing unchanged. Independent18:11:02.140UTC
+process-absent/journal0600+dir0700/twoevents/sevensourcepins/clean-tree checks
+PASS. Raw journal private; scrubbed evidence and runbook added. Documentation-only
+evidence commit will have one full gate, never another live request.
+
 2026-09-06 23:29 IST — Task2 sole full gate35793 PASS:4368Vitest196/75.53s,
 839Bun55/6114assert/170.53s,rootwebstrict0,client412ms/SSR197ms. Seven sourcepins,
 13paths,11unchangedcontracts/locks,13links,privacy/diff checks PASS. Scoped

@@ -143,6 +143,17 @@ accounted, and native SDK cost is not independent provider billing.
 The [public SDD follow-up](superpowers/sdd/2026-09-04-B-publish-adapters/free-route-integration.md)
 records genuine test failures, the three commits, independent reviews and all gates.
 
+### B13 Chat Completions follow-up — same Agent Skill PASS
+
+On main43d8ba4, September6,2026 18:09:40–18:10:11UTC, the unchanged diff-triage
+folder succeeded through openai-api on the approved free b.ai GLM route: one
+request, HTTP200, tool_calls→end_turn,1,930tokens,1,633-byte schema-valid output.
+The historical c6f6676 folder and current public listing match exactly. This is
+two API formats using the same GLM model, not two underlying model vendors.
+No new payment, wallet action or previous B13 replay occurred. The
+[scrubbed evidence](evidence/B13-openai-api.md) records source/output hashes,
+local validation, promotional cost limits and independent process-exit verification.
+
 ---
 
 ## The environment variables that matter
