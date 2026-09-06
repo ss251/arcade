@@ -4,14 +4,17 @@ import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { buildManifest, renderManifest, type ManifestPaths } from "../build-manifest.ts"
+import { approvedSplitterPin, buildManifest, renderManifest, type ManifestPaths } from "../build-manifest.ts"
 
 const text = (relative: string): string => readFileSync(new URL(relative, import.meta.url), "utf8")
 const chain = (): unknown => JSON.parse(text("../../config/chains/arc-testnet.json"))
 const template = (): string => text("../subgraph.template.yaml")
 const pilot = "0xf95c8afefae677fdcfc7bd5b8aaaf3702db99206"
+const a9 = "0x9e304ec13dd862c81ee8caa8fd262dac426fbedf"
 const list = () => ({ splitters: [{ address: pilot, startBlock: 0 }] })
+const reviewedList = () => ({ splitters: [{ address: a9, startBlock: 60_460_646 }, { address: pilot, startBlock: 0 }] })
 const render = () => renderManifest(template(), chain(), list())
+const renderReviewed = () => renderManifest(template(), chain(), reviewedList())
 const invalid = "Invalid staged subgraph manifest"
 const requiredAssets = [
   "schema.graphql", "src/fee-splitter.ts", "src/ids.ts", "abis/FeeSplitter.json", "abis/FeeSplitterV2.json",
@@ -160,10 +163,90 @@ async function child(root: string, args: string[]) {
   } finally { clearTimeout(timer); if (childProcess.exitCode === null) { childProcess.kill(); await childProcess.exited } }
 }
 
-describe("G3 manifest boundary with G4 mappings and inactive G5 registries", () => {
+describe("G6 reviewed static emitters with inactive G5 registries", () => {
+  test("commits exactly the reviewed address-sorted two-source inventory", () => {
+    expect(JSON.parse(text("../splitters.json"))).toEqual(reviewedList())
+  })
+
+  test("renders the reviewed V2 static source while retaining the exact pilot and four inactive templates", () => {
+    const rendered = renderManifest(template(), chain(), reviewedList())
+    const actual = Bun.YAML.parse(rendered) as { dataSources: unknown[]; templates: unknown[] }
+    const historical = Bun.YAML.parse(render()) as { dataSources: unknown[]; templates: unknown[] }
+    expect(actual.dataSources).toEqual([{
+      kind: "ethereum", name: "FeeSplitterA9", network: "arc-testnet",
+      source: { address: a9, abi: "FeeSplitterV2", startBlock: 60_460_646 },
+      mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript", file: "./src/fee-splitter.ts",
+        entities: ["Settlement", "Splitter", "Tree", "TreeOccurrence"],
+        abis: [{ name: "FeeSplitterV2", file: "./abis/FeeSplitterV2.json" }],
+        eventHandlers: [
+          { event: "Settled(indexed address,uint256,uint256,uint256,indexed bytes32)", handler: "handleSettled" },
+          { event: "SettledTree(indexed address,uint256,uint256,uint256,indexed bytes32,indexed bytes32,uint32,uint256)", handler: "handleSettledTree" }
+        ] }
+    }, ...historical.dataSources])
+    expect(actual.templates).toEqual(historical.templates)
+    expect(JSON.stringify(actual.dataSources)).not.toMatch(/Registry|Marketplace|listing|seller|context/)
+    expect(rendered).toBe(renderManifest(template(), chain(), JSON.parse(text("../splitters.json"))))
+  })
+
+  test("canonicalizes order and case without mutating the reviewed two-source input", () => {
+    const input = { splitters: [...reviewedList().splitters].reverse().map((entry) => ({ ...entry, address: `0x${entry.address.slice(2).toUpperCase()}` })) }
+    const before = JSON.stringify(input)
+    expect(renderManifest(template(), chain(), input)).toBe(renderManifest(template(), chain(), reviewedList()))
+    expect(JSON.stringify(input)).toBe(before)
+  })
   test("retains indexed event history explicitly", () => {
     expect(Bun.YAML.parse(render())).toHaveProperty("indexerHints.prune", "never")
   })
+
+  test("returns only immutable reviewed address/seller/height pins", () => {
+    const expected = [
+      { address: a9, seller: "0xcf821769ed3c0e55e152745377bb833d7155a78a", startBlock: 60_460_646 },
+      { address: pilot, seller: "0x3b2bbb840a9570223adbf2172a33bb77fe8d21af", startBlock: 0 }
+    ]
+    for (const entry of expected) {
+      const pin = approvedSplitterPin(`0x${entry.address.slice(2).toUpperCase()}`)
+      expect(pin).toEqual(entry)
+      expect(Object.keys(pin!)).toEqual(["address", "seller", "startBlock"])
+      expect(Object.isFrozen(pin)).toBe(true)
+      expect(Reflect.set(pin!, "seller", a9)).toBe(false)
+      expect(Reflect.set(pin!, "startBlock", 1)).toBe(false)
+      expect(Reflect.set(pin!, "verified", true)).toBe(false)
+      expect(approvedSplitterPin(entry.address)).toEqual(entry)
+    }
+  })
+
+  test("refuses unknown/malformed pin inputs without coercion or property access", () => {
+    let calls = 0
+    const trap = new Proxy({}, { get() { calls++; throw Error("SENTINEL") }, ownKeys() { calls++; throw Error("SENTINEL") } })
+    const coercible = { toString() { calls++; return pilot } }
+    for (const value of [null, undefined, false, 1, 1n, Symbol("pin"), {}, [], trap, coercible,
+      new String(pilot), "", pilot + "\n", pilot + " ", pilot.slice(2), pilot.toUpperCase(),
+      "0x" + "0".repeat(40), "0x" + "a".repeat(40), a9.replace("9", "g"), "x".repeat(4097)]) {
+      expect(approvedSplitterPin(value as string)).toBeNull()
+    }
+    expect(calls).toBe(0)
+  })
+
+  for (const height of [0, -0, -1, 0.5, 60_460_645, 60_460_647, 2_147_483_647, 2_147_483_648, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, "60460646", 60_460_646n, null]) {
+    test(`refuses changed A9 height ${String(height)} (${typeof height})`, () => {
+      expect(() => renderManifest(template(), chain(), { splitters: [
+        { address: a9, startBlock: height }, ...list().splitters
+      ] })).toThrow(new Error(invalid))
+    })
+  }
+
+  for (const [label, value] of [
+    ["A9 without required pilot", { splitters: [reviewedList().splitters[0]] }],
+    ["case-folded duplicate V2", { splitters: [...reviewedList().splitters, { address: `0x${a9.slice(2).toUpperCase()}`, startBlock: 60_460_646 }] }],
+    ["unknown emitter with plausible height", { splitters: [...list().splitters, { address: "0x" + "a".repeat(40), startBlock: 60_460_646 }] }],
+    ["caller seller assignment", { splitters: [{ ...reviewedList().splitters[0], seller: a9 }, ...list().splitters] }],
+    ["caller approval flag", { splitters: [{ ...reviewedList().splitters[0], verified: true }, ...list().splitters] }],
+    ["caller ABI override", { splitters: [{ ...reviewedList().splitters[0], abi: "FeeSplitter" }, ...list().splitters] }]
+  ] as const) {
+    test(`refuses ${label} before rendering any selected source`, () => {
+      expect(() => renderManifest(template(), chain(), value)).toThrow(new Error(invalid))
+    })
+  }
 
   test("renders committed inputs before pinned code generation and compilation", () => {
     expect(JSON.parse(text("../package.json"))).toHaveProperty("scripts.codegen", "bun --no-env-file run manifest && graph codegen subgraph.yaml")
@@ -173,9 +256,9 @@ describe("G3 manifest boundary with G4 mappings and inactive G5 registries", () 
     expect(JSON.parse(text("../package.json"))).toHaveProperty("scripts.test", "graph test --version 0.6.0")
   })
 
-  test("renders committed inputs deterministically with exactly the active pilot and no context", () => {
+  test("retains the valid pilot-only compatibility selection with no context", () => {
     const source = render()
-    expect(source).toBe(renderManifest(template(), chain(), JSON.parse(text("../splitters.json"))))
+    expect(source).toBe(renderManifest(template(), chain(), list()))
     expect(source).toBe(render())
     expect(source.endsWith("\n")).toBe(true)
     expect(source).not.toContain("{{")
@@ -303,11 +386,28 @@ describe("G3 manifest boundary with G4 mappings and inactive G5 registries", () 
   test("writes a complete owned-temp output with all inactive registry inputs present", async () => {
     await fixture(async (paths) => {
       await buildManifest(paths)
-      expect(await readFile(paths.output, "utf8")).toBe(render())
+      expect(await readFile(paths.output, "utf8")).toBe(renderReviewed())
       expect((await readdir(new URL("./abis/", paths.output))).sort()).toEqual([
         "FeeSplitter.json", "FeeSplitterV2.json", "IdentityRegistry.json", "ReputationRegistry.json", "ValidationRegistry.json"
       ])
     })
+  })
+
+  test("invalid reviewed-source edits preserve the prior manifest without temporary output", async () => {
+    for (const changed of [
+      { splitters: [{ address: a9, startBlock: 0 }, ...list().splitters] },
+      { splitters: [reviewedList().splitters[0]] },
+      { splitters: [...list().splitters, { address: "0x" + "a".repeat(40), startBlock: 60_460_646 }] },
+      { splitters: [{ ...reviewedList().splitters[0], verified: true }, ...list().splitters] }
+    ]) {
+      await fixture(async (paths) => {
+        await writeFile(paths.output, "preserve reviewed prior output\n")
+        await writeFile(paths.splitters, JSON.stringify(changed))
+        await expect(buildManifest(paths)).rejects.toThrow(new Error(invalid))
+        expect(await readFile(paths.output, "utf8")).toBe("preserve reviewed prior output\n")
+        expect((await readdir(new URL("./", paths.output))).some((name) => name.endsWith(".tmp"))).toBe(false)
+      })
+    }
   })
 
   for (const asset of requiredAssets) {
@@ -347,7 +447,7 @@ describe("G3 manifest boundary with G4 mappings and inactive G5 registries", () 
       expect(await child(root, ["--eval", `await import(${JSON.stringify(module)})`])).toEqual({ exit: 0, stdout: "", stderr: "" })
       expect((await readdir(new URL("./", paths.output))).includes("subgraph.yaml")).toBe(false)
       expect(await child(root, [join(root, "subgraph/build-manifest.ts")])).toEqual({ exit: 0, stdout: "", stderr: "" })
-      expect(await readFile(paths.output, "utf8")).toBe(render())
+      expect(await readFile(paths.output, "utf8")).toBe(renderReviewed())
       await writeFile(paths.output, "preserve on import\n")
       expect(await child(root, ["--eval", `await import(${JSON.stringify(module)})`])).toEqual({ exit: 0, stdout: "", stderr: "" })
       expect(await readFile(paths.output, "utf8")).toBe("preserve on import\n")

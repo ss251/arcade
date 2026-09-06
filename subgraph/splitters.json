@@ -1,6 +1,10 @@
 {
   "splitters": [
     {
+      "address": "0x9e304ec13dd862c81ee8caa8fd262dac426fbedf",
+      "startBlock": 60460646
+    },
+    {
       "address": "0xf95c8afefae677fdcfc7bd5b8aaaf3702db99206",
       "startBlock": 0
     }

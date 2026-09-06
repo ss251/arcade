@@ -124,3 +124,22 @@ expect calls, root/web strict and actual Graph WASM compilation. The truncated
 Vitest display is not used to invent a new aggregate count or rerun the gate.
 The [parent review](task-5-parent-review.md) and brief preserve this later result;
 final public audit/atomic commit follow, with no live or canonical-link claim.
+
+## September 6 — G6 selected-emitter implementation
+
+G5 committed as `42769befd5df157d7aa70c0d251fe8f59dbd7c21`. The
+[G6 brief](task-6-brief.md) links the selected readiness, decisions, source reports
+and independent dated provenance. Local source now includes the pilot and exact
+A9 V2 emitter, a bounded current-discovery join and fixed one-shot deployment
+consumer. Four templates remain inactive; no Marketplace or per-skill assignment
+is synthesized. Independent review and the sole parent full gate/build are in
+progress. This is not a new upload/deployment/indexed proof or a completed G6.
+
+### Later G6 local acceptance
+
+Independent generator/deployment reviews are CLEAN, including verified native
+child cleanup before operation return. The sole parent gate/build exited0:
+2941 Vitest/131 files,815 Bun/50 files/5637 assertions, root/web strict and actual
+Graph WASM build. The [parent review](task-6-parent-review.md) records this later
+acceptance with unchanged source hashes. Final public audit and local commit
+follow; no new deployment or indexed proof is implied.

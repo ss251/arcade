@@ -1366,3 +1366,41 @@ See [M6 evidence](evidence/m6-gateway.md) and the [exact live follow-up](superpo
 for amounts, addresses, transactions, transfer identifier and exact CLI output.
 F2–12 implementation is unblocked, while further live runs and F13 retain their
 separate evidence/owner-approval requirements. EIP-3009 remains the application default.
+
+## Evidence: the ARCADE ledger subgraph
+
+September 6, 2026, G6 local implementation checkpoint: **not deployed yet**.
+The [subgraph operator notes](../subgraph/README.md#september-6-2026--g6-selected-emitter-ledger)
+record the two reviewed static settlement emitters, exact start blocks and bounded
+commands. G1's acknowledged `v0.0.1-smoke` remains the only deployed evidence at
+this checkpoint; its CID and historical indexed-match proof are retained there.
+
+The selected local build includes the historical v1 pilot and A9's V2 splitter
+`0x9e304ec13dd862c81ee8caa8fd262dac426fbedf` from block 60460646. Registry templates
+remain inactive. Marketplace and canonical per-skill links remain unavailable,
+not measured zero. Do not use emitter totals as per-skill or whole-market totals.
+
+The existing A9 root is
+[this Arc transaction](https://testnet.arcscan.app/tx/0x0d02f5f9793bc7baede3d88b65666052be2b549bc10ea4024d74ecacce28e23d),
+block 60523612/log 49, tree hash
+`0x87cb3b5b32d849ebb6d5777ac247bdbdb15aa532b226fb86a591c491fa8f4a28`.
+Its receipt reports 300000 atomic USDC (285000 seller, 15000 fee), two children
+and 60000 child-total atomic USDC. A September 6 keyless receipt read corroborated
+the retained event. **That is not a Graph indexing result or another purchase.**
+
+After reviewing the exact public build and CID, the authorized one-shot deploy
+uses the following interface, with a fresh file inside an owned 0700 directory:
+
+```sh
+bun --no-env-file run subgraph:deploy --cid REVIEWED_CIDV0 --version v0.1.0 --journal /ABSOLUTE/OWNED_DIRECTORY/deployment.jsonl
+```
+
+The placeholder is intentionally not an executable deployment value. The consumer
+reads `arcade-graph-deploy-key` / `GRAPH_DEPLOY_KEY` from Keychain internally.
+Never pass the key in argv, use `graph auth`, reuse G1's journal, automatically
+retry an unknown result or create a new journal to repeat an uncertain dispatch.
+An acknowledgment alone is not indexing proof. The subsequent evidence must
+record exact CID/version, query URL, `_meta` height/no errors, the three known A9
+occurrences and tree, and actual `marketplace: null`. Studio Synced/current-head
+status must not be inferred from a historical-event match. No new payment is
+needed for this evidence.

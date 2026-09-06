@@ -185,7 +185,10 @@ describe("G2 ledger schema contract (offline)", () => {
 
   test("declares pilot entities and the real inactive tree mapping without registry coverage", () => {
     const manifest = Bun.YAML.parse(renderManifest(text("../subgraph.template.yaml"), JSON.parse(text("../../config/chains/arc-testnet.json")), JSON.parse(text("../splitters.json"))))
-    expect(manifest).toMatchObject({ dataSources: [{ mapping: { entities: ["Settlement", "Splitter"] } }] })
+    expect(manifest).toMatchObject({ dataSources: [
+      { name: "FeeSplitterA9", mapping: { entities: ["Settlement", "Splitter", "Tree", "TreeOccurrence"] } },
+      { name: "FeeSplitterSmoke", mapping: { entities: ["Settlement", "Splitter"] } }
+    ] })
     expect(manifest).toHaveProperty("templates.0", expect.objectContaining({
       name: "FeeSplitterV2",
       mapping: expect.objectContaining({ entities: ["Settlement", "Splitter", "Tree", "TreeOccurrence"] })

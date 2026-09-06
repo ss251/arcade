@@ -1,4 +1,10 @@
-# ARCADE ledger — G1 smoke checkpoint
+# ARCADE ledger
+
+Current local work is the [G6 selected-emitter build](#september-6-2026--g6-selected-emitter-ledger).
+The dated G1 sections preserve the acknowledged historical smoke deployment;
+they are not a claim that later local source is already deployed.
+
+## Historical G1 smoke checkpoint
 
 This temporary smoke subgraph maps the **v1 pilot FeeSplitter's `Settled` event**
 to immutable `Settlement` entities. It does not yet index FeeSplitterV2 trees or
@@ -369,3 +375,69 @@ and its exact four-root TypeScript strict check. One coordinated local codegen
 generated RegistryEvent and the three inactive template event modules after all
 four real registry source drafts existed. These results do not claim mapping
 runtime acceptance, a complete gate, registry activation or a new deployment.
+
+## September 6, 2026 — G6 selected-emitter ledger
+
+Local source now selects two reviewed Arc-testnet settlement emitters. This
+checkpoint is implementation in progress, not a new Studio acknowledgment or
+indexed-tree proof. G5 committed as `42769befd5df157d7aa70c0d251fe8f59dbd7c21`.
+
+| Static emitter | ABI | Start block | Scope |
+| --- | --- | ---: | --- |
+| `0xf95c8afefae677fdcfc7bd5b8aaaf3702db99206` | FeeSplitter | 0 | Retained historical pilot exception, not a creation-height fallback |
+| `0x9e304ec13dd862c81ee8caa8fd262dac426fbedf` | FeeSplitterV2 | 60460646 | Verified A9 deployment, Settled and SettledTree |
+
+The A9 source creation receipt and fixed-block runtime/immutable checks are
+separate from hub announcements. At block 60670577 both selected runtimes matched
+the reviewed compiler artifacts outside declared immutable slots, including
+their metadata trailers. Their USDC immutable was
+`0x3600000000000000000000000000000000000000`, with 500 bps fees. Pilot seller and
+treasury were `0x3b2bbb840a9570223adbf2172a33bb77fe8d21af`; A9 seller and treasury
+were `0xcf821769ed3c0e55e152745377bb833d7155a78a`. This dated verification does not
+establish exclusive historical use by any skill.
+
+Four templates remain inactive: V2 plus IdentityRegistry, ReputationRegistry and
+ValidationRegistry. Current proxy ABI observations do not establish pre-upgrade
+history, so no registry epoch is silently activated. No Marketplace row or
+canonical Listing/Agent/Splitter assignment is synthesized. Emitter-level counts
+must not be relabeled per-skill, all-rail or marketplace-wide totals.
+
+### Bounded operator workflow
+
+Run from the repository root with its locked dependencies and the separately
+pinned subgraph toolchain already installed:
+
+```sh
+bun --no-env-file run subgraph:splitters --help
+bun --no-env-file run subgraph:splitters --hub https://arcade-hub-production.up.railway.app
+bun --no-env-file run subgraph:manifest
+bun --no-env-file run subgraph:build
+bun --no-env-file run subgraph:deploy --help
+```
+
+Discovery is a default dry run. An explicit `--write` permits only a validated
+local list update. It joins two bounded GET responses, `/listings` and
+`/.well-known/x402`, against the exact default EIP-3009 chain/token/price/resource
+coordinates and reviewed immutable profiles. It does not POST a quote, discover
+arbitrary contracts, fetch metadata, use zero on lookup failure or prune historical
+emitters. Multiple current skills may share one emitter; their observed IDs are
+not canonical payment attribution. These GETs are not an atomic hub snapshot.
+
+The dated public observation at 2026-09-06T02:21:52Z had an empty catalogue and
+empty discovery resources, with no rail in the retained projection. That is not
+permission to invent an EIP-3009 default or delete the two historical pins.
+Unavailable or inconsistent discovery must preserve the existing list.
+
+The new deploy command accepts an explicit reviewed CID, fixed `v0.1.0` version
+and fresh absolute journal path. It selects the approved macOS Keychain service
+`arcade-graph-deploy-key` / account `GRAPH_DEPLOY_KEY` inside its consuming process.
+No deploy key is accepted in arguments, printed, written to a file or saved by
+`graph auth`. Imports/help do not retrieve it. A successful acknowledgment records
+the exact returned versioned query URL; it does not prove indexing. A dispatched
+unknown outcome requires reconciliation, never an automatic retry or a fresh
+journal to replay it. The old G1 deployment and its journal remain untouched.
+
+Building does not upload. Any deliberate public IPFS upload and one fresh Studio
+deployment follow source review, offline checks and the parent gate. No such
+remote operation is claimed yet by this local checkpoint. Existing A9 settlements
+will supply the indexing proof; do not buy them again to refresh the subgraph.

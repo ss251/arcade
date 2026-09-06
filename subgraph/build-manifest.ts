@@ -7,6 +7,21 @@ const MARKER = "{{SPLITTER_SOURCES}}"
 const MAX_BLOCK = 2_147_483_647
 const fail = (): never => { throw new Error(ERROR) }
 
+type SplitterPin = Readonly<{ address: string; seller: string; startBlock: number }>
+// Reviewed fixed-block code/immutable evidence. Zero is the retained pilot
+// exception, not a creation-height fallback or current hub announcement.
+const SPLITTER_PINS: readonly SplitterPin[] = Object.freeze([
+  Object.freeze({ address: "0x9e304ec13dd862c81ee8caa8fd262dac426fbedf", seller: "0xcf821769ed3c0e55e152745377bb833d7155a78a", startBlock: 60_460_646 }),
+  Object.freeze({ address: PILOT, seller: "0x3b2bbb840a9570223adbf2172a33bb77fe8d21af", startBlock: 0 })
+])
+
+/** Inert immutable policy lookup; no discovery, contract read or caller trust flag. */
+export function approvedSplitterPin(address: string): SplitterPin | null {
+  if (typeof address !== "string" || address.length !== 42 || !/^0x[0-9a-fA-F]{40}$/.test(address)) return null
+  const canonicalAddress = address.toLowerCase()
+  return SPLITTER_PINS.find((pin) => pin.address === canonicalAddress) ?? null
+}
+
 /** Capture only bounded own data, without invoking caller-provided accessors/toJSON. */
 function data(value: unknown, depth = 0): unknown {
   if (depth > 8) return fail()
@@ -62,11 +77,11 @@ const CHAIN = canonical({
   gateway: { wallet: "0x0077777d7EBA4688BDeF3E311b846F25870A19B9", domain: 26, facilitatorUrl: "https://gateway-api-testnet.circle.com", minValiditySeconds: 604900 }
 })
 
-function activeManifest(address: string, startBlock: number) {
-  return {
+function activeManifest(pins: readonly SplitterPin[]) {
+  const manifest = {
     specVersion: "1.0.0", indexerHints: { prune: "never" }, schema: { file: "./schema.graphql" },
     dataSources: [{ kind: "ethereum", name: "FeeSplitterSmoke", network: "arc-testnet",
-      source: { address, abi: "FeeSplitter", startBlock },
+      source: { address: PILOT, abi: "FeeSplitter", startBlock: 0 },
       mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
         file: "./src/fee-splitter.ts", entities: ["Settlement", "Splitter"],
         abis: [{ name: "FeeSplitter", file: "./abis/FeeSplitter.json" }],
@@ -117,17 +132,25 @@ function activeManifest(address: string, startBlock: number) {
       }
     }]
   }
+  const pilot = manifest.dataSources[0]!
+  manifest.dataSources = pins.map((pin) => pin.address === PILOT ? pilot : {
+    kind: "ethereum", name: "FeeSplitterA9", network: "arc-testnet",
+    source: { address: pin.address, abi: "FeeSplitterV2", startBlock: pin.startBlock },
+    mapping: manifest.templates[0]!.mapping
+  })
+  return manifest
 }
 
-/** G5: one pilot and four inactive templates; no registry activation or listing authority. */
+/** G6: required pilot, optional exact A9 pin; four inactive templates, no listing authority. */
 export function renderManifest(template: string, chainConfig: unknown, splitters: unknown): string {
   try {
     if (canonical(chainConfig) !== CHAIN) return fail()
     const captured = data(splitters)
     if (captured === null || typeof captured !== "object" || Array.isArray(captured)) return fail()
     const list = captured as Record<string, unknown>
-    if (Object.keys(list).join() !== "splitters" || !Array.isArray(list.splitters) || list.splitters.length === 0) return fail()
+    if (Object.keys(list).join() !== "splitters" || !Array.isArray(list.splitters) || list.splitters.length < 1 || list.splitters.length > SPLITTER_PINS.length) return fail()
     const seen = new Set<string>()
+    const pins: SplitterPin[] = []
     for (const entry of list.splitters) {
       if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return fail()
       const item = entry as Record<string, unknown>
@@ -138,12 +161,13 @@ export function renderManifest(template: string, chainConfig: unknown, splitters
       seen.add(address)
       if (typeof item.startBlock !== "number" || !Number.isInteger(item.startBlock) ||
           item.startBlock < 0 || item.startBlock > MAX_BLOCK) return fail()
-      // Zero is the accepted historical pilot exception, not its verified creation height.
-      if (address !== PILOT || item.startBlock !== 0) return fail()
+      const pin = approvedSplitterPin(address)
+      if (!pin || item.startBlock !== pin.startBlock) return fail()
+      pins.push(pin)
     }
-    if (list.splitters.length !== 1 || typeof template !== "string" || template.length > 16_384 ||
+    if (!seen.has(PILOT) || typeof template !== "string" || template.length > 16_384 ||
         /[\u0000-\u0008\u000b-\u001f\u007f]/.test(template) || template.split(MARKER).length !== 2) return fail()
-    const expected = activeManifest(PILOT, 0)
+    const expected = activeManifest(pins.sort((a, b) => a.address < b.address ? -1 : a.address > b.address ? 1 : 0))
     const source = Bun.YAML.stringify(expected.dataSources, null, 2).trimEnd().split("\n").map((line) => `  ${line}`).join("\n")
     const rendered = template.replace(MARKER, source)
     if (/[{}]/.test(rendered) || canonical(Bun.YAML.parse(rendered)) !== canonical(expected)) return fail()

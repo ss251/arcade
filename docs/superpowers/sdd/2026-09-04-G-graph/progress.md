@@ -375,3 +375,32 @@ The [parent review](task-4-parent-review.md) is now a sixth banner-only copy; th
 five earlier copies still use exactly ten approved substitutions. The earlier
 gate-pending entries remain historical. Final publication audit and the separate
 atomic G4 commit follow; no live indexing or complete-coverage claim is added.
+
+## September 6 — G5 committed; G6 local implementation checkpoint
+
+G5's completed source and evidence committed as
+`42769befd5df157d7aa70c0d251fe8f59dbd7c21`; its dated final acceptance is recorded
+in the [G5 brief](task-5-brief.md) and [parent review](task-5-parent-review.md).
+
+G6 now selects two reviewed static settlement sources, preserving all four
+inactive templates and unchanged G4/G5 mappings/schema. Its generator accepts
+only exact approved immutable profiles through a bounded current-discovery join;
+its deployment command uses an explicit CID and fresh journal with in-process
+Keychain retrieval and no automatic retry. Root added four tested command aliases
+and the runbook's local/not-yet-deployed evidence block.
+
+The [G6 brief](task-6-brief.md) preserves six preparation/implementation/provenance
+records. Focused generator/integrator checks passed; independent command review
+and the sole complete parent gate/build remain in progress. The local commit
+will precede deliberate reviewed upload, one fresh v0.1.0 deployment and exact
+existing-A9 indexed proof. Task6 live acceptance stays open. No new spend or push.
+
+### G6 later local gate and source acceptance
+
+The sole complete parent command passed2941 Vitest/131 files,815 Bun/50 files/
+5637 assertions, root/web strict and actual Graph WASM build. Independent command
+review is CLEAN after the native-child cleanup correction. Thirteen frozen
+source hashes remained unchanged; no full-gate or native-AS repeat was performed.
+Ten sanitized historical copies now include the [parent review](task-6-parent-review.md).
+Final public audit/local commit follow; the upload, one-shot deployment and live
+indexed A9 evidence are still separate unperformed steps at this checkpoint.
