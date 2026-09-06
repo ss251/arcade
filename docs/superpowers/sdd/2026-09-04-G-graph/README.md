@@ -1,5 +1,20 @@
 # Plan G — execution records
 
+## September 6 — G8 web follow-up
+
+G9 merged as c8d6337. The [web brief](task-8-web-brief.md) and
+[parent report](task-8-web-parent-report.md) record two corrected decoding
+omissions,117 focused tests, exact strict0, six native read-only browser cases
+and independently joined cleanup. The optional Graph section is separate from
+D registry facts, uses existing styles and adds no purchase authority. The sole
+full gate and atomic commit follow; no current/live indexing claim or spend.
+
+Later: the sole full gate passed 4,282 Vitest tests, 872 Bun tests with 6,383
+assertions, root/web strict checks and client/SSR builds. All 14 frozen source
+pins, 191 links and the scoped privacy/preservation audit passed. This full gate
+also covers G9's final detail-ID guard. Atomic commit/fast-forward follows.
+
+
 ## September 6 — G9 MCP index evidence
 
 G8 is committed/merged as c5a5389. G9's [brief](task-9-brief.md) and

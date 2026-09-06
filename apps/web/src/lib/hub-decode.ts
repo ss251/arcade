@@ -4,6 +4,7 @@ import { dnsNameOf } from "../../../../packages/core/src/ens.ts"
 import { formatPrice } from "../../../../packages/core/src/money.ts"
 import { loadChainConfig } from "../../../../packages/core/src/chain-config.ts"
 import { NON_SETTLING } from "../../../../packages/core/src/job.ts"
+import { checkedGraphEvidence, type GraphEvidence } from "../../../../packages/buyer/src/graph-evidence.ts"
 import { settlementReferenceKind, type SettlementReferenceKind } from "./format.ts"
 
 export interface PayTest { readonly atMs: number; readonly jobId: string; readonly ok: boolean; readonly settleTx?: string }
@@ -17,6 +18,7 @@ export interface ListingSummary {
   readonly tags?: ReadonlyArray<string>; readonly price: string; readonly replaces?: string; readonly seller: string
   readonly payTested?: PayTest | null; readonly delisted?: boolean; readonly ensName?: string | null
   readonly ensExpired?: boolean; readonly stats?: ListingStats
+  readonly graph?: GraphEvidence
 }
 export interface ListingDetail extends ListingSummary {
   readonly inputSchema: unknown; readonly outputSchema: unknown; readonly bounds?: Record<string, unknown>
@@ -192,6 +194,9 @@ const payTest = (v: unknown): PayTest => {
 }
 const listingSummary = (v: unknown): ListingSummary => {
   const r = object(v), id = skill(own(r, "id"))
+  // Optional index evidence must not discard an otherwise valid listing.
+  const d = Object.getOwnPropertyDescriptor(r, "graph")
+  const graph = d?.enumerable && "value" in d ? checkedGraphEvidence(d.value) : undefined
   return { id, version: text(own(r, "version"), 128, true), serviceName: text(own(r, "serviceName"), 32),
     description: text(own(r, "description"), 500, true), price: price(own(r, "price")), seller: address(own(r, "seller")),
     ...copyOptional("tags", optional(r, "tags", v => array(v, 5).map(tag => text(tag, 32)))),
@@ -199,7 +204,7 @@ const listingSummary = (v: unknown): ListingSummary => {
     ...copyOptional("ensName", optional(r, "ensName", v => v === null ? null : nameOk(v) ? v : invalid())),
     ...copyOptional("ensExpired", optional(r, "ensExpired", bool)), ...copyOptional("delisted", optional(r, "delisted", bool)),
     ...copyOptional("payTested", optional(r, "payTested", v => v === null ? null : payTest(v))),
-    ...copyOptional("stats", optional(r, "stats", v => statsOf(v, id))) }
+    ...copyOptional("stats", optional(r, "stats", v => statsOf(v, id))), ...copyOptional("graph", graph) }
 }
 /** Schemas remain public data; copy bounded plain JSON, never an accessor/prototype. */
 const jsonValue = (v: unknown, depth = 0, budget = { left: 8192 }): unknown => {

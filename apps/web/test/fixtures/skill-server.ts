@@ -8,7 +8,8 @@ const tx = `0x${"a".repeat(64)}`, payTx = `0x${"b".repeat(64)}`, registrationTx 
 const privateJob = "job_PRIVATECANARY0000000000000001", privateHistory = "job_PRIVATEHISTORY00000000000001"
 const modes = new Set(["ok", "detail-down", "receipts-down", "both-down", "empty-receipts", "absent-history",
   "empty-history", "unknown-evidence", "zero-evidence", "stale-evidence", "unverified-evidence", "ens-ok",
-  "ens-expired", "ens-down", "ens-seller-mismatch", "ens-skill-mismatch", "redirect", "long"])
+  "ens-expired", "ens-down", "ens-seller-mismatch", "ens-skill-mismatch", "redirect", "long",
+  "graph-ready", "graph-zero", "graph-invalid", "graph-long"])
 let mode = "ok", reads = { detail: 0, receipts: 0, names: 0, other: 0 }
 let closing = false, web: ViteDevServer | undefined, startup: Promise<void> | undefined, closeWork: Promise<void> | undefined
 let hubOrigin = ""
@@ -39,6 +40,12 @@ function detail() {
       settlementFeedback: mode === "zero-evidence" ? 0 : 7, private: "PRIVATE_IDENTITY_EXTRA"
     } }),
     ...(mode.startsWith("ens-") ? { ensName: "triage.arcade.eth", ensExpired: false } : {}),
+    ...(mode.startsWith("graph-") ? { graph: {
+      agentId: mode === "graph-invalid" ? "PRIVATE_GRAPH" : mode === "graph-long" ? `5042002:${(1n << 256n) - 1n}` : "5042002:7",
+      settlementCount: mode === "graph-zero" ? 0 : mode === "graph-long" ? Number.MAX_SAFE_INTEGER : 11,
+      feedbackCount: mode === "graph-zero" ? 0 : 5, validationPassCount: mode === "graph-zero" ? 0 : 4,
+      indexedBlock: 99, privateUrl: "PRIVATE_GRAPH"
+    } } : {}),
     engine: "PRIVATE_ENGINE", secrets: "PRIVATE_SECRET", jobToken: "PRIVATE_LISTING_TOKEN"
   }
 }

@@ -1,6 +1,7 @@
 import { EnsNameExpired, type ListingDetail, type PublicReceiptRow } from "./hub.ts"
 import { addressOk, decodeListing, decodeReceipts, nameOk, skillIdOk } from "./hub-decode.ts"
 import { settlementReferenceKind } from "./format.ts"
+import { checkedGraphEvidence } from "../../../../packages/buyer/src/graph-evidence.ts"
 
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
 export interface SkillPageListing extends Omit<ListingDetail, "inputSchema" | "outputSchema" | "bounds"> {
@@ -77,6 +78,9 @@ const listingProjection = (value: unknown, id: string, resolvedSeller?: string):
     (out.id !== id || out.seller.toLowerCase() !== resolvedSeller.toLowerCase())) throw new NameMismatch()
   const inputSchema = schemaCopy(own(raw, "inputSchema")), outputSchema = schemaCopy(own(raw, "outputSchema"))
   out.inputSchema = inputSchema; out.outputSchema = outputSchema
+  const graphDescriptor = Object.getOwnPropertyDescriptor(raw, "graph")
+  const graph = graphDescriptor?.enumerable && "value" in graphDescriptor ? checkedGraphEvidence(graphDescriptor.value) : undefined
+  if (graph !== undefined) out.graph = graph
   const nested: Readonly<Record<string, readonly string[]>> = {
     bounds: ["timeoutSec", "maxTurns", "maxTokens", "maxToolCalls", "maxCostUsd", "maxSubSpendUsd"],
     stats: ["skillId", "calls", "settled", "successRate", "p50LatencyMs", "p95LatencyMs", "availability"], ratings: ["count", "average"]

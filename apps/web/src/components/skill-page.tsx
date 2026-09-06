@@ -1,4 +1,5 @@
 import { Evidence, SchemaBlock } from "./evidence.tsx"
+import { IndexedEvidence } from "./graph-evidence.tsx"
 import { Nav } from "./nav.tsx"
 import { ago, txLink } from "../lib/format.ts"
 import type { PublicReceiptChild, PublicReceiptRow } from "../lib/hub-decode.ts"
@@ -88,6 +89,7 @@ export function SkillPage({ data }: { readonly data: SkillPageData }) {
               </li>)}</ol>}
         </section>
         <Evidence listing={l} />
+        <IndexedEvidence evidence={l.graph} />
       </>}
     <Records data={data} />
   </main>

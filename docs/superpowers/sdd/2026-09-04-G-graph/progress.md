@@ -1,5 +1,21 @@
 # SDD ledger — Plan G
 
+2026-09-06 22:36 IST: G8 web sole gate 61261 passed 4,282 Vitest /191 files,
+872 Bun /58 files /6,383 assertions, root/web strict and builds 345ms/174ms.
+Final source unchanged, including G9's previously targeted detail-ID guard.
+14 source pins /10 scoped files /191 links, privacy and preservation PASS.
+Atomic commit and immediate main fast-forward next; no duplicate main gate.
+
+
+2026-09-06 22:33 IST: G8 web follow-up preserves the shared four-field projection
+through both public boundaries and renders separate qualified index evidence.
+Three genuine Reds corrected;117focused/5files and exact7rootsstrict0.
+Six native cases PASS; three useful inspected section captures, one excluded
+pre-scroll image. First run had a wrong plural route; both attempts independently
+cleaned10PIDs/5uniqueports/0profileprocesses. Sole fullgate/public audit next,
+root-only/max4/no browser-gate overlap, spend, key, production or push.
+
+
 2026-09-06 22:15 IST: G9 sole69025 gate passed4272Vitest190/57.29s,
 872Bun58/6385assert/162.73s,rootwebstrict0,build340/192ms. After gate, actual
 detail-ID mismatch Red corrected with one fixed refusal. Final89focused/4files
