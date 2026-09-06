@@ -1,5 +1,10 @@
 # Plan H — execution records
 
+Current integration: [F/H provenance and session safeguards](task-7-integration.md).
+H1–H7 are rebased onto main; the follow-up records the exact full-sweep failures,
+focused repairs and completed strict/build checks. H remains unmerged. The
+paragraphs below preserve earlier task checkpoints, not newer integration status.
+
 Latest isolated task: [H7 receipt-tree geometry, rendering and evidence](task-7-brief.md).
 Its final gate/commit and the F/H rebase are separate from historical H1–6 acceptance.
 

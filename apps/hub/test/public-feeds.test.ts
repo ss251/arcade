@@ -62,7 +62,7 @@ describe("shared public receipt boundary", () => {
     expect(row.reason).toBe("settled")
     expect(Object.keys(row).sort()).toEqual(["skillId", "skillVersion", "seller", "rail", "network",
       "priceAtomic", "sellerAtomic", "feeAtomic", "feeBps", "price", "sellerShare", "fee", "settled",
-      "reason", "latencyMs", "createdAtMs", "settleTx", "explorer", "hop", "treeHash", "children",
+      "reason", "latencyMs", "createdAtMs", "settleTx", "explorer", "session", "hop", "treeHash", "children",
       "treeCeilingAtomic", "treeCommittedAtomic"].sort())
     expect(Object.keys(row.children![0]!).sort()).toEqual(["skillId", "priceAtomic", "price", "settled", "settleTx", "explorer"].sort())
   })
@@ -103,7 +103,7 @@ describe("shared public receipt boundary", () => {
       expect(JSON.stringify(row)).not.toContain("PRIVATE")
     })
   it("keeps only fixed canonical verdicts", () => {
-    for (const reason of ["ok", "refused", "job status is failed", "job status is runner_lost", "job status is invalid",
+    for (const reason of ["ok", "refused", "session_released", "job status is failed", "job status is runner_lost", "job status is invalid",
       "job status is timeout", "job status is bounds_exceeded", "job status is rejected",
       "engine refused (stop_reason=content_filter)", "engine refused (stop_reason=reasoning_extraction)",
       "output is empty", "output failed the listing's outputSchema"]) {

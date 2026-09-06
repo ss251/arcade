@@ -88,7 +88,28 @@ describe("display helpers", () => {
     expect(txLink(tx, Object.create(settled))).toBeNull()
   })
 
-  it.each(["network", "rail", "settled"])("never invokes an untrusted %s accessor", async key => {
+  it.each([undefined, null, "gateway-transfer", "gateway-batch", "test", "unrecognized", "future", 0])(
+    "refuses a present non-onchain reference kind: %s", async settleRefKind => {
+      const { txLink } = await import("../src/lib/format.ts")
+      expect(txLink(tx, { ...settled, settleRefKind })).toBeNull()
+    })
+  it("keeps true absence and explicit own onchain eligible, without trusting inherited or hidden kinds", async () => {
+    const { txLink } = await import("../src/lib/format.ts")
+    expect(txLink(tx, settled)).not.toBeNull()
+    expect(txLink(tx, { ...settled, settleRefKind: "onchain" })).not.toBeNull()
+    expect(txLink(tx, Object.assign(Object.create({ settleRefKind: "onchain" }), settled))).toBeNull()
+    expect(txLink(tx, Object.defineProperty({ ...settled }, "settleRefKind", { value: "onchain" }))).toBeNull()
+  })
+  it("refuses a reference-kind descriptor trap without reflecting its diagnostic", async () => {
+    const { txLink } = await import("../src/lib/format.ts")
+    const context = new Proxy({ ...settled }, { getOwnPropertyDescriptor(target, key) {
+      if (key === "settleRefKind") throw Error("PRIVATE_KIND_DIAGNOSTIC")
+      return Reflect.getOwnPropertyDescriptor(target, key)
+    } })
+    expect(txLink(tx, context)).toBeNull()
+  })
+
+  it.each(["network", "rail", "settled", "settleRefKind"])("never invokes an untrusted %s accessor", async key => {
     const { txLink } = await import("../src/lib/format.ts")
     let reads = 0
     const context = { ...settled }

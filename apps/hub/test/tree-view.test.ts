@@ -184,4 +184,43 @@ describe("anonymized tree evidence, not flat-list hierarchy", () => {
     expect(buildTreeView(ROOT, [...fixture(), unrelated])!.complete).toBe(true)
     expect(calls).toBe(0)
   })
+  it.each(["onchain", "gateway-transfer", "gateway-batch", "test", undefined, null, "future-kind"])(
+    "preserves reference-kind presence through root and full-child snapshots: %s", kind => {
+      const rows = fixture().map(r => Object.defineProperty({ ...r }, "settleRefKind",
+        { value: kind, enumerable: true }) as Receipt)
+      const view = buildTreeView(ROOT, rows)!
+      expect(view.complete).toBe(true)
+      expect(view.nodes).toHaveLength(3)
+      for (const node of view.nodes) expect(node.explorer === null).toBe(kind !== "onchain")
+    })
+  it("does not erase accessor, nonenumerable or inherited kinds into legacy snapshots", () => {
+    let reads = 0
+    for (const descriptor of [
+      { get() { reads++; return "onchain" }, enumerable: true },
+      { value: "onchain", enumerable: false }
+    ]) {
+      const rows = fixture().map(r => Object.defineProperty({ ...r }, "settleRefKind", descriptor) as Receipt)
+      expect(buildTreeView(ROOT, rows)!.nodes.every(n => n.explorer === null)).toBe(true)
+    }
+    const rows = fixture().map(r => Object.assign(Object.create({ get settleRefKind() { reads++; return "onchain" } }), r) as Receipt)
+    expect(buildTreeView(ROOT, rows)!.nodes.every(n => n.explorer === null)).toBe(true)
+    expect(reads).toBe(0)
+  })
+  it("treats missing versus invalid-present kind as conflicting full-child evidence", () => {
+    const rows = fixture(), duplicate = Object.defineProperty({ ...rows[1]! }, "settleRefKind",
+      { value: undefined, enumerable: true }) as Receipt
+    const view = buildTreeView(ROOT, [...rows, duplicate])!
+    expect(view.evidenceFlags).toContain("receipt-conflict")
+    expect(view.nodes.some(n => n.skillId === "child-skill")).toBe(false)
+  })
+  it("uses each full receipt's own kind instead of inheriting a different root's kind", () => {
+    const rows = fixture()
+    rows[0] = Receipt.make({ ...rows[0]!, settleRefKind: "gateway-transfer" })
+    rows[1] = Receipt.make({ ...rows[1]!, settleRefKind: "onchain" })
+    const view = buildTreeView(ROOT, rows)!
+    expect(view.complete).toBe(true)
+    expect(view.nodes[0]!.explorer).toBeNull()
+    expect(view.nodes[1]!.explorer).not.toBeNull()
+    expect(view.nodes[2]!.explorer).not.toBeNull()
+  })
 })

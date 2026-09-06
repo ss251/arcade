@@ -54,7 +54,7 @@ describe("publicReceipt", () => {
     expect(JSON.stringify(pub)).not.toContain(sessionId)
     expect(pub).not.toHaveProperty("sessionId")
     expect(pub).toHaveProperty("session", true)
-    expect(pub).toMatchObject({ skillId: "parent", rail: "test", network: "eip155:5042002", priceAtomic: "250000" })
+    expect(pub).toMatchObject({ skillId: "parent", rail: "eip3009", network: "eip155:5042002", priceAtomic: "250000" })
   })
 
   it("carries no jobId, buyer, or authorizationNonce at any depth", () => {
@@ -70,7 +70,7 @@ describe("publicReceipt", () => {
     expect(pub).not.toHaveProperty("authorizationNonce")
   })
 
-  it("keeps tree shape and opaque simulated references without inventing explorer links", () => {
+  it("keeps flat child evidence and qualified recorded EIP reference links", () => {
     const pub = publicReceipt(receipt)
     expect(pub.treeCeilingAtomic).toBe("50000")
     expect(pub.treeCommittedAtomic).toBe("10000")
@@ -86,7 +86,7 @@ describe("publicReceipt", () => {
     ])
   })
 
-  it("stringifies atomic fields but does not link a simulated malformed reference", () => {
+  it("stringifies atomic fields and preserves the qualified recorded root link", () => {
     const pub = publicReceipt(receipt)
     expect(pub.priceAtomic).toBe("250000")
     expect(pub.sellerAtomic).toBe("237500")
@@ -205,5 +205,81 @@ describe("publicReceipt", () => {
     expect(raw).not.toHaveProperty("session")
     expect(child.skillId).toBe("child")
     expect(child).not.toHaveProperty("explorer")
+  })
+
+  it.each([false, true])("projects an own kind accessor as unrecognized without invoking it (throws=%s)", throws => {
+    let invoked = 0
+    const raw = Receipt.make({ ...receipt })
+    Object.defineProperty(raw, "settleRefKind", { enumerable: true, get() {
+      invoked++
+      if (throws) throw Error("PRIVATE_KIND_ACCESSOR")
+      return "onchain"
+    } })
+    const pub = publicReceipt(raw)
+    expect(invoked).toBe(0)
+    expect(pub).toMatchObject({ settleRefKind: "unrecognized", explorer: null })
+    expect(pub.children[0]?.explorer).toBeNull()
+    expect(JSON.parse(JSON.stringify(pub))).toHaveProperty("settleRefKind", "unrecognized")
+  })
+
+  it.each([undefined, "onchain", "gateway-transfer"])("preserves inherited kind presence as unrecognized: %s", settleRefKind => {
+    const raw = Object.setPrototypeOf(Receipt.make({ ...receipt }), { settleRefKind })
+    expect(Object.hasOwn(raw, "settleRefKind")).toBe(false)
+    const pub = publicReceipt(raw)
+    expect(pub).toMatchObject({ settleRefKind: "unrecognized", explorer: null })
+    expect(pub.children[0]?.explorer).toBeNull()
+    expect(JSON.parse(JSON.stringify(pub))).toHaveProperty("settleRefKind", "unrecognized")
+  })
+
+  it("does not invoke an inherited kind accessor or treat it as legacy absence", () => {
+    let invoked = 0
+    const prototype = Object.defineProperty({}, "settleRefKind", { get() { invoked++; throw Error("PRIVATE_KIND_ACCESSOR") } })
+    const pub = publicReceipt(Object.setPrototypeOf(Receipt.make({ ...receipt }), prototype))
+    expect(invoked).toBe(0)
+    expect(pub).toMatchObject({ settleRefKind: "unrecognized", explorer: null })
+    expect(pub.children[0]?.explorer).toBeNull()
+  })
+
+  it("does not promote a hidden own kind into public link authority", () => {
+    const raw = Object.defineProperty(Receipt.make({ ...receipt }), "settleRefKind", { value: "onchain", enumerable: false })
+    expect(publicReceipt(raw)).toMatchObject({ settleRefKind: "unrecognized", explorer: null })
+  })
+
+  it.each(["descriptor", "presence"] as const)("contains a failing kind %s reflection as unrecognized", trap => {
+    const raw = new Proxy(Receipt.make({ ...receipt }), {
+      getOwnPropertyDescriptor(target, key) {
+        if (key === "settleRefKind" && trap === "descriptor") throw Error("PRIVATE_KIND_REFLECTION")
+        return Reflect.getOwnPropertyDescriptor(target, key)
+      },
+      has(target, key) {
+        if (key === "settleRefKind" && trap === "presence") throw Error("PRIVATE_KIND_REFLECTION")
+        return Reflect.has(target, key)
+      }
+    })
+    const pub = publicReceipt(raw)
+    expect(pub).toMatchObject({ settleRefKind: "unrecognized", explorer: null })
+    expect(pub.children[0]?.explorer).toBeNull()
+    expect(JSON.stringify(pub)).not.toContain("PRIVATE")
+  })
+
+  it.each(["inherited", "accessor"] as const)("does not accept %s private session identity or copy child session claims", mode => {
+    let invoked = 0
+    const raw = Receipt.make({ ...receipt, children: [Object.assign(ReceiptChild.make({ ...receipt.children![0]! }), {
+      session: true, sessionId: `ses_${"b".repeat(32)}`
+    })] })
+    if (mode === "inherited") Object.setPrototypeOf(raw, { sessionId: `ses_${"a".repeat(32)}` })
+    else Object.defineProperty(raw, "sessionId", { enumerable: true, get() { invoked++; throw Error("PRIVATE_SESSION_ACCESSOR") } })
+    const pub = publicReceipt(raw)
+    expect(invoked).toBe(0)
+    expect(pub.session).toBe(false)
+    expect(pub.children[0]).not.toHaveProperty("session")
+    expect(JSON.stringify(pub)).not.toContain("ses_")
+  })
+
+  it("retains the fixed session release reason without rewriting its authorized amount or inferring a refund", () => {
+    const pub = publicReceipt(Receipt.make({ ...receipt, settled: false, reason: "session_released", sessionId: `ses_${"a".repeat(32)}` }))
+    expect(pub).toMatchObject({ reason: "session_released", session: true, settled: false,
+      priceAtomic: "250000", sellerAtomic: "237500", feeAtomic: "12500", explorer: null })
+    expect(pub).not.toHaveProperty("settleTx")
   })
 })

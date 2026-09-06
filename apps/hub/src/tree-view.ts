@@ -59,16 +59,25 @@ const snapshot = (value: unknown): Receipt | undefined => {
     hop !== undefined && !integer(hop, MAX_DEPTH) || ceiling !== undefined && !atomic(ceiling) ||
     committed !== undefined && !atomic(committed)) return undefined
   const reason = own(value, "reason"), tx = own(value, "settleTx"), treeHash = own(value, "treeHash")
+  const kindDescriptor = Object.getOwnPropertyDescriptor(value, "settleRefKind")
+  const kindAbsent = kindDescriptor === undefined && !("settleRefKind" in (value as object))
+  const candidate = kindDescriptor?.enumerable && "value" in kindDescriptor ? kindDescriptor.value : undefined
+  const kind = candidate === "onchain" || candidate === "gateway-transfer" || candidate === "gateway-batch" || candidate === "test"
+    ? candidate : undefined
+  // Own undefined preserves invalid presence without passing an invalid enum into
+  // Receipt.make. F14's link guard refuses it; only true absence is legacy data.
   return Receipt.make({ jobId: id, skillId: skill, skillVersion: version, buyer, seller,
     priceAtomic: price, sellerAtomic: sellerShare, feeAtomic: fee, feeBps,
     rail: rail as Receipt["rail"], network, settled, latencyMs: latency, createdAtMs: created,
     reason: text(reason, 1024) ? reason : "",
+    ...(kindAbsent ? {} : { settleRefKind: kind }),
     ...(text(tx, 128) ? { settleTx: tx } : {}), ...(text(treeHash, 128) ? { treeHash } : {}),
     ...(root === undefined ? {} : { rootJobId: root }), ...(parent === undefined ? {} : { parentJobId: parent }),
     ...(hop === undefined ? {} : { hop }), ...(ceiling === undefined ? {} : { treeCeilingAtomic: ceiling }),
     ...(committed === undefined ? {} : { treeCommittedAtomic: committed }) })
 }
-const fingerprint = (r: Receipt): string => JSON.stringify(r, (_, v) => typeof v === "bigint" ? v.toString() : v)
+const fingerprint = (r: Receipt): string => JSON.stringify({ kindPresent: Object.hasOwn(r, "settleRefKind"), receipt: r },
+  (_, v) => typeof v === "bigint" ? v.toString() : v)
 
 /**
  * Root children are FLAT reserved/committed descendants; released calls are absent.

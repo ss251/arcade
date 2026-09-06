@@ -329,8 +329,15 @@ describe("session-root execution", () => {
       : malformed === "wrong-hop" ? { hop: 0 } : malformed === "wrong-ancestors" ? { ancestors: ["foreign"] }
       : malformed === "wrong-price" ? { priceAtomic: 1n, sellerAtomic: 1n } : {}
     if (malformed !== "missing") await Effect.runPromise(f.store.putReceipt(Receipt.make({ ...original, ...patch })))
-    if (malformed === "duplicate") await Effect.runPromise(f.store.putReceipt(original))
-    const settle = vi.spyOn(f.call.rail, "settle"), result = await Effect.runPromise(runSessionJob(f.call, f))
+    // Ordinary writes upsert by job ID. Duplicate evidence must be injected at
+    // a corrupted read boundary, not claimed as two rows persisted by that API.
+    const store = malformed === "duplicate" ? { ...f.store,
+      allReceipts: f.store.allReceipts.pipe(Effect.map(rows => [...rows, original])) } : f.store
+    if (malformed === "duplicate") {
+      expect(await Effect.runPromise(f.store.allReceipts)).toHaveLength(1)
+      expect(await Effect.runPromise(store.allReceipts)).toHaveLength(2)
+    }
+    const settle = vi.spyOn(f.call.rail, "settle"), result = await Effect.runPromise(runSessionJob(f.call, { ...f, store }))
     expect(result.receipt.settled).toBe(false); expect(settle).not.toHaveBeenCalled()
     expect(result.outcome.output).toBeUndefined()
     expect((await Effect.runPromise(f.sessions.snapshot(f.id))).calls[0]?.state).toBe("released")

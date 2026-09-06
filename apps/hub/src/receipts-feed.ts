@@ -1,8 +1,15 @@
 import { formatPrice, NON_SETTLING, type Receipt } from "@arcade/core"
 import { hasSessionMarker, receiptChildExplorer, receiptExplorer } from "./receipt-reference.ts"
 
-const publicKind = (value: unknown): "onchain" | "gateway-transfer" | "test" | "unrecognized" =>
-  value === "onchain" || value === "gateway-transfer" || value === "test" ? value : "unrecognized"
+/** Absence alone is legacy. Never invoke a kind accessor or erase invalid presence. */
+const publicKind = (receipt: Receipt): Pick<PublicReceiptRow, "settleRefKind"> => {
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(receipt, "settleRefKind")
+    if (descriptor === undefined) return "settleRefKind" in receipt ? { settleRefKind: "unrecognized" } : {}
+    const value: unknown = descriptor.enumerable && "value" in descriptor ? descriptor.value : undefined
+    return { settleRefKind: value === "onchain" || value === "gateway-transfer" || value === "test" ? value : "unrecognized" }
+  } catch { return { settleRefKind: "unrecognized" } }
+}
 
 export interface PublicReceiptChild {
   readonly skillId: string
@@ -53,7 +60,7 @@ const reference = (rail: Receipt["rail"], value: string | undefined): value is s
     rail === "test" && /^0xtest[0-9a-fA-F]{14,26}$/.test(value))
 
 const reasons = new Set([
-  "ok", "refused", "output is empty", "output failed the listing's outputSchema",
+  "ok", "refused", "session_released", "output is empty", "output failed the listing's outputSchema",
   "job status is queued", "job status is running", "job status is succeeded",
   ...Array.from(NON_SETTLING, status => `job status is ${status}`),
   "engine refused (stop_reason=refusal)", "engine refused (stop_reason=content_filter)",
@@ -86,7 +93,7 @@ export const scrubReceipt = (r: Receipt): PublicReceiptRow => ({
   ...(r.settled && reference(r.rail, r.settleTx) ? { settleTx: r.settleTx } : {}),
   explorer: receiptExplorer(r),
   session: hasSessionMarker(r),
-  ...(Object.hasOwn(r, "settleRefKind") ? { settleRefKind: publicKind(r.settleRefKind) } : {}),
+  ...publicKind(r),
   hop: r.hop ?? 0,
   ...(hash(r.treeHash) ? { treeHash: r.treeHash } : {}),
   ...(hash(r.feeSweepTx) ? { feeSweepTx: r.feeSweepTx } : {}),

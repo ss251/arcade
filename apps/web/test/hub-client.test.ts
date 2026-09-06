@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import * as hub from "../src/lib/hub.ts"
+import { decodeReceipts, decodeTree } from "../src/lib/hub-decode.ts"
+import { Receipt, ReceiptChild, treeHashOf } from "@arcade/core"
+import { buildTreeView } from "../../hub/src/tree-view.ts"
+import { scrubReceipt } from "../../hub/src/receipts-feed.ts"
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
+import { TreeGraph } from "../src/components/tree-graph.tsx"
 
 const HUB = "https://hub.example"
 const SELLER = `0x${"1".repeat(40)}`, PAYEE = `0x${"2".repeat(40)}`, TX = `0x${"3".repeat(64)}`
@@ -199,4 +206,115 @@ describe("H4 read-only hub boundary", () => {
     stub({ ...counters(), ignored: "x".repeat(131_072) })
     await expect(hub.stats()).rejects.toThrow(hub.HubUnreachable)
   })
+})
+
+describe("F/H reference provenance integration", () => {
+  const compact = () => ({ skillId: "child-skill", priceAtomic: "10000", price: "$0.01", settled: true,
+    settleTx: TX, explorer: `https://testnet.arcscan.app/tx/${TX}` })
+  it.each(["onchain", "gateway-transfer", "test", "unrecognized"])("retains the safe public kind %s for root and compact links", settleRefKind => {
+    const out = decodeReceipts([{ ...receipt(), settleRefKind, children: [{ ...compact(), settleRefKind: "onchain" }] }])[0]!
+    expect(out).toHaveProperty("settleRefKind", settleRefKind)
+    expect(out.explorer === null).toBe(settleRefKind !== "onchain")
+    expect(out.children[0]!.explorer === null).toBe(settleRefKind !== "onchain")
+    expect(out.children[0]).not.toHaveProperty("settleRefKind")
+  })
+  it.each([undefined, null, "gateway-batch", "future-kind", 1])("normalizes invalid-present kind %s without legacy fallback", settleRefKind => {
+    const out = decodeReceipts([{ ...receipt(), settleRefKind, children: [compact()] }])[0]!
+    expect(out).toHaveProperty("settleRefKind", "unrecognized")
+    expect(out.explorer).toBeNull()
+    expect(out.children[0]!.explorer).toBeNull()
+  })
+  it("keeps legacy absence and released-root compact-child settlement independent", () => {
+    const legacy = decodeReceipts([{ ...receipt(), children: [compact()] }])[0]!
+    expect(legacy).not.toHaveProperty("settleRefKind")
+    expect(legacy.explorer).not.toBeNull()
+    expect(legacy.children[0]!.explorer).not.toBeNull()
+    for (const settleRefKind of ["onchain", "test", undefined]) {
+      const out = decodeReceipts([{ ...receipt(), settled: false, settleRefKind, children: [compact()] }])[0]!
+      expect(out.explorer).toBeNull()
+      expect(out.children[0]!.explorer === null).toBe(settleRefKind !== "onchain")
+    }
+  })
+  it("never invokes reference-kind accessors or treats hidden/inherited authority as missing", () => {
+    let calls = 0
+    for (const descriptor of [{ enumerable: true, get() { calls++; return "onchain" } }, { value: "onchain" }]) {
+      const r = Object.defineProperty({ ...receipt(), children: [compact()] }, "settleRefKind", descriptor)
+      const out = decodeReceipts([r])[0]!
+      expect(out).toHaveProperty("settleRefKind", "unrecognized")
+      expect(out.explorer).toBeNull()
+      expect(out.children[0]!.explorer).toBeNull()
+    }
+    const inherited = Object.assign(Object.create({ get settleRefKind() { calls++; return "onchain" } }), receipt())
+    expect(() => decodeReceipts([inherited])).toThrow("Invalid public hub response")
+    expect(calls).toBe(0)
+  })
+  it("preserves only optional boolean session provenance, independently of canary", async () => {
+    expect(decodeReceipts([receipt()])[0]).not.toHaveProperty("session")
+    for (const session of [false, true]) {
+      const r = { ...receipt(), session, sessionId: PRIVATE, authorizationNonce: PRIVATE }
+      stub([r])
+      const out = (await hub.receipts())[0]!
+      expect(out).toMatchObject({ session, canary: true })
+      expect(JSON.stringify(out)).not.toContain(PRIVATE)
+    }
+  })
+  it.each([undefined, null, "true", 1, {}])("refuses present invalid session marker %s", session => {
+    expect(() => decodeReceipts([{ ...receipt(), session }])).toThrow("Invalid public hub response")
+  })
+  it("does not invoke a session getter or infer a marker from inherited data", () => {
+    let calls = 0
+    const own = Object.defineProperty(receipt(), "session", { enumerable: true, get() { calls++; return true } })
+    expect(() => decodeReceipts([own])).toThrow("Invalid public hub response")
+    const inherited = Object.assign(Object.create({ get session() { calls++; return true } }), receipt())
+    expect(() => decodeReceipts([inherited])).toThrow("Invalid public hub response")
+    expect(calls).toBe(0)
+    expect(() => decodeReceipts([Object.defineProperty(receipt(), "session", { value: true })]))
+      .toThrow("Invalid public hub response")
+  })
+  it.each([{ rail: "gateway", network: CHAIN }, { rail: "test", network: CHAIN }, { rail: "eip3009", network: "eip155:1" }])(
+    "does not let onchain kind or compact-child aliases override root rail/network %j", context => {
+      const out = decodeReceipts([{ ...receipt(), ...context, settleRefKind: "onchain",
+        children: [{ ...compact(), rail: "eip3009", network: CHAIN, session: true }] }])[0]!
+      expect(out.explorer).toBeNull()
+      expect(out.children[0]!.explorer).toBeNull()
+      expect(out.children[0]).not.toHaveProperty("rail")
+      expect(out.children[0]).not.toHaveProperty("session")
+    })
+  it("retains the fixed session release reason without asserting refund or zero price", () => {
+    const out = decodeReceipts([{ ...receipt(), settled: false, reason: "session_released", session: true }])[0]!
+    expect(out).toMatchObject({ reason: "session_released", priceAtomic: "10000", settled: false, explorer: null })
+    expect(out).not.toHaveProperty("settleTx")
+  })
+  it.each(["absent", "onchain", "gateway-transfer", "gateway-batch", "undefined", "accessor", "inherited"])(
+    "preserves real producer → decoder → frozen H7 rendering provenance for %s", kind => {
+      const childId = "job_childabcdefghijk", child = Receipt.make({ jobId: childId, skillId: "child-skill", skillVersion: "1",
+        buyer: PAYEE, seller: SELLER, priceAtomic: 10000n, sellerAtomic: 9500n, feeAtomic: 500n, feeBps: 500,
+        rail: "eip3009", network: CHAIN, settled: true, reason: "ok", latencyMs: 1, createdAtMs: 1,
+        rootJobId: ROOT, parentJobId: ROOT, hop: 1, settleTx: TX })
+      const children = [ReceiptChild.make({ jobId: childId, skillId: child.skillId, priceAtomic: child.priceAtomic,
+        settled: true, settleTx: TX })]
+      const root = Receipt.make({ ...child, jobId: ROOT, skillId: ID, parentJobId: undefined, hop: 0,
+        children, treeHash: treeHashOf(ROOT, children), treeCeilingAtomic: 10000n, treeCommittedAtomic: 10000n })
+      let calls = 0
+      const rows = [root, child].map(r => {
+        if (kind === "absent") return r
+        if (kind === "inherited") return Object.assign(Object.create({ get settleRefKind() { calls++; return "onchain" } }), r) as Receipt
+        return Object.defineProperty({ ...r }, "settleRefKind", kind === "accessor"
+          ? { enumerable: true, get() { calls++; return "onchain" } }
+          : { enumerable: true, value: kind === "undefined" ? undefined : kind }) as Receipt
+      })
+      const decoded = decodeTree(buildTreeView(ROOT, rows), ROOT)
+      expect(decoded.complete).toBe(true)
+      const html = renderToStaticMarkup(createElement(TreeGraph, { view: decoded }))
+      const eligible = kind === "absent" || kind === "onchain"
+      expect((html.match(/<a /g) ?? []).length).toBe(eligible ? 4 : 0)
+      expect(html).not.toContain(ROOT)
+      expect(html).not.toContain(childId)
+      expect(calls).toBe(0)
+      if (kind !== "inherited") {
+        const feed = decodeReceipts([scrubReceipt(rows[0]!)])[0]!
+        expect(feed.explorer === null).toBe(!eligible)
+        expect(feed.children[0]!.explorer === null).toBe(!eligible)
+      }
+    })
 })

@@ -1,5 +1,6 @@
 /** Public JSON decoders. Explicit projections, no hub boot, IO, keys or payment authority. */
 import { dnsNameOf, formatPrice, loadChainConfig, NON_SETTLING } from "@arcade/core"
+import { settlementReferenceKind, type SettlementReferenceKind } from "./format.ts"
 
 export interface PayTest { readonly atMs: number; readonly jobId: string; readonly ok: boolean; readonly settleTx?: string }
 export interface ListingStats {
@@ -39,6 +40,8 @@ export interface PublicReceiptRow extends ReceiptRow {
   readonly skillVersion: string; readonly seller: string; readonly rail: "eip3009" | "gateway" | "test"; readonly network: string
   readonly sellerCostUsd?: number; readonly feeSweepTx?: string; readonly treeCeilingAtomic?: string
   readonly treeCommittedAtomic?: string; readonly canary?: boolean
+  /** Older hubs omit these fields; an absent session marker is not inferred false. */
+  readonly session?: boolean; readonly settleRefKind?: SettlementReferenceKind
 }
 export interface MarketStats {
   readonly listings: number; readonly sellers: number; readonly calls: number; readonly settled: number
@@ -143,7 +146,7 @@ const displayedAtomic = (v: unknown): bigint => {
   if (s !== money(n.toString())) return invalid()
   return n
 }
-const reasonSet = new Set(["ok", "refused", "settled", "not settled", "output is empty", "output failed the listing's outputSchema",
+const reasonSet = new Set(["ok", "refused", "settled", "not settled", "session_released", "output is empty", "output failed the listing's outputSchema",
   "job status is queued", "job status is running", "job status is succeeded", ...Array.from(NON_SETTLING, s => `job status is ${s}`),
   "engine refused (stop_reason=refusal)", "engine refused (stop_reason=content_filter)", "engine refused (stop_reason=reasoning_extraction)",
   "settlement failed (SettlementFailed)", "settlement failed (RpcFailure)"])
@@ -153,8 +156,9 @@ const chain = (v: unknown) => configs.find(c => c.caip2 === v)
 const reference = (v: unknown, rail?: string): string | undefined => hashOk(v) ? v : typeof v === "string" && (
   rail === "gateway" && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v) ||
   rail === "test" && /^0xtest[0-9a-fA-F]{14,26}$/.test(v)) ? v : undefined
-const explorer = (v: unknown, tx: string | undefined, settled: boolean, network?: string, rail?: string): string | null => {
-  if (!settled || !hashOk(tx) || rail !== undefined && rail !== "eip3009") return null
+const explorer = (v: unknown, tx: string | undefined, settled: boolean, network?: string, rail?: string,
+  kind?: SettlementReferenceKind): string | null => {
+  if (!settled || !hashOk(tx) || rail !== undefined && rail !== "eip3009" || kind !== undefined && kind !== "onchain") return null
   return configs.some(c => (network === undefined || network === c.caip2) && v === `${c.explorerBaseUrl.replace(/\/$/, "")}/tx/${tx}`)
     ? v as string : null
 }
@@ -162,6 +166,11 @@ const optional = <T>(r: Record<string, unknown>, key: string, read: (v: unknown)
   const v = own(r, key); return v === undefined ? undefined : read(v)
 }
 const copyOptional = <K extends string, T>(key: K, value: T | undefined): Partial<Record<K, T>> => value === undefined ? {} : { [key]: value } as Record<K, T>
+const sessionMarker = (r: Record<string, unknown>): boolean | undefined => {
+  const d = Object.getOwnPropertyDescriptor(r, "session")
+  if (d === undefined) return "session" in r ? invalid() : undefined
+  return d.enumerable && "value" in d ? bool(d.value) : invalid()
+}
 
 const statsOf = (v: unknown, id: string): ListingStats => {
   const r = object(v), calls = integer(own(r, "calls")), settled = integer(own(r, "settled")), rate = finite(own(r, "successRate"), 1)
@@ -247,12 +256,12 @@ export const decodeStats = (v: unknown): MarketStats => {
   if (sellers > listings || settled > calls || trees > settled || BigInt(fees.atomic) > BigInt(volume.atomic) || source !== "hub" && source !== "subgraph") return invalid()
   return { listings, sellers, calls, settled, trees, volume: volume.display, volumeAtomic: volume.atomic, fees: fees.display, feesAtomic: fees.atomic, source }
 }
-const receiptChild = (v: unknown, rail: string, network: string): PublicReceiptChild => {
+const receiptChild = (v: unknown, rail: string, network: string, kind: SettlementReferenceKind | undefined): PublicReceiptChild => {
   const r = object(v), priceAtomic = atomic(own(r, "priceAtomic")), settled = bool(own(r, "settled")), tx = settled ? reference(own(r, "settleTx"), rail) : undefined
   if (own(r, "price") !== money(priceAtomic)) return invalid()
   const skillId = own(r, "skillId")
   return { skillId: skillIdOk(skillId) ? skillId : "unknown-skill", priceAtomic, price: money(priceAtomic), settled,
-    ...copyOptional("settleTx", tx), explorer: explorer(own(r, "explorer"), tx, settled, network, rail) }
+    ...copyOptional("settleTx", tx), explorer: explorer(own(r, "explorer"), tx, settled, network, rail, kind) }
 }
 export const decodeReceipts = (v: unknown, requested?: string, max = 10_000): ReadonlyArray<PublicReceiptRow> => {
   const rows = array(v, max).map((value): PublicReceiptRow => {
@@ -261,16 +270,17 @@ export const decodeReceipts = (v: unknown, requested?: string, max = 10_000): Re
     if (requested !== undefined && skillId !== requested || rail !== "eip3009" && rail !== "gateway" && rail !== "test" ||
       BigInt(sellerAtomic) + BigInt(feeAtomic) !== BigInt(priceAtomic) || own(r, "price") !== money(priceAtomic) ||
       own(r, "sellerShare") !== money(sellerAtomic) || own(r, "fee") !== money(feeAtomic)) return invalid()
-    const tx = settled ? reference(own(r, "settleTx"), rail) : undefined
+    const tx = settled ? reference(own(r, "settleTx"), rail) : undefined, kind = settlementReferenceKind(r)
     return { skillId, skillVersion: text(own(r, "skillVersion"), 128, true), seller: address(own(r, "seller")), rail, network,
       priceAtomic, sellerAtomic, feeAtomic, feeBps, price: money(priceAtomic), sellerShare: money(sellerAtomic), fee: money(feeAtomic),
       settled, reason: reason(own(r, "reason"), settled), latencyMs: integer(own(r, "latencyMs")), createdAtMs: integer(own(r, "createdAtMs")),
-      ...copyOptional("settleTx", tx), explorer: explorer(own(r, "explorer"), tx, settled, network, rail), hop: integer(own(r, "hop"), 64),
+      ...copyOptional("settleTx", tx), explorer: explorer(own(r, "explorer"), tx, settled, network, rail, kind), hop: integer(own(r, "hop"), 64),
       ...copyOptional("treeHash", hashOk(own(r, "treeHash")) ? own(r, "treeHash") as string : undefined),
       ...copyOptional("feeSweepTx", hashOk(own(r, "feeSweepTx")) ? own(r, "feeSweepTx") as string : undefined),
       ...copyOptional("treeCeilingAtomic", optional(r, "treeCeilingAtomic", atomic)), ...copyOptional("treeCommittedAtomic", optional(r, "treeCommittedAtomic", atomic)),
       ...copyOptional("sellerCostUsd", optional(r, "sellerCostUsd", finite)), ...copyOptional("canary", optional(r, "canary", bool)),
-      children: array(own(r, "children"), 1024).map(c => receiptChild(c, rail, network)) }
+      ...copyOptional("session", sessionMarker(r)), ...copyOptional("settleRefKind", kind),
+      children: array(own(r, "children"), 1024).map(c => receiptChild(c, rail, network, kind)) }
   })
   if (requested !== undefined && rows.some((r, i) => i > 0 && r.createdAtMs > rows[i - 1]!.createdAtMs)) return invalid()
   return rows

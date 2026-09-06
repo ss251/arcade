@@ -34,6 +34,18 @@ const canonicalHex = (value: unknown, digits: number): value is string =>
   typeof value === "string" && value.length === digits + 2 &&
   /^0x[0-9a-fA-F]+$/.test(value) && /[1-9a-fA-F]/.test(value.slice(2))
 
+export type SettlementReferenceKind = "onchain" | "gateway-transfer" | "test" | "unrecognized"
+/** Undefined means true absence only. Malformed presence never restores legacy link eligibility. */
+export const settlementReferenceKind = (context: unknown): SettlementReferenceKind | undefined => {
+  if (context === null || typeof context !== "object" || Array.isArray(context)) return "unrecognized"
+  try {
+    const d = Object.getOwnPropertyDescriptor(context, "settleRefKind")
+    if (d === undefined) return "settleRefKind" in context ? "unrecognized" : undefined
+    if (!d.enumerable || !("value" in d)) return "unrecognized"
+    return d.value === "onchain" || d.value === "gateway-transfer" || d.value === "test" ? d.value : "unrecognized"
+  } catch { return "unrecognized" }
+}
+
 /** Match only configured network IDs or their exact CAIP-2 IDs, never caller manifests. */
 const explorerFor = (network: unknown): string | null => {
   if (typeof network !== "string") return null
@@ -55,7 +67,8 @@ export const txLink = (tx: unknown, context?: unknown): string | null => {
       const descriptor = Object.getOwnPropertyDescriptor(context, key)
       return descriptor !== undefined && "value" in descriptor ? descriptor.value : undefined
     }
-    if (data("rail") !== "eip3009" || data("settled") !== true) return null
+    const kind = settlementReferenceKind(context)
+    if (data("rail") !== "eip3009" || data("settled") !== true || kind !== undefined && kind !== "onchain") return null
     const explorer = explorerFor(data("network"))
     return explorer === null ? null : `${explorer}/tx/${tx}`
   } catch { return null }

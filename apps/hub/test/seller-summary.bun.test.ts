@@ -35,11 +35,11 @@ if (process.env["ARCADE_SUMMARY_FIXTURE"] === "1") {
   for (const r of [root("job_PRIVATE_ROOT", { children, treeCommittedAtomic: 50_000n, treeHash: treeHashOf("job_PRIVATE_ROOT", children) }),
     Receipt.make(withoutCost), root("job_PRIVATE_FAILED", { settled: false, sellerCostUsd: 0.01 }), descendant,
     root("job_PRIVATE_BAD", { seller: BAD, feeAtomic: 1n })]) {
-    await Effect.runPromise(store.putReceipt(Object.assign(r, { sessionId: "PRIVATE_SESSION", token: "PRIVATE_TOKEN", future: "PRIVATE_FUTURE" })))
+    await Effect.runPromise(store.putReceipt(r))
   }
   let writes = 0, reads = 0, external = 0, failNextReceiptRead = false
   const guarded = Object.fromEntries(Object.entries(store).map(([name, value]) => [name,
-    typeof value === "function" && /^(put|record|remove|drop|touch|backfill|reserve|commit|release)/.test(name)
+    typeof value === "function" && /^(put|record|remove|drop|touch|backfill|reserve|commit|release|open|begin|finish|mark|close)/.test(name)
       ? () => Effect.sync(() => { writes++; throw new Error("unexpected mutation") }) : value])) as unknown as Store
   const counted: Store = { ...guarded,
     allListings: store.allListings.pipe(Effect.tap(() => Effect.sync(() => { reads++ }))),
@@ -49,7 +49,11 @@ if (process.env["ARCADE_SUMMARY_FIXTURE"] === "1") {
         failNextReceiptRead = false
         return Effect.die(new Error("PRIVATE_STORAGE_DIAGNOSTIC job_PRIVATE_ROOT"))
       }
-      return store.allReceipts
+      // Inject private sentinels only into copied read projections. Ordinary
+      // persisted receipts remain valid inputs to the unchanged F session guard.
+      return store.allReceipts.pipe(Effect.map(rows => rows.map(r => Object.assign(Receipt.make({ ...r }), {
+        sessionId: "PRIVATE_SESSION", token: "PRIVATE_TOKEN", future: "PRIVATE_FUTURE"
+      }))))
     }),
     allRunners: store.allRunners.pipe(Effect.tap(() => Effect.sync(() => { reads++ }))) }
   mock.module("../src/store-sqlite.ts", () => ({ StoreFromEnv: () => Layer.succeed(StoreTag, counted) }))

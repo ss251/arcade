@@ -231,3 +231,20 @@ actual client/SSR builds (359 ms / 170 ms). These isolated branch counts are not
 the larger post-F/G main suite. Final publication review and commit follow.
 H remains unmerged; the accepted F/H session and receipt-provenance integration
 is mandatory before H8 or eventual H merge. No G8 completion is claimed.
+
+## H7 follow-up — F/H integration accepted
+
+H1–H7 rebased onto main5259f9a; H7 is now616ce5e and its six rendering/fixture
+files are unchanged. Kind-presence handling is preserved through public feeds,
+full tree snapshots and the web decoder/formatter. Session identity stays private;
+cross-realm tokens are refused before Store IO. F's guards, selected terminal
+pair and SQLite implementation remain intact. See the
+[integration brief](task-7-integration.md) and its four historical reports.
+
+The sole full Vitest sweep had3252passes/1old-fixture failure; corrected corrupted-
+read injection then passed the48-test pipeline suite. The sole Bun sweep had
+768passes/2missing-toolchain module errors; the two affected suites passed55tests
+after the separate frozen subgraph install. Root/web strict and actual client/
+SSR builds passed334ms/145ms. No full sweep was repeated or relabelled all-green.
+Source/public review accepted; atomic integration commit next, then H8. No H
+main merge, new live authority, payment, production deployment or push occurred.

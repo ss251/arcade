@@ -1,6 +1,8 @@
 import { Effect, Layer } from "effect"
 import { Job, Receipt, ReceiptChild, treeHashOf } from "@arcade/core"
 import { StoreLive, StoreTag, type Store } from "../src/store.ts"
+import { sessionJobToken } from "../src/server-session-calls.ts"
+import { sessionToken } from "../src/server-sessions.ts"
 import { createHmac } from "node:crypto"
 import { spawn, type ChildProcess } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -10,6 +12,7 @@ const ROOT = "job_root000000000000", CHILD = "job_child00000000000", GRAND = "jo
 const PENDING = "job_pending000000000", RESERVED = "job_reserved00000000", UNKNOWN = "job_unknown000000000"
 const BUYER = `0x${"9".repeat(40)}`, SUBBUY = `0x${"7".repeat(40)}`, SELLER = `0x${"8".repeat(40)}`
 const SECRET = "offline-tree-fixture-not-a-key"
+const SESSION = `ses_${"a".repeat(32)}`
 const token = (id: string) => createHmac("sha256", SECRET).update(`arcade-job:${id}`).digest("hex").slice(0, 32)
 const tx = (digit: string) => `0x${digit.repeat(64)}`
 const rows = (): Receipt[] => {
@@ -31,7 +34,6 @@ const rows = (): Receipt[] => {
     treeCeilingAtomic: 200_000n, treeCommittedAtomic: 100_000n }), child,
     Receipt.make({ ...row(PENDING, "pending-skill", PENDING, 0), children: pendingChildren,
       treeHash: treeHashOf(PENDING, pendingChildren), treeCeilingAtomic: 100_000n, treeCommittedAtomic: 0n }), reserved]
-    .map(r => Object.assign(r, { sessionId: "PRIVATE_SESSION", future: "PRIVATE_FUTURE" }))
 }
 
 // Test-only preload: the real production router runs with a real in-memory Store,
@@ -45,7 +47,7 @@ if (process.env["ARCADE_TREE_FIXTURE"] === "1") {
   let reads = 0, writes = 0, external = 0, failNextReceiptRead = false
   const guarded = Object.fromEntries(Object.entries(store).map(([name, value]) => {
     if (typeof value === "function") {
-      if (/^(put|record|remove|drop|touch|backfill|reserve|commit|release)/.test(name)) {
+      if (/^(put|record|remove|drop|touch|backfill|reserve|commit|release|open|begin|finish|mark|close)/.test(name)) {
         return [name, () => Effect.sync(() => { writes++; throw new Error("unexpected mutation") })]
       }
       return [name, (...args: unknown[]) => Effect.suspend(() => {
@@ -59,7 +61,11 @@ if (process.env["ARCADE_TREE_FIXTURE"] === "1") {
   const counted: Store = { ...guarded, allReceipts: Effect.suspend(() => {
     reads++
     if (failNextReceiptRead) { failNextReceiptRead = false; return Effect.die(new Error(`PRIVATE_STORAGE_DIAGNOSTIC ${CHILD}`)) }
-    return store.allReceipts
+    // Deliberately hostile read extras, not session evidence persisted through
+    // ordinary putReceipt. Neither Store internals nor existing rows are mutated.
+    return store.allReceipts.pipe(Effect.map(rows => rows.map(r => Object.assign(Receipt.make({ ...r }), {
+      sessionId: "PRIVATE_SESSION", future: "PRIVATE_FUTURE"
+    }))))
   }) }
   mock.module("../src/store-sqlite.ts", () => ({ StoreFromEnv: () => Layer.succeed(StoreTag, counted) }))
   globalThis.fetch = Object.assign(async () => { external++; throw new Error("external fetch disabled") },
@@ -104,7 +110,8 @@ if (process.env["ARCADE_TREE_FIXTURE"] === "1") {
       finally { clearTimeout(kill); clearTimeout(timer) }
       expect(child.exitCode !== null || child.signalCode !== null).toBe(true)
       if (base) await expect(fetch(base + "/healthz", { signal: AbortSignal.timeout(500) })).rejects.toThrow()
-      for (const value of [token(ROOT), token(CHILD), token(PENDING), "PRIVATE_STORAGE_DIAGNOSTIC"]) expect(output).not.toContain(value)
+      for (const value of [token(ROOT), token(CHILD), token(PENDING), sessionJobToken(SECRET, SESSION, ROOT),
+        sessionToken(SECRET, SESSION), "PRIVATE_STORAGE_DIAGNOSTIC"]) expect(output).not.toContain(value)
     }, 5_000)
     const get = (path: string, options: RequestInit = {}) => fetch(base + path, { ...options,
       redirect: "error", credentials: "omit", signal: AbortSignal.timeout(2_000) })
@@ -115,18 +122,38 @@ if (process.env["ARCADE_TREE_FIXTURE"] === "1") {
       expect(response.headers.get("set-cookie")).toBeNull()
       expect(response.headers.get("location")).toBeNull()
     }
-    const notFound = async (response: Response) => {
+    const notFound = async (response: Response, compact = false) => {
       expect(response.status).toBe(404); privateResponse(response)
-      expect(await response.text()).toBe(JSON.stringify({ error: "not_found" }, null, 2))
+      // F job/session refusals are compact; H tree refusals retain pretty JSON.
+      expect(await response.text()).toBe(compact ? JSON.stringify({ error: "not_found" }) : JSON.stringify({ error: "not_found" }, null, 2))
     }
     test("rejects a 32-character non-ASCII token on existing job routes without throwing or reading", async () => {
       const before = await observe()
       for (const suffix of ["", "/result"]) {
         const response = await get(`/jobs/${ROOT}${suffix}?token=${encodeURIComponent("é".repeat(32))}`)
-        expect(response.status).toBe(404)
-        expect(await response.text()).toBe(JSON.stringify({ error: "not_found" }, null, 2))
+        await notFound(response, true)
       }
       expect(await observe()).toEqual(before)
+    })
+    test("keeps session job capabilities out of ordinary tree/job routes before any store IO", async () => {
+      const before = await observe(), sessionCapability = sessionJobToken(SECRET, SESSION, ROOT)
+      expect(sessionCapability).not.toBe(token(ROOT))
+      // Actual F token derivation with a fixed offline secret; no session was
+      // created, funded or claimed to exist in the fixture Store.
+      for (const path of [`/trees/${ROOT}`, `/jobs/${ROOT}`, `/jobs/${ROOT}/result`]) {
+        await notFound(await get(`${path}?token=${sessionCapability}`), !path.startsWith("/trees/"))
+        await notFound(await get(path, { headers: { "x-job-token": sessionCapability } }), !path.startsWith("/trees/"))
+      }
+      // Conversely, an ordinary job token cannot unlock F's selected session
+      // result lane even with a correctly shaped session-level capability.
+      await notFound(await get(`/jobs/${ROOT}/result`, { headers: {
+        "x-arcade-session": SESSION, "x-session-token": sessionToken(SECRET, SESSION), "x-job-token": token(ROOT)
+      } }), true)
+      expect(await observe()).toEqual(before)
+      const ordinary = await get(`/trees/${ROOT}`, { headers: { "x-job-token": token(ROOT) } })
+      expect(ordinary.status).toBe(200); privateResponse(ordinary)
+      expect((await ordinary.json()).complete).toBe(true)
+      expect(await observe()).toEqual({ reads: before.reads + 1, writes: 0, external: 0 })
     })
     test("draws positional edges from complete raw flat descendants without leaking capabilities or child handles", async () => {
       const before = await observe(), response = await get(authorized())

@@ -198,6 +198,30 @@ describe("durable session accounting through the Store API", () => {
     expect((await run(b.allReceipts))[0]?.feeSweepTx).toBeUndefined()
     expect((await run(b.getSessionSnapshot(id(1))))?.session.spentAtomic).toBe(60n)
   })
+  test.each(["memory", "disk"])("H ordinary upserts preserve %s session membership and terminal evidence", async backend => {
+    const s = backend === "disk" ? disk().open().store : await run(StoreTag.pipe(Effect.provide(StoreLive)))
+    const x = admission(), t = terminal(1, 60n, 1, false)
+    await run(s.openSession(makeSession())); await run(s.reserveSessionJob(x.binding, x.job))
+    await run(s.finishSessionJob(t))
+    const { sessionId: _privateSession, ...ordinaryFields } = t.receipt
+    const ordinary = Receipt.make({ ...ordinaryFields, jobId: jid(2), reason: "ordinary initial" })
+    const replacement = Receipt.make({ ...ordinary, reason: "ordinary updated", feeSweepTx: `0x${"f".repeat(64)}` })
+    await run(s.putReceipt(ordinary)); await run(s.putReceipt(replacement))
+    // The backends do not promise a shared mixed-lane iteration order.
+    const rows = async () => [...await run(s.allReceipts)].sort((a, b) => a.jobId < b.jobId ? -1 : a.jobId > b.jobId ? 1 : 0)
+    expect(await run(s.statsSource)).toBe("hub")
+    expect(await rows()).toEqual([t.receipt, replacement])
+
+    // Stripping the private marker cannot remove the ledger's session ownership;
+    // adding a marker to an unrelated ordinary row cannot invent membership.
+    for (const forbidden of [Receipt.make(ordinaryFields), Receipt.make({ ...replacement, sessionId: id(1) })]) {
+      expect((await run(Effect.exit(s.putReceipt(forbidden))))._tag).toBe("Failure")
+    }
+    expect(await rows()).toEqual([t.receipt, replacement])
+    expect(await run(s.getSessionTerminal(id(1), jid(1)))).toMatchObject({ job: t.job, receipt: t.receipt })
+    expect(await run(s.getSessionSnapshot(id(1)))).toMatchObject({ heldAtomic: 0n,
+      session: { spentAtomic: 0n }, calls: [{ state: "released" }] })
+  })
   test("memory session reads do not expose mutable queued input or receipt objects", async () => {
     const s = await run(StoreTag.pipe(Effect.provide(StoreLive))), x = admission()
     await run(s.openSession(makeSession())); await run(s.reserveSessionJob(x.binding, x.job))

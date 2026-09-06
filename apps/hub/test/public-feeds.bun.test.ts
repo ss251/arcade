@@ -23,7 +23,7 @@ if (process.env["ARCADE_PUBLIC_FEEDS_FIXTURE"] === "1") {
       inputSchema: { type: "object" }, outputSchema: { type: "object" } }), seller: seller!, runnerId: "rnr_fixture", publishedAtMs: 1 }))
   }
   for (let i = 0; i < 105; i++) {
-    await Effect.runPromise(store.putReceipt(Object.assign(Receipt.make({
+    await Effect.runPromise(store.putReceipt(Receipt.make({
       jobId: `job_PRIVATE_${i}`, skillId: i === 104 ? "second-skill" : "feed-skill", skillVersion: "1.0.0",
       buyer: "PRIVATE_BUYER", seller: `0x${"a".repeat(40)}`, priceAtomic: 10_000n,
       sellerAtomic: 9_500n, feeAtomic: 500n, feeBps: 500, rail: i === 104 ? "gateway" : "eip3009",
@@ -32,13 +32,28 @@ if (process.env["ARCADE_PUBLIC_FEEDS_FIXTURE"] === "1") {
       ancestors: ["PRIVATE_ANCESTOR"], rootJobId: `job_PRIVATE_${i}`, canary: i === 102,
       ...(i === 102 ? { treeHash: hash, children: [ReceiptChild.make({ jobId: "job_PRIVATE_DESCENDANT",
         skillId: "second-skill", priceAtomic: 1n, settled: true, settleTx: hash })] } : {})
-    }), { sessionId: "PRIVATE_SESSION", token: "PRIVATE_TOKEN", future: "PRIVATE_FUTURE" })))
+    })))
   }
-  let writes = 0, sourceReads = 0, source: "hub" | "subgraph" = "hub"
+  let writes = 0, sourceReads = 0, kindReads = 0, source: "hub" | "subgraph" = "hub"
   const guarded = Object.fromEntries(Object.entries(store).map(([key, value]) => [key,
-    typeof value === "function" && /^(put|record|remove|drop|touch|backfill|reserve|commit|release)/.test(key)
+    typeof value === "function" && /^(put|record|remove|drop|touch|backfill|reserve|commit|release|open|begin|finish|mark|close)/.test(key)
       ? () => Effect.sync(() => { writes++; throw new Error("unexpected feed mutation") }) : value])) as unknown as Store
-  const sourceGuarded: Store = { ...guarded, statsSource: Effect.sync(() => { sourceReads++; return source }) }
+  const sourceGuarded: Store = { ...guarded, statsSource: Effect.sync(() => { sourceReads++; return source }),
+    // Adversarial projection inputs, never ordinary writes with session markers.
+    // Fresh copies preserve the real Store/session guard and its underlying rows.
+    allReceipts: store.allReceipts.pipe(Effect.map(rows => rows.map(r => {
+      const copy = Object.assign(Receipt.make({ ...r }), {
+        sessionId: "PRIVATE_SESSION", session: true, token: "PRIVATE_TOKEN", future: "PRIVATE_FUTURE"
+      })
+      if (r.createdAtMs === 99) Object.setPrototypeOf(copy, { settleRefKind: "onchain" })
+      if (r.createdAtMs === 100) Object.defineProperty(copy, "settleRefKind", {
+        enumerable: true, get() { kindReads++; throw Error("PRIVATE_KIND_ACCESSOR") }
+      })
+      if (r.createdAtMs === 101) Object.defineProperty(copy, "settleRefKind", { enumerable: true, value: undefined })
+      if (r.createdAtMs === 102) Object.defineProperty(copy, "settleRefKind", { enumerable: true, value: "onchain" })
+      if (r.createdAtMs === 104) Object.defineProperty(copy, "settleRefKind", { enumerable: true, value: "gateway-transfer" })
+      return copy
+    }))) }
   mock.module("../src/store-sqlite.ts", () => ({ StoreFromEnv: () => Layer.succeed(StoreTag, sourceGuarded) }))
   globalThis.fetch = Object.assign(async () => { throw new Error("external fetch disabled") },
     { preconnect: () => { throw new Error("external preconnect disabled") } })
@@ -47,7 +62,7 @@ if (process.env["ARCADE_PUBLIC_FEEDS_FIXTURE"] === "1") {
     const originalFetch = options.fetch!
     const server = serve({ ...options, hostname: "127.0.0.1", port: 0,
       fetch(req, server) {
-        if (new URL(req.url).pathname === "/__fixture_writes") return Response.json({ writes })
+        if (new URL(req.url).pathname === "/__fixture_writes") return Response.json({ writes, kindReads })
         if (new URL(req.url).pathname === "/__fixture_source") {
           source = new URL(req.url).searchParams.get("value") === "subgraph" ? "subgraph" : "hub"
           return Response.json({ sourceReads })
@@ -126,7 +141,12 @@ if (process.env["ARCADE_PUBLIC_FEEDS_FIXTURE"] === "1") {
       const scoped = await (await get("/listings/feed-skill/receipts?limit=2")).json()
       expect(scoped).toEqual(all.filter((r: { skillId: string }) => r.skillId === "feed-skill").reverse().slice(0, 2))
       expect(JSON.stringify(all)).not.toContain("PRIVATE")
+      expect(all.every((r: { session: boolean }) => r.session === false)).toBe(true)
       expect(scoped[1]).toMatchObject({ canary: true, children: [{ skillId: "second-skill", price: "$0.000001" }] })
+      for (const index of [99, 100, 101]) expect(all[index]).toMatchObject({ settleRefKind: "unrecognized", explorer: null })
+      expect(all[98]).not.toHaveProperty("settleRefKind")
+      expect(all[102]).toMatchObject({ settleRefKind: "onchain", explorer: `https://testnet.arcscan.app/tx/${hash}` })
+      expect(all[104].settleRefKind).toBe("gateway-transfer")
       expect(all[104].explorer).toBeNull()
       expect(all[103]).toMatchObject({ reason: "not settled", settled: false, explorer: null })
       expect(all[103]).not.toHaveProperty("settleTx")
@@ -138,7 +158,7 @@ if (process.env["ARCADE_PUBLIC_FEEDS_FIXTURE"] === "1") {
       }
       expect((await get("/jobs/job_PRIVATE_1")).status).toBe(404)
       expect((await get("/jobs/job_PRIVATE_1/result")).status).toBe(404)
-      expect(await (await get("/__fixture_writes")).json()).toEqual({ writes: 0 })
+      expect(await (await get("/__fixture_writes")).json()).toEqual({ writes: 0, kindReads: 0 })
     })
   })
   test("SQLite inherits the same hub source seam after reopening without a new persistence subsystem", async () => {
