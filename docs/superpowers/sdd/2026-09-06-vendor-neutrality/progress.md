@@ -1,5 +1,17 @@
 # Vendor-neutrality progress
 
+2026-09-07 01:07 IST — Task3B2 sole gate18105 PASS:4490Vitest200/63.93s,
+839Bun55/6114assert/164.36s,rootwebstrict0,client337ms/SSR165ms. Fivepins,
+twelvepaths,sixteenlinks,existingpublisher/writer/core/payments/engines/locks
+preservation,privacy/diffPASS. CLI commit/FFnext; B3Circlefixture/evidence pending.
+
+2026-09-07 01:00 IST — Task3B2 CLI implemented: genuine native plugin-route
+Red,50initial passes,141passes/one incorrect public-tool-name assertion corrected,
+then197focused/7/11.10s PASS;five-root strict0. Selectors/hashes/private projection,
+offline actualSDK discovery,no-force generation and singular read-back tested.
+CLI guide/README/seller guide updated. Source freeze/sole max4fullgate next;
+Circle source attribution/fixture/read-only proof is a separate B3 checkpoint.
+
 2026-09-07 00:36 IST — Task3B1 sole gate97468 PASS:4458Vitest198/63.55s,
 839Bun55/6114assert/163.86s,rootwebstrict0,client377ms/SSR207ms. Threepins,
 sevenpaths,twelvelinks,unchangedCLI+existingadapters/core/payments/locks,privacy/

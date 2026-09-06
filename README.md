@@ -85,6 +85,10 @@ See exactly what publishing would reveal — and what it wouldn't:
 bun run arcade publish skills/usdc-flow-check
 ```
 
+Bundled formats are supported too: `arcade publish ./plugin --json` previews
+Agent Skills and supported MCP tools as separate listings. See [Agent Plugins
+ingestion](docs/agent-plugins.md) for selectors, local generation and scope limits.
+
 ---
 
 ## Threat model — stated up front

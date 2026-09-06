@@ -54,6 +54,11 @@ not an operating-system network firewall.
 
 ### Agent Skills (open standard)
 
+For bundled Agent Skills and MCP server configurations, use
+`arcade publish <plugin-dir> --json`. The [Agent Plugins guide](./agent-plugins.md)
+documents supported formats, selectors, skip reports and protected local output.
+This path does not install the plugin or execute bundled commands.
+
 An **Agent Skill (open standard)** is a portable `SKILL.md` folder defined by the
 [Agent Skills specification](https://agentskills.io/specification), not a
 vendor-specific engine. The same folder runs in Codex, ChatGPT, Cursor, Copilot,

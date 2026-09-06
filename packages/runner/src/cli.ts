@@ -15,6 +15,7 @@ import { startDaemon } from "./daemon.ts"
 import { buildEnv } from "./exec.ts"
 import { gate } from "./publishable.ts"
 import { createPublishPreview } from "./publish-preview.ts"
+import { runPublishPlugin } from "./publish-plugin.js"
 import { seatDir, seatIsLoggedIn } from "./engines/claude-agent.ts"
 import {
   generateWallet,
@@ -25,7 +26,7 @@ import {
 } from "./wallet.ts"
 import { checkHub, fetchBalanceAtomic, planIdentity } from "./onboard.ts"
 import { runIdentityCommand } from "./identity-cli.ts"
-import { mkdir, readFile } from "node:fs/promises"
+import { lstat, mkdir, readFile } from "node:fs/promises"
 import { dirname, basename, resolve, join } from "node:path"
 import {
   listMcpTools,
@@ -79,6 +80,7 @@ const usage = () => {
   arcade start [--skills DIR]                      connect to the hub and serve jobs
 
   arcade publish <skillDir>                        preview the PUBLIC projection
+  arcade publish <pluginDir> [--yes]               Agent Plugin skills + supported MCP tools
   arcade publish mcp://<host>/<path> [--yes]       one listing per MCP tool
   arcade publish mcp:// [options] -- <cmd> [args…] …from a stdio MCP server
   arcade publish <openapi.json> [--yes]            one listing per OpenAPI operation
@@ -91,6 +93,8 @@ const usage = () => {
     --out DIR            output directory (default ./skills)
     --tool NAME          select an MCP tool (repeatable)
     --operation ID       select an OpenAPI operation (repeatable)
+    --skill FOLDER        select a bundled plugin skill (repeatable)
+    --server NAME         select a supported plugin MCP server (repeatable)
     --auth header:X-Api-Key=UPSTREAM_KEY           bind an ENV NAME; also query:name=ENV
     --include-writes     include MCP tools not marked read-only
     --yes                write generated files; without it, preview only
@@ -98,6 +102,10 @@ const usage = () => {
     --json               one preview JSON object; generated batches are unwritten
                          preview-only: cannot combine with --yes or --force
     Put all arcade options before --; arguments after it belong to the server.
+    Plugins: https://agent-plugins.org/ (portable 1.0.0 + separate Codex compatibility).
+    Plugin selectors restrict generation to selected kinds; without them, inspect all.
+    Plugin generation refuses --force; use a fresh output directory. Unsupported
+    connectors are reported, never installed or executed. Review generated manifests.
 
   arcade identity status                          recorded agents and pending registration (offline)
   arcade identity register <skill>                 mint/resume this skill's ERC-8004 identity
@@ -690,17 +698,39 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
   if (cmd === "publish") {
     const target = args[1]
     if (target === undefined || target.startsWith("-")) {
-      console.error("usage: arcade publish <skillDir|mcp://host/path|openapi.json> [options]\n" +
+      console.error("usage: arcade publish <skillDir|pluginDir|mcp://host/path|openapi.json> [options]\n" +
         "       arcade publish mcp:// [options] -- <cmd> [args…]\n" +
         "Run arcade publish --help for options.")
       process.exit(2)
     }
-    if (publishTargetKind(target) !== "dir") {
+    const targetKind = publishTargetKind(target)
+    // Local directories can legitimately have a .json suffix. Keep URL routing
+    // pure, but inspect a local document-looking target before choosing its lane.
+    const documentDirectory = targetKind === "openapi" && !/^[a-z][a-z\d+.-]*:/i.test(target)
+      ? yield* Effect.promise(() => lstat(target).then(info => info.isDirectory(), () => false)) : false
+    if (targetKind !== "dir" && !documentDirectory) {
       yield* Effect.tryPromise({
         try: () => runPublishIntrospection(target, rawArgs.slice(2)),
         catch: (error) => error instanceof Error ? error : new Error("Could not prepare generated listings")
       })
       return
+    }
+    const singular = yield* Effect.tryPromise({
+      try: async () => {
+        try { await lstat(join(resolve(target), "arcade.json")); return true }
+        catch (error) {
+          if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return false
+          throw new Error("Could not inspect the listing directory")
+        }
+      },
+      catch: () => new Error("Could not inspect the listing directory")
+    })
+    if (!singular) {
+      const handled = yield* Effect.tryPromise({
+        try: () => runPublishPlugin(target, rawArgs.slice(2)),
+        catch: (error) => error instanceof Error ? error : new Error("Could not prepare plugin listings")
+      })
+      if (handled) return
     }
     if (args.slice(2).some((option) => option !== "--json")) {
       throw new Error("Directory previews support --json; use --help for generated listing options")

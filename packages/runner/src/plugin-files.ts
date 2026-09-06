@@ -121,13 +121,8 @@ const outputRoot = async (out: string): Promise<string> => {
   return join(canonical, ...suffix)
 }
 
-/** Full preflight, then exclusive creation. No --force mode: every listing
- * directory must be new, including for MCP entries. Validation errors write
- * nothing; later I/O races/failures may leave partial new output, never trigger
- * a retry, and never cause existing seller files to be overwritten or deleted. */
-export const writePluginListings = async (
-  outDir: string, listings: ReadonlyArray<PluginListingFiles>, sourceRoot: string
-): Promise<ReadonlyArray<string>> => {
+/** Pure batch validation/snapshot shared by dry-run previews and the writer. */
+export const preparePluginFileBatch = (listings: ReadonlyArray<PluginListingFiles>) => {
   try {
     if (listings.length === 0 || listings.length > PLUGIN_COPY_LIMITS.listings)
       return refuse("Plugin batch size is invalid")
@@ -166,6 +161,22 @@ export const writePluginListings = async (
         return refuse("Plugin entry file is absent from its generated tree")
       planned.push({ id: decoded.id, directories, files: [{ name: "arcade.json", content: manifestContent }, ...files] })
     }
+    return planned
+  } catch (error) {
+    if (error instanceof PluginFileError) throw error
+    throw new PluginFileError("Plugin generated manifest or file batch is invalid")
+  }
+}
+
+/** Full preflight, then exclusive creation. No --force mode: every listing
+ * directory must be new, including for MCP entries. Validation errors write
+ * nothing; later I/O races/failures may leave partial new output, never trigger
+ * a retry, and never cause existing seller files to be overwritten or deleted. */
+export const writePluginListings = async (
+  outDir: string, listings: ReadonlyArray<PluginListingFiles>, sourceRoot: string
+): Promise<ReadonlyArray<string>> => {
+  try {
+    const planned = preparePluginFileBatch(listings)
     const root = await outputRoot(outDir)
     const original = await realpath(sourceRoot)
     if (inside(original, root)) return refuse("Plugin output cannot be inside the source plugin")
