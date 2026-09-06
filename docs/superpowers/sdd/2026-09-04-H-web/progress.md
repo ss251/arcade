@@ -346,3 +346,28 @@ hashes, 14 literal home substitutions, all18 source/test pins, 14 retained H8/H9
 Pages pins, 84 local links across13 public documents, and zero selected privacy-
 pattern findings. This publication audit was single-threaded; no parallel review
 or repeated full gate was started. The atomic local H10a commit follows.
+
+## H10b1 — single-use approval foundation
+
+H10a committed as `e8ea873`. Single-threaded parent implementation adds a pure
+conversation-owned opaque approval token, captured canonical actual input and
+complete EIP3009/Gateway quote context. Binding mismatch burns authority before
+any wallet boundary; copying/restoring/model output cannot reconstruct a token.
+Bounded input, monotonic five-minute unused expiry and retained identity
+tombstones prevent hidden rearming. Active UI/controller integration is separate.
+
+Prewritten38 tests passed on first implementation; six supplemental self-review
+cases also passed. These are not represented as product Reds or independent
+review. Final44 focused tests and exact two-root strict checks passed. The sole
+sequential full gate passed3,652 Vitest/153 (49.07s),834 Bun/54/6,091 assertions
+(162.50s), root/web strict and actual client309ms/SSR149ms builds. Vitest used
+maxWorkers4/minWorkers1/maxConcurrency4; Bun max-concurrency4 without parallel.
+No delegate, overlapping/repeated gate, new payment, wallet key, production change
+or push. Public audit and the six-path local commit follow. H10b2 active purchase,
+session completeness and H11–14 remain; H remains unmerged.
+
+Final single-threaded audit passed: the new exact bannered copy/original hash
+`f09810268c8e2dfca60adcf493178dd3cb5a017c645ba91c8df4cde03dfaab7c`,
+both frozen source pins, all nine prior H10a copies,18 prior source pins and14
+retained H8/H9/F/Pages pins. Index links resolve (86 prior-document local links
+plus the two new documents); selected privacy-pattern findings were zero.

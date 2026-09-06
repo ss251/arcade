@@ -1,5 +1,13 @@
 # Plan H — execution records
 
+Current task: [H10b1 single-use approval foundation](task-10b1-brief.md), after
+H10a `e8ea873`. Parent-written pure approval capture/consumption passed44 focused
+tests, exact strict checks and its sole four-worker-bounded full gate. The
+[parent report](task-10b1-parent-report.md) distinguishes first-pass Green tests,
+self-review and still-unimplemented active browser integration. No delegates or
+parallel reviews were used under the owner machine-load restriction. Earlier
+checkpoints remain below; H is unmerged.
+
 Current task: [H10a passive browser protocol support](task-10a-brief.md), after H9
 `7cc4409`. Hub CORS/protocol and corrected web quote/read transport reviews passed;
 the single four-worker-bounded full gate and final publication audit passed. The
