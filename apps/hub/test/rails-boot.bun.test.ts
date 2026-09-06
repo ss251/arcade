@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { privateKeyToAccount } from "viem/accounts"
-import { loadChainConfig } from "@arcade/core"
+import { HIRE_CAPABILITY_HEADER, loadChainConfig } from "@arcade/core"
+import type { PaymentRequirements } from "@arcade/payments"
 const root = new URL("../../..", import.meta.url).pathname, KEY = `0x${"01".repeat(32)}` as const
 const pinned = loadChainConfig("arc-testnet")
 async function hub(env: Record<string, string>, check: (origin: string, output: () => string) => Promise<void>) {
@@ -54,13 +55,21 @@ describe("actual F4 boot and constructed rail inventory", () => {
       expect(stats.networkRequests).toBe(0); expect(stats.gateway).toHaveLength(1); expect(stats.eip).toHaveLength(rail === "eip3009" ? 1 : 0)
       expect(stats.gateway[0]).toEqual({ wallet: pinned.gateway!.wallet, facilitatorUrl: pinned.gateway!.facilitatorUrl,
         chainId: pinned.chainId, minValiditySeconds: pinned.gateway!.minValiditySeconds })
+      const challenge = await get(origin, `/x/0x${"2".repeat(40)}/first`, { method: "POST", body: "{}" })
+      expect(challenge.status).toBe(402)
+      const accepts = (await challenge.json()).accepts
+      expect(accepts).toHaveLength(rail === "eip3009" ? 2 : 1)
+      expect(accepts[0].extra.name).toBe(rail === "test" ? "USDC" : "GatewayWalletBatched")
       if (rail === "eip3009") {
         expect(stats.eip[0]).toMatchObject({ chainId: 5042002, rpcUrl: "http://127.0.0.1:1", facilitator: privateKeyToAccount(KEY).address })
         expect(stats.eip[0]).not.toHaveProperty("feeSplitter")
         for (const [id, seller, splitter] of [["first", "2", "3"], ["second", "4", "5"]]) {
           const response = await get(origin, `/x/0x${seller!.repeat(40)}/${id}`, { method: "POST", body: "{}" })
           expect(response.status).toBe(402)
-          expect((await response.json()).accepts[0]).toMatchObject({ payTo: `0x${splitter!.repeat(40)}`, extra: { name: "USDC" } })
+          const accepts = (await response.json()).accepts
+          expect(accepts).toHaveLength(2)
+          expect(accepts[0]).toMatchObject({ payTo: `0x${seller!.repeat(40)}`, extra: { name: "GatewayWalletBatched" } })
+          expect(accepts[1]).toMatchObject({ payTo: `0x${splitter!.repeat(40)}`, extra: { name: "USDC", feeSplitterVersion: 2 } })
         }
       }
       expect((await (await get(origin, "/__rails_fixture")).json()).networkRequests).toBe(0)
@@ -101,5 +110,127 @@ describe("actual F4 boot and constructed rail inventory", () => {
   it.each([{ ARCADE_RAIL: "PRIVATE_BAD_RAIL" }, { ARCADE_RAIL: "gateway", TEST_NO_GATEWAY: "1" }, { ARCADE_NETWORK: "arc-mainnet" }])("refuses invalid or unavailable boot before building a listener %#", async env => {
     const exit = await hub(env, async (origin, output) => { expect(origin).toBe(""); expect(output()).toContain("refusing to start") })
     expect(exit).toBe(2)
+  }, 10000)
+})
+
+const paidEnv = { ARCADE_RAIL: "eip3009", ARCADE_FACILITATOR_KEY: KEY, ARCADE_RPC_URL: "http://127.0.0.1:1", TEST_RAIL_PAYMENTS: "1" }
+const pathFor = (id = "first", seller = "2") => `/x/0x${seller.repeat(40)}/${id}`
+const simulatedPayment = (accepted: PaymentRequirements, signature = "0xgood", value = accepted.amount) => ({ x402Version: 2, accepted,
+  payload: { signature, authorization: { from: `0x${"a".repeat(40)}`, to: accepted.payTo, value,
+    validAfter: String(Math.floor(Date.now() / 1000) - 1), validBefore: String(Math.floor(Date.now() / 1000) + 600),
+    nonce: `0x${crypto.randomUUID().replaceAll("-", "").repeat(2)}` } } })
+const signed = (value: unknown) => ({ "payment-signature": Buffer.from(JSON.stringify(value)).toString("base64") })
+const stats = async (origin: string) => (await get(origin, "/__rails_fixture")).json()
+const probe = async (origin: string, path = pathFor(), headers?: HeadersInit) => {
+  const response = await get(origin, path, { method: "POST", body: "{}", ...(headers === undefined ? {} : { headers }) })
+  expect(response.status).toBe(402)
+  return response.json() as Promise<{ accepts: PaymentRequirements[]; error: string }>
+}
+async function finished(origin: string, response: Response) {
+  expect(response.status).toBe(202)
+  const handle = await response.json()
+  expect(handle.status).toBe("queued")
+  const url = new URL(handle.poll_url)
+  expect(url.origin).toBe(origin)
+  for (let i = 0; i < 100; i++) {
+    const result = await (await get(origin, url.pathname + url.search)).json()
+    if (result.receipt) return result.receipt
+    await Bun.sleep(10)
+  }
+  throw Error("Owned simulated job did not finish")
+}
+describe("J1 native ordinary-route selection (offline named rails)", () => {
+  it("booted without Gateway, advertises and settles only exact", async () => {
+    await hub({ ...paidEnv, TEST_NO_GATEWAY: "1" }, async origin => {
+      const choices = (await probe(origin)).accepts
+      expect(choices).toHaveLength(1); expect(choices[0]!.extra["name"]).toBe("USDC")
+      const receipt = await finished(origin, await get(origin, pathFor(), { method: "POST", body: "{}", headers: signed(simulatedPayment(choices[0]!)) }))
+      expect(receipt).toMatchObject({ rail: "eip3009", settled: true })
+      expect(await stats(origin)).toMatchObject({ gateway: [], verifies: ["eip3009"], settlements: ["eip3009"], networkRequests: 0 })
+    })
+  }, 10000)
+  it.each(["gateway", "eip3009"] as const)("carries %s through verify, settlement and receipt", async name => {
+    await hub(paidEnv, async origin => {
+      const choices = (await probe(origin)).accepts
+      expect(choices).toHaveLength(2)
+      const accepted = choices[name === "gateway" ? 0 : 1]!
+      const receipt = await finished(origin, await get(origin, pathFor(), { method: "POST", body: "{}", headers: signed(simulatedPayment(accepted)) }))
+      expect(receipt).toMatchObject({ rail: name, settled: true })
+      const result = await stats(origin)
+      expect(result).toMatchObject({ verifies: [name], settlements: [name], dispatches: 1, reservations: 0, networkRequests: 0 })
+      expect(result.receipts).toHaveLength(1)
+    })
+  }, 10000)
+  it("preserves exact overpayment authorization policy without accepting a changed quote", async () => {
+    await hub(paidEnv, async origin => {
+      const accepted = (await probe(origin)).accepts[1]!
+      const receipt = await finished(origin, await get(origin, pathFor(), { method: "POST", body: "{}", headers: signed(simulatedPayment(accepted, "0xgood", "10001")) }))
+      expect(receipt).toMatchObject({ rail: "eip3009", settled: true })
+      expect((await stats(origin)).settlements).toEqual(["eip3009"])
+    })
+  }, 10000)
+  it.each(["gateway", "eip3009"] as const)("does not settle %s when output fails its schema", async name => {
+    await hub(paidEnv, async origin => {
+      const path = pathFor(`only-${name}`), accepted = (await probe(origin, path)).accepts[0]!
+      const receipt = await finished(origin, await get(origin, path, { method: "POST", body: '{"fail":true}', headers: signed(simulatedPayment(accepted)) }))
+      expect(receipt).toMatchObject({ rail: name, settled: false })
+      expect(await stats(origin)).toMatchObject({ verifies: [name], settlements: [], dispatches: 1, networkRequests: 0 })
+    })
+  }, 10000)
+  it("refuses unknown, unbuilt and unlisted rails before verify, jobs or reservations", async () => {
+    await hub(paidEnv, async origin => {
+      const [gateway, exact] = (await probe(origin)).accepts
+      for (const [path, accepted] of [
+        [pathFor(), { ...gateway, scheme: "unknown" }], [pathFor(), { ...exact, scheme: "erc8183" }],
+        [pathFor("only-eip3009"), gateway], [pathFor("only-gateway"), exact]
+      ] as const) {
+        const response = await get(origin, path, { method: "POST", body: "{}", headers: signed(simulatedPayment(accepted as PaymentRequirements)) })
+        expect(response.status).toBe(402); expect(await response.json()).toEqual({ error: "unsupported_rail" })
+      }
+      expect(await probe(origin, pathFor("only-erc8183"))).toMatchObject({ error: "unsupported_rail", accepts: [] })
+      expect(await stats(origin)).toMatchObject({ verifies: [], settlements: [], dispatches: 0, jobWrites: 0, reservations: 0, networkRequests: 0 })
+    })
+  }, 10000)
+  it("binds every echoed payment term before a verifier can run", async () => {
+    await hub(paidEnv, async origin => {
+      const exact = (await probe(origin)).accepts[1]!
+      for (const change of [{ amount: "10001" }, { asset: `0x${"6".repeat(40)}` }, { network: "eip155:1" },
+        { payTo: `0x${"6".repeat(40)}` }, { resource: "/other" }, { maxTimeoutSeconds: 1 },
+        { extra: { ...exact.extra, version: "3" } }, { extra: { ...exact.extra, feeSplitterVersion: 1 } },
+        { extra: { ...exact.extra, feeSplitter: `0x${"6".repeat(40)}` } }]) {
+        const response = await get(origin, pathFor(), { method: "POST", body: "{}", headers: signed(simulatedPayment({ ...exact, ...change })) })
+        expect(response.status).toBe(402); expect(await response.json()).toEqual({ error: "payment_invalid", detail: "requirements_mismatch" })
+      }
+      const gateway = (await probe(origin)).accepts[0]!
+      const response = await get(origin, pathFor(), { method: "POST", body: "{}", headers: signed(simulatedPayment({ ...gateway,
+        extra: { ...gateway.extra, verifyingContract: `0x${"6".repeat(40)}` } })) })
+      expect(response.status).toBe(402); expect(await response.json()).toEqual({ error: "payment_invalid", detail: "requirements_mismatch" })
+      expect(await stats(origin)).toMatchObject({ verifies: [], settlements: [], dispatches: 0, jobWrites: 0, reservations: 0, networkRequests: 0 })
+    })
+  }, 10000)
+  it("keeps malformed envelopes at 400 and invalid signatures at 402 without work", async () => {
+    await hub(paidEnv, async origin => {
+      for (const raw of [null, [], {}, { x402Version: 2, accepted: { scheme: "exact" }, payload: {} }]) {
+        expect((await get(origin, pathFor(), { method: "POST", body: "{}", headers: signed(raw) })).status).toBe(400)
+      }
+      const accepted = (await probe(origin)).accepts[0]!
+      const response = await get(origin, pathFor(), { method: "POST", body: "{}", headers: signed(simulatedPayment(accepted, "0xbad")) })
+      expect(response.status).toBe(402); expect(await response.json()).toMatchObject({ error: "payment_invalid" })
+      expect(await stats(origin)).toMatchObject({ verifies: ["gateway"], settlements: [], dispatches: 0, jobWrites: 0, reservations: 0, networkRequests: 0 })
+    })
+  }, 10000)
+  it("keeps authorized child calls on exact, with no Gateway admission or speculative budget reservation", async () => {
+    await hub(paidEnv, async origin => {
+      const { capability } = await (await get(origin, "/__rails_child")).json()
+      const headers = { [HIRE_CAPABILITY_HEADER]: capability }, path = pathFor("second", "4")
+      const rootChoices = (await probe(origin, path)).accepts, child = (await probe(origin, path, headers)).accepts
+      expect(child).toHaveLength(1); expect(child[0]).toEqual(rootChoices[1])
+      const refused = await get(origin, path, { method: "POST", body: "{}", headers: { ...headers, ...signed(simulatedPayment(rootChoices[0]!)) } })
+      expect(refused.status).toBe(402); expect(await refused.json()).toEqual({ error: "unsupported_rail" })
+      expect(await stats(origin)).toMatchObject({ verifies: [], jobWrites: 0, reservations: 0 })
+      const receipt = await finished(origin, await get(origin, path, { method: "POST", body: "{}", headers: { ...headers, ...signed(simulatedPayment(child[0]!)) } }))
+      expect(receipt).toMatchObject({ rail: "eip3009", settled: true, hop: 1 })
+      expect(await stats(origin)).toMatchObject({ verifies: ["eip3009"], settlements: ["eip3009"], reservations: 1, networkRequests: 0 })
+    })
   }, 10000)
 })

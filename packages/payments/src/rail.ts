@@ -62,16 +62,16 @@ export type SettleError = SettlementFailed | RpcRateLimited | RpcFailure
  * The payment rail.
  *
  * Two production implementations (`EIP3009Live`, `GatewayLive`) plus `RailTest` satisfy this
- * one interface, and the hub depends only on the tag. Choosing a rail is therefore a
- * `Layer` wiring decision that the compiler checks — not a runtime `if`, and not an env flag
- * that could let one implementation silently rot.
+ * one interface. Layers construct the built inventory; an ordinary request selects
+ * one of the listing's advertised choices, which is retained through settlement.
+ * `erc8183` is a reserved contract here, not a built escrow implementation.
  *
  * The split of verify/settle is load-bearing for D2: we verify BEFORE the seller does any
  * work, and settle only AFTER the output validates, which may be minutes later. That is
  * exactly why Circle's Express middleware (which settles inside the request) is unusable here.
  */
 export interface Rail {
-  readonly name: "eip3009" | "gateway" | "test"
+  readonly name: "eip3009" | "gateway" | "erc8183" | "test"
 
   /** Build the 402 body a buyer needs in order to pay. */
   readonly challenge: (input: ChallengeInput) => Effect.Effect<PaymentRequirements>

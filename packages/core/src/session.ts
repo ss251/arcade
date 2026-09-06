@@ -14,7 +14,7 @@ export class Session extends Schema.Class<Session>("Session")(Schema.Struct({
   id: SessionId, buyer: SessionAddress, budgetAtomic: SessionAmount.pipe(Schema.filter(v => v > 0n)),
   spentAtomic: SessionAmount, rail: RailName, network: Schema.String.pipe(Schema.pattern(/^eip155:[1-9][0-9]{0,15}$/)),
   openedAtMs: SessionTime, closedAtMs: Schema.optional(SessionTime)
-}).pipe(Schema.filter(v => v.spentAtomic <= v.budgetAtomic && (v.closedAtMs === undefined || v.closedAtMs >= v.openedAtMs)))) {}
+}).pipe(Schema.filter(v => v.rail !== "erc8183" && v.spentAtomic <= v.budgetAtomic && (v.closedAtMs === undefined || v.closedAtMs >= v.openedAtMs)))) {}
 /** Public accounting summary: no nonce, signature, request or private diagnostics. */
 export class SessionCall extends Schema.Class<SessionCall>("SessionCall")(Schema.Struct({
   jobId: JobId, skillId: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128)),
@@ -37,7 +37,7 @@ export class SessionReceipt extends Schema.Class<SessionReceipt>("SessionReceipt
   const settled = v.calls.filter(call => call.state === "settled")
   const refs = settled.map(call => call.settleRef)
   const kind = v.rail === "gateway" ? "gateway-transfer" : v.rail === "test" ? "test" : "onchain"
-  return v.heldAtomic === 0n && v.spentAtomic <= v.budgetAtomic && v.closedAtMs >= v.openedAtMs
+  return v.rail !== "erc8183" && v.heldAtomic === 0n && v.spentAtomic <= v.budgetAtomic && v.closedAtMs >= v.openedAtMs
     && v.calls.every(call => (call.state === "settled" || call.state === "released") && call.createdAtMs >= v.openedAtMs && call.createdAtMs <= v.closedAtMs)
     && new Set(v.calls.map(call => call.jobId)).size === v.calls.length
     && settled.length === v.settledCalls && settled.reduce((sum, call) => sum + call.priceAtomic, 0n) === v.spentAtomic

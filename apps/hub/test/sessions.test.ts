@@ -107,6 +107,14 @@ describe("thin authoritative session service", () => {
     await fails(service.openSession({ ...open(), rail: "eip3009" }), "SessionRailUnavailable")
     expect(write).not.toHaveBeenCalled()
   })
+  it("never opens an escrow session even if a future escrow rail is built", async () => {
+    const f = await setup(), escrow = rail("erc8183"), write = vi.fn(f.store.openSession), newId = vi.fn(() => sid())
+    const service = makeSessions({ store: { ...f.store, openSession: write }, rails: makeRails(escrow, [f.test]), chain, newId })
+    await fails(service.openSession({ ...open(), rail: "erc8183" }), "SessionRailUnavailable")
+    await fails(service.openSession(open()), "SessionRailUnavailable")
+    expect(newId).not.toHaveBeenCalled(); expect(write).not.toHaveBeenCalled()
+    expect(escrow.challenge).not.toHaveBeenCalled(); expect(escrow.verify).not.toHaveBeenCalled(); expect(escrow.settle).not.toHaveBeenCalled()
+  })
   it.each(["ses_abc", "ses_" + "A".repeat(32), "ses_" + "0".repeat(33)])("refuses injected noncanonical ID %s", async id => {
     const f = await setup(), write = vi.fn(f.store.openSession)
     const service = makeSessions({ store: { ...f.store, openSession: write }, rails: f.rails, chain, newId: () => id })

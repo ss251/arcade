@@ -10,7 +10,9 @@ import { ARC_CAIP2, USDC_ADDRESS } from "@arcade/core"
  */
 
 export class PaymentRequirements extends Schema.Class<PaymentRequirements>("PaymentRequirements")({
-  scheme: Schema.Literal("exact"),
+  // Escrow requirements can be advertised by a future built rail. Its funded-job
+  // payload/implementation is not enabled by this wire-contract reservation.
+  scheme: Schema.Literal("exact", "erc8183"),
   /** CAIP-2, e.g. eip155:5042002 */
   network: Schema.String,
   /** Atomic units (6-dec USDC) as a decimal string — bigints don't survive JSON. */

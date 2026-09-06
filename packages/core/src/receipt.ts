@@ -11,7 +11,7 @@ import { keccak256, toHex } from "viem"
  * traceable on-chain; it is simply batched, exactly as Gateway batches settlement.
  */
 
-export const RailName = Schema.Literal("eip3009", "gateway", "test")
+export const RailName = Schema.Literal("eip3009", "gateway", "erc8183", "test")
 export type RailName = typeof RailName.Type
 
 export class ReceiptChild extends Schema.Class<ReceiptChild>("ReceiptChild")({

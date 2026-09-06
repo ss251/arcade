@@ -63,11 +63,19 @@ See spec §1 (table with evidence). Re-verify only what a task names; do not re-
 
 ### Task 1: Dual-accept challenge and rail dispatch (J1 core)
 
-- [ ] `packages/core`: add optional `rails` (default `["gateway","eip3009"]` when unset; validated), `category` (enum of the six registry values), `tags` (≤10 lowercase slugs) to the public manifest; tests for validation.
-- [ ] `apps/hub/src/challenge.ts`: `buildAccepts(rails, listing, input)` → ordered `PaymentRequirements[]`: Gateway first when `rails.get("gateway")` exists, then `eip3009`, then `erc8183` when the listing declares it and `rails.get("erc8183")` exists. Unit tests for every combination, including a hub booted without Gateway.
-- [ ] `server.ts`: the 402 body is `{x402Version: 2, error: "payment required", accepts: buildAccepts(...)}`; `verify` picks the rail whose `name` matches `payload.accepted` (`extra.name === "GatewayWalletBatched"` → gateway; `scheme === "erc8183"` → erc8183; else eip3009). Refuse with `402 unsupported_rail` when no built rail matches.
-- [ ] Regression: the existing single-rail tests keep passing with `accepts.length === 1` when only one rail is built.
+- [x] `packages/core`: add optional `rails` (default `["gateway","eip3009"]` when unset; validated), `category` (enum of the six registry values), `tags` (≤10 lowercase slugs) to the public manifest; tests for validation.
+- [x] `apps/hub/src/challenge.ts`: `buildAccepts(rails, listing, input)` → ordered `PaymentRequirements[]`: Gateway first when `rails.get("gateway")` exists, then `eip3009`, then `erc8183` when the listing declares it and `rails.get("erc8183")` exists. Unit tests for every combination, including a hub booted without Gateway.
+- [x] `server.ts`: the 402 body is `{x402Version: 2, error: "payment required", accepts: buildAccepts(...)}`; `verify` picks the rail whose `name` matches `payload.accepted` (`extra.name === "GatewayWalletBatched"` → gateway; `scheme === "erc8183"` → erc8183; else eip3009). Refuse with `402 unsupported_rail` when no built rail matches.
+- [x] Regression: the existing single-rail tests keep passing with `accepts.length === 1` when only one rail is built.
 - [ ] Commit: `feat(hub,payments): advertise every built rail in one 402 and dispatch verification by the accepted requirements`.
+
+Execution note: split into metadata98d6e64 and challenge/dispatch checkpoints.
+Unknown schemes never fall through to exact; echoed terms are bound before
+verification, and the chosen rail persists through settlement. Test mode remains
+offline, children retain their default and sessions exclude escrow. The reserved
+escrow type is not a built implementation. [Task1B report](../sdd/2026-09-06-J-arc-native/task-1b-report.md)
+records the sole full gate's old-fixture failures, targeted correction and
+unreached-stage results; no full gate replay or live proof is claimed.
 
 ### Task 2: Registry-shaped discovery (J1)
 

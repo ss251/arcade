@@ -1,5 +1,19 @@
 # Plan J progress
 
+2026-09-07 02:13 IST — Task1B DONE_WITH_CONCERNS. Sole17003:4578VitestPASS,
+7FAIL/203/64.76s from old Gateway-named/USDC-metadata HTTP fakes. Production
+13pins unchanged; sixfixture/testfiles corrected,12targeted/3/5.30s and19-root
+strict0 PASS. Onlyunreached81633 thenPASS849Bun55/6266assert/167.60s,rootweb
+strict,clientSSRbuilds. No fullrepeat; failure/splitcoverage retained. Atomic
+commit/exactFFnext. J2 preflight observed public registry input/output fields;
+no J2 source yet. No newkeys/payments/agents/push.
+
+2026-09-07 02:03 IST — Task1A merged98d6e64. Task1B ordered/bound choices and
+selected verification/settlement implemented;118focused/5/1.54s,29native/2/
+380assert/15.79s,13-rootstrict0 PASS. Two actual session-widening Reds fixed;
+escrow stays unavailable to sessions and remains only a reserved ordinary rail
+contract. Source freeze/audit/solefullgate next. No keys/payments/agents/push.
+
 2026-09-07 01:44 IST — Task1A sole42779PASS:4530Vitest202/64.67s,
 839Bun55/6114assert/163.57s,rootwebstrict0,client365ms/SSR173ms. Fivepins,
 11paths/25links/privacydiffPASS;all9firstpartymanifestpublicbytes matchbaseline.
@@ -12,7 +26,8 @@ implemented after32genuineReds/4passes; array-table test shape corrected,then
 121focused/5/3.15sPASS. Strict/audit/solefullgate/atomiccommitnext. Tasks1B–12
 notrun; later escrow-state/Circlepayer/queued202 assumptions explicitly flagged.
 
-- Task1 IN_PROGRESS:1A schema checkpoint COMPLETE;1B ordered challenge/dispatch next.
+- Task1 DONE_WITH_CONCERNS:1A MERGED;1B complete with recorded split verification,
+  atomic commit/merge pending. No live Circle/escrow claim.
 - Task2 NOT_STARTED: registry-shaped discovery.
 - Task3 NOT_STARTED: buyer funded/preferred accept selection.
 - Task4 NOT_RUN: Circle CLI inspect/estimate/bounded testnet pay proof.

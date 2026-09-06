@@ -8,9 +8,9 @@ import { HEADER_PAYMENT_SIGNATURE, signAuthorization } from "@arcade/payments"
 
 const root = fileURLToPath(new URL("../../..", import.meta.url))
 const buyer = privateKeyToAccount(`0x${"1".repeat(64)}`) // Fixed unfunded simulation fixture.
-const seller = `0x${"2".repeat(40)}`, payTo = `0x${"3".repeat(40)}`
+const seller = `0x${"2".repeat(40)}`
 const withHub = async (mode: string, check: (base: string, output: () => string) => Promise<void>) => {
-  const child = spawn("bun", ["run", "--preload", "./apps/hub/test/fixtures/pipeline-attest-http-preload.ts", "apps/hub/src/server.ts"], {
+  const child = spawn("bun", ["--no-env-file", "--preload", "./apps/hub/test/fixtures/pipeline-attest-http-preload.ts", "apps/hub/src/server.ts"], {
     cwd: root, env: { PATH: process.env["PATH"] ?? "", PORT: "0", ARCADE_NETWORK: "arc-testnet",
       ARCADE_RAIL: mode === "test" ? "test" : "gateway", ARCADE_CHAIN_CHECK: "0", TEST_ATTEST_MODE: mode,
       ARCADE_HUB_SECRET: "offline-attestation-only" }
@@ -40,6 +40,8 @@ describe("actual paid HTTP path attestation wiring (offline simulation)", () => 
       const probe = await request(url, { method: "POST", body: "{}" })
       expect(probe.status).toBe(402)
       const accepted = (await probe.json()).accepts[0]
+      expect(accepted.payTo).toBe(seller)
+      expect(accepted.extra.name).toBe(mode === "test" ? "USDC" : "GatewayWalletBatched")
       const signed = await Effect.runPromise(signAuthorization({ account: buyer, to: accepted.payTo, valueAtomic: 10_000n }))
       const { signature, ...authorization } = signed
       const response = await request(url, { method: "POST", body: JSON.stringify({ private: "INPUT_PRIVATE" }),
@@ -54,7 +56,7 @@ describe("actual paid HTTP path attestation wiring (offline simulation)", () => 
       else {
         expect(lines).toHaveLength(1)
         expect(JSON.parse(lines[0]!.slice(18))).toMatchObject({ jobId: queued.job_id, agentId: "42", buyer: buyer.address,
-          seller, payTo, origin: base, chainId: 5042002, identityRegistry: loadChainConfig("arc-testnet").erc8004!.identity,
+          seller, payTo: seller, origin: base, chainId: 5042002, identityRegistry: loadChainConfig("arc-testnet").erc8004!.identity,
           settled: mode !== "failed", receiptExists: true, timestampMatches: true, inputMatches: true, outputMatches: true })
       }
     })

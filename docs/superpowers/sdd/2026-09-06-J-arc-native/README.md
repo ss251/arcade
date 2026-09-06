@@ -6,7 +6,8 @@ evidence remain separate open work; this index does not mark them accepted.
 
 - [Approved design](../../specs/2026-09-06-arc-native-settlement-design.md).
 - [Twelve-task plan](../../plans/2026-09-06-J-arc-native.md).
-- [Task 1 brief](task-1-brief.md), [manifest checkpoint](task-1a-report.md).
+- [Task 1 brief](task-1-brief.md), [manifest checkpoint](task-1a-report.md),
+  [challenge/dispatch checkpoint](task-1b-report.md).
 - [Progress ledger](progress.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per

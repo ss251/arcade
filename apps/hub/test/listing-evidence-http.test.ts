@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url"
 import { expect, it } from "vitest"
 const root = fileURLToPath(new URL("../../..", import.meta.url))
 it("only reads the requested detail identity, rechecking ownership and withholding unavailable counts", async () => {
-  const child = spawn("bun", ["run", "--preload", "./apps/hub/test/fixtures/listing-evidence-http-preload.ts", "apps/hub/src/server.ts"], {
+  const child = spawn("bun", ["--no-env-file", "--preload", "./apps/hub/test/fixtures/listing-evidence-http-preload.ts", "apps/hub/src/server.ts"], {
     cwd: root, env: { PATH: process.env["PATH"] ?? "", PORT: "0", ARCADE_NETWORK: "arc-testnet", ARCADE_RAIL: "gateway",
       ARCADE_CHAIN_CHECK: "0", ARCADE_HUB_SECRET: "offline-identity-only" }
   })

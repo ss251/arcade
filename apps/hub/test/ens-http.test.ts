@@ -21,7 +21,7 @@ const eventually = async (predicate: () => Promise<boolean>) => {
   expect(await predicate()).toBe(true)
 }
 const withHub = async (enabled: boolean, check: (base: string) => Promise<void>, held = false) => {
-  const child = spawn("bun", ["run", "--preload", "./apps/hub/test/fixtures/ens-http-preload.ts", "apps/hub/src/server.ts"], {
+  const child = spawn("bun", ["--no-env-file", "--preload", "./apps/hub/test/fixtures/ens-http-preload.ts", "apps/hub/src/server.ts"], {
     cwd: root, env: { PATH: process.env["PATH"] ?? "", PORT: "0", ARCADE_NETWORK: "arc-testnet",
       ARCADE_RAIL: "gateway", ARCADE_CHAIN_CHECK: "0", ARCADE_HUB_SECRET: "offline-ens-only",
       ...(held ? { TEST_ENS_HELD: "1" } : {}),
@@ -91,6 +91,8 @@ describe("actual hub ENS discovery (offline simulation)", () => {
       const probe = await request(url, { method: "POST", body: "{}" })
       expect(probe.status).toBe(402)
       const accepted = (await probe.json()).accepts[0]
+      expect(accepted.extra.name).toBe("GatewayWalletBatched")
+      expect(accepted.payTo).toBe(seller)
       // Fixed unfunded offline fixture: simulated rail only, no external transport.
       const signed = await Effect.runPromise(signAuthorization({ account: privateKeyToAccount(`0x${"1".repeat(64)}`), to: accepted.payTo, valueAtomic: 10_000n }))
       const { signature, ...authorization } = signed

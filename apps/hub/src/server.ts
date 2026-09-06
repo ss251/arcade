@@ -45,6 +45,7 @@ import { listingEvidence } from "./listing-evidence.ts"
 import { AttestLive, AttestTag } from "./attest.ts"
 import { runJob } from "./pipeline.ts"
 import { RailsTag, railsLayerFrom } from "./rails.ts"
+import { challengeChoices, matchesRequirements, paymentRailName } from "./challenge.ts"
 import { makeSessions } from "./sessions.ts"
 import { makeSessionRoutes, timingSafeTokenOk } from "./server-sessions.ts"
 import { makeSessionCallRoutes } from "./server-session-calls.ts"
@@ -1195,26 +1196,31 @@ const main = Effect.gen(function* () {
         }
         const lineage0 = lineageE.right
 
+        const choices = await run(challengeChoices(rails, listing, {
+          priceAtomic, resource, payTo: seller, description: listing.description,
+          ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }),
+          ...(found.right.splitterVersion === undefined ? {} : { feeSplitterVersion: found.right.splitterVersion })
+        }, { child: lineage0.hop > 0 }))
+
         if (header === null) {
-          const requirements = await run(rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description, ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }), ...(found.right.splitterVersion === undefined ? {} : { feeSplitterVersion: found.right.splitterVersion }) }))
           return json(
-            { x402Version: 2, error: "payment required", rail: rail.name, accepts: [requirements] },
+            { x402Version: 2, error: choices.length === 0 ? "unsupported_rail" : "payment required",
+              rail: rail.name, accepts: choices.map(choice => choice.requirements) },
             402
           )
         }
 
-        const decoded = await run(
-          Effect.flatMap(
-            Effect.try(() => decodeHeaderJson(header)),
-            (j) => Schema.decodeUnknown(PaymentPayload)(j)
-          ).pipe(Effect.either)
-        )
+        const raw = await run(Effect.try(() => decodeHeaderJson(header)).pipe(Effect.either))
+        if (raw._tag === "Left") return json({ error: "malformed payment header" }, 400)
+        const name = paymentRailName(raw.right)
+        if (name === "malformed") return json({ error: "malformed payment header" }, 400)
+        const chosen = choices.find(choice => choice.rail.name === name || name === "eip3009" && choice.rail.name === "test")
+        if (chosen === undefined) return json({ error: "unsupported_rail" }, 402)
+        const decoded = await run(Schema.decodeUnknown(PaymentPayload)(raw.right).pipe(Effect.either))
         if (decoded._tag === "Left") return json({ error: "malformed payment header" }, 400)
-
-        const requirements = await run(
-          rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description, ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }), ...(found.right.splitterVersion === undefined ? {} : { feeSplitterVersion: found.right.splitterVersion }) })
-        )
-        const verifiedE = await run(rail.verify(decoded.right, requirements).pipe(Effect.either))
+        const { rail: selectedRail, requirements } = chosen
+        if (!matchesRequirements(decoded.right.accepted, requirements)) return json({ error: "payment_invalid", detail: "requirements_mismatch" }, 402)
+        const verifiedE = await run(selectedRail.verify(decoded.right, requirements).pipe(Effect.either))
         if (verifiedE._tag === "Left") {
           return json({ error: "payment_invalid", detail: verifiedE.left._tag }, 402)
         }
@@ -1288,14 +1294,15 @@ const main = Effect.gen(function* () {
             seller,
             input,
             verified,
+            rail: selectedRail,
             feeBps: FEE_BPS,
             accrualId,
             lineage,
             // Only ownership-verified, real-rail jobs may become registry evidence.
             // The asynchronous worker rechecks current ownership before broadcasting.
-            ...(rail.name === "test" || !erc8004.armed || found.right.agentVerified !== true ||
+            ...(selectedRail.name === "test" || !erc8004.armed || found.right.agentVerified !== true ||
                 found.right.agentId === undefined || chainConfig.erc8004 === undefined ? {} : {
-              attest: { agentId: found.right.agentId, payTo: found.right.feeSplitter ?? seller,
+              attest: { agentId: found.right.agentId, payTo: requirements.payTo,
                 origin: publicOrigin(url), chainId: chainConfig.chainId, identityRegistry: chainConfig.erc8004.identity }
             }),
             ...(isCanary ? { canary: true } : {}),

@@ -4,6 +4,7 @@ import { Effect, Layer, Ref } from "effect"
 import { Bounds, JobOutcome, PublicListing, loadChainConfig } from "@arcade/core"
 import { StoreLive, StoreTag } from "../../src/store.ts"
 import { BrokerTag, type Broker } from "../../src/broker.ts"
+import type { Attest } from "../../src/attest.ts"
 const payments = { ...await import("@arcade/payments") }
 const erc = { ...await import("../../src/erc8004.ts") }
 const attest = { ...await import("../../src/attest.ts") }
@@ -17,10 +18,12 @@ await Effect.runPromise(store.putListing({ listing: PublicListing.make({ id: "ht
   ...(mode === "missing" ? {} : { agentId: "42", registrationTx: `0x${"a".repeat(64)}`, agentVerified: mode !== "unverified" }) }))
 mock.module("../../src/store-sqlite.ts", () => ({ StoreFromEnv: () => Layer.succeed(StoreTag, store) }))
 const rail = payments.makeTestRail(Effect.runSync(Ref.make(payments.makeTestState({}, 1_000_000n))))
-mock.module("@arcade/payments", () => ({ ...payments, GatewayLive: () => Layer.succeed(payments.RailTag, {
-  ...rail, name: "gateway" as const,
-  challenge: (args: Parameters<typeof rail.challenge>[0]) => rail.challenge({ ...args, payTo: args.feeSplitter ?? args.payTo })
-}) }))
+// Real Gateway metadata/payee, simulated verification and settlement only.
+mock.module("@arcade/payments", () => ({ ...payments,
+  GatewayLive: (options: Parameters<typeof payments.GatewayLive>[0]) => Layer.effect(payments.RailTag, Effect.gen(function* () {
+    const gateway = yield* payments.RailTag.pipe(Effect.provide(payments.GatewayLive(options)))
+    return { ...gateway, verify: rail.verify, settle: rail.settle }
+  })) }))
 const broker: Broker = { register: () => Effect.void, unregister: () => Effect.void, complete: () => Effect.void,
   runnerFor: () => Effect.succeed("rnr_attest"), runnerForJob: () => Effect.succeed("rnr_attest"),
   dispatch: () => Effect.succeed(JobOutcome.make({ status: "succeeded", stopReason: "end_turn", startedAtMs: 0, finishedAtMs: 1,
@@ -40,8 +43,9 @@ mock.module("../../src/attest.ts", () => ({ ...attest, AttestLive: Layer.succeed
       outputMatches: (job.output as { private?: string }).private === "OUTPUT_PRIVATE" }))
     if (mode === "broken") yield* Effect.die("QUEUE_PRIVATE")
   }), idle: Effect.void
-} satisfies attest.Attest) }))
-globalThis.fetch = async () => { throw new Error("external calls disabled in offline attestation fixture") }
+} satisfies Attest) }))
+globalThis.fetch = Object.assign(async () => { throw new Error("external calls disabled in offline attestation fixture") },
+  { preconnect() { throw Error("external preconnect disabled in offline attestation fixture") } })
 const serve = Bun.serve
 Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
   const server = serve({ ...options, hostname: "127.0.0.1", port: 0 } as Parameters<typeof Bun.serve>[0])

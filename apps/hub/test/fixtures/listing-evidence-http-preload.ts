@@ -13,7 +13,12 @@ for (const [id, agentId] of [["fresh", "1"], ["transferred", "2"], ["stale", "3"
 }
 mock.module("../../src/store-sqlite.ts", () => ({ StoreFromEnv: () => Layer.succeed(StoreTag, store) }))
 const rail = payments.makeTestRail(Effect.runSync(Ref.make(payments.makeTestState())))
-mock.module("@arcade/payments", () => ({ ...payments, GatewayLive: () => Layer.succeed(payments.RailTag, { ...rail, name: "gateway" as const }) }))
+// Real Gateway metadata/payee, simulated verification and settlement only.
+mock.module("@arcade/payments", () => ({ ...payments,
+  GatewayLive: (options: Parameters<typeof payments.GatewayLive>[0]) => Layer.effect(payments.RailTag, Effect.gen(function* () {
+    const gateway = yield* payments.RailTag.pipe(Effect.provide(payments.GatewayLive(options)))
+    return { ...gateway, verify: rail.verify, settle: rail.settle }
+  })) }))
 mock.module("../../src/erc8004.ts", () => ({ ...erc, Erc8004FromEnv: () => Layer.succeed(erc.Erc8004Tag, {
   ...erc.noopErc8004("offline fixture"), armed: true, registries: loadChainConfig("arc-testnet").erc8004!,
   addresses: { operator: `0x${"4".repeat(40)}`, validator: `0x${"5".repeat(40)}`, attester: `0x${"6".repeat(40)}` },
@@ -27,7 +32,8 @@ mock.module("../../src/erc8004.ts", () => ({ ...erc, Erc8004FromEnv: () => Layer
     return { validationPasses: 7, validationsRead: 8, settlementFeedback: 5, stale: agentId === "3", private: "PRIVATE_SERVICE" }
   })
 }) }))
-globalThis.fetch = async () => { throw new Error("external calls disabled in offline identity fixture") }
+globalThis.fetch = Object.assign(async () => { throw new Error("external calls disabled in offline identity fixture") },
+  { preconnect() { throw Error("external preconnect disabled in offline identity fixture") } })
 const serve = Bun.serve
 Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
   const server = serve({ ...options, hostname: "127.0.0.1", port: 0 } as Parameters<typeof Bun.serve>[0])

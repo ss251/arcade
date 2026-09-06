@@ -41,15 +41,18 @@ mock.module("@arcade/buyer", () => ({ ...buyer, sepoliaEnsReader: () => ({
   }
 }) }))
 const rail = payments.makeTestRail(Effect.runSync(Ref.make(payments.makeTestState({}, 1_000_000n))))
-mock.module("@arcade/payments", () => ({ ...payments, GatewayLive: () => Layer.succeed(payments.RailTag, {
-  ...rail, name: "gateway" as const,
-  challenge: (args: Parameters<typeof rail.challenge>[0]) => rail.challenge({ ...args, payTo: args.feeSplitter ?? args.payTo })
-}) }))
+// Real Gateway metadata/payee, simulated verification and settlement only.
+mock.module("@arcade/payments", () => ({ ...payments,
+  GatewayLive: (options: Parameters<typeof payments.GatewayLive>[0]) => Layer.effect(payments.RailTag, Effect.gen(function* () {
+    const gateway = yield* payments.RailTag.pipe(Effect.provide(payments.GatewayLive(options)))
+    return { ...gateway, verify: rail.verify, settle: rail.settle }
+  })) }))
 const broker: Broker = { register: () => Effect.void, unregister: () => Effect.void, complete: () => Effect.void,
   runnerFor: () => Effect.succeed("rnr_ens"), runnerForJob: () => Effect.succeed("rnr_ens"),
   dispatch: () => Effect.succeed(JobOutcome.make({ status: "succeeded", stopReason: "end_turn", startedAtMs: 0, finishedAtMs: 1, output: { ok: true } })) }
 mock.module("../../src/broker.ts", () => ({ BrokerTag, BrokerLive: Layer.succeed(BrokerTag, broker) }))
-globalThis.fetch = async () => { throw Error("external network disabled in offline ENS fixture") }
+globalThis.fetch = Object.assign(async () => { throw Error("external network disabled in offline ENS fixture") },
+  { preconnect() { throw Error("external preconnect disabled in offline ENS fixture") } })
 const serve = Bun.serve
 Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
   const original = options.fetch!

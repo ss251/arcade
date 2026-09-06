@@ -116,6 +116,8 @@ export const makeSessions = ({ store, rails, chain, newId = newSessionId }: Sess
   const selected = pinnedChain(chain)
   const built = (name: unknown): RailName => {
     const canonical = namedRail(name), rail = rails.get(canonical)
+    // Escrow is an ordinary root-job protocol, not a session budget rail.
+    if (canonical === "erc8183") throw new SessionRailUnavailable({ rail: canonical })
     if (rail === undefined || rail.name !== canonical) throw new SessionRailUnavailable({ rail: canonical })
     if (canonical === "gateway" && selected.gateway === null) throw new SessionRailUnavailable({ rail: canonical })
     return canonical

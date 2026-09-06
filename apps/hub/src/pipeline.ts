@@ -37,7 +37,7 @@ export interface RunJobArgs {
   readonly seller: string
   readonly input: unknown
   readonly verified: VerifiedPayment
-  /** Internal caller-selected rail; ordinary root calls keep the injected default. */
+  /** Trusted advertised rail selected by the caller; retained through settlement. */
   readonly rail?: Rail
   readonly feeBps?: number
   readonly accrualId?: string

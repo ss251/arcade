@@ -9,6 +9,10 @@ const receipt = { sessionId: fields.id, buyer: fields.buyer, rail: fields.rail, 
   budgetAtomic: 100n, spentAtomic: 0n, heldAtomic: 0n, calls: [SessionCall.make(call)], settledCalls: 0,
   settlementRefs: [], complete: true as const, openedAtMs: 1, closedAtMs: 3 }
 describe("session public schemas are budgets, not financial proofs", () => {
+  it("does not expand session schemas when ordinary receipts reserve the escrow rail", () => {
+    expect(() => Session.make({ ...fields, rail: "erc8183" })).toThrow()
+    expect(() => SessionReceipt.make({ ...receipt, rail: "erc8183" })).toThrow()
+  })
   it("retains the exact header and bigint amounts without selecting environment or doing IO", () => {
     expect(SESSION_HEADER).toBe("x-arcade-session")
     expect(Session.make({ ...fields, budgetAtomic: 9007199254740993n }).budgetAtomic).toBe(9007199254740993n)
