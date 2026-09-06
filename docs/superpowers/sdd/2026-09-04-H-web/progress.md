@@ -468,3 +468,41 @@ Eight frozen source/test pins, prior source/copy pins and retained F/Pages pins
 passed; the H10b1 source replacement was verified against exact H10b3 commit
 bytes. Local links resolve (94 prior-document links plus new documents), with
 zero selected privacy-pattern findings. No source/gate rerun followed the audit.
+
+## H10b5 — confirmation gesture lifetime and keyboard operation
+
+H10b4 committed `afe2026`. Native input against the unchanged real Confirm
+reproduced approved1/denied1 after keyboard denial during a pointer hold. A
+changed-price case did not independently reproduce a defect. The setup's missing
+raw-SVG loader, background input timeout and later frozen-clock precondition
+mistake are retained separately, not counted as production regressions.
+
+Confirm now cancels on decision/terms/block/connecting/callback changes, focus/
+visibility loss and unmount, and consumes each displayed card before approving
+or denying. Primary-pointer/Space/Enter use the same monotonic900ms hold; release
+cancels, repeated gestures/clicks cannot approve again. The private identity is
+never rendered; a new decision requires a new card instance. H10b4's actual
+payment authority and the Chat/SDK binding remain separate.
+
+Native checks passed12cases plus a corrected4-case supplement, not a repeated
+whole matrix. Desktop-light1280 and mobile-width-dark390 screenshots were read;
+both contained full address, ENS and keyboard instruction. All22 owned PIDs were
+independently absent and all8 former endpoints refused connections afterward.
+This is fixture DOM/gesture proof, not native wallet/two-origin payment or touch.
+
+37 focused/3files and exact4-root web/one-root fixture strict0 passed. The sole
+sequential max4 full gate passed3,886 Vitest/159/49.50s,834 Bun/54/6,091assertions/
+162.69s,root/webstrict,client317ms/SSR144ms. Gate9636 closed exit0 with no source
+change, overlap or repeat. Public-copy/preservation audit and local commit follow.
+No delegates, independent review claim, new spend/key, approval replay, ENS/
+mainnet change or push. Active Chat/courier migration, buyer/session/H11–14 and
+H merge remain uncompleted; G8/G9, vendor tasks and I follow afterward.
+
+Final self-audit passed two exact bannered copies, report original hash
+`410ac5e45cfa71b61f2f07468f8d226c8e07351af824e8ac23b95991c3da1971`
+and preflight original hash
+`2894eceeab28884dff7d88174074ee097c84fc45ae155446cf95c5e36cd34fc0`.
+Four new source/test pins and three unchanged ENS/Thread/style pins passed,
+along with prior H10a–b4 copies/source pins and F/Pages preservation. All local
+links resolve (97 prior-document links plus new records), with zero selected
+privacy findings. No additional gate or source change followed this audit.

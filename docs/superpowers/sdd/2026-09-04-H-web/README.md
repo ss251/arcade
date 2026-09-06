@@ -1,5 +1,13 @@
 # Plan H — execution records
 
+Current task: [H10b5 confirmation gesture lifetime](task-10b5-brief.md), after
+H10b4 `afe2026`. The [UI preflight](task-10b5-ui-preflight.md) preserves broader
+integration constraints. Its [parent/native report](task-10b5-parent-report.md)
+records the actual deny-then-approve regression,16 passing interaction cases
+across two checks, fixture corrections, cleanup,37 focused tests and the sole
+full gate. This fixes the real card but does not yet connect H10b4 to Chat or
+retire the courier. Those and buyer/session/native two-origin proof remain next.
+
 Current task: [H10b4 private purchase composition](task-10b4-brief.md), after
 H10b3 `6101146`. The [preflight](task-10b4-controller-preflight.md) binds original
 approval/input/quote to one signature/POST and browser recovery. The

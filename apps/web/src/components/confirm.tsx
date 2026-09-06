@@ -39,6 +39,8 @@ import { ArcMark, UsdcMark } from "./marks.tsx"
  */
 
 export interface ConfirmProps {
+  /** Private full decision identity from the owner; never rendered or approval authority. */
+  readonly decisionKey?: string | undefined
   readonly skillId: string
   readonly price: string
   readonly payTo: string
@@ -116,19 +118,29 @@ const Address = ({ value }: { value: string }) => (
 )
 
 export const Confirm = ({
+  decisionKey,
   skillId,
   price,
   payTo,
   network,
   ensName,
-  blocked,
+  blocked: reason,
   onConnect,
   connecting,
   onApprove,
   onDeny
 }: ConfirmProps) => {
   const [progress, setProgress] = useState(0)
+  const [decided, setDecided] = useState(false)
   const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const spent = useRef(false)
+  const blocked = reason ?? (connecting === true ? "Finish connecting your wallet before approving." : undefined)
+  const identity = JSON.stringify([decisionKey, skillId, price, payTo, network, ensName, blocked, connecting])
+  // Read on every tick as well as effect cleanup: an old closure cannot approve
+  // between a changed render and its passive effect. Conservative cancellation
+  // on callback replacement is intentional. A new decision needs a new card.
+  const current = useRef({ identity, onApprove, onDeny })
+  current.current = { identity, onApprove, onDeny }
 
   const stop = () => {
     if (timer.current !== undefined) clearInterval(timer.current)
@@ -136,22 +148,48 @@ export const Confirm = ({
     setProgress(0)
   }
 
-  useEffect(() => stop, [])
+  useEffect(() => {
+    stop()
+    const hidden = () => { if (document.visibilityState !== "visible") stop() }
+    window.addEventListener("blur", stop)
+    document.addEventListener("visibilitychange", hidden)
+    return () => {
+      if (timer.current !== undefined) clearInterval(timer.current)
+      timer.current = undefined
+      window.removeEventListener("blur", stop)
+      document.removeEventListener("visibilitychange", hidden)
+    }
+  }, [identity, onApprove, onDeny])
 
   const start = () => {
-    if (blocked !== undefined || timer.current !== undefined) return
-    const began = Date.now()
+    if (blocked !== undefined || spent.current || timer.current !== undefined || document.visibilityState !== "visible") return
+    const captured = current.current, now = performance.now.bind(performance), began = now()
+    if (!Number.isFinite(began) || began < 0 || began > Number.MAX_SAFE_INTEGER - HOLD_MS) return
+    let last = began
     timer.current = setInterval(() => {
-      const pct = Math.min(1, (Date.now() - began) / HOLD_MS)
+      const at = now(), latest = current.current
+      if (spent.current || captured.identity !== latest.identity || captured.onApprove !== latest.onApprove ||
+        captured.onDeny !== latest.onDeny || !Number.isFinite(at) || at < last || at > Number.MAX_SAFE_INTEGER ||
+        document.visibilityState !== "visible") { stop(); return }
+      last = at
+      const pct = Math.min(1, (at - began) / HOLD_MS)
       setProgress(pct)
       if (pct >= 1) {
         stop()
-        onApprove()
+        spent.current = true; setDecided(true)
+        captured.onApprove()
       }
     }, 16)
   }
 
-  const label = blocked === undefined ? `hold to pay ${price}` : "unavailable"
+  const deny = () => {
+    stop()
+    if (spent.current) return
+    spent.current = true; setDecided(true)
+    onDeny()
+  }
+
+  const label = decided ? "decision recorded" : blocked === undefined ? `hold to pay ${price}` : "unavailable"
 
   return (
     <div className="confirm" role="group" aria-label={`Confirm purchase of ${skillId}`}>
@@ -213,8 +251,10 @@ export const Confirm = ({
         <p className="confirm-blocked">{blocked}</p>
       )}
 
+      <p className="tool-note">Hold with a pointer, Space or Enter for 0.9 seconds. Releasing or leaving the card cancels.</p>
+
       <div className="confirm-actions">
-        <button type="button" className="deny" onClick={onDeny}>
+        <button type="button" className="deny" onClick={deny} disabled={decided}>
           no
         </button>
         {blocked !== undefined && onConnect !== undefined ? (
@@ -241,11 +281,20 @@ export const Confirm = ({
            * against cannot drift apart.
            */
           style={{ "--p": progress } as React.CSSProperties}
-          disabled={blocked !== undefined}
-          onPointerDown={start}
+          disabled={blocked !== undefined || decided}
+          onPointerDown={e => { if (e.isPrimary && e.button === 0) start() }}
           onPointerUp={stop}
           onPointerLeave={stop}
           onPointerCancel={stop}
+          onBlur={stop}
+          onClick={e => e.preventDefault()}
+          onKeyDown={e => {
+            if (e.key === " " || e.key === "Enter") {
+              e.preventDefault()
+              if (!e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey) start()
+            } else stop()
+          }}
+          onKeyUp={e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); stop() } }}
           aria-label={`Hold to approve paying ${price} for ${skillId}`}
         >
           <span className="approve-fill" aria-hidden="true" />
