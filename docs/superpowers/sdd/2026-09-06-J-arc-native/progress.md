@@ -1,5 +1,17 @@
 # Plan J progress
 
+2026-09-07 03:07 IST — Task3A sole79816PASS:4,649Vitest206/64.92s,
+855Bun56/6,316assert/167.40s,root/webstrict+client352ms/SSR266ms. Fivepins
+frozen,10paths/16links/privacy0beforegate. Finalaudit/atomiccommit/oneFFmain
+next. Task3B SDK/MCP/canary wiring notimplemented; no newlivepayment/keys.
+
+2026-09-07 03:03 IST — Task2 mergedc447759,18paths/22links/privacy0 andexact
+oneFFcleanmain. Task3A selection/balanceleafmodules implemented, notintegrated
+with SDK/MCP/canary.52unit/2/857ms,5-rootstrict0,1native/11assert/205msPASS.
+Actual Schema.Class extra-copy freeze Red fixed; native request-clone fixture
+and testtyping failures fixed without timeoutincreases. Freeze/solegate next.
+Task3B integration remains unimplemented; no key/liveprovider/payment/deploy.
+
 2026-09-07 02:49 IST — Task2 DONE_WITH_CONCERNS. Sole90663 all4,597Vitest
 passed but unchanged H8 cleanup failed; isolated9PASS/causeunproved. Remaining
 14338 Bun822PASS/27FAIL/55/168.26s exposed actual Graph discovery compatibility
@@ -44,9 +56,10 @@ notrun; later escrow-state/Circlepayer/queued202 assumptions explicitly flagged.
 
 - Task1 MERGED:1A98d6e64,1Bc760062. 1B retains recorded split verification.
   No live Circle/escrow claim.
-- Task2 DONE_WITH_CONCERNS: registry-shaped discovery and Graph compatibility
-  implemented; split verification recorded. Atomic commit/merge next.
-- Task3 NOT_STARTED: buyer funded/preferred accept selection.
+- Task2 MERGED c447759 WITH_CONCERNS: registry-shaped discovery and Graph
+  compatibility; original failures and split verification retained.
+- Task3 IN_PROGRESS:3A leaf foundations COMPLETE after sole full gate; atomic
+  commit/merge next.3B actual buyer/MCP/canary integration unimplemented.
 - Task4 NOT_RUN: Circle CLI inspect/estimate/bounded testnet pay proof.
 - Task5 NOT_STARTED: Unified Balance delegate funding and separate live proof.
 - Task6 NOT_STARTED: pinned escrow contracts/hook; one approved deployment unused.

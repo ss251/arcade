@@ -94,6 +94,11 @@ See [Task2 brief](../sdd/2026-09-06-J-arc-native/task-2-brief.md).
 
 ### Task 3: Buyer SDK accept selection (J1)
 
+Execution checkpoints:3A adds bounded selection/balance leaf modules;3B wires
+SDK/MCP/canary behavior. See [Task3 brief](../sdd/2026-09-06-J-arc-native/task-3-brief.md).
+Escrow remains unselectable until its Task9 lifecycle exists; an explicit rail
+preference is an ordered allow-list, not authority to silently broaden it.
+
 - [ ] `fetch-with-payment.ts`: replace `accepts[0]` with `selectAccept(accepts, preferRail)`; default preference `["gateway","eip3009","erc8183"]`; the Gateway path requires a Gateway balance and falls through otherwise; log which accept was chosen in the receipt-side journal. MCP `arcade_call_skill` gains `rail?`.
 - [ ] Tests: three-accept 402 → picks Gateway when funded, exact otherwise; unknown scheme is skipped; empty → refusal unchanged.
 - [ ] Commit: `feat(buyer): choose among 402 accepts by rail preference`.
