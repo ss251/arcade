@@ -1,14 +1,12 @@
 #!/usr/bin/env bun
 import { Effect, Schema } from "effect"
 import {
-  advisoryFor,
   assertManifestPublishable,
   credentialOf,
   NotPublishable,
   parsePrice,
   Price,
-  SkillManifest,
-  toPublicListing
+  SkillManifest
 } from "@arcade/core"
 import { formatUsdc } from "@arcade/core"
 import { defaultConfig, configExists, configPath, readConfig, writeConfig } from "./config.ts"
@@ -16,6 +14,7 @@ import { loadSkills } from "./skills.ts"
 import { startDaemon } from "./daemon.ts"
 import { buildEnv } from "./exec.ts"
 import { gate } from "./publishable.ts"
+import { createPublishPreview } from "./publish-preview.ts"
 import { seatDir, seatIsLoggedIn } from "./engines/claude-agent.ts"
 import {
   generateWallet,
@@ -27,7 +26,7 @@ import {
 import { checkHub, fetchBalanceAtomic, planIdentity } from "./onboard.ts"
 import { runIdentityCommand } from "./identity-cli.ts"
 import { mkdir, readFile } from "node:fs/promises"
-import { dirname, basename, resolve } from "node:path"
+import { dirname, basename, resolve, join } from "node:path"
 import {
   listMcpTools,
   manifestFromMcpTool,
@@ -92,7 +91,8 @@ const usage = () => {
     --include-writes     include MCP tools not marked read-only
     --yes                write generated files; without it, preview only
     --force              overwrite existing generated files
-    --json               directory preview as one JSON object, without prose
+    --json               one preview JSON object; generated batches are unwritten
+                         preview-only: cannot combine with --yes or --force
     Put all arcade options before --; arguments after it belong to the server.
 
   arcade identity status                          recorded agents and pending registration (offline)
@@ -208,10 +208,14 @@ const readOpenapiDocument = async (target: string): Promise<Record<string, unkno
 
 const generatedOptions = (argv: ReadonlyArray<string>, kind: "mcp" | "openapi") => {
   const options = applicationArgs(argv)
-  if (options.includes("--json")) throw new Error("--json supports directory previews only; generate listings first, then preview their directories")
+  const json = options.includes("--json")
+  if (options.filter(option => option === "--json").length > 1) throw new Error("--json can only be supplied once")
+  if (json && (options.includes("--yes") || options.includes("--force"))) {
+    throw new Error("--json is preview-only and cannot be combined with --yes or --force")
+  }
   const valued = new Set(["--price", "--out", kind === "mcp" ? "--tool" : "--operation",
     ...(kind === "openapi" ? ["--auth"] : [])])
-  const switches = new Set(["--yes", "--force", ...(kind === "mcp" ? ["--include-writes"] : [])])
+  const switches = new Set(["--json", "--yes", "--force", ...(kind === "mcp" ? ["--include-writes"] : [])])
   for (let i = 0; i < options.length; i += 1) {
     const name = options[i]!
     if (valued.has(name)) { flagAll(options, name); i += 1 }
@@ -229,6 +233,7 @@ const generatedOptions = (argv: ReadonlyArray<string>, kind: "mcp" | "openapi") 
   } catch { throw new Error("Invalid --price; use at least $0.000001 with at most six decimal places") }
   const authValue = one("--auth")
   return {
+    json,
     price,
     outDir: one("--out") ?? skillsDirDefault,
     only: new Set(flagAll(options, kind === "mcp" ? "--tool" : "--operation")),
@@ -242,6 +247,7 @@ const generatedOptions = (argv: ReadonlyArray<string>, kind: "mcp" | "openapi") 
 /** The entire batch must be publishable before either a preview or a write is produced. */
 const validateGenerated = (manifests: ReadonlyArray<Record<string, unknown>>) => {
   const ids = new Set<string>()
+  const decodedManifests: SkillManifest[] = []
   for (const manifest of manifests) {
     let decoded: SkillManifest
     try {
@@ -251,7 +257,9 @@ const validateGenerated = (manifests: ReadonlyArray<Record<string, unknown>>) =>
     } catch { throw new Error("Generated manifest is invalid; check its price and engine configuration") }
     if (ids.has(decoded.id)) throw new Error("Selected entries produce duplicate listing ids")
     ids.add(decoded.id)
+    decodedManifests.push(decoded)
   }
+  return decodedManifests
 }
 
 /** Publish options exclude the target; any argv after -- is passed literally to MCP. */
@@ -264,6 +272,7 @@ export const runPublishIntrospection = async (target: string, argv: ReadonlyArra
   let manifests: Record<string, unknown>[]
   let extras: Array<{ id: string; name: string; content: string }> = []
   let summary: string[]
+  let skipped: Array<{ name: string; reason: "not-marked-read-only" }> = []
   if (kind === "mcp") {
     const src = parseMcpTarget(target, rest)
     const tools = await listMcpTools(src).catch(() => { throw new Error("Could not introspect that MCP server; verify its configuration") })
@@ -271,6 +280,7 @@ export const runPublishIntrospection = async (target: string, argv: ReadonlyArra
       throw new Error("Requested MCP tool was not found on the server")
     }
     const eligible = publishableTools(tools, options.includeWrites)
+    skipped = tools.filter(tool => !eligible.includes(tool)).map(tool => ({ name: tool.name, reason: "not-marked-read-only" }))
     if ([...options.only].some((name) => !eligible.some((tool) => tool.name === name))) {
       throw new Error("Requested MCP tool is not marked read-only; use --include-writes to select it")
     }
@@ -295,7 +305,18 @@ export const runPublishIntrospection = async (target: string, argv: ReadonlyArra
     extras = manifests.map((manifest) => ({ id: String(manifest["id"]), name: "openapi.json", content: `${JSON.stringify(spec, null, 2)}\n` }))
     summary = ["document OpenAPI JSON", `ops      ${operations.length} with an operationId, ${chosen.length} to publish`]
   }
-  validateGenerated(manifests)
+  const decoded = validateGenerated(manifests)
+  if (options.json) {
+    // Validate the entire batch before any stdout. These paths are hypothetical;
+    // JSON mode never calls the generated writer and never invokes a tool.
+    const batch = {
+      version: 1, kind: "generated", source: kind, written: false, target,
+      entries: decoded.map(manifest => createPublishPreview(join(options.outDir, manifest.id), manifest)),
+      skipped
+    }
+    console.log(JSON.stringify(batch))
+    return
+  }
   for (const line of summary) console.log(line)
   console.log("")
   for (const manifest of manifests) console.log(`${manifest["id"]}  ${manifest["price"]}`)
@@ -708,7 +729,8 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
       throw e
     }
 
-    const advisory = advisoryFor(found.manifest.engine.adapter, credentialOf(found.manifest))
+    const preview = createPublishPreview(dir, found.manifest)
+    const advisory = preview.advisory
     if (advisory !== undefined) {
       // Publishable, but the provider's terms are not unambiguous. Saying so is not the
       // same as refusing: this repository does not get to settle a licensing question on a
@@ -716,21 +738,6 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
       console.error(`ADVISORY\n\n${advisory}\n`)
     }
 
-    const pub = toPublicListing(found.manifest)
-    const preview = {
-      target: dir,
-      skillId: found.manifest.id,
-      engine: { adapter: found.manifest.engine.adapter, credential: credentialOf(found.manifest) },
-      grants: [...found.manifest.engine.capabilities],
-      ...(advisory === undefined ? {} : { advisory }),
-      public: pub,
-      private: {
-        engine: found.manifest.engine,
-        secrets: found.manifest.secrets,
-        egress: found.manifest.egress,
-        workdir: found.manifest.workdir
-      }
-    }
     if (args.includes("--json")) {
       console.log(JSON.stringify(preview))
       return
@@ -744,7 +751,7 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
     console.log(`engine  ${adapter} (${credentialOf(found.manifest)})`)
     console.log(`grants  ${access}\n`)
     console.log("PUBLISHED to the hub:\n")
-    console.log(JSON.stringify(pub, null, 2))
+    console.log(JSON.stringify(preview.public, null, 2))
     console.log("\nSTAYS ON THIS MACHINE (never transmitted):\n")
     console.log(
       JSON.stringify(

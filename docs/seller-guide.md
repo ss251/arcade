@@ -60,8 +60,18 @@ A SKILL.md directory needs a manifest pointing at its Markdown entry:
 
 Its body is the system prompt; the manifest controls model, credential and capabilities.
 The included `diff-triage` listing is a complete example. For a machine-readable preview,
-run `arcade publish skills/diff-triage --json`; this singular JSON mode accepts generated
-or hand-written **directories**, not multi-listing discovery targets.
+run `arcade publish skills/diff-triage --json`; directories retain the singular
+`{target, skillId, engine, grants, advisory?, public, private}` shape.
+
+MCP/OpenAPI discovery also supports `--json`, returning one versioned batch:
+`{version:1, kind:"generated", source:"mcp"|"openapi", written:false, target, entries, skipped}`.
+Each entry uses the same public/private projection; its output-directory target
+is hypothetical, not an existing or served listing. MCP entries remain read-only
+by default, skipped tool names/reasons are reported, and existing selection flags
+apply. JSON mode rejects `--yes`/`--force`; review first, then explicitly run
+generation separately. It never calls a discovered tool or writes generated files.
+Private configuration can contain paths, prompts and literal transport arguments:
+keep the complete preview local, and share only its public projection.
 
 Run `bash scripts/e2e-publish-adapters.sh` for the default three-adapter local evidence.
 It needs `ANTHROPIC_API_KEY` for `diff-triage`. Without that credential, an explicitly

@@ -1,5 +1,11 @@
 # Plan H — execution records
 
+Current task: [H12a canonical CLI preview](task-12a-brief.md), after H11.
+The [parent report](task-12a-parent-report.md) records the real directory/generated
+contract, preview-only guards and actual OpenAPI/stdio fixtures. Focused checks
+and exact strict passed; sole full gate passed4,022 Vitest/834 Bun, strict and
+client/SSR builds. No web wizard is claimed yet.
+
 Current task: [H11 public seller dashboard](task-11-brief.md), after `65e38c0`.
 The [parent report](task-11-parent-report.md) records actual accounting semantics,
 selected-address correlation and fixed errors. [Native evidence](task-11-native-check.md)

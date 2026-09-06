@@ -1,5 +1,20 @@
 # SDD ledger — Plan H
 
+2026-09-06 18:13 IST: H12a sole36703gate exit0:4022Vitest172/54.71s,
+834Bun54/6093assert/163.65s,rootwebstrict0,client354msSSR163ms. Five new runner
+source/test pins and39 retained H11 pins/public audit PASS; atomic commit next.
+No fullrepeat/concurrentgate/browser/keys/spend/push. H12b read-only readiness
+records real loopback binding, request-origin, output/deadline and CLI root needs;
+no H12b source yet. Follow with H13/H14 and remaining session/deferred-plan work.
+
+2026-09-06 18:08 IST: H12a canonical directory/generated CLI JSON source frozen.
+6 genuine initial failures fixed;74 CLI tests passed, then added helper coverage
+had1 stale capability-fixture failure corrected with4/4 targeted passes. Actual
+OpenAPI and stdio MCP subprocess JSON previews left files/config unwritten;
+no live upstream or key. Exact5 roots strict0;39 H11 predecessor pins preserved.
+[Report](task-12a-parent-report.md); one full sequential max4 gate now follows.
+H12b wizard/local process security remains separate. Root-only/no spend/push.
+
 2026-09-06 17:54 IST: H11 final gate/audit complete. Sole53132 sweep4,012pass/
 1obsolete navigation404 expectation/171files/52.07s. Unknown-route target fixed,
 404 assertion retained; targeted nav+seller2/2 passed, no full Vitest repeat.

@@ -54,6 +54,36 @@ describe("flagAll", () => {
 })
 
 describe("MCP publishing", () => {
+  it("emits one canonical unwritten JSON batch and reports skipped tools without executing or writing", async () => {
+    await runPublishIntrospection("mcp://docs.arc.io/mcp", ["--json", "--out", "generated"])
+    expect(output).toHaveLength(1)
+    const batch = JSON.parse(output[0]!)
+    expect(batch).toMatchObject({ version: 1, kind: "generated", source: "mcp", written: false,
+      target: "mcp://docs.arc.io/mcp", skipped: [{ name: "write_docs", reason: "not-marked-read-only" }] })
+    expect(batch.entries).toHaveLength(1)
+    expect(batch.entries[0]).toMatchObject({ target: "generated/search-docs", skillId: "search-docs",
+      engine: { adapter: "mcp", credential: "none" }, grants: [],
+      public: { id: "search-docs", price: "$0.05" },
+      private: { engine: { url: "https://docs.arc.io/mcp", tool: "search_docs" }, secrets: [], egress: ["docs.arc.io"] } })
+    expect(batch.entries[0].public).not.toHaveProperty("engine")
+    expect(batch.entries[0].public).not.toHaveProperty("secrets")
+    expect(discover).toHaveBeenCalledOnce(); expect(write).not.toHaveBeenCalled()
+  })
+  it("keeps literal stdio argv private in JSON without promoting server write flags", async () => {
+    const command = ["server", "PRIVATE_LITERAL_ARGUMENT", "--yes", "--json", "--force"]
+    await runPublishIntrospection("mcp://", ["--json", "--", ...command])
+    const batch = JSON.parse(output[0]!)
+    expect(batch.written).toBe(false)
+    expect(batch.entries[0].private.engine.command).toEqual(command)
+    expect(JSON.stringify(batch.entries[0].public)).not.toContain("PRIVATE_LITERAL_ARGUMENT")
+    expect(write).not.toHaveBeenCalled()
+  })
+  it("does not emit a partial JSON batch when a later generated manifest is invalid", async () => {
+    discover.mockResolvedValueOnce([tool("valid"), { ...tool("invalid"), inputSchema: {} }])
+    await expect(runPublishIntrospection("mcp://docs.arc.io/mcp", ["--json"])).rejects.toThrow()
+    expect(discover).toHaveBeenCalledOnce()
+    expect(output).toEqual([]); expect(write).not.toHaveBeenCalled()
+  })
   it("previews only read-only tools and keeps server arguments literal and private", async () => {
     const serverArgs = ["server", "PRIVATE_TOKEN", "--yes", "--price", "$900", "--help", "-h"]
     await runPublishIntrospection("mcp://", ["--", ...serverArgs])
@@ -104,6 +134,18 @@ describe("MCP publishing", () => {
 })
 
 describe("OpenAPI publishing", () => {
+  it("uses actual public/private projection for local OpenAPI JSON without claiming generated files exist", async () => {
+    await runPublishIntrospection(fixturePath, ["--json", "--out", "generated", "--auth", "header:X-Key=UPSTREAM_KEY"])
+    expect(output).toHaveLength(1)
+    const batch = JSON.parse(output[0]!)
+    expect(batch).toMatchObject({ version: 1, kind: "generated", source: "openapi", written: false, skipped: [] })
+    expect(batch.entries).toHaveLength(1)
+    expect(batch.entries[0]).toMatchObject({ target: "generated/fx-rate", skillId: "fx-rate",
+      public: { id: "fx-rate" }, private: { secrets: ["UPSTREAM_KEY"],
+        engine: { adapter: "openapi", spec: "openapi.json", operationId: "fxRate", auth: { env: "UPSTREAM_KEY" } } } })
+    for (const key of ["engine", "secrets", "egress", "workdir", "systemPrompt"]) expect(batch.entries[0].public).not.toHaveProperty(key)
+    expect(write).not.toHaveBeenCalled(); expect(discover).not.toHaveBeenCalled()
+  })
   it.each(["mcp://docs.arc.io/mcp", source])("refuses a zero price before reading or introspecting %s", async (target) => {
     const fetcher = vi.fn()
     vi.stubGlobal("fetch", fetcher)
@@ -136,10 +178,12 @@ describe("OpenAPI publishing", () => {
     expect(output).toEqual([])
     expect(write).not.toHaveBeenCalled()
   })
-  it.each(["mcp://docs.arc.io/mcp", source])("reserves --json for directory previews before introspecting %s", async (target) => {
+  it.each(["mcp://docs.arc.io/mcp", source])("refuses conflicting or duplicate JSON flags before introspecting %s", async (target) => {
     const fetcher = vi.fn()
     vi.stubGlobal("fetch", fetcher)
-    await expect(runPublishIntrospection(target, ["--json", "--yes"])).rejects.toThrow(/directory/)
+    for (const flags of [["--json", "--yes"], ["--json", "--force"], ["--json", "--json"]]) {
+      await expect(runPublishIntrospection(target, flags)).rejects.toThrow(/preview-only|once/)
+    }
     expect(fetcher).not.toHaveBeenCalled()
     expect(discover).not.toHaveBeenCalled()
     expect(write).not.toHaveBeenCalled()

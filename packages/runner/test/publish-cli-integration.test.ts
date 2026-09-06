@@ -16,12 +16,24 @@ const home = () => {
 afterEach(() => { for (const dir of homes.splice(0)) rmSync(dir, { recursive: true, force: true }) })
 
 const run = (dir: string, argv: string[], preload?: string) => spawnSync("bun", [
-  "run", ...(preload === undefined ? [] : [`--preload=${preload}`]), "packages/runner/src/cli.ts", ...argv
+  "--no-env-file", "run", ...(preload === undefined ? [] : [`--preload=${preload}`]), "packages/runner/src/cli.ts", ...argv
 ], {
   cwd: root, env: { PATH: process.env["PATH"] ?? "", HOME: dir }, encoding: "utf8", timeout: 12_000
 })
 
 describe("arcade publish subprocess integration", () => {
+  it("prints a real OpenAPI JSON dry-run without generated files or runner configuration", () => {
+    const dir = home(), out = join(dir, "generated")
+    const result = run(dir, ["publish", fixture, "--json", "--out", out, "--auth", "header:X-Key=UPSTREAM_KEY"])
+    expect(result.status, result.stderr).toBe(0)
+    const batch = JSON.parse(result.stdout)
+    expect(batch).toMatchObject({ version: 1, kind: "generated", source: "openapi", written: false, skipped: [] })
+    expect(batch.entries).toHaveLength(1)
+    expect(batch.entries[0]).toMatchObject({ target: join(out, "fx-rate"), skillId: "fx-rate",
+      public: { id: "fx-rate" }, private: { secrets: ["UPSTREAM_KEY"], engine: { operationId: "fxRate" } } })
+    expect(batch.entries[0].public).not.toHaveProperty("engine")
+    expect(existsSync(out)).toBe(false); expect(existsSync(join(dir, ".arcade"))).toBe(false)
+  })
   it("prints the directory wizard contract as one JSON object without touching runner configuration", () => {
     const dir = home()
     const result = run(dir, ["publish", "skills/diff-triage", "--json"])
@@ -137,6 +149,16 @@ await server.connect(new StdioServerTransport());
     expect(preview.stdout).toContain("read-value")
     expect(preview.stdout).toContain("Nothing written")
     expect(existsSync(out)).toBe(false)
+    const json = run(dir, [...args, "--json", ...serverArgs])
+    expect(json.status, json.stderr).toBe(0)
+    const batch = JSON.parse(json.stdout)
+    expect(batch).toMatchObject({ version: 1, kind: "generated", source: "mcp", written: false,
+      skipped: [{ name: "write_value", reason: "not-marked-read-only" }] })
+    expect(batch.entries).toHaveLength(1)
+    expect(batch.entries[0].private.engine.command).toEqual(["bun", "run", server, ...rest])
+    expect(batch.entries[0].public.id).toBe("read-value")
+    expect(batch.entries[0].public).not.toHaveProperty("command")
+    expect(existsSync(out)).toBe(false); expect(existsSync(join(dir, ".arcade"))).toBe(false)
     const write = run(dir, [...args, "--yes", ...serverArgs])
     expect(write.status, write.stderr).toBe(0)
     const manifest = JSON.parse(readFileSync(join(out, "read-value", "arcade.json"), "utf8"))
