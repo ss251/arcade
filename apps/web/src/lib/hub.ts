@@ -13,11 +13,12 @@
  */
 
 import { Schema } from "effect"
-import { dnsNameOf, loadChainConfig } from "@arcade/core"
+import { loadChainConfig } from "@arcade/core"
 import { PaymentRequirements } from "@arcade/payments"
 import { hubJson, hubOrigin, jsonFetch } from "./hub-http.ts"
 import { capturePurchaseContext, type BrowserPurchaseContext, type BrowserPurchaseRail } from "./purchase-context.ts"
 import { purchaseInput } from "./purchase-input.ts"
+import { capturePurchaseTarget, type PurchaseTarget } from "./purchase-target.ts"
 import { addressOk, decodeListing, decodeListings, decodeName, decodeReceipts, decodeSellerSummary, decodeStats,
   decodeTree, nameOk, rootIdOk, skillIdOk } from "./hub-decode.ts"
 import type { ListingDetail, ListingSummary, MarketStats, PublicReceiptRow, ResolvedName, SellerSummary, TreeView } from "./hub-decode.ts"
@@ -73,18 +74,27 @@ export class EnsNameExpired extends Error {
   readonly _tag = "EnsNameExpired"
   constructor() { super("ENS name is expired") }
 }
-export const resolveName = async (name: string): Promise<ResolvedName> => {
+const resolveNameAt = async (name: string, issuer: string): Promise<ResolvedName> => {
   if (!nameOk(name)) throw new HubUnreachable("/names", "invalid name")
   const path = `/names/${name}`
   try {
-    const response = await hubJson(path, { method: "GET", headers: { accept: "application/json" } })
+    const response = await jsonFetch(issuer + path, { method: "GET", headers: { accept: "application/json" } })
     if (response.status === 404 && response.body !== null && typeof response.body === "object" &&
         !Array.isArray(response.body) && Object.getOwnPropertyDescriptor(response.body, "error")?.value === "ens_name_expired") throw new EnsNameExpired()
     if (response.status !== 200) throw new Error()
-    return decodeName(response.body, name, hubOrigin())
+    return decodeName(response.body, name, issuer)
   } catch (error) {
     if (error instanceof EnsNameExpired) throw error
     throw new HubUnreachable(path, "request unavailable or invalid")
+  }
+}
+export const resolveName = (name: string): Promise<ResolvedName> => resolveNameAt(name, hubOrigin())
+
+/** Created only from decoded resolver/challenge public addresses, never causes. */
+export class EnsPayToMismatch extends Error {
+  readonly _tag = "EnsPayToMismatch"
+  constructor(readonly ensPayTo: string, readonly challengePayTo: string) {
+    super(`ENS payTo ${ensPayTo} differs from the payment challenge payTo ${challengePayTo}; nothing was signed`)
   }
 }
 
@@ -121,10 +131,20 @@ export interface Quote {
  * would actually have to sign, so a listing whose advertised price has drifted from its
  * endpoint is caught here rather than after a signature.
  */
-export const quote = async (skillId: string, input: unknown = {}): Promise<Quote> => {
-  if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(skillId)) throw new Error("Invalid skill identifier")
+export const quote = async (targetInput: string | PurchaseTarget, input: unknown = {}): Promise<Quote> => {
+  const target = capturePurchaseTarget(typeof targetInput === "string" ? { skillId: targetInput } : targetInput)
+  if (!target) throw new Error("Invalid purchase target")
   const issuer = hubOrigin(), cfg = loadChainConfig()
   const body = JSON.stringify(purchaseInput(input))
+  const nameRead = async (name: string) => {
+    try { return await resolveNameAt(name, issuer) }
+    catch (error) {
+      if (error instanceof EnsNameExpired) throw error
+      throw new Error("ENS resolution unavailable or inconsistent; nothing was signed")
+    }
+  }
+  const initial = target.name === undefined ? undefined : await nameRead(target.name)
+  const skillId = initial?.skillId ?? target.skillId!
   // Quote alone captures its issuer/config once; public H4 reads remain unchanged.
   const detail = await jsonFetch(`${issuer}/listings/${skillId}`, { method: "GET", headers: { accept: "application/json" } }, 25_000)
   if (detail.status !== 200) throw new Error("Invalid listing identity")
@@ -160,18 +180,20 @@ export const quote = async (skillId: string, input: unknown = {}): Promise<Quote
   } catch { throw new Error("The payment challenge is unavailable or invalid; nothing was signed") }
 
   let ensName: string | undefined
-  if (listing.ensName !== undefined && listing.ensName !== null) {
-    try {
-      if (typeof listing.ensName !== "string" || !/^[a-z0-9.-]+\.eth$/.test(listing.ensName)) throw new Error()
-      dnsNameOf(listing.ensName)
-      const resolved = await jsonFetch(`${issuer}/names/${listing.ensName}`, { headers: { accept: "application/json" } })
-      const n = resolved.body as Record<string, unknown> | null
-      if (resolved.status !== 200 || !n || n["name"] !== listing.ensName || n["expired"] !== false ||
-          n["skillId"] !== skillId || !address(n["seller"]) || n["seller"].toLowerCase() !== listing.seller.toLowerCase() ||
-          n["endpoint"] !== endpoint || !address(n["payTo"]) || n["payTo"].toLowerCase() !== requirement.payTo.toLowerCase() ||
-          n["chain"] !== requirement.network) throw new Error()
-      ensName = listing.ensName
-    } catch { throw new Error("ENS resolution unavailable or inconsistent; nothing was signed") }
+  const agrees = (n: ResolvedName) => {
+    if (n.skillId !== skillId || n.seller.toLowerCase() !== listing.seller.toLowerCase() ||
+        n.endpoint !== endpoint || n.chain !== requirement.network) {
+      throw new Error("ENS resolution unavailable or inconsistent; nothing was signed")
+    }
+    if (n.payTo.toLowerCase() !== requirement.payTo.toLowerCase()) throw new EnsPayToMismatch(n.payTo, requirement.payTo)
+  }
+  if (initial) agrees(initial)
+  // Keep advertised-name verification on the legacy id path; explicit names
+  // additionally retain their own fresh mapping even if no name is advertised.
+  for (const name of new Set([listing.ensName, target.name])) {
+    if (name === undefined || name === null) continue
+    agrees(await nameRead(name))
+    ensName = name
   }
   const quoted = {
     skillId: listing.id,

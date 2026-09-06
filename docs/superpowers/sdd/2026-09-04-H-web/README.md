@@ -1,5 +1,12 @@
 # Plan H — execution records
 
+Current task: [H13a keyless ENS targets](task-13a-brief.md), after f689ba6.
+The [parent report](task-13a-parent-report.md) records original-name resolution,
+actual-input 402 correlation, typed refusals and the free resolver tool. One full
+sweep passed; a schema-inspection finding was then reproduced and corrected with
+209 targeted checks, exact strict and a fresh build, without a full sweep repeat.
+Browser name approval is still H13b, not claimed here. Root-only; no live writes.
+
 Current task: [H12b3 local wizard](task-12b3-brief.md) afterff0fab3.
 [Parent report](task-12b3-parent-report.md):28 focused checks, actual Start route,
 11-root strict0 and [native10](task-12b3-native-check.md), five captures inspected,

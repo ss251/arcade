@@ -1,5 +1,16 @@
 # SDD ledger — Plan H
 
+2026-09-06 20:22 IST: H13a keyless target/quote/tools complete, browser name
+binding still H13b. Pre-source 29 Red; strict roots/options fixed; producer-aligned
+priceAtomic null added to two old fixtures. Final focused209/9 and exact10strict0.
+Sole66822 gate:4188Vitest184/57.42s,834Bun54/6091assert/163.38s,
+root/web strict0,client376ms/SSR188ms. At launch schema inspection found field
+definitions lost by Effect annotation; held source through gate. Subsequent
+schema Red reproduced, corrected, targeted209/9+exactstrict0+build432/192ms.
+No full sweep repeat; full gate is not falsely attributed to final schema bytes.
+Root-only/max4/no browser/gate overlap/keys/new spend/live ENS/push. Atomic
+commit next, then H13b/H14/session gap/Hmerge/deferredG/vendor/I.
+
 2026-09-06 19:54 IST: H12b3 sole39211gate exit0:4140Vitest182/57.66s,
 834Bun54/6091assert/163.02s,rootwebstrict0,client347msSSR176ms. No fullrepeat
 or source change. Four runtime markers absent37clientJS/present46serverJS.

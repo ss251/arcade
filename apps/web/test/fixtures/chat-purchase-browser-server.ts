@@ -35,7 +35,7 @@ const hub = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(req): Promis
       version: "1.0.0", serviceName: "Fixture diff triage", description: "Offline fixture", tags: [],
       price: "$0.01", inputSchema: {}, outputSchema: {}, bounds: { timeoutSec: 30 } })
     if (url.pathname === "/names/" + NAME) return Response.json({ name: NAME, skillId: ID, seller: SELLER,
-      endpoint: hub.url.origin + resource, payTo: SELLER, chain: chain.caip2, expired: false })
+      endpoint: hub.url.origin + resource, payTo: SELLER, chain: chain.caip2, priceAtomic: null, expired: false })
     if (url.pathname === resource && req.method === "POST") {
       const input = await req.json() as { diff?: unknown }
       if (input.diff !== "native fixture input") return Response.json({ error: "wrong_fixture_input" }, { status: 400 })

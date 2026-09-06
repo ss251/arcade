@@ -43,7 +43,7 @@ async function setup() {
     if (u === HUB + "/listings/" + ID) return Response.json({ id: ID, seller: SELLER, ensName: NAME, version: "1.0.0",
       serviceName: "USDC Flow Check", description: "Public fixture", tags: [], price: "$0.01", inputSchema: {}, outputSchema: {}, bounds: { timeoutSec: 30 } })
     if (u === HUB + "/names/" + NAME) return Response.json({ name: NAME, skillId: ID, seller: SELLER,
-      endpoint: HUB + RESOURCE, payTo: PAYEE, chain: REQ.network, expired: expired || signed && expireAfterSigning })
+      endpoint: HUB + RESOURCE, payTo: PAYEE, chain: REQ.network, priceAtomic: null, expired: expired || signed && expireAfterSigning })
     if (u === HUB + RESOURCE) {
       inputs.push(JSON.parse(String(init?.body)))
       if (!headers.has("payment-signature")) return Response.json({ x402Version: 2, rail: "eip3009", accepts: [REQ] }, { status: 402 })

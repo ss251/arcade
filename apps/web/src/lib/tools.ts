@@ -3,11 +3,13 @@ import { JSONSchema, Schema } from "effect"
 import { TreeFormatter } from "effect/ParseResult"
 import { fenceListing, fenceListings, formatPrice, parsePrice } from "@arcade/core"
 import * as hub from "./hub.ts"
-import { deriveSigningRequest, PriceMovedAboveApproval } from "./purchase.ts"
+import { deriveSigningRequest, EnsNameExpired, EnsPayToMismatch, PriceMovedAboveApproval } from "./purchase.ts"
 import { purchaseInput } from "./purchase-input.ts"
+import { capturePurchaseTarget } from "./purchase-target.ts"
+import { nameOk } from "./hub-decode.ts"
 
 /**
- * The five READ-ONLY tools. Nothing here can spend.
+ * The READ-ONLY tools. Nothing here can spend.
  *
  * These are the same tools `packages/buyer/src/mcp.ts` exposes over stdio, minus
  * `arcade_call_skill`, which is the purchase edge and belongs to the browser because that
@@ -229,12 +231,32 @@ export const arcade_budget = tool({
   })
 })
 
+export const arcade_resolve_name = tool({
+  description: "Resolve an ENS skill name to the hub-reported listing and payment coordinates. " +
+    "Free and keyless; not a quote or proof of settlement. Use the returned skillId to inspect its input schema, " +
+    "then keep the original name when preparing the purchase.",
+  inputSchema: std(Schema.Struct({ name: Schema.String.pipe(Schema.maxLength(253),
+    Schema.pattern(/^[a-z0-9.-]+\.eth$/), Schema.filter(nameOk)) })),
+  execute: async ({ name }) => {
+    try {
+      const n = await hub.resolveName(name)
+      return { ...n, note: "These are hub-reported ENS records, not an independent browser chain verification. " +
+        "Purchase preparation rechecks them against the actual-input 402; its price is authoritative. Nothing was signed or spent." }
+    } catch (error) {
+      return { resolved: false, reason: error instanceof EnsNameExpired
+        ? "The ENS name has expired. Resolve a renewed name before preparing a purchase; no payment was started."
+        : "ENS resolution is unavailable or invalid. No payment was started." }
+    }
+  }
+})
+
 export const READ_ONLY_TOOLS = {
   arcade_list_skills,
   arcade_describe_skill,
   arcade_quote,
   arcade_receipts,
-  arcade_budget
+  arcade_budget,
+  arcade_resolve_name
 } as const
 
 /**
@@ -252,10 +274,13 @@ export const READ_ONLY_TOOLS = {
  * guard cannot drift from what is actually mounted — a hand-written list is the second copy
  * this codebase keeps deleting.
  */
-const CallArgs = Schema.Struct({
-  skillId: Schema.String.annotations({
+const CallArgFields = Schema.Struct({
+  skillId: Schema.optional(Schema.String.annotations({
     description: "The skill's id, exactly as returned by arcade_list_skills."
-  }),
+  })),
+  name: Schema.optional(Schema.String.annotations({
+    description: "An exact ENS skill name instead of skillId. Never supply both."
+  })),
   maxAmountUsd: Schema.String.annotations({
     description:
       'The most this call may cost, as a dollar string like "$0.25". The purchase is ' +
@@ -282,6 +307,13 @@ const CallArgs = Schema.Struct({
     })
   )
 })
+const CallArgs = CallArgFields.pipe(Schema.filter(value => capturePurchaseTarget(value) !== undefined, {
+  message: () => "Exactly one valid skillId or ENS name is required",
+  // Effect's annotation replaces (not extends) the inferred JSON Schema.
+  // Retain all fields/required ceiling when adding the target exclusivity.
+  jsonSchema: { ...JSONSchema.make(CallArgFields), oneOf: [{ required: ["skillId"], not: { required: ["name"] } },
+    { required: ["name"], not: { required: ["skillId"] } }] }
+}))
 
 /**
  * The purchase edge. Returns a SIGNING REQUEST, never a completed purchase.
@@ -299,10 +331,13 @@ export const arcade_call_skill = tool({
     "uncertain outcome does not prove no charge; a signed authorization may remain valid. " +
     "Quote first. The browser presents the private result; do not claim settlement from this tool's readiness signal.",
   inputSchema: std(CallArgs),
-  execute: async ({ skillId, maxAmountUsd, input }, { toolCallId }) => {
+  execute: async (args, { toolCallId }) => {
+    const target = capturePurchaseTarget(args)
+    if (!target) throw new Error("Invalid purchase target")
+    const { maxAmountUsd, input } = args
     try {
       const parsedInput = purchaseInput(input)
-      const request = await deriveSigningRequest({ skillId, maxAmountUsd, toolCallId, input: parsedInput })
+      const request = await deriveSigningRequest({ ...target, maxAmountUsd, toolCallId, input: parsedInput })
       return {
         awaitingSignature: true,
         ...request,
@@ -315,12 +350,12 @@ export const arcade_call_skill = tool({
           "browser confirmation can continue. The private result is displayed in the browser, not sent to this model."
       }
     } catch (e) {
-      if (e instanceof PriceMovedAboveApproval) {
+      if (e instanceof PriceMovedAboveApproval || e instanceof EnsPayToMismatch || e instanceof EnsNameExpired) {
         return {
           awaitingSignature: false,
           refused: true,
-          reason: e.message,
-          skillId
+          reason: e instanceof EnsNameExpired ? "The ENS name has expired. No payment was started; request a fresh resolution after renewal." : e.message,
+          ...target
         }
       }
       throw e

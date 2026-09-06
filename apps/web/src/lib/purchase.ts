@@ -1,5 +1,7 @@
 import { parsePrice, formatPrice } from "@arcade/core"
 import * as hub from "./hub.ts"
+import { capturePurchaseTarget } from "./purchase-target.ts"
+export { EnsNameExpired, EnsPayToMismatch } from "./hub.ts"
 
 /**
  * Server-side purchase preparation only; this module never signs or spends.
@@ -23,6 +25,8 @@ export class PriceMovedAboveApproval extends Error {
 }
 
 export interface SigningRequest {
+  /** Original explicit target, distinct from an id listing's advertised name. */
+  readonly name?: string
   readonly ensName?: string
   readonly skillId: string
   /** The resource the payment authorises. Derived, never supplied by the client. */
@@ -50,10 +54,12 @@ export interface SigningRequest {
  * the number changed. Re-asking would be defensible; silently proceeding would not.
  */
 export const deriveSigningRequest = async (
-  approved: { readonly skillId: string; readonly maxAmountUsd: string; readonly toolCallId: string; readonly input?: unknown }
+  approved: { readonly skillId?: string; readonly name?: string; readonly maxAmountUsd: string; readonly toolCallId: string; readonly input?: unknown }
 ): Promise<SigningRequest> => {
+  const target = capturePurchaseTarget(approved)
+  if (!target) throw new Error("Invalid purchase target")
   const approvedAtomic = parsePrice(approved.maxAmountUsd)
-  const quote = await hub.quote(approved.skillId, approved.input)
+  const quote = await hub.quote(target, approved.input)
   const quotedAtomic = BigInt(quote.amountAtomic)
 
   if (quotedAtomic > approvedAtomic) {
@@ -71,6 +77,7 @@ export const deriveSigningRequest = async (
     amountAtomic: quote.amountAtomic,
     price: formatPrice(quotedAtomic),
     ...(quote.ensName === undefined ? {} : { ensName: quote.ensName }),
+    ...(target.name === undefined ? {} : { name: target.name }),
     toolCallId: approved.toolCallId
   }
 }

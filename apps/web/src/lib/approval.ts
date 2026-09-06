@@ -37,6 +37,7 @@ export type ApprovalDecision = "approved" | "denied" | "user-approval" | "not-ap
 
 export interface PurchaseArgs {
   readonly skillId?: unknown
+  readonly name?: unknown
   readonly maxAmountUsd?: unknown
 }
 
@@ -53,7 +54,8 @@ export const decide = (
   args: PurchaseArgs,
   env: Record<string, string | undefined> = process.env
 ): ApprovalDecision => {
-  if (typeof args.skillId !== "string" || args.skillId === "") return "user-approval"
+  if ((typeof args.skillId !== "string" || args.skillId === "") &&
+      (typeof args.name !== "string" || args.name === "")) return "user-approval"
 
   const raw = args.maxAmountUsd
   // A missing or unparseable amount means we do not know what this costs. Ask.
