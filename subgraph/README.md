@@ -263,3 +263,60 @@ and upgrade boundaries will be kept distinct before later source activation.
 
 No paid query, new payment, registry write, deployment or mainnet action occurred.
 G4/G5 mapping execution, source activation and G6 evidence remain separate work.
+
+## September 6, 2026 — G4 local mapping execution
+
+After G3 committed, G4 replaces only the local pilot's active mapping target with
+the real settlement handler. The historical `smoke.ts`, original G1 schema fixture,
+acknowledged CID and earlier evidence above remain unchanged. The static source
+still has the exact pilot address, v1 Settled ABI and historical zero start block.
+One **inactive** FeeSplitterV2 template compiles the real Settled/SettledTree
+handlers; no code instantiates it. There are no registry data sources, new
+emitters or metadata-authorized mappings.
+
+Each transaction/log occurrence owns deduplication before entity or counter
+changes. Existing concatI32 IDs are retained for indices0..2147483647; negative
+or larger synthetic indices abort without truncating into another identity.
+Amounts, nonce, emitter, transaction, block and event timestamp are preserved
+without native-gas scaling or recomputed fee policy. Splitter counters advance
+once per occurrence, preserving first discovery and any existing nullable listing
+reference without creating a listing or asserting its provenance.
+
+Every distinct tree event creates an immutable TreeOccurrence. A hash summary
+preserves its first scalar facts; a second distinct occurrence clears its root
+permanently and marks ambiguity. Replays do not increment it. Full uint32 child
+counts stay exact BigInts on occurrences, while summary counts above2147483647
+remain null. An emitted hash/count is not verification of an off-chain tree.
+Child spend is preserved even when greater than root price.
+
+No Marketplace, Agent or Listing row is created. Unknown aggregate coverage is
+absence, not measured zeros. This preserves G7's existing unavailable behavior
+without changing the hub or claiming complete registry indexing.
+
+The local tests run the actual mapping and generated classes in Matchstick's
+AssemblyScript/WASM host, not a TypeScript ledger mirror. They cover exact facts,
+duplicate/source-context overlap, distinct transactions/logs, cross-emitter tree
+collisions, permanent ambiguity, first-discovery preservation, uint32 boundaries,
+large money and direct stored null semantics. Missing or explicit Graph Null is
+accepted; negative controls reject measured zero and a non-null root. Historical
+source/schema checks remain separate evidence.
+
+The provisioned native Matchstick0.6.0 bytes are pinned by SHA-256
+`cd05611b588649e629e42e4ea0915d811d1ddbb73e8edd392a718c81b4361dbd`.
+The author invokes that exact executable by absolute path in a minimal child
+environment, with capped captured output, a finite60-second owning fuse and an
+awaited/reaped process. Its private temporary path is not a portable installation.
+The `test` package script pins `graph test --version 0.6.0`, but the Graph CLI may
+download a missing binary and its native cache is unversioned: that script alone
+does not authenticate cached bytes. Do not use it to auto-provision a replacement.
+
+Local codegen has generated the pilot and inactive template event types. The
+author's final selection passed **27 actual Matchstick tests**, **112 focused Bun
+tests /240 expect calls**, and the exact four-root TypeScript strict check with
+zero diagnostics. These are distinct mapping/runtime and source/contract checks,
+not an additive live-coverage count. Independent review remains separate.
+Parent owns the separate complete gate,
+final actual WASM build and commit; none is inferred from codegen or an earlier
+historical build. No Matchstick run proves live graph-node/Studio persistence or
+indexing. No upload, deployment, query, key access, signing or spending is performed
+for G4, and the consumed G1 deployment must not be replayed.

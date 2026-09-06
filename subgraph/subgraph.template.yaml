@@ -5,3 +5,27 @@ schema:
   file: ./schema.graphql
 dataSources:
 {{SPLITTER_SOURCES}}
+templates:
+  - kind: ethereum
+    name: FeeSplitterV2
+    network: arc-testnet
+    source:
+      abi: FeeSplitterV2
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/fee-splitter.ts
+      entities:
+        - Settlement
+        - Splitter
+        - Tree
+        - TreeOccurrence
+      abis:
+        - name: FeeSplitterV2
+          file: ./abis/FeeSplitterV2.json
+      eventHandlers:
+        - event: Settled(indexed address,uint256,uint256,uint256,indexed bytes32)
+          handler: handleSettled
+        - event: SettledTree(indexed address,uint256,uint256,uint256,indexed bytes32,indexed bytes32,uint32,uint256)
+          handler: handleSettledTree

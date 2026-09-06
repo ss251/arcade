@@ -313,3 +313,39 @@ result, spending, push or complete Plan G archive is claimed.
 The [G3 parent review](task-3-parent-review.md) is now included as an eighth exact
 historical copy, with no substitutions. Its frozen full gate and actual build are
 complete; final publication audit and the separate atomic commit follow.
+
+## September 6 — G4 source and focused independent checkpoint
+
+G3 committed as `e00cd89d1845d32660ddd5fa1ec3b181cd55a457`; parent explicitly
+released G4 afterward. The [G4 brief](task-4-brief.md) records the frozen 13-path
+source/config checkpoint: eleven author paths and two parent-owned ignore entries.
+Historical smoke/schema/v1 ABI and the splitter list remain unchanged.
+
+Author and independent reviewer each passed 27 actual native Matchstick
+AssemblyScript/WASM/store tests, 112 focused Bun checks /240 expect calls and
+exact four-root strict TypeScript. Native execution is distinct from static
+schema/source checks, author codegen and the pending final parent Graph build.
+The two genuine unchanged-smoke log-index Reds, three manifest-transition Reds,
+later test-only null-representation correction and passing supplemental coverage
+are retained without rewriting the original author or independent reports.
+
+Five standard-banner copies contain exactly ten approved literal redactions/link
+substitutions. No native binary, private executable, raw provenance or additional
+readiness research is included. Parent's sole full repository gate and actual
+final Graph build remain in progress here; final review/audit and commit follow.
+No registry source, new emitter, template instantiation, canonical listing,
+Marketplace coverage, live indexing, new deployment or funded operation is claimed.
+
+### G4 later parent full gate and build
+
+The sole frozen parent command completed exit zero, collected at 02:35:29 UTC:
+2,941 Vitest /131 files, 675 Bun /47 files /5,148 expect calls, root/web strict
+checks and actual manifest regeneration/codegen/Graph WASM build. These totals
+include retained private fixtures; the 27 native Matchstick AS cases are not
+automatically part of the repository test script. The exact 13 source pins stayed
+unchanged throughout. No second full gate, upload, deployment or payment occurred.
+
+The [parent review](task-4-parent-review.md) is now a sixth banner-only copy; the
+five earlier copies still use exactly ten approved substitutions. The earlier
+gate-pending entries remain historical. Final publication audit and the separate
+atomic G4 commit follow; no live indexing or complete-coverage claim is added.

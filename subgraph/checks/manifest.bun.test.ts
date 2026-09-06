@@ -18,7 +18,7 @@ async function fixture(run: (paths: ManifestPaths, root: string) => Promise<void
   const root = await mkdtemp(join(tmpdir(), "arcade-g3-manifest-"))
   try {
     for (const directory of ["subgraph/src", "subgraph/abis", "config/chains", "elsewhere"]) await mkdir(join(root, directory), { recursive: true })
-    for (const path of ["subgraph/build-manifest.ts", "subgraph/subgraph.template.yaml", "subgraph/splitters.json", "subgraph/schema.graphql", "subgraph/src/smoke.ts", "subgraph/abis/FeeSplitter.json", "config/chains/arc-testnet.json"]) {
+    for (const path of ["subgraph/build-manifest.ts", "subgraph/subgraph.template.yaml", "subgraph/splitters.json", "subgraph/schema.graphql", "subgraph/src/fee-splitter.ts", "subgraph/src/ids.ts", "subgraph/abis/FeeSplitter.json", "subgraph/abis/FeeSplitterV2.json", "config/chains/arc-testnet.json"]) {
       await copyFile(new URL(`../../${path}`, import.meta.url), join(root, path))
     }
     await run({
@@ -39,7 +39,7 @@ async function child(root: string, args: string[]) {
   } finally { clearTimeout(timer); if (childProcess.exitCode === null) { childProcess.kill(); await childProcess.exited } }
 }
 
-describe("G3 staged manifest boundary", () => {
+describe("G3 manifest boundary with the approved G4 mapping transition", () => {
   test("retains indexed event history explicitly", () => {
     expect(Bun.YAML.parse(render())).toHaveProperty("indexerHints.prune", "never")
   })
@@ -49,6 +49,7 @@ describe("G3 staged manifest boundary", () => {
     expect(JSON.parse(text("../package.json"))).toHaveProperty("scripts.build", "bun --no-env-file run codegen && graph build subgraph.yaml")
     expect(JSON.parse(text("../package.json"))).toHaveProperty("scripts.manifest", "bun --no-env-file build-manifest.ts")
     expect(JSON.parse(text("../package.json"))).toHaveProperty("scripts.deploy", "bun --no-env-file run build && graph deploy arcade-ledger-arc-testnet subgraph.yaml")
+    expect(JSON.parse(text("../package.json"))).toHaveProperty("scripts.test", "graph test --version 0.6.0")
   })
 
   test("renders committed inputs deterministically with exactly the active pilot and no context", () => {
@@ -61,11 +62,20 @@ describe("G3 staged manifest boundary", () => {
     expect(parsed).toHaveProperty("dataSources", [{
       kind: "ethereum", name: "FeeSplitterSmoke", network: "arc-testnet",
       source: { address: pilot, abi: "FeeSplitter", startBlock: 0 },
-      mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript", file: "./src/smoke.ts",
+      mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript", file: "./src/fee-splitter.ts",
         entities: ["Settlement", "Splitter"], abis: [{ name: "FeeSplitter", file: "./abis/FeeSplitter.json" }],
         eventHandlers: [{ event: "Settled(indexed address,uint256,uint256,uint256,indexed bytes32)", handler: "handleSettled" }] }
     }])
-    expect(parsed).not.toHaveProperty("templates")
+    expect(parsed).toHaveProperty("templates", [{
+      kind: "ethereum", name: "FeeSplitterV2", network: "arc-testnet", source: { abi: "FeeSplitterV2" },
+      mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript", file: "./src/fee-splitter.ts",
+        entities: ["Settlement", "Splitter", "Tree", "TreeOccurrence"],
+        abis: [{ name: "FeeSplitterV2", file: "./abis/FeeSplitterV2.json" }],
+        eventHandlers: [
+          { event: "Settled(indexed address,uint256,uint256,uint256,indexed bytes32)", handler: "handleSettled" },
+          { event: "SettledTree(indexed address,uint256,uint256,uint256,indexed bytes32,indexed bytes32,uint32,uint256)", handler: "handleSettledTree" }
+        ] }
+    }])
     expect(source).not.toMatch(/Registry|Marketplace|listing|context/)
   })
 
@@ -144,15 +154,15 @@ describe("G3 staged manifest boundary", () => {
     for (const value of values) expect(() => renderManifest(template(), chain(), value)).toThrow(new Error(invalid))
   })
 
-  test("writes a complete owned-temp output without requiring inactive ABIs", async () => {
+  test("writes a complete owned-temp output without requiring inactive registry ABIs", async () => {
     await fixture(async (paths) => {
       await buildManifest(paths)
       expect(await readFile(paths.output, "utf8")).toBe(render())
-      expect((await readdir(new URL("./abis/", paths.output))).sort()).toEqual(["FeeSplitter.json"])
+      expect((await readdir(new URL("./abis/", paths.output))).sort()).toEqual(["FeeSplitter.json", "FeeSplitterV2.json"])
     })
   })
 
-  for (const asset of ["schema.graphql", "src/smoke.ts", "abis/FeeSplitter.json"]) {
+  for (const asset of ["schema.graphql", "src/fee-splitter.ts", "src/ids.ts", "abis/FeeSplitter.json", "abis/FeeSplitterV2.json"]) {
     test(`missing active ${asset} preserves prior output`, async () => {
       await fixture(async (paths) => {
         await writeFile(paths.output, "prior output\n")

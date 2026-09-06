@@ -76,3 +76,28 @@ The sole complete gate subsequently exited zero: 2,941 Vitest tests /131 files,
 supersedes the immediately preceding gate-pending checkpoint. The codegen/WASM
 repeat also passed; final parent review publication and the atomic G3 commit
 remain pending, with no new live or indexing claim.
+
+## September 6 — G4 settlement mapping checkpoint
+
+G3 subsequently committed as `e00cd89d1845d32660ddd5fa1ec3b181cd55a457` and parent
+released G4. The [G4 brief](task-4-brief.md) links five exact historical records,
+including native runtime provisioning and the independent source/runtime review.
+Author and reviewer each passed 27 real Matchstick AS/store cases, 112 focused
+Bun checks /240 expect calls and exact four-root strict checking. Their repeated
+results are not added into unique coverage; original Red/setup distinctions remain.
+
+Only the pilot is active, now using the real settlement mapping. One inactive V2
+template compiles its real handlers without activation. No registry source,
+Marketplace totals, canonical listing binding or new indexing proof is claimed.
+Parent's sole complete G4 gate and final Graph build are still in progress at
+this checkpoint; final parent review, publication audit and commit follow.
+
+### Later G4 complete parent gate
+
+Parent's sole frozen command subsequently exited zero at the 02:35:29 UTC
+checkpoint: 2,941 Vitest /131 files, 675 Bun /47 files /5,148 expect calls,
+root/web strict and actual pinned manifest/codegen/Graph WASM build. Totals include
+retained private fixtures; the 27 native AS cases are separate. The
+[G4 parent review](task-4-parent-review.md) is now the sixth exact historical copy,
+with no body substitutions. These results supersede the preceding pending gate;
+final publication audit and commit follow, with source hashes unchanged.

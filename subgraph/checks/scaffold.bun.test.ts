@@ -36,9 +36,19 @@ describe("G1 offline smoke scaffold", () => {
       dataSources: [{ kind: "ethereum", name: "FeeSplitterSmoke", network: "arc-testnet",
         source: { address, abi: "FeeSplitter", startBlock: 0 },
         mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
-          file: "./src/smoke.ts", entities: ["Settlement", "Splitter"],
+          file: "./src/fee-splitter.ts", entities: ["Settlement", "Splitter"],
           abis: [{ name: "FeeSplitter", file: "./abis/FeeSplitter.json" }],
           eventHandlers: [{ event: "Settled(indexed address,uint256,uint256,uint256,indexed bytes32)", handler: "handleSettled" }]
+        }
+      }],
+      templates: [{ kind: "ethereum", name: "FeeSplitterV2", network: "arc-testnet", source: { abi: "FeeSplitterV2" },
+        mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
+          file: "./src/fee-splitter.ts", entities: ["Settlement", "Splitter", "Tree", "TreeOccurrence"],
+          abis: [{ name: "FeeSplitterV2", file: "./abis/FeeSplitterV2.json" }],
+          eventHandlers: [
+            { event: "Settled(indexed address,uint256,uint256,uint256,indexed bytes32)", handler: "handleSettled" },
+            { event: "SettledTree(indexed address,uint256,uint256,uint256,indexed bytes32,indexed bytes32,uint32,uint256)", handler: "handleSettledTree" }
+          ]
         }
       }]
     })
@@ -66,7 +76,7 @@ describe("G1 offline smoke scaffold", () => {
     const patterns = (path: string) => text(path).split(/\r?\n/).map((s) => s.trim()).filter((s) => s && !s.startsWith("#"))
     const git = patterns("../../.gitignore")
     const docker = patterns("../../.dockerignore")
-    for (const pattern of ["subgraph/generated/", "build/", "node_modules/"]) {
+    for (const pattern of ["subgraph/generated/", "subgraph/tests/.bin/", "build/", "node_modules/"]) {
       expect(git).toContain(pattern)
       expect(docker).toContain(pattern)
     }

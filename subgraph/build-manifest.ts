@@ -68,15 +68,26 @@ function activeManifest(address: string, startBlock: number) {
     dataSources: [{ kind: "ethereum", name: "FeeSplitterSmoke", network: "arc-testnet",
       source: { address, abi: "FeeSplitter", startBlock },
       mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
-        file: "./src/smoke.ts", entities: ["Settlement", "Splitter"],
+        file: "./src/fee-splitter.ts", entities: ["Settlement", "Splitter"],
         abis: [{ name: "FeeSplitter", file: "./abis/FeeSplitter.json" }],
         eventHandlers: [{ event: "Settled(indexed address,uint256,uint256,uint256,indexed bytes32)", handler: "handleSettled" }]
+      }
+    }],
+    templates: [{ kind: "ethereum", name: "FeeSplitterV2", network: "arc-testnet",
+      source: { abi: "FeeSplitterV2" },
+      mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
+        file: "./src/fee-splitter.ts", entities: ["Settlement", "Splitter", "Tree", "TreeOccurrence"],
+        abis: [{ name: "FeeSplitterV2", file: "./abis/FeeSplitterV2.json" }],
+        eventHandlers: [
+          { event: "Settled(indexed address,uint256,uint256,uint256,indexed bytes32)", handler: "handleSettled" },
+          { event: "SettledTree(indexed address,uint256,uint256,uint256,indexed bytes32,indexed bytes32,uint32,uint256)", handler: "handleSettledTree" }
+        ]
       }
     }]
   }
 }
 
-/** G3 only: no registry source, dynamic template, listing context or inferred ownership. */
+/** G4: one pilot, one never-instantiated V2 template; no registry or listing authority. */
 export function renderManifest(template: string, chainConfig: unknown, splitters: unknown): string {
   try {
     if (canonical(chainConfig) !== CHAIN) return fail()
@@ -131,8 +142,8 @@ export async function buildManifest(paths: ManifestPaths): Promise<void> {
     }
     const [source, chain, list] = await Promise.all([read(template), read(chainConfig), read(splitters)])
     const rendered = renderManifest(source, JSON.parse(chain), JSON.parse(list))
-    // Only the three active pilot assets are prerequisites. The four G3 ABIs stay inactive.
-    for (const relative of ["./schema.graphql", "./src/smoke.ts", "./abis/FeeSplitter.json"]) {
+    // The real shared mapping and inactive template must have their local inputs present.
+    for (const relative of ["./schema.graphql", "./src/fee-splitter.ts", "./src/ids.ts", "./abis/FeeSplitter.json", "./abis/FeeSplitterV2.json"]) {
       if (!(await stat(new URL(relative, output))).isFile()) return fail()
     }
     temporary = new URL(`.subgraph-${randomUUID()}.tmp`, output)

@@ -6,7 +6,7 @@
     "manifest": "bun --no-env-file build-manifest.ts",
     "codegen": "bun --no-env-file run manifest && graph codegen subgraph.yaml",
     "build": "bun --no-env-file run codegen && graph build subgraph.yaml",
-    "test": "graph test",
+    "test": "graph test --version 0.6.0",
     "test:scaffold": "bun --no-env-file test ./checks/scaffold.bun.test.ts",
     "deploy": "bun --no-env-file run build && graph deploy arcade-ledger-arc-testnet subgraph.yaml"
   },

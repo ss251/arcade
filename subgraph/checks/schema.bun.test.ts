@@ -176,9 +176,13 @@ describe("G2 ledger schema contract (offline)", () => {
     expect(mapping).not.toMatch(/(?:Marketplace|Agent|Listing)\.(?:load|save)|new (?:Marketplace|Agent|Listing)|splitter\.listing\s*=/)
   })
 
-  test("declares only the existing settlement and its required emitter in the smoke manifest", () => {
+  test("declares pilot entities and the real inactive tree mapping without registry coverage", () => {
     const manifest = Bun.YAML.parse(renderManifest(text("../subgraph.template.yaml"), JSON.parse(text("../../config/chains/arc-testnet.json")), JSON.parse(text("../splitters.json"))))
     expect(manifest).toMatchObject({ dataSources: [{ mapping: { entities: ["Settlement", "Splitter"] } }] })
+    expect(manifest).toHaveProperty("templates", [expect.objectContaining({
+      name: "FeeSplitterV2",
+      mapping: expect.objectContaining({ entities: ["Settlement", "Splitter", "Tree", "TreeOccurrence"] })
+    })])
   })
 
   test("labels local schema evolution separately from deployed G1 and unavailable aggregates", () => {

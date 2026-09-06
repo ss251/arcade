@@ -90,3 +90,6 @@ handoff/
 
 # Deterministic G3 manifest output; committed template/list remain source inputs.
 subgraph/subgraph.yaml
+
+# Matchstick's compiled AS test binaries; test sources remain tracked.
+subgraph/tests/.bin/
