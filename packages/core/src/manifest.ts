@@ -19,14 +19,14 @@ import {
  * a type error rather than a forgotten `delete`. `secrecy.property.test.ts` proves this
  * over arbitrary generated manifests.
  *
- * Bazaar limits (serviceName ≤32, ≤5 tags, https iconUrl) are enforced HERE at publish time
- * rather than being silently dropped later by a facilitator.
+ * Public metadata limits are enforced HERE at publish time. Plan J uses up to ten
+ * lowercase slug tags; this is not a claim of older Bazaar five-tag conformance.
  */
 
-// ── Bazaar constraints (mirrors agentcash-router resource-metadata.ts) ───────
+// ── Public metadata constraints ─────────────────────────────────────────────
 
 export const SERVICE_NAME_MAX = 32
-export const MAX_TAGS = 5
+export const MAX_TAGS = 10
 export const ICON_URL_MAX = 2048
 
 const printableAscii = (s: string) => /^[\x20-\x7E]*$/.test(s)
@@ -43,7 +43,20 @@ export const ServiceName = Schema.String.pipe(
 export const Tag = Schema.String.pipe(
   Schema.minLength(1),
   Schema.maxLength(SERVICE_NAME_MAX),
-  Schema.filter(printableAscii, { message: () => "tag must be printable ASCII" })
+  Schema.pattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    { message: () => "tag must be a lowercase alphanumeric slug separated by single hyphens" })
+)
+
+/** Declared availability, not a payment authorization or a claim that a hub built a rail. */
+export const ListingRail = Schema.Literal("gateway", "eip3009", "erc8183")
+export type ListingRail = typeof ListingRail.Type
+export const DEFAULT_LISTING_RAILS: ReadonlyArray<ListingRail> = Object.freeze(["gateway", "eip3009"])
+export const ListingRails = Schema.Array(ListingRail).pipe(
+  Schema.minItems(1), Schema.maxItems(3),
+  Schema.filter(rails => new Set(rails).size === rails.length, { message: () => "rails must not contain duplicates" })
+)
+export const ListingCategory = Schema.Literal(
+  "CREATIVE", "DATA_ENRICHMENT", "FINANCIAL_ANALYSIS", "INFRASTRUCTURE", "PREDICTION_MARKETS", "WEB_SEARCH_RESEARCH"
 )
 
 export const IconUrl = Schema.String.pipe(
@@ -164,7 +177,11 @@ export class PublicListing extends Schema.Class<PublicListing>("PublicListing")(
   version: Schema.String,
   serviceName: ServiceName,
   description: Schema.String.pipe(Schema.maxLength(500)),
-  tags: Schema.Array(Tag).pipe(Schema.maxItems(MAX_TAGS)),
+  tags: Schema.optionalWith(Schema.Array(Tag).pipe(Schema.maxItems(MAX_TAGS)), { default: () => [] }),
+  /** Omitted means DEFAULT_LISTING_RAILS at challenge time, not an escrow opt-in. */
+  rails: Schema.optional(ListingRails),
+  /** Discovery uses INFRASTRUCTURE when omitted; retain omission on the public wire. */
+  category: Schema.optional(ListingCategory),
   iconUrl: Schema.optional(IconUrl),
   price: Price,
   /** Optional subscription-comparison hook, e.g. "$500/mo data seat". */
@@ -313,7 +330,9 @@ export class SkillManifest extends Schema.Class<SkillManifest>("SkillManifest")(
   version: Schema.String,
   serviceName: ServiceName,
   description: Schema.String.pipe(Schema.maxLength(500)),
-  tags: Schema.Array(Tag).pipe(Schema.maxItems(MAX_TAGS)),
+  tags: Schema.optionalWith(Schema.Array(Tag).pipe(Schema.maxItems(MAX_TAGS)), { default: () => [] }),
+  rails: Schema.optional(ListingRails),
+  category: Schema.optional(ListingCategory),
   iconUrl: Schema.optional(IconUrl),
   price: Price,
   replaces: Schema.optional(Schema.String.pipe(Schema.maxLength(120))),
@@ -347,6 +366,8 @@ export const toPublicListing = (m: SkillManifest): PublicListing =>
     serviceName: m.serviceName,
     description: m.description,
     tags: m.tags,
+    ...(m.rails === undefined ? {} : { rails: m.rails }),
+    ...(m.category === undefined ? {} : { category: m.category }),
     ...(m.iconUrl === undefined ? {} : { iconUrl: m.iconUrl }),
     price: m.price,
     ...(m.replaces === undefined ? {} : { replaces: m.replaces }),

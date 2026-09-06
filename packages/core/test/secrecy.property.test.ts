@@ -23,7 +23,9 @@ const arbManifest = fc.record({
   version: fc.stringMatching(/^\d+\.\d+\.\d+$/),
   serviceName: printable,
   description: fc.string({ maxLength: 200 }),
-  tags: fc.array(printable, { maxLength: 5 }),
+  tags: fc.array(fc.stringMatching(/^[a-z0-9]{1,24}$/), { maxLength: 10 }),
+  rails: fc.option(fc.shuffledSubarray(["gateway", "eip3009", "erc8183"], { minLength: 1, maxLength: 3 }), { nil: undefined }),
+  category: fc.option(fc.constantFrom("CREATIVE", "DATA_ENRICHMENT", "FINANCIAL_ANALYSIS", "INFRASTRUCTURE", "PREDICTION_MARKETS", "WEB_SEARCH_RESEARCH"), { nil: undefined }),
   price: fc.stringMatching(/^\$\d\.\d{2}$/),
   bounds: fc.record({ timeoutSec: fc.integer({ min: 1, max: 900 }) }),
   inputSchema: fc.constant({ type: "object" }),
@@ -105,6 +107,8 @@ describe("secrecy boundary", () => {
         expect(decoded.id).toBe(pub.id)
         expect(decoded.price).toBe(pub.price)
         expect(decoded.bounds.timeoutSec).toBe(pub.bounds.timeoutSec)
+        expect(decoded.rails).toEqual(pub.rails)
+        expect(decoded.category).toEqual(pub.category)
       }),
       { numRuns: 100 }
     )

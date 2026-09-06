@@ -10,9 +10,9 @@ export interface LoadedSkill {
 /**
  * Load every `<skillsDir>/<id>/arcade.json`.
  *
- * Validation happens HERE, on the seller's machine, at publish/start time — so Bazaar limits
- * (serviceName ≤32, ≤5 tags, https icon) surface as a local error the seller can fix rather
- * than being silently dropped by a facilitator later.
+ * Validation happens HERE, on the seller's machine, at publish/start time. Public limits
+ * (serviceName ≤32, ≤10 lowercase slug tags, https icon) surface as a local error.
+ * The Plan J tag contract does not imply older Bazaar five-tag conformance.
  */
 export const loadSkills = (skillsDir: string) =>
   Effect.gen(function* () {

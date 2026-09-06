@@ -13,9 +13,8 @@ import {
 /**
  * Publish-time validation.
  *
- * Bazaar silently DROPS metadata that violates its limits — a 40-char serviceName or a 6th
- * tag just disappears downstream, and the seller never finds out. Enforcing here turns a
- * silent truncation into a local error the seller can actually fix.
+ * ARCADE enforces public metadata locally. Plan J allows ten lowercase slug tags;
+ * the retained service-name and icon limits do not imply older Bazaar conformance.
  */
 
 const base = {
@@ -51,7 +50,7 @@ describe("manifest validation", () => {
     expect(decode().ok).toBe(true)
   })
 
-  describe("Bazaar limits — enforced locally so nothing is silently dropped", () => {
+  describe("public metadata limits — enforced locally so nothing is silently dropped", () => {
     it(`rejects a serviceName longer than ${SERVICE_NAME_MAX}`, () => {
       expect(decode({ serviceName: "x".repeat(SERVICE_NAME_MAX) }).ok).toBe(true)
       expect(decode({ serviceName: "x".repeat(SERVICE_NAME_MAX + 1) }).ok).toBe(false)
@@ -63,8 +62,9 @@ describe("manifest validation", () => {
     })
 
     it(`rejects more than ${MAX_TAGS} tags`, () => {
-      expect(decode({ tags: ["a", "b", "c", "d", "e"] }).ok).toBe(true)
-      expect(decode({ tags: ["a", "b", "c", "d", "e", "f"] }).ok).toBe(false)
+      const tags = Array.from({ length: MAX_TAGS }, (_, index) => `tag-${index}`)
+      expect(decode({ tags }).ok).toBe(true)
+      expect(decode({ tags: [...tags, "extra"] }).ok).toBe(false)
     })
 
     it("rejects a non-https iconUrl", () => {

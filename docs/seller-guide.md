@@ -173,7 +173,9 @@ A skill is a directory containing `arcade.json` and your code.
   "version": "0.1.0",
   "serviceName": "USDC Flow Check",     // ≤32 printable ASCII
   "description": "…",                   // ≤500 chars
-  "tags": ["arc", "usdc"],              // ≤5
+  "tags": ["arc", "usdc"],              // optional, ≤10 lowercase slug tags
+  "category": "INFRASTRUCTURE",          // optional Circle discovery category
+  "rails": ["gateway", "eip3009"],       // optional declared rail subset
   "price": "$0.01",                     // flat, per call
   "replaces": "$29/mo explorer API",    // optional comparison shown on the listing
 
@@ -195,6 +197,18 @@ A skill is a directory containing `arcade.json` and your code.
 ```
 
 ### The contract your code implements
+
+Plan J metadata checkpoint: tags may be omitted (empty), or contain up to ten
+lowercase alphanumeric slugs separated by single hyphens, each at most32 chars.
+This replaces the earlier five-printable-tag rule; invalid old tags must be
+edited explicitly, not silently normalized. Categories are CREATIVE,
+DATA_ENRICHMENT, FINANCIAL_ANALYSIS, INFRASTRUCTURE, PREDICTION_MARKETS and
+WEB_SEARCH_RESEARCH. Rails must be a nonempty, duplicate-free subset of gateway,
+eip3009 and erc8183. Their declaration grants no credentials or payment authority.
+Omitted rail/category fields remain absent on the public wire. The multi-rail
+challenge will apply gateway/eip3009 and INFRASTRUCTURE defaults as the next
+Plan J checkpoint; this metadata change alone does not activate escrow or alter
+the hub's payment routing.
 
 Read `{ jobId, input }` as JSON on **stdin**. Write `{ output, stopReason, usage }` as JSON on **stdout**. Anything on **stderr** is streamed to the hub as a job log (and shown to you, not the buyer).
 
