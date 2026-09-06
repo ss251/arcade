@@ -2,6 +2,15 @@
 
 Plan: [2026-09-04-H-web](../../plans/2026-09-04-H-web.md).
 
+2026-09-06 16:47 IST: H10c1 frozen after H10b6 `6937ce9`. Historical recovery
+foundation keeps ordinary authority private and reads only on explicit request;
+saved-row correlation is not original signature provenance.39 focused tests,
+exact two-file strict0; sole fullgate41534 exit0:3,957 Vitest/165,834 Bun/54 with
+6,093 assertions,root/web strict0,client387msSSR150ms.20 source pins checked,
+including unchanged H10b6. No UI/native acceptance yet; H10c2 follows. No sessions,
+new spend, keys, delegate, concurrent gate, production action, H merge or push.
+See [brief](task-10c1-brief.md) and [parent report](task-10c1-parent-report.md).
+
 September 5, 2026: isolated H worktree created from main381093e; frozen locked
 dependencies installed with lifecycle scripts disabled and no dependency changes.
 H1 implemented with genuine failure-first unit/actual HTTP tests and independent

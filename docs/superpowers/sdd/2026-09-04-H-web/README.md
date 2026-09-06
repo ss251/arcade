@@ -1,5 +1,13 @@
 # Plan H — execution records
 
+Current task: [H10c1 saved-job recovery foundation](task-10c1-brief.md), after
+committed H10b6 `6937ce9`. The [parent report](task-10c1-parent-report.md) separates
+issuing-hub historical claims from original signature provenance. Passive direct
+reads and selection ownership passed39 focused tests and exact strict checks;
+the sole full gate passed3,957 Vitest/834 Bun, strict and client/SSR builds.
+Buyer route/native acceptance follows in H10c2.
+No sessions, live-chain proof or H merge is implied.
+
 Current task: [H10b6 live Chat purchase binding](task-10b6-brief.md), after
 H10b5 e87ae07. The [preflight](task-10b6-chat-preflight.md) and
 [parent report](task-10b6-parent-report.md) record the private one-use lifecycle,
