@@ -8,7 +8,8 @@ single-threaded, no new spending or push.
 - Task2: [API engine brief](task-2-brief.md), [implementation report](task-2-report.md).
   [Approved free-route live evidence](../../../evidence/B13-openai-api.md) passed
   once: unchanged first-party skill/public listing, one API request, no payment.
-- Task3: Agent Plugins ingestion remains next; unsupported types must be reported.
+- Task3: [ingestion brief](task-3-brief.md), [inert-loader checkpoint](task-3a-report.md).
+  CLI generation and the pinned Circle fixture remain next; unsupported types are reported.
 
 The [public SDD index](../README.md) and [seller guide](../../../seller-guide.md)
 remain the entry points. Historical terminology updates are explicitly dated;

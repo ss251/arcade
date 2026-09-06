@@ -1,0 +1,8 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "fixture-tools",
+  "version": "1.0.0",
+  "description": "Local ingestion fixture; never installed.",
+  "license": "MIT"
+}
+

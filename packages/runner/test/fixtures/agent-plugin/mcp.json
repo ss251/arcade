@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "docs": {
+      "type": "streamable-http",
+      "url": "https://docs.example.test/mcp"
+    },
+    "local": {
+      "type": "stdio",
+      "command": "DO_NOT_EXECUTE",
+      "args": [
+        "${PLUGIN_ROOT}",
+        "${PLUGIN_DATA}"
+      ]
+    },
+    "legacy": {
+      "type": "sse",
+      "url": "https://legacy.example.test/events"
+    }
+  }
+}
+

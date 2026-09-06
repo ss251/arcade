@@ -1,5 +1,17 @@
 # Vendor-neutrality progress
 
+2026-09-07 00:17 IST — Task3A sole gate56532 PASS:4422Vitest197/61.15s,
+839Bun55/6116assert/163.67s,rootwebstrict0,client356ms/SSR185ms. Eightfrozen
+source/fixture pins,12scopedpaths,verbatimparser/unchangedCLI+payments/projection,
+privacy/diff PASS. Loader commit/FFmain next; CLI generation remains unimplemented.
+
+2026-09-07 00:12 IST — Task3A loader implemented; initial absent-module collection
+failure,49loader passes,then104focused/5files/4.21s after edge-case expansion.
+Four-root strict0; mechanical parser/helper extraction slip corrected before
+existing-engine coverage. Loader is inert, fixed diagnostics, bounded/contained
+reads, independent component failures; CLI untouched. Source freeze and sole
+sequential max4 full gate next. No network, subprocess, keyread, spend or push.
+
 2026-09-06 23:48 IST — Task2 evidence-only gate31253 PASS:4368Vitest196/64.61s,
 839Bun55/6116assert/166.04s,rootwebstrict0,client363ms/SSR268ms. Fourdocspaths,
 sevensourcepins unchanged,fiveaddedlinks/privacy/emptyindexPASS. No newlivecall.
