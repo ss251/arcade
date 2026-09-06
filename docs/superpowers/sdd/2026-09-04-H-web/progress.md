@@ -205,3 +205,29 @@ exact projected report copies and repeated43local-file-link/privacy checks.
 See [final review](task-6-parent-review.md). The separate full test/types/client+
 SSR gate above applies to these frozen source bytes. Ready for atomic local
 commit; no H merge, future-page completion or new live authority is implied.
+
+## H7 — receipt-tree rendering and bounded native-browser acceptance
+
+Implemented the pure bounded positional layout, SVG receipt graph and complete
+accessible details fallback. Qualified explorer links come from the existing
+decoded view, not a guessed transaction or settlement rail. Malformed topology
+is unavailable; incomplete evidence does not imply refunds or untouched funds.
+See the [H7 brief](task-7-brief.md) and its seven historical implementation/review
+records for genuine regression checkpoints, retained limitations and exact
+public-copy boundaries.
+
+The final focused source check passed 64 tests in two files. The actual owned
+browser matrix covered 28 exact-document cases at desktop/mobile in both themes,
+four native keyboard/disclosure sequences, contained page width and six measured
+AA text contrast pairs. A separate bounded native-scroll check passed mobile
+wheel and desktop keyboard/wheel scrolling without a source change. Parent
+inspected eight matrix/focus images and all four scroll before/after images.
+All owned processes were reaped and their ports refused after cleanup; no live
+hub, wallet, model or chain was contacted by these synthetic fixtures.
+
+Parent's single full H7 gate passed **2,395 Vitest tests / 119 files**,
+**325 Bun tests / 31 files / 3,735 assertions**, root/web strict TypeScript and
+actual client/SSR builds (359 ms / 170 ms). These isolated branch counts are not
+the larger post-F/G main suite. Final publication review and commit follow.
+H remains unmerged; the accepted F/H session and receipt-provenance integration
+is mandatory before H8 or eventual H merge. No G8 completion is claimed.

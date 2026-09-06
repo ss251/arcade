@@ -1349,3 +1349,32 @@ a {
 .market .counters-source { align-self: end; }
 .market .market-provenance { margin: 0 0 32px; color: var(--slate); font-size: 12px; max-width: 78ch; }
 .market .market-notice { margin: 0 0 24px; color: var(--slate); }
+
+/* Recorded receipt graph: no animation, no new semantic colours, no body overflow. */
+.tree { min-width: 0; max-width: 100%; margin: 0 0 24px; }
+.tree-viewport { max-width: 100%; overflow-x: auto; padding: 4px; overscroll-behavior-x: contain; }
+.tree-viewport svg { display: block; max-width: none; }
+.tree-viewport:focus-visible, .tree-details summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.tree-viewport a:focus-visible { outline: none; }
+.tree-viewport a:focus-visible rect { stroke: var(--ink); stroke-width: 3; }
+.tree-details a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.tree a:hover rect { stroke-width: 2; }
+.tree a:active rect { stroke: var(--ink); }
+.tree .tree-edge { stroke: var(--line); stroke-width: 1.5; }
+.tree .node rect { fill: var(--card); stroke: var(--line); }
+.tree .node.is-settled rect { stroke: var(--stamp); }
+.tree .node.is-refused rect { stroke: var(--refuse); }
+.tree .node-skill { font-family: var(--mono); font-size: 11px; fill: var(--ink); }
+.tree .node-price { font-family: var(--sans); font-size: 13px; font-variant-numeric: tabular-nums; fill: var(--usdc); }
+/* Small text needs stronger contrast than the semantic border colours. */
+.tree .node-state { font-family: var(--sans); font-size: 10px; fill: var(--ink); }
+.tree figcaption { margin-top: 8px; color: var(--slate); font-size: 12px; overflow-wrap: anywhere; }
+.tree figcaption p { margin: 4px 0; }
+.tree .tree-money { color: var(--usdc); font-family: var(--sans); font-variant-numeric: tabular-nums; }
+.tree-details { margin-top: 12px; font-size: 13px; }
+.tree-details summary { cursor: pointer; width: fit-content; max-width: 100%; padding: 10px 0; }
+.tree-details ol { margin: 8px 0 0; padding-left: 24px; }
+.tree-details li { margin: 0 0 16px; padding-left: 4px; overflow-wrap: anywhere; }
+.tree-details li > span { display: block; }
+.tree-detail-skill { font-family: var(--mono); }
+.tree-parent { color: var(--slate); font-size: 12px; }

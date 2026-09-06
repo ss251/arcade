@@ -1,5 +1,8 @@
 # Plan H — execution records
 
+Latest isolated task: [H7 receipt-tree geometry, rendering and evidence](task-7-brief.md).
+Its final gate/commit and the F/H rebase are separate from historical H1–6 acceptance.
+
 H1's read-only public feeds are committed. H2 seller accounting and its read-only
 route are implemented and independently reviewed, with the full gate passed.
 H3's private-tree projection and authenticated route are implemented and reviewed;
