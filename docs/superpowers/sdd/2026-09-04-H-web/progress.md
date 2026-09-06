@@ -276,3 +276,35 @@ the standard banner, exact bodies/EOF and five explicit privacy substitutions.
 Final audit then verified seven original pins/exact copies, ten frozen source/test
 pins, 64 local links and zero selected privacy-pattern findings across ten public
 documents. Atomic H8 commit follows, with H still unmerged.
+
+## H9 — corrected contract released
+
+H8 committed as `b7fee76`. H9 retains the plan filenames and key but adds required
+issuer/ordinary scope, closed bounded data, visible read/write failures, explicit
+malformed-envelope recovery and no eviction. Legacy issuer-less rows are not
+silently migrated. First functional draft passed 69 focused tests; a parent's
+trailing-line-terminator hypothesis was refuted by four additional Green tests on
+unchanged source, not recorded as a Red. Size/capture checks and independent frozen
+review remain; no full H9 gate or commit yet. Three historical preflight/readiness
+copies use the standard banner and preserve their exact original bodies.
+
+H10's browser custody, live approval ownership and explicit CORS correction is
+read-only preparation, not source release or recovered F session support. No new
+payment, key access, production configuration, H merge or push occurred.
+
+Independent review subsequently reproduced one fixed-refusal gap: a revoked Proxy
+escaped `Array.isArray` before the validation catch. Three genuine collected
+failures preceded the narrow correction. Final author and independent suites each
+passed 80 tests with exact two-root strict checks; unchanged fileless counterexamples
+now return invalid/undefined/invalid without throwing. Source/review frozen CLEAN.
+Six historical copies preserve the initial checkpoints and later correction, with
+four literal personal-home substitutions. The single full H9 gate is running;
+final publication audit and atomic commit remain next.
+
+The single full H9 gate subsequently passed 3,423 Vitest/146 files (47.91s),
+823 Bun/53 files/5,917 assertions (160.03s), root/web strict TypeScript and actual
+client/SSR builds (379ms/143ms), without a repeated sweep. Final audit verified six
+exact copies/original pins, four literal home substitutions, two source/test pins,
+ten unchanged H8 pins, 67 local links and zero selected privacy-pattern findings
+across nine public documents. Pages configuration retained. Atomic H9 commit next;
+H10 remains separately scoped preparation, with H still unmerged and no new spend.

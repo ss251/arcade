@@ -1,5 +1,18 @@
 # Plan H — execution records
 
+Current task: [H9 ordinary browser recovery store](task-9-brief.md), after committed
+H8 `b7fee76`. Implementation and independent frozen review passed 80 focused tests
+and exact strict checks. The single full gate and final publication audit passed;
+the atomic commit follows. This is not yet purchase or
+dashboard wiring. H remains unmerged. Earlier checkpoints follow.
+
+- [H9–10 original integration readiness](task-9-readiness.md)
+- [H9 accepted contract preflight](task-9-contract-preflight.md)
+- [H9 independent review preparation](task-9-review-preparation.md)
+- [H9 author chronology and correction](task-9-author-report.md)
+- [H9 independent finding and resolved recheck](task-9-independent-review.md)
+- [H9 initial publication checkpoint](task-9-publication-checkpoint.md)
+
 Current task: [H8 public listing detail](task-8-brief.md), following committed
 F/H integration `2580f40`. Loader/UI and actual-route checks, cross-source review,
 the 16-case native browser matrix, separate full gate and final public audit passed.
