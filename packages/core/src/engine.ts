@@ -34,7 +34,7 @@ export const EngineAdapter = Schema.Literal(
   "claude-agent", // Claude Agent SDK
   "codex", // OpenAI Codex
   "grok", // xAI Grok
-  "skill", // a Claude Code SKILL.md directory, run through claude-agent
+  "skill", // Agent Skill (open standard), run through claude-agent; https://agentskills.io/specification
   "mcp", // one tool on a local or remote MCP server
   "openapi" // one operation of an OpenAPI document
 )

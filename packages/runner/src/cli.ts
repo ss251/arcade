@@ -83,6 +83,10 @@ const usage = () => {
   arcade publish mcp:// [options] -- <cmd> [args…] …from a stdio MCP server
   arcade publish <openapi.json> [--yes]            one listing per OpenAPI operation
 
+    Agent Skill (open standard): https://agentskills.io/specification
+    Add arcade.json to its SKILL.md folder. Execution checks non-empty
+    name + description frontmatter and body; not full specification validation.
+
     --price '$0.05'       price per generated listing (default $0.05)
     --out DIR            output directory (default ./skills)
     --tool NAME          select an MCP tool (repeatable)

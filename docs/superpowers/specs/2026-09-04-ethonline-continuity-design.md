@@ -1,5 +1,7 @@
 # ARCADE at ETHOnline 2026 — continuity design ("Charizard")
 
+> September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
+
 Status: approved scope, 2026-09-04 (supersedes the first, narrower draft of the same date). Derived from `docs/superpowers/research/ethonline-2026/` (sponsor research, X sweeps, three-model debate, `DEBATE/SYNTHESIS.md`) and the owner's decisions: partners **Arc + The Graph + ENS**; full scope including Gateway sessions; all three publish adapters; Circle CLI interop before Gateway; the Graph payment hop on Base mainnet with a funded payer; research artifacts committed once hacking opens (Sept 4, 09:30pm IST).
 
 Build window Fri Sept 5 → Fri Sept 12 with parallel executor agents; submission before Sat Sept 13, 12:00pm EDT; check-ins Sept 8 and 11.
@@ -50,7 +52,7 @@ web ── marketplace · listing/receipt tree · seller & buyer dashboards · p
 
 Three new `EngineAdapter` values and engines registered in `packages/runner/src/engines/harness.ts` (`ENGINES`), each implementing `{run, envGrants, doctor}` from `engines/types.ts`. `packages/core/src/engine.ts` gains the literals, `termsFor` rules (all three sellable with `api-key` or `none`), and manifest validation.
 
-- **`skill`**: `engine: {adapter: "skill", entry: "SKILL.md", credential: "api-key"}`. Loads the Claude Code skill directory (SKILL.md frontmatter + body + `references/`), runs it through the existing `claude-agent` engine with the SKILL.md body as the system prompt, workdir pinned to the directory, capabilities from the manifest, `submit` tool built from `outputSchema`. Any Claude Code skill becomes a listing without a rewrite.
+- **`skill`**: `engine: {adapter: "skill", entry: "SKILL.md", credential: "api-key"}`. Loads the Agent Skill (open standard) directory (SKILL.md frontmatter + body + `references/`), runs it through the existing `claude-agent` engine with the SKILL.md body as the system prompt, workdir pinned to the directory, capabilities from the manifest, `submit` tool built from `outputSchema`. Any Agent Skill (open standard) becomes a listing without a rewrite.
 - **`mcp`**: `engine: {adapter: "mcp", command: ["bunx", "some-mcp-server"], tool: "get_weather"}` or `url` for streamable HTTP. The runner starts the server (stdio) with the scrubbed env plus declared secrets, calls one tool per listing with the buyer input as arguments, validates against `outputSchema`, reports `stopReason: end_turn` on success and `error` on `isError`. `arcade publish mcp://` introspects `tools/list` and writes one manifest per tool (input schema copied from the tool's `inputSchema`). Uses `@modelcontextprotocol/sdk` already in the workspace.
 - **`openapi`**: `engine: {adapter: "openapi", spec: "openapi.json", operationId: "…"}`. `arcade publish openapi.json` writes one manifest per operation; the runner calls the operation with declared secrets as headers/query, never exposing the upstream URL or keys (they stay in the private half of the manifest).
 - Publish wizard in the web app (M8) drives the same CLI code path.

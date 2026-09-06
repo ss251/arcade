@@ -52,7 +52,20 @@ the bound seller credential. A configured API or MCP transport still accesses it
 upstream when model capabilities are empty—those capabilities describe model tools,
 not an operating-system network firewall.
 
-A SKILL.md directory needs a manifest pointing at its Markdown entry:
+### Agent Skills (open standard)
+
+An **Agent Skill (open standard)** is a portable `SKILL.md` folder defined by the
+[Agent Skills specification](https://agentskills.io/specification), not a
+vendor-specific engine. The same folder runs in Codex, ChatGPT, Cursor, Copilot,
+Gemini CLI and Claude Code, subject to each client's setup and available tools.
+
+The adapter validates non-empty values for exactly the spec's two required
+frontmatter fields, `name` and `description`, and also requires a non-empty body.
+It is not a complete spec validator: it does not enforce every naming/parent-folder
+rule or support all YAML features. ARCADE's current parser reads flat scalar
+metadata; optional metadata never grants tools or changes manifest authority.
+
+To publish an Agent Skill folder in ARCADE, add a manifest pointing at its Markdown entry:
 
 ```json
 "engine": { "adapter": "skill", "credential": "api-key", "entry": "SKILL.md", "model": "claude-sonnet-5" }
@@ -212,7 +225,7 @@ Set `timeoutSec` on every skill. It is the one bound that is always enforced.
 | `script` | your executable | none — no model, no provider terms |
 | `claude-api` | Claude API tool runner | `api-key` |
 | `claude-agent` | Claude Agent SDK | `api-key`, or `subscription` for local use |
-| `skill` | SKILL.md through the Claude Agent SDK | `api-key`, or `subscription` for local use |
+| `skill` | Agent Skill (open standard) through the current Claude Agent SDK runtime | `api-key`, or `subscription` for local use |
 | `mcp` | One MCP tool over HTTPS or stdio | `none`, with explicit secret bindings when needed |
 | `openapi` | One operation in a local OpenAPI JSON document | `none`, with explicit secret bindings when needed |
 | `codex` / `grok` | OpenAI / xAI | `api-key` (not yet implemented — issues #1, #2) |

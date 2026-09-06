@@ -1,5 +1,9 @@
 # Spec-driven development records
 
+September 6 follow-up: [vendor-neutrality briefs and evidence](2026-09-06-vendor-neutrality/README.md)
+track the separately approved format-wording, openai-api and plugin-ingestion work.
+This link does not mark those later tasks complete.
+
 These are sanitized copies of the execution records for ARCADE's ETHOnline continuation. The [continuity statement](../../CONTINUITY.md) separates the inherited build from new work; the [design specification](../specs/2026-09-04-ethonline-continuity-design.md) and [execution index](../plans/2026-09-04-02-execution-index.md) describe the approved scope.
 
 | Plan | Records | Implementation checkpoint |

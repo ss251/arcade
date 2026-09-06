@@ -2,7 +2,9 @@
 
 # Task 4 report
 
-- Commit: `26434f1 feat(runner): skill adapter — a Claude Code SKILL.md directory as a listing`.
+> September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
+
+- Commit: `26434f1`; format-neutral scope description: the skill adapter publishes an Agent Skill (open standard) SKILL.md directory as a listing. This is not a quotation of the original commit subject.
 - Implemented exact parseSkillMd, referenceFiles, loadSkillAgent and skillEngine interfaces; registered harness dispatch. Flat metadata is descriptive only: manifest credential/model/capabilities remain authoritative. Existing Claude Agent run/environment/doctor behavior reused.
 - TDD: missing module/registration failures then green. Nested cwd and outside absolute/symlink entry tests reproduced three behavioral failures then passed after realpath containment and relative workdir handling. Initial fake-provider CLI invocation was corrected before recording behavioral reds.
 - 22 parser/loader/reference tests and seven real harness/registry cases added. Fake SDK preload captures actual query options, with no network/provider call. Private prompt/path/reference contents excluded from diagnostics. Symlinked references root rejected; nested symlinks not followed.

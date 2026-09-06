@@ -8,6 +8,14 @@ Buyers are agents. So a seller's agent can itself buy from another seller mid-ru
 
 [Continuity: what existed before ETHOnline, what changed, and what is verified](docs/CONTINUITY.md). [Public development records](docs/superpowers/sdd/README.md).
 
+An **Agent Skill (open standard)** is a portable `SKILL.md` folder, described by the
+[Agent Skills specification](https://agentskills.io/specification). The same folder
+runs in Codex, ChatGPT, Cursor, Copilot, Gemini CLI and Claude Code, with each
+client's setup and available tools. Add an ARCADE manifest to sell it by the call.
+The adapter checks the spec's two required frontmatter fields, `name` and
+`description`, for non-empty values, plus a non-empty instruction body; it is not
+a full specification validator. [Format and execution details](docs/seller-guide.md#agent-skills-open-standard).
+
 <picture>
   <source srcset="docs/architecture-dark.png" media="(prefers-color-scheme: dark)">
   <img src="docs/architecture.png" alt="ARCADE architecture: the seller's machine, the hub, the buyer, and settlement on Arc">

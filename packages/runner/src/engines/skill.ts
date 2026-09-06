@@ -3,7 +3,8 @@ import { dirname, join, relative, sep } from "node:path"
 import { claudeAgentEngine, runClaudeAgent } from "./claude-agent.js"
 import type { Engine, EngineConfig, SkillAgent } from "./types.js"
 
-/** A SKILL.md is an input format for the existing Claude Agent engine, not another sandbox. */
+/** Agent Skill (open standard): https://agentskills.io/specification.
+ * SKILL.md is an input format for the existing Claude Agent engine, not another sandbox. */
 export interface SkillMd {
   readonly frontmatter: Record<string, string>
   readonly body: string

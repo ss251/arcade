@@ -1,5 +1,7 @@
 # Plan I — Circle CLI interop (M9 part 2) + packaging
 
+> September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prove a third-party Circle CLI 1.0.0 agent wallet can pay an ARCADE endpoint that was not changed for it, then package the week: a README that declares what existed before commit `57183db` and what is new, an architecture diagram that shows the new layers, a 2–4 minute human-voiced video, a submission checklist for three partner prizes, two check-ins, and the Sept 16 mainnet flip.
@@ -1058,7 +1060,7 @@ carries the tree hash on chain", "hop two is the hiring seller's working-capital
 `beat-1.txt`:
 
 ```
-This is a Claude skill directory on my laptop. One command turns it into a paid endpoint. Before anything is published, ARCADE shows exactly what leaves this machine — a name, a price, two schemas — and what never does: the prompt, the entry point, the secret names, the code. The same command publishes an MCP server, one listing per tool.
+This is an Agent Skill (open standard) directory on my laptop. One command turns it into a paid endpoint. Before anything is published, ARCADE shows exactly what leaves this machine — a name, a price, two schemas — and what never does: the prompt, the entry point, the secret names, the code. The same command publishes an MCP server, one listing per tool.
 ```
 
 `beat-2.txt`:

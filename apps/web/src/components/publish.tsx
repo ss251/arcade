@@ -73,6 +73,8 @@ export function PublishPage({ enabled, request = fetchPublishPreview }: { enable
   }
   return <main className="wrap publish-page"><Nav here="publish" />
     <h1>Inspect the boundary before you publish.</h1>
+    <p className="publish-note">Publish an <a href="https://agentskills.io/specification">Agent Skill (open standard)</a> folder
+      with an ARCADE manifest, or generate listings from MCP and OpenAPI. The format is separate from the execution engine.</p>
     {!enabled ? <section aria-label="Local publishing setup"><h2>Publishing runs locally</h2>
       <p>This hosted/default page cannot read your files or launch the publishing CLI. From the root of your trusted ARCADE checkout, enable an isolated local preview:</p>
       <pre tabIndex={0} aria-label="Local preview setup command">{LOCAL_COMMAND}</pre>

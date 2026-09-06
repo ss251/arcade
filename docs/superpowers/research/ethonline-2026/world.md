@@ -1,5 +1,7 @@
 # World / AgentKit research for ARCADE — ETHOnline 2026
 
+> September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
+
 Target prize: **AgentKit Continuity — $3,500** (continuity track). Researched 2026-09-04.
 Every claim below carries a URL or a repo file path. Repo clone used: `worldcoin/agentkit` @ `main` (latest commit `2026-08-24 fix: resolve cargo-deny advisory failures (#41)`, via `gh api repos/worldcoin/agentkit/commits`).
 
@@ -22,7 +24,7 @@ It is an **extension to x402** (HTTP 402), not a standalone auth system: "AgentK
 
 `@worldcoin/agentkit` re-exports all of `@worldcoin/agentkit-core` (`export * from '@worldcoin/agentkit-core'`) — https://github.com/worldcoin/agentkit/blob/main/x402/src/index.ts. So you only install `@worldcoin/agentkit`.
 
-Also shipped: two Claude/agent **skills** in-repo — `npx skills add worldcoin/agentkit agentkit-x402` (buyer side) and `npx skills add worldcoin/agentkit integrate-agentkit` (seller side) — https://github.com/worldcoin/agentkit/blob/main/README.md, sources at `skills/agentkit-x402/SKILL.md` and `skills/integrate-agentkit/SKILL.md`.
+Also shipped: two **Agent Skills (open standard)** in-repo — `npx skills add worldcoin/agentkit agentkit-x402` (buyer side) and `npx skills add worldcoin/agentkit integrate-agentkit` (seller side) — https://github.com/worldcoin/agentkit/blob/main/README.md, sources at `skills/agentkit-x402/SKILL.md` and `skills/integrate-agentkit/SKILL.md`.
 
 There is a Rust workspace too (`Cargo.toml`, `deny.toml` at repo root) but the shipped integration surface is TypeScript.
 

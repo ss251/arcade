@@ -1,8 +1,10 @@
 # Plan B — Publish anything (M1): `skill`, `mcp`, `openapi` adapters
 
+> September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let anyone publish a Claude Code skill directory, a local or remote MCP server tool, or one OpenAPI operation as a paid ARCADE listing — without writing an agent module, and without any of the new private configuration (`command`, `url`, `spec`, `operationId`, `tool`, `auth`, `model`) ever reaching the hub.
+**Goal:** Let anyone publish an Agent Skill (open standard) directory, a local or remote MCP server tool, or one OpenAPI operation as a paid ARCADE listing — without writing an agent module, and without any of the new private configuration (`command`, `url`, `spec`, `operationId`, `tool`, `auth`, `model`) ever reaching the hub.
 
 **Architecture:** Three new `EngineAdapter` literals in `packages/core/src/engine.ts`, three new optional private fields groups on `Engine` in `packages/core/src/manifest.ts` guarded by one per-adapter shape rule, and three new engines registered in `ENGINES` (`packages/runner/src/engines/harness.ts`). The adapters need per-listing configuration that the seller's agent module used to carry, so `exec.ts` now hands the harness an `engineConfig` — parent-to-child on the same machine, never on the wire. `skill` is a thin front end over the existing `claude-agent` engine (SKILL.md body becomes the system prompt); `mcp` and `openapi` are model-free adapters that take the buyer's input straight through. `arcade publish` grows two introspection paths (`mcp://…` and `<spec>.json`) that write one manifest per tool/operation.
 
@@ -120,7 +122,7 @@ export const EngineAdapter = Schema.Literal(
   "claude-agent", // Claude Agent SDK
   "codex", // OpenAI Codex
   "grok", // xAI Grok
-  "skill", // a Claude Code SKILL.md directory, run through claude-agent
+  "skill", // an Agent Skill (open standard) SKILL.md directory, run through claude-agent
   "mcp", // one tool on a local or remote MCP server
   "openapi" // one operation of an OpenAPI document
 )
@@ -853,7 +855,7 @@ describe("loadSkillAgent", () => {
   })
 
   it("names the reference files so the model knows they exist", async () => {
-    // A Claude Code skill's `references/` is loaded on demand by a model that has been TOLD
+    // An Agent Skill (open standard)'s `references/` is loaded on demand by a model that has been TOLD
     // the files are there. Copying the body verbatim without that line publishes a skill
     // whose second half is unreachable.
     const dir = await scratch()
@@ -872,7 +874,7 @@ describe("loadSkillAgent", () => {
     )
   })
 
-  it("refuses a file that is not a Claude Code skill", async () => {
+  it("refuses a file that is not an Agent Skill (open standard)", async () => {
     const dir = await scratch()
     await writeFile(join(dir, "SKILL.md"), "# notes\n\nsome markdown")
     await expect(loadSkillAgent(join(dir, "SKILL.md"), { adapter: "skill" })).rejects.toThrow(
@@ -930,7 +932,7 @@ import { claudeAgentEngine, runClaudeAgent } from "./claude-agent.js"
 import type { Engine, EngineConfig, SkillAgent } from "./types.js"
 
 /**
- * The `skill` adapter — a Claude Code skill directory, sold by the call.
+ * The `skill` adapter — an Agent Skill (open standard) directory, sold by the call.
  *
  * There are tens of thousands of SKILL.md files in the world and every one of them is a
  * complete, tested operator prompt someone already uses. The gap between "I have a skill"
@@ -996,7 +998,7 @@ export const loadSkillAgent = async (
   if (!(await file.exists())) {
     throw new Error(
       `${entryPath} does not exist. For the \`skill\` adapter, engine.entry must point at ` +
-        "the SKILL.md of a Claude Code skill directory."
+        "the SKILL.md of an Agent Skill (open standard) directory."
     )
   }
 
@@ -1073,7 +1075,7 @@ Expected: PASS, including `harness.test.ts:146` (`engineFor("claude-agent")`) an
 
 ```bash
 git add packages/runner/src/engines/skill.ts packages/runner/src/engines/harness.ts packages/runner/test/skill-engine.test.ts
-git commit -m "feat(runner): skill adapter — a Claude Code SKILL.md directory as a listing"
+git commit -m "feat(runner): skill adapter — an Agent Skill (open standard) SKILL.md directory as a listing"
 ```
 
 ---
