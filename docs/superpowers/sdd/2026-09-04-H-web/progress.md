@@ -1,5 +1,17 @@
 # SDD ledger — Plan H
 
+2026-09-06 18:36 IST: H12b1 sole25795 gate exit0:4081Vitest175/52.93s,
+834Bun54/6093assert/163.61s,rootwebstrict0,client355msSSR181ms. No repeat or
+source change. Pure parser/policy only; H12b2 actual binding/runtime follows.
+Root-only, max4, no concurrent gate/browser, keys, spend, production or push.
+
+2026-09-06 18:32 IST: H12b1 source frozen. Four MCP target Reds, generated-zero
+price refusal and fresh-import chain-selection Red fixed; alias collection issue
+resolved via existing pure-file imports.63focused/4 files and6exactstrict roots0.
+[Report](task-12b1-parent-report.md); parser/policy only, no subprocess/route/UI
+or listener binding. H12b2 runtime remains. One max4 full sequential gate next;
+root-only/no fan-out/parallelreview/browser/keys/spend/production/push.
+
 2026-09-06 18:13 IST: H12a sole36703gate exit0:4022Vitest172/54.71s,
 834Bun54/6093assert/163.65s,rootwebstrict0,client354msSSR163ms. Five new runner
 source/test pins and39 retained H11 pins/public audit PASS; atomic commit next.

@@ -1,4 +1,5 @@
-import { advisoryFor, assertManifestPublishable, credentialOf, toPublicListing, type SkillManifest } from "@arcade/core"
+import { assertManifestPublishable, credentialOf, toPublicListing, type SkillManifest } from "../../core/src/manifest.ts"
+import { advisoryFor } from "../../core/src/engine.ts"
 
 /** Canonical CLI projection of an already-decoded local manifest. No IO, execution
  * or environment lookup. Private configuration is for the local seller only;

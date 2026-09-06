@@ -1,5 +1,11 @@
 # Plan H — execution records
 
+Current task: [H12b1 bounded validation](task-12b1-brief.md) after28ce88a.
+The [parent report](task-12b1-parent-report.md) records63 focused checks, actual
+fresh-import regressions and six-root strict0. These are pure JSON/target/request
+gates, not an enabled route/process/listener. The sole full sequential gate passed
+4,081 Vitest/834 Bun, root/web strict and client/SSR builds. H12b2 follows.
+
 Current task: [H12a canonical CLI preview](task-12a-brief.md), after H11.
 The [parent report](task-12a-parent-report.md) records the real directory/generated
 contract, preview-only guards and actual OpenAPI/stdio fixtures. Focused checks
