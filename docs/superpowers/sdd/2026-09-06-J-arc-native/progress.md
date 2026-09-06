@@ -1,5 +1,21 @@
 # Plan J progress
 
+2026-09-07 04:01 IST — Task4A sole56380PASS:4,681Vitest208/65.43s,
+874Bun57/6,374assert/167.35s,root/webstrict,client399ms/SSR174ms. Two frozen
+source/test pins; final8-path audit/atomic commit/exactFFmain next. J4B live
+proof is blocked on a newly found validity-policy choice: CLI1.0.0 forces30days,
+ARCADE pins604900seconds; no CLI override/newer release found, current anonymous
+supported response still minimum604800. Owner asked for bounded testnet profile
+approval. No policy relaxation, deposit, payment, new key read or deployment.
+
+2026-09-07 03:52 IST — Task3B merged459f5fb, exactoneFFcleanmain. Task4A
+offline evidence/journal contracts:19Bun/60assertions/298ms, two-rootstrict0.
+Four read-only CLI wallet/status/balance calls confirmed funded Arc SCA and
+distinct zero-Gateway backing EOA; terms unchanged. Installed CLI/source/docs
+correct the original SCA-payer/immediate200 assumptions. Freeze/audit/sole full
+gate next; Task4B runtime and all J4 deposit/payment actions remain unimplemented/
+NOT_RUN. No new keys, agents, deployments, mainnet, production changes or push.
+
 2026-09-07 03:34 IST — Task3B COMPLETE WITH_CONCERNS: sole79007 retained
 4,678VitestPASS/3FAIL/208/66.40s, all failures from the ENS/Gateway fixture's
 missing balance branch. Targeted correction59214:22PASS/1.12s,16-rootstrict0;
@@ -75,9 +91,11 @@ notrun; later escrow-state/Circlepayer/queued202 assumptions explicitly flagged.
   No live Circle/escrow claim.
 - Task2 MERGED c447759 WITH_CONCERNS: registry-shaped discovery and Graph
   compatibility; original failures and split verification retained.
-- Task3 COMPLETE:3A MERGED519a244;3B WITH_CONCERNS for recorded split gate,
-  final audit/atomic commit/merge next. No live-payment claim.
-- Task4 NOT_RUN: Circle CLI inspect/estimate/bounded testnet pay proof.
+- Task3 MERGED:3A519a244;3B459f5fb WITH_CONCERNS for recorded split gate.
+  No live-payment claim.
+- Task4 IN_PROGRESS:4A COMPLETE after sole full gate, final audit/commit/merge
+  next.4B runtime unimplemented and live proof NOT_RUN; validity-policy owner
+  decision pending. Existing deposit/payment approvals remain unused.
 - Task5 NOT_STARTED: Unified Balance delegate funding and separate live proof.
 - Task6 NOT_STARTED: pinned escrow contracts/hook; one approved deployment unused.
 - Task7 NOT_STARTED: escrow rail/relayed authorizations.

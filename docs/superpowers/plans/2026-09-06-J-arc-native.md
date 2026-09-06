@@ -111,6 +111,18 @@ See the [Task3B report](../sdd/2026-09-06-J-arc-native/task-3b-report.md).
 
 ### Task 4: Live proof — Circle CLI inspects and pays (J1 + J2)
 
+Execution checkpoints:4A bounded observation/journal contracts, then4B owned
+runtime and live proof. See the [brief](../sdd/2026-09-06-J-arc-native/task-4-brief.md)
+and [4A record](../sdd/2026-09-06-J-arc-native/task-4a-report.md). Installed CLI1.0.0
+uses a backing EOA for Gateway and returns ARCADE's queued202 without polling.
+Verify those actual identities/statuses instead of the original SCA-payer/
+immediate200 assertion below. Raw journals stay private; only scrubbed summaries
+belong in docs/evidence. Local discovery overrides never imply public listing.
+Task4A passed its sole full gate. Before funding, source inspection found the
+CLI's forced30-day validity incompatible with ARCADE's604900-second pin.
+An explicit bounded testnet-profile decision is pending; no expiry change or
+live payment is authorized by this execution note.
+
 - [ ] `scripts/e2e-circle-cli.sh`: start hub (both rails) + runner locally, then: `curl -i` the unpaid 402 (all accepts), `circle services inspect <url> --output json` (assert scheme `GatewayWalletBatched`, price, method), `circle gateway balance --address <agent> --chain ARC-TESTNET`, `circle services pay <url> -X POST --address <agent> --chain ARC-TESTNET --max-amount 0.01 --data '<canaryInput>' --output json`; assert HTTP 200 body and a receipt whose payer is the Circle SCA. Journal to `docs/evidence/J/circle-cli.jsonl`. Agent wallet from Plan I Task 1; if the CLI refuses the chain, capture the exact error and fall back to `--estimate` evidence plus the header replay from Plan I Task 2. Do not guess at CLI behaviour; record it.
 - [ ] Commit: `test(e2e): Circle CLI agent wallet inspects and pays an ARCADE listing on Arc testnet`.
 

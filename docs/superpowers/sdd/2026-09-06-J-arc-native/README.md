@@ -12,6 +12,8 @@ evidence remain separate open work; this index does not mark them accepted.
   [discovery contract](../../../circle-discovery.md).
 - [Task 3 brief](task-3-brief.md), [selection/balance foundations](task-3a-report.md),
   [SDK/MCP/canary integration](task-3b-report.md).
+- [Task 4 brief](task-4-brief.md), [proof contracts](task-4a-report.md),
+  [read-only CLI preflight](../../../evidence/J/circle-cli-preflight.md).
 - [Progress ledger](progress.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
