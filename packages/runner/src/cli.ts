@@ -796,6 +796,15 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
           `  env=[${Object.keys(env).join(",")}]` +
           (missing.length > 0 ? `  MISSING SECRETS: ${missing.join(",")}` : "")
       )
+      if (s.manifest.engine.adapter === "openai-api") {
+        const { doctorOpenAi } = yield* Effect.promise(() => import("./engines/openai-api.js"))
+        const engine = s.manifest.engine
+        const check = doctorOpenAi({ systemPrompt: "", capabilities: engine.capabilities,
+          ...(engine.credential === undefined ? {} : { credential: engine.credential }),
+          ...(engine.model === undefined ? {} : { model: engine.model }) }, env)
+        console.log(`    ${check.ok ? "ok" : "FAILED"}: ${check.detail}`)
+        if (!check.ok) process.exitCode = 1
+      }
     }
     return
   }

@@ -20,7 +20,7 @@
  */
 
 import { realpath } from "node:fs/promises"
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path"
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path"
 import {
   assertOutputSize,
   fence,
@@ -30,6 +30,7 @@ import {
   type EngineAdapter
 } from "@arcade/core"
 import { claudeApiEngine } from "./claude-api.js"
+import { openAiApiEngine } from "./openai-api.js"
 import { claudeAgentEngine } from "./claude-agent.js"
 import { loadSkillAgent, skillEngine } from "./skill.js"
 import { mcpEngine } from "./mcp.js"
@@ -38,6 +39,7 @@ import type { Engine, HarnessJob, JobEnvelope, SkillAgent } from "./types.js"
 
 export const ENGINES: Partial<Record<EngineAdapter, Engine>> = {
   "claude-api": claudeApiEngine,
+  "openai-api": openAiApiEngine,
   "claude-agent": claudeAgentEngine,
   skill: skillEngine,
   mcp: mcpEngine,
@@ -135,7 +137,7 @@ const agentFor = async (request: HarnessRequest, entryArg: string): Promise<Skil
   // `import()` resolves a bare relative path against THIS module, not the working
   // directory, which would look for the seller's agent inside the runner package.
   const entry = resolve(process.cwd(), entryArg)
-  if (request.adapter === "skill") {
+  if (request.adapter === "skill" || (request.adapter === "openai-api" && basename(entry) === "SKILL.md")) {
     let rootPath: string
     let entryPath: string
     try {

@@ -1,5 +1,17 @@
 # Vendor-neutrality progress
 
+2026-09-06 23:29 IST — Task2 sole full gate35793 PASS:4368Vitest196/75.53s,
+839Bun55/6114assert/170.53s,rootwebstrict0,client412ms/SSR197ms. Seven sourcepins,
+13paths,11unchangedcontracts/locks,13links,privacy/diff checks PASS. Scoped
+implementation commit next; free-route evidence notrun, no keyreads or payments.
+
+2026-09-06 23:26 IST — Task2 implementation frozen with seven source SHA-256 pins,
+147 focused tests and seven-root strict0. Three initial registration Reds and
+subsequent source/fixture corrections recorded in report. Sole full gate35793
+running sequentially with four-worker caps; no agents, real provider calls,
+credential reads, new spending or push. PlanJ docs branch3cb8871 queued for an
+exact fast-forward into main at this commit boundary, before adapter main merge.
+
 2026-09-06 22:54 IST — Task1 gate coverage complete without repeating a full
 sweep: sole14540 passed4,285Vitest/193, then784Bun/6,003 assertions and two
 missing-subgraph-dependency collection errors. Installed unchanged pinned

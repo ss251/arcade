@@ -5,7 +5,8 @@ single-threaded, no new spending or push.
 
 - Task1: [wording brief](task-1-brief.md), [parent report](task-1-report.md).
 - [Progress ledger](progress.md).
-- Task2: openai-api implementation and approved free-route evidence remain next.
+- Task2: [API engine brief](task-2-brief.md), [implementation report](task-2-report.md).
+  Approved free-route live evidence remains separate and pending.
 - Task3: Agent Plugins ingestion remains next; unsupported types must be reported.
 
 The [public SDD index](../README.md) and [seller guide](../../../seller-guide.md)

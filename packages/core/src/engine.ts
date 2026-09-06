@@ -31,6 +31,7 @@ import { Schema } from "effect"
 export const EngineAdapter = Schema.Literal(
   "script", // no model — a plain executable
   "claude-api", // Claude API tool runner
+  "openai-api", // API-key Chat Completions wire format; provider selected privately
   "claude-agent", // Claude Agent SDK
   "codex", // OpenAI Codex
   "grok", // xAI Grok
@@ -112,6 +113,7 @@ const XAI_OUTPUT_ADVISORY =
 export const ENGINE_TERMS: Record<EngineAdapter, ReadonlyArray<CredentialSource>> = {
   script: ["none"],
   "claude-api": ["api-key"],
+  "openai-api": ["api-key"],
   "claude-agent": ["api-key", "subscription"],
   codex: ["api-key", "subscription"],
   grok: ["api-key", "subscription"],
