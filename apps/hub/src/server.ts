@@ -14,7 +14,6 @@ import {
   HELLO_MAX_AGE_MS,
   decodeRunnerMessage,
   docBytes,
-  explorerTxUrl,
   formatPrice,
   loadChainConfig,
   mintHireCapability,
@@ -54,6 +53,7 @@ import { claimedPayerOf, delistRefusal } from "./delisted.ts"
 export { claimedPayerOf, delistRefusal } from "./delisted.ts"
 import { ceilingAtomicFor, maxHopFromEnv, resolveLineage } from "./lineage.ts"
 import { publicReceipt } from "./receipts-feed.ts"
+import { receiptChildExplorer, receiptExplorer } from "./receipt-reference.ts"
 import { chainCheck, chainMetadataCheck, chainStartupRefusal } from "./chain-check.ts"
 import { createChainRpc } from "./chain-rpc.ts"
 import {
@@ -1288,13 +1288,13 @@ const main = Effect.gen(function* () {
                 price: formatPrice(receipt.priceAtomic),
                 sellerShare: formatPrice(receipt.sellerAtomic),
                 fee: formatPrice(receipt.feeAtomic),
-                explorer: receipt.settleTx === undefined ? null : explorerTxUrl(receipt.settleTx),
+                explorer: receiptExplorer(receipt),
                 treeCeilingAtomic: receipt.treeCeilingAtomic?.toString(),
                 treeCommittedAtomic: receipt.treeCommittedAtomic?.toString(),
                 children: receipt.children?.map((c) => ({
                   ...c,
                   priceAtomic: c.priceAtomic.toString(),
-                  explorer: c.settleTx === undefined ? null : explorerTxUrl(c.settleTx)
+                  explorer: receiptChildExplorer(receipt, c)
                 }))
               }
             })

@@ -165,3 +165,12 @@ results,529Bun/4681assertions/41files and root/web strict0. Bun includes retaine
 private review fixtures; exact Vitest test count was truncated, not inferred.
 Independent correction review is CLEAN; six final source hashes are unchanged.
 Final public-copy audit precedes the atomic offline checkpoint commit.
+
+F12 subsequently committed as `fb26382`. F14's [brief](task-14-brief.md) indexes
+the seven preserved execution artifacts, actual synthetic browser QA and frozen
+full gate:2,748Vitest/124files,529Bun/41files/4,681assertions, root/web strict and
+client/SSR builds, exit0. Source review is CLEAN. Corrected mobile overflow and
+default-fee labeling retain their original failures; all owned previews stopped.
+Public-copy audit and F14 commit precede the separate full-F four gates and
+fast-forward merge. F12 live remains unimplemented/NOT RUN; F13 was not triggered.
+No new spending, approval replay or push.

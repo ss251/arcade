@@ -20,11 +20,10 @@ Every paid operation publishes its **price before you call it** — in dollars a
 {
   "mcpServers": {
     "arcade": {
-      "command": "bunx",
-      "args": ["arcade-mcp"],
+      "command": "bun",
+      "args": ["--no-env-file", "packages/buyer/src/mcp.ts"],
       "env": {
-        "ARCADE_HUB": "http://localhost:8787",
-        "ARCADE_BUYER_KEY": "0x<testnet throwaway>",
+        "ARCADE_HUB": "http://127.0.0.1:8787",
         "ARCADE_MAX_CALL_USD": "$1.00",
         "ARCADE_SESSION_BUDGET_USD": "$10.00"
       }
@@ -33,9 +32,22 @@ Every paid operation publishes its **price before you call it** — in dollars a
 }
 ```
 
-Six tools: `arcade_list_skills`, `arcade_describe_skill`, `arcade_quote`, `arcade_call_skill`, `arcade_receipts`, `arcade_budget`. Only `arcade_call_skill` spends money, and it is annotated accordingly so a client can gate it.
+Run this configuration from the repository root. Supply a separately reviewed
+`ARCADE_BUYER_KEY` securely through the launching environment, never by embedding
+it in this JSON, a prompt, command argument, committed file or log. Use an owned
+HTTPS origin remotely; the session path accepts literal `127.0.0.1`/`[::1]` HTTP,
+not the legacy `localhost` default.
 
-**Two spend limits, both refusing before anything is signed:** a per-call ceiling (`ARCADE_MAX_CALL_USD`, or a lower `maxAmountUsd` per call) and a cumulative session budget (`ARCADE_SESSION_BUDGET_USD`). A refusal names the exact numbers, so an agent never discovers a limit by watching a call fail. A job that does not settle is not counted against the budget — non-settlement is the refund.
+Eight tools: `arcade_list_skills`, `arcade_describe_skill`, `arcade_quote`,
+`arcade_call_skill`, `arcade_receipts`, `arcade_budget`, `arcade_open_session` and
+`arcade_close_session`. Only the call tool authorizes a payment. Open/close mutate
+session lifecycle but do not deposit, withdraw, refund or reset the process cap.
+
+**Stacked ceilings:** the per-call limit (`ARCADE_MAX_CALL_USD`, optionally narrowed
+by `maxAmountUsd`), the per-process `ARCADE_SESSION_BUDGET_USD`, and an explicit hub
+session's budget all apply. Locally issued authority consumes the process ceiling;
+a failed response, released hub reservation or closed session does not restore it.
+An uncertain paid outcome remains exposure until correlated evidence resolves it.
 
 `ARCADE_BUYER_KEY` is read from the environment only and is never a tool argument, so no prompt can persuade the server to accept a credential.
 
@@ -52,16 +64,18 @@ POST again with PAYMENT-SIGNATURE   →  202 { job_id, poll_url }
 GET  poll_url                       →  200 { result, receipt }
 ```
 
-You never need a gas balance and never touch the chain. You sign a message; the facilitator broadcasts it and pays the gas.
+For an ordinary per-call authorization, the buyer signs a message and the
+facilitator handles settlement gas. This is not a statement that explicit Gateway
+deposit/withdrawal is gas-free or that a wallet balance is Gateway credit.
 
 ## CLI
 
 ```bash
-export ARCADE_BUYER_KEY=0x…        # testnet throwaway; read from env, never a flag,
-                                   # so it can't land in shell history
-export ARCADE_HUB=http://localhost:8787
+# Supply the reviewed buyer credential securely in the process environment.
+# Do not type or paste a private key into this command or shell history.
+export ARCADE_HUB=http://127.0.0.1:8787
 
-bun run arcade-buy usdc-flow-check \
+bun --no-env-file packages/buyer/src/cli.ts usdc-flow-check \
   --input '{"address":"0xAeB742…"}' \
   --max-amount 0.05
 ```
@@ -71,20 +85,103 @@ bun run arcade-buy usdc-flow-check \
 ## SDK
 
 ```ts
-import { callSkill } from "@arcade/buyer"
-import { privateKeyToAccount } from "viem/accounts"
+import { callSkillPromise } from "@arcade/buyer"
+import { parsePrice } from "@arcade/core"
+import type { Account } from "viem"
 
-const out = await Effect.runPromise(callSkill({
-  hubUrl: "http://localhost:8787",
-  seller: "0x…",
+declare const account: Account // supplied by your reviewed signing integration
+declare const seller: string   // the selected ordinary listing's route segment
+
+const out = await callSkillPromise({
+  hubUrl: "http://127.0.0.1:8787",
+  seller,
   skillId: "usdc-flow-check",
   input: { address: "0x…" },
-  account: privateKeyToAccount(process.env.ARCADE_BUYER_KEY as `0x${string}`),
+  account,
   maxAmountAtomic: parsePrice("$0.05")
-}))
+})
 ```
 
-`callSkill` handles the probe, the 402, the offline signature, the retry, and the polling. Skills legitimately take 2 seconds to 7 minutes, so polling is the contract, not a workaround.
+`callSkillPromise` handles the probe, 402, one signed paid retry and polling.
+`callSkill` is the Effect equivalent. These are ordinary calls; opt into the
+captured session lifecycle explicitly below.
+
+## Sessions
+
+Opening needs a trusted hub and an exact decimal `budgetUsd` string with at most
+six fractional digits. It is a ceiling plus a rail, not escrow, prepay or a
+discount. These are API examples, not authority to spend or fund an account.
+
+```ts
+import { openSessionPromise } from "@arcade/buyer"
+import { parsePrice } from "@arcade/core"
+import type { Account } from "viem"
+
+declare const account: Account // private signing integration, never a tool argument
+const session = await openSessionPromise({
+  hubUrl: "http://127.0.0.1:8787",
+  account,
+  budgetUsd: "0.20",
+  rail: "gateway"
+})
+
+// Replace these with the reviewed listing's exact lower-case service segment,
+// skill ID and actual schema-valid input; `seller` here is not a wallet address.
+const request = { seller: "reviewed-service", skillId: "reviewed-skill", input: { field: "reviewed-value" } }
+const quote = await session.quote(request) // no signing or issued-budget debit
+const out = await session.call({ ...request, maxAmountAtomic: parsePrice("$0.01") })
+// call probes the actual input afresh; the earlier quote is not purchase authority.
+const status = await session.status()
+const closed = await session.close() // reached only after success, never in finally
+```
+
+The Promise facade accepts optional `{ signal: AbortSignal }` on open, quote,
+call, status and close. `openSession` exposes the same methods as Effects. Use
+`out.fencedResult` for model context and `out.result` only as untrusted structured
+data. Keep the private handle in memory; no serialization/resume token is exposed.
+
+Origin, account, chain, rail, budget, inputs and signer authority are captured and
+checked before signing. Direct payees must match the listing; EIP splitter ownership
+and fee are trusted hub-handshake assertions, not independent SDK chain reads.
+Session routes require both private session headers, with the job capability for
+results; the SDK handles them. ENS-by-name and sandbox hire are not session APIs.
+
+`status` separates hub `spentAtomic`/`heldAtomic`/`remainingAtomic` from local
+`localIssuedAtomic`/`localConfirmedAtomic`/`localExposureAtomic`. Neither is wallet
+USDC or Gateway available credit. Intentional calls issue once; repeated evaluation
+of one Effect is refused. `BuyerSessionFailure` preserves fixed `code`, `phase`
+(`unsigned`, `issued`, `mutation-uncertain`) and `authorizedAmountAtomic` fields.
+A timeout after signing can retain exposure even if no result arrived. Do not
+automatically retry, reopen, fund or close on error. If a close reply is lost, use
+the same handle's read-only `status()`; do not send a second close.
+
+For MCP, the equivalent explicit tool arguments are:
+
+```jsonc
+{"name":"arcade_open_session","arguments":{"budgetUsd":"0.20","rail":"gateway"}}
+{"name":"arcade_quote","arguments":{"skillId":"reviewed-skill","input":{"field":"reviewed-value"}}}
+{"name":"arcade_call_skill","arguments":{"skillId":"reviewed-skill","input":{"field":"reviewed-value"},"maxAmountUsd":0.01}}
+{"name":"arcade_budget","arguments":{}}
+{"name":"arcade_close_session","arguments":{}}
+```
+
+One active session is held per MCP process. Queued work cannot silently switch
+from an old session to a new session or an ordinary purchase. The close tool may
+inspect its previously uncertain close; it does not resend it. Active quotes use
+both private headers and the actual input; unavailable evidence has no catalogue-
+price fallback. Closing neither refunds issued exposure nor withdraws Gateway funds.
+
+[Explicit CLI/funding instructions](./sessions.md) cover `session`, `gateway-balance`,
+`gateway-deposit`, `gateway-withdraw`, `gateway-reconcile` and `gateway-finalize`.
+Funding needs separate amount/gas/fee/height authority and fresh journal ownership;
+no session method tops up automatically. Current deposit credit attribution stays
+pending and the observed Minter identity mismatch refuses withdrawal. Arc Gateway
+is pinned to testnet; mainnet remains pending and owner-only.
+
+[F12 evidence](./evidence/m6-gateway.md) is offline PASS with actual local runner
+execution: twenty calls at 10000 atomic, twenty distinct transfer UUIDs, not one
+mined batch. `fundsMoved:false`, liveEvidence:NOT_RUN; the live entry is unimplemented.
+The consumed F1 live proof remains separate and does not authorize a replay.
 
 ### The double-payment guard
 
@@ -103,10 +200,8 @@ That is not an attack on their own run. It is an attack on you.
 So every result comes back two ways:
 
 ```ts
-const r = yield* callSkill({ ... })
-
-r.result        // parse this in code
-r.fencedResult  // paste this into a prompt
+out.result        // parse this in code; `out` is returned by either SDK example
+out.fencedResult  // use this fenced form in model context
 ```
 
 `fencedResult` wraps the output in a per-call random delimiter with an explicit statement that the contents are third-party data, not instruction. It is computed for **every** call rather than offered as an opt-in helper, because a safety measure each caller has to remember only protects the callers who did not need it.
@@ -119,7 +214,12 @@ Full analysis, including what this does *not* protect against, is in [`threat-mo
 
 ## What you pay for
 
-Only successful, schema-valid, non-refused output. Every other outcome — timeout, engine refusal, bounds breach, empty result, runner death — leaves your authorization **unbroadcast**. Your balance is untouched and you still get a receipt explaining why.
+Settlement is attempted only after successful, schema-valid, non-refused output.
+An observed timeout, refusal, bounds breach or runner failure before settlement
+prevents that attempt. A transport timeout or lost settlement acknowledgement is
+different: the paid outcome can remain unknown. An unsettled receipt is not an
+independent balance proof, and issued authorizations are not revoked by a failed
+response. Preserve evidence and reconcile instead of automatically paying again.
 
 That receipt is worth keeping: it's what lets you rate the listing.
 
@@ -127,10 +227,17 @@ That receipt is worth keeping: it's what lets you rate the listing.
 {
   "price": "$0.25", "sellerShare": "$0.2375", "fee": "$0.0125",
   "settled": true, "reason": "ok",
-  "settleTx": "0x…",       // opens on testnet.arcscan.app
+  "rail": "eip3009", "network": "eip155:5042002",
+  "settleRefKind": "onchain",
+  "settleTx": "0x…",       // abbreviated here; only a nonzero full hash can link
   "latencyMs": 41203
 }
 ```
+
+Only kind-qualified, settled EIP-3009 references on a ready matching network get
+inspection links. Gateway transfer UUIDs and simulated TestRail references never
+become mined transaction links. Public feeds show a boolean `session` marker, not
+the private ID. Session membership is not inherited by seller-funded child hires.
 
 ## Rating a call
 

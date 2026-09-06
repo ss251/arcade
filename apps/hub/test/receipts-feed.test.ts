@@ -51,6 +51,7 @@ describe("publicReceipt", () => {
     const pub = publicReceipt(Receipt.make({ ...receipt, sessionId }))
     expect(JSON.stringify(pub)).not.toContain(sessionId)
     expect(pub).not.toHaveProperty("sessionId")
+    expect(pub).toHaveProperty("session", true)
     expect(pub).toMatchObject({ skillId: "parent", rail: "test", network: "eip155:5042002", priceAtomic: "250000" })
   })
 
@@ -67,7 +68,7 @@ describe("publicReceipt", () => {
     expect(pub).not.toHaveProperty("authorizationNonce")
   })
 
-  it("keeps the tree shape a public reader needs: skillId, price, settled, tx, explorer", () => {
+  it("keeps tree shape and opaque simulated references without inventing explorer links", () => {
     const pub = publicReceipt(receipt)
     expect(pub.treeCeilingAtomic).toBe("50000")
     expect(pub.treeCommittedAtomic).toBe("10000")
@@ -77,17 +78,17 @@ describe("publicReceipt", () => {
         priceAtomic: "10000",
         settled: true,
         settleTx: "0xchildtx",
-        explorer: expect.stringContaining("0xchildtx")
+        explorer: null
       }
     ])
   })
 
-  it("stringifies the top-level atomic fields and still computes price/explorer", () => {
+  it("stringifies atomic fields but does not link a simulated malformed reference", () => {
     const pub = publicReceipt(receipt)
     expect(pub.priceAtomic).toBe("250000")
     expect(pub.sellerAtomic).toBe("237500")
     expect(pub.feeAtomic).toBe("12500")
-    expect(pub.explorer).toContain("0xdeadbeef")
+    expect(pub.explorer).toBeNull()
   })
 
   it("omits children/treeCeilingAtomic/treeCommittedAtomic when the receipt has none (a plain child receipt)", () => {
@@ -117,5 +118,89 @@ describe("publicReceipt", () => {
     expect(pub).not.toHaveProperty("treeCeilingAtomic")
     expect(pub).not.toHaveProperty("treeCommittedAtomic")
     expect(pub).not.toHaveProperty("jobId")
+  })
+
+  it("preserves legacy EIP root and child reference inspection on the recorded network", () => {
+    const tx = `0x${"A1".repeat(32)}`, childTx = `0x${"b2".repeat(32)}`
+    const pub = publicReceipt(Receipt.make({ ...receipt, rail: "eip3009", settleTx: tx,
+      children: [ReceiptChild.make({ ...receipt.children![0]!, settleTx: childTx })] }))
+    expect(pub.explorer).toBe(`https://testnet.arcscan.app/tx/${tx}`)
+    expect(pub.children?.[0]?.explorer).toBe(`https://testnet.arcscan.app/tx/${childTx}`)
+  })
+
+  it.each(["00000000-0000-4000-8000-000000000001", `0x${"a".repeat(64)}`])(
+    "keeps a Gateway transfer reference opaque: %s", settleTx => {
+      const pub = publicReceipt(Receipt.make({ ...receipt, rail: "gateway", settleRefKind: "gateway-transfer", settleTx }))
+      expect(pub.explorer).toBeNull()
+      expect(pub.settleTx).toBe(settleTx)
+      expect(pub.children?.[0]?.explorer).toBeNull()
+    })
+
+  it("does not let a released root erase a separately settled EIP child reference", () => {
+    const childTx = `0x${"b".repeat(64)}`
+    const pub = publicReceipt(Receipt.make({ ...receipt, rail: "eip3009", settled: false, settleTx: `0x${"a".repeat(64)}`,
+      children: [ReceiptChild.make({ ...receipt.children![0]!, settleTx: childTx })] }))
+    expect(pub.explorer).toBeNull()
+    expect(pub.children?.[0]?.explorer).toBe(`https://testnet.arcscan.app/tx/${childTx}`)
+  })
+
+  it("scrubs the pipeline child-job fallback alias without changing monetary evidence", () => {
+    const pub = publicReceipt(Receipt.make({ ...receipt,
+      children: [ReceiptChild.make({ ...receipt.children![0]!, skillId: CHILD_JOB_ID })] }))
+    expect(pub.children?.[0]).toMatchObject({ skillId: "unknown-skill", priceAtomic: "10000", settled: true })
+    expect(JSON.stringify(pub)).not.toContain(CHILD_JOB_ID)
+  })
+
+  it.each([undefined, `ses_${"A".repeat(32)}`, `ses_${"a".repeat(31)}`, `ses_${"a".repeat(32)}\n`])(
+    "overwrites forged public session provenance when the private ID is not canonical", sessionId => {
+      const raw = Receipt.make({ ...receipt, ...(sessionId === undefined ? {} : { sessionId }) })
+      const pub = publicReceipt(Object.assign(raw, { session: true }))
+      expect(pub).toHaveProperty("session", false)
+      expect(pub).not.toHaveProperty("sessionId")
+      expect(pub.children?.[0]).not.toHaveProperty("session")
+    })
+
+  it("preserves canary and session provenance independently without exposing the session ID", () => {
+    const sessionId = `ses_${"a".repeat(32)}`
+    const pub = publicReceipt(Receipt.make({ ...receipt, canary: true, settled: false, sessionId }))
+    expect(pub).toMatchObject({ canary: true, session: true, settled: false })
+    expect(JSON.stringify(pub)).not.toContain(sessionId)
+  })
+
+  it.each([undefined, "gateway-batch"] as const)("keeps a present ineligible kind from becoming eligible legacy absence", settleRefKind => {
+    const raw = Receipt.make({ ...receipt, rail: "eip3009", settleTx: `0x${"a".repeat(64)}`, settleRefKind })
+    const pub = publicReceipt(raw)
+    expect(Object.hasOwn(raw, "settleRefKind")).toBe(true)
+    expect(pub).toHaveProperty("settleRefKind", "unrecognized")
+    expect(pub.explorer).toBeNull()
+    expect(JSON.parse(JSON.stringify(pub))).toHaveProperty("settleRefKind", "unrecognized")
+  })
+
+  it("preserves true legacy kind absence in public JSON", () => {
+    const pub = publicReceipt(receipt)
+    expect(pub).not.toHaveProperty("settleRefKind")
+  })
+
+  it.each(["onchain", "gateway-transfer", "test"] as const)("retains the safe present reference kind %s", settleRefKind => {
+    const pub = publicReceipt(Receipt.make({ ...receipt, settleRefKind }))
+    expect(pub).toHaveProperty("settleRefKind", settleRefKind)
+  })
+
+  it.each(["unknown-kind", null, { privateDiagnostic: "do-not-project-fixture" }])(
+    "normalizes a malformed runtime kind without retaining its private value", settleRefKind => {
+      const pub = publicReceipt(Object.assign(Receipt.make({ ...receipt, rail: "eip3009", settleTx: `0x${"a".repeat(64)}` }), { settleRefKind }))
+      expect(pub.explorer).toBeNull()
+      expect(pub).toHaveProperty("settleRefKind", "unrecognized")
+      expect(JSON.stringify(pub)).not.toContain("do-not-project-fixture")
+      expect(JSON.stringify(pub)).not.toContain("unknown-kind")
+    })
+
+  it("does not mutate the trusted root or compact child records", () => {
+    const child = Object.freeze(ReceiptChild.make({ ...receipt.children![0]! }))
+    const raw = Object.freeze(Receipt.make({ ...receipt, children: [child], sessionId: `ses_${"a".repeat(32)}` }))
+    expect(() => publicReceipt(raw)).not.toThrow()
+    expect(raw).not.toHaveProperty("session")
+    expect(child.skillId).toBe("child")
+    expect(child).not.toHaveProperty("explorer")
   })
 })

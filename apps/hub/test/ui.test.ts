@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { Receipt } from "@arcade/core"
+import { Receipt, ReceiptChild } from "@arcade/core"
 import { Schema } from "effect"
 import { PublicListing } from "@arcade/core"
-import { agoText, payTestText, renderIndex, renderListingPage, renderListingRows, renderReceiptRows, type ListingView, type PageData } from "../src/ui.ts"
+import { agoText, payTestText, renderIndex, renderListingPage, renderListingRows, renderMeta, renderReceiptRows, type ListingView, type PageData } from "../src/ui.ts"
 
 /**
  * The page's argument is that its figures are EVIDENCE, not claims — "every statistic is
@@ -127,11 +127,11 @@ describe("agoText", () => {
 })
 
 describe("marketplace page — evidence claims", () => {
-  it("asserts on-chain provenance on a real rail", () => {
+  it("does not relabel historical simulated rows from the current real default", () => {
     const html = renderIndex(page({ rail: "eip3009" }))
-    expect(html).toContain(EVIDENCE_CLAIM)
-    expect(html).toContain(ONCHAIN_ROW_CLAIM)
-    expect(html).not.toContain('class="sandbox"')
+    expect(html).not.toContain(EVIDENCE_CLAIM)
+    expect(html).not.toContain(ONCHAIN_ROW_CLAIM)
+    expect(html).toContain("TestRail rows are simulated")
   })
 
   it("withholds both on-chain claims on the simulated rail", () => {
@@ -143,23 +143,159 @@ describe("marketplace page — evidence claims", () => {
   it("says what the sandbox is, rather than staying silent about it", () => {
     const html = renderIndex(page({ rail: "test" }))
     expect(html).toContain('class="sandbox"')
-    expect(html).toContain("No USDC")
-    expect(html).toContain("not evidence that it settled")
+    expect(html).toContain("No USDC moves for TestRail rows")
+    expect(html).toContain("not proof of a mined settlement")
   })
 
-  it("keeps the settle-on-success guarantee on both rails — it is rail-independent", () => {
-    // This one is TRUE on the test rail: a refusal is never charged regardless of how
-    // settlement is performed. Withholding it too would understate the product.
-    for (const rail of ["eip3009", "test"]) {
-      expect(renderIndex(page({ rail }))).toContain("Failed calls are never charged")
+  it("distinguishes validation refusal from an unknown paid outcome on every default rail", () => {
+    for (const rail of ["eip3009", "test", "gateway"]) {
+      const html = renderIndex(page({ rail }))
+      expect(html).not.toContain("Failed calls are never charged")
+      expect(html).not.toContain("the payer keeps")
+      expect(html).toContain("Settlement is attempted only after output validation")
+      expect(html).toContain("An unknown paid outcome is not proof of no charge")
+      expect(html).toContain("do not retry a payment automatically")
     }
+  })
+
+  it("does not relabel EIP and Gateway history when the default is TestRail", () => {
+    const html = renderIndex(page({ rail: "test", receipts: [
+      receipt({ rail: "eip3009", settleTx: `0x${"a".repeat(64)}` }),
+      receipt({ rail: "gateway", settleRefKind: "gateway-transfer", settleTx: "00000000-0000-4000-8000-000000000001" })
+    ] }))
+    expect(html).not.toContain("no row below is a transaction")
+    expect(html).not.toContain("no transaction below exists")
+    expect(html).toContain("Gateway transfer references are not mined batch proof")
+    expect(html).toContain("Reference links are for inspection")
+    expect(html).toContain("<th>reference</th>")
   })
 
   it("still discloses a treasury-is-seller pilot inside the sandbox copy", () => {
     // The two disclosures compose; neither branch may swallow the other.
     const html = renderIndex(page({ rail: "test", treasuryIsSeller: true }))
     expect(html).toContain("the treasury is the operator")
-    expect(html).toContain("simulated settlement")
+    expect(html).toContain("TestRail rows are simulated")
+  })
+})
+
+describe("receipt references and private session provenance", () => {
+  const hash = `0x${"a".repeat(64)}`
+  const uuid = "00000000-0000-4000-8000-000000000001"
+  const child = (over: Partial<ReceiptChild> = {}) => new ReceiptChild({
+    jobId: "job_private_child", skillId: "child-skill", priceAtomic: 1000n,
+    settled: true, settleTx: hash, ...over
+  })
+
+  it.each([undefined, "onchain"] as const)("links only eligible EIP references with kind %s", (kind) => {
+    const html = renderReceiptRows([receipt({ rail: "eip3009", settleTx: hash, ...(kind === undefined ? {} : { settleRefKind: kind }) })])
+    expect(html).toContain(`href="https://testnet.arcscan.app/tx/${hash}"`)
+    expect(html).toContain('rel="noreferrer"')
+    expect(html).toContain("$0.01")
+  })
+
+  it.each([
+    { rail: "gateway", settleRefKind: "gateway-transfer", settleTx: uuid },
+    { rail: "gateway", settleRefKind: "onchain", settleTx: hash },
+    { rail: "test", settleTx: hash },
+    { rail: "eip3009", settleRefKind: "gateway-transfer", settleTx: hash },
+    { rail: "eip3009", settleRefKind: "gateway-batch", settleTx: hash },
+    { rail: "eip3009", settleRefKind: "test", settleTx: hash },
+    { rail: "eip3009", network: "eip155:1", settleTx: hash },
+    { rail: "eip3009", network: "arc-mainnet", settleTx: hash },
+    { rail: "eip3009", settleTx: `0x${"0".repeat(64)}` },
+    { rail: "eip3009", settleTx: "0xmalformed" },
+    { rail: "eip3009", settled: false, settleTx: hash }
+  ] satisfies Partial<Receipt>[])("does not manufacture explorer proof for %j", (over) => {
+    expect(renderReceiptRows([receipt(over)])).not.toContain("href=")
+  })
+
+  it("keeps a full escaped Gateway reference and labels simulated references", () => {
+    const html = renderReceiptRows([receipt({ rail: "gateway", settleRefKind: "gateway-transfer", settleTx: uuid })])
+    expect(html).toContain(`Gateway transfer · ${uuid}`)
+    const hostile = renderReceiptRows([receipt({ rail: "gateway", settleTx: '<img src=x onerror="alert(1)">' })])
+    expect(hostile).not.toContain("<img")
+    expect(hostile).not.toContain("href=")
+    expect(hostile).toContain("&lt;img")
+    expect(renderReceiptRows([receipt()])).toContain("simulated")
+  })
+
+  it("uses root provenance but the settled child's own state and reference", () => {
+    const html = renderReceiptRows([receipt({ rail: "eip3009", settled: false, settleTx: undefined,
+      children: [child()] })])
+    expect(html).toContain(`href="https://testnet.arcscan.app/tx/${hash}"`)
+    expect(html).toContain('class="child"')
+    for (const rail of ["test", "gateway"] as const) {
+      expect(renderReceiptRows([receipt({ rail, children: [child()] })])).not.toContain("href=")
+    }
+    expect(renderReceiptRows([receipt({ rail: "eip3009", settleTx: undefined,
+      children: [child({ settled: false })] })])).not.toContain("href=")
+  })
+
+  it("scrubs a child skill alias that contains the private job handle", () => {
+    const html = renderReceiptRows([receipt({ children: [child({ skillId: "job_private_child" })] })])
+    expect(html).not.toContain("job_private_child")
+    expect(html).toContain("unknown-skill")
+  })
+
+  it("emits only the session word alongside canary, including released receipts", () => {
+    const sessionId = `ses_${"a".repeat(32)}`
+    const html = renderReceiptRows([receipt({ sessionId, canary: true, settled: false, children: [child()] })])
+    expect(html).toContain('<span class="unrated">session</span>')
+    expect(html).toContain('<span class="unrated">canary</span>')
+    expect(html).not.toContain(sessionId)
+    expect(html.match(/>session<\/span>/g)).toHaveLength(1)
+  })
+
+  it.each([undefined, "ses_abc", `ses_${"A".repeat(32)}`, `ses_${"a".repeat(32)}\n`])("does not forge a session marker for %j", (sessionId) => {
+    const r = { ...receipt({ sessionId }), session: true } as Receipt
+    expect(renderReceiptRows([r])).not.toContain('>session</span>')
+  })
+
+  it("uses the same reference heading on the listing detail", () => {
+    const html = renderListingPage(view(), [receipt()], { rail: "eip3009", network: "eip155:5042002", feeBps: 500 })
+    expect(html).toContain("<th>reference</th>")
+    expect(html).not.toContain("<th>tx</th>")
+  })
+
+  it("does not claim zero charge from a non-settled receipt after an unknown paid outcome", () => {
+    const html = renderReceiptRows([receipt({ rail: "eip3009", settled: false, reason: "SettleError", settleTx: undefined })])
+    expect(html).not.toContain("$0 charged")
+    expect(html).toContain('title="No settlement recorded; not a balance proof."')
+    expect(html).toContain("SettleError")
+  })
+
+  it.each([undefined, "unexpected", null])("does not turn a present invalid kind into legacy link authority: %j", (kind) => {
+    const malformed = { ...receipt({ rail: "eip3009", settleTx: hash }), settleRefKind: kind } as unknown as Receipt
+    expect(renderReceiptRows([malformed])).not.toContain("href=")
+  })
+})
+
+describe("receipt table scroll structure", () => {
+  it.each(["index", "detail"] as const)("provides contained, keyboard-accessible scrolling on the %s page", (surface) => {
+    const html = surface === "index" ? renderIndex(page()) : renderListingPage(view(), [receipt()],
+      { rail: "eip3009", network: "eip155:5042002", feeBps: 500 })
+    // String assertions pin the CSS/accessible structure, not browser layout.
+    expect(html).toMatch(/\.tape\{[^}]*overflow-x:auto/)
+    expect(html).toContain(".tape table{min-width:640px}")
+    expect(html).toContain('<div class="tape" role="region" aria-label="Receipts (scroll horizontally for references)" tabindex="0">')
+    expect(html).toContain(".tape:focus-visible")
+  })
+})
+
+describe("mixed-receipt fee presentation", () => {
+  const gateway = receipt({ rail: "gateway", settleRefKind: "gateway-transfer",
+    settleTx: "00000000-0000-4000-8000-000000000001", feeBps: 0, feeAtomic: 0n, sellerAtomic: 10000n })
+  it.each(["index", "detail"] as const)("does not apply the configured percentage to every %s receipt", (surface) => {
+    const html = surface === "index" ? renderIndex(page({ receipts: [gateway] })) : renderListingPage(view(), [gateway],
+      { rail: "eip3009", network: "eip155:5042002", feeBps: 500 })
+    expect(html).not.toContain('<th class="num">fee (5%)</th>')
+    expect(html).toContain('<th class="num">fee</th>')
+    expect(html).toContain('<td class="num">$0.00</td>')
+  })
+  it("labels the configured default consistently in initial and refreshed metadata", () => {
+    for (const html of [renderIndex(page({ receipts: [gateway] })), renderMeta(page({ receipts: [gateway] }))]) {
+      expect(html).toContain("default fee 5%")
+    }
   })
 })
 

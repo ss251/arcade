@@ -1,4 +1,8 @@
-import { explorerTxUrl, formatPrice, type Receipt } from "@arcade/core"
+import { formatPrice, type Receipt } from "@arcade/core"
+import { hasSessionMarker, receiptChildExplorer, receiptExplorer } from "./receipt-reference.ts"
+
+const publicKind = (value: unknown): "onchain" | "gateway-transfer" | "test" | "unrecognized" =>
+  value === "onchain" || value === "gateway-transfer" || value === "test" ? value : "unrecognized"
 
 /**
  * Shapes a `Receipt` for the PUBLIC `/receipts` feed.
@@ -35,13 +39,17 @@ export const publicReceipt = (r: Receipt) => {
   } = r
   return {
     ...rest,
+    // Set these after the legacy rest projection: an extra cannot forge provenance,
+    // and JSON must not erase a present invalid kind into eligible legacy absence.
+    session: hasSessionMarker(r),
+    ...(Object.hasOwn(r, "settleRefKind") ? { settleRefKind: publicKind(r.settleRefKind) } : {}),
     priceAtomic: r.priceAtomic.toString(),
     sellerAtomic: r.sellerAtomic.toString(),
     feeAtomic: r.feeAtomic.toString(),
     price: formatPrice(r.priceAtomic),
     sellerShare: formatPrice(r.sellerAtomic),
     fee: formatPrice(r.feeAtomic),
-    explorer: r.settleTx === undefined ? null : explorerTxUrl(r.settleTx),
+    explorer: receiptExplorer(r),
     ...(r.treeCeilingAtomic === undefined ? {} : { treeCeilingAtomic: r.treeCeilingAtomic.toString() }),
     ...(r.treeCommittedAtomic === undefined ? {} : { treeCommittedAtomic: r.treeCommittedAtomic.toString() }),
     ...(children === undefined
@@ -50,11 +58,11 @@ export const publicReceipt = (r: Receipt) => {
           // No `jobId` here either — a public reader gets the shape of the tree (which
           // skill, how much, whether it settled) and nothing that identifies the call.
           children: children.map((c) => ({
-            skillId: c.skillId,
+            skillId: c.skillId === c.jobId ? "unknown-skill" : c.skillId,
             priceAtomic: c.priceAtomic.toString(),
             settled: c.settled,
             ...(c.settleTx === undefined ? {} : { settleTx: c.settleTx }),
-            explorer: c.settleTx === undefined ? null : explorerTxUrl(c.settleTx)
+            explorer: receiptChildExplorer(r, c)
           }))
         })
   }

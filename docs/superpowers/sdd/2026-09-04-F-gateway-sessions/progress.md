@@ -481,3 +481,27 @@ probe guard; do not sum them again or claim all529 are public-checkout coverage.
 All six executable/source hashes and original115-line F1 evidence prefix match.
 Parent read final author and independent reviews; header correction CLEAN.
 Final historical-copy audit and atomic F12 commit follow; no F14 source yet.
+
+## September 6 — F14 final local checkpoint
+
+F12 committed `fb26382`; its final publication audit was CLEAN (eleven exact
+copies, ten locator substitutions, fifteen public files and106 resolving local
+links). F14 now implements explicit eligible-chain references, private-ID-free
+session provenance, honest mixed-rail/fee/failure text and current SDK/MCP docs.
+The [brief](task-14-brief.md) indexes seven exact historical execution copies.
+
+Initial helper/feed14Reds and UI21Reds are distinct from a new-module loader
+failure; the separate zero-charge Red is preserved. Parent rendered mobile QA
+found actual423px overflow at390px; the corrected page remains390px with keyboard
+scroll inside its receipt region. A mixed-rail fee heading correction preserves
+recorded values. Both fixes have genuine collected Reds and independent54UI/
+exact3-root strict0 correction checks. Browser evidence is parent-attributed;
+all owned browsers/previews stopped and both ports returned ECONNREFUSED.
+
+The sole frozen gate starting06:48:16IST passed2,748Vitest/124files,
+529Bun/41files/4,681assertions, root/web strict and client/SSR production builds.
+Ignored historical fixtures contribute to Bun totals; do not add them again or
+label all529 public-checkout coverage. Ten source hashes match; source review
+CLEAN. Final public-copy audit and atomic F14 commit are next. Full-F four gates
+including Forge, fast-forward merge and all four main gates remain separate.
+No F12 live acceptance, mined batch, new spending, approval replay or push.

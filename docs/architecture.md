@@ -12,8 +12,8 @@ verify payment  →  execute in sandbox  →  validate output  →  settle
 
 This ordering is the product's core guarantee in both directions:
 
-- **The buyer never pays for a failure.** Settlement happens only after the output passes. A refusal, timeout, bounds breach, empty result or schema mismatch means the signed authorization is simply never broadcast. There is no refund flow because there is nothing to refund.
-- **The seller never works unpaid.** Verification — signature, funds, validity window, replay — happens *before* the job is dispatched.
+- **Validation precedes settlement.** An observed refusal, timeout, bounds breach, empty result or schema mismatch before settlement prevents an attempt. A timeout or lost acknowledgement after issuing payment is uncertain, not proof of no charge; no automatic payment retry is safe.
+- **Verification precedes work.** Signature, funds, validity-window and replay checks happen before dispatch. Verification is not escrow or a guarantee that a later settlement succeeds.
 
 ### Why this rules out Circle's Express middleware
 
@@ -43,16 +43,48 @@ That decision is why the hub is `Bun.serve` + Effect rather than Express, and it
 | layer | what |
 |---|---|
 | `EIP3009Live` | `transferWithAuthorization` on Arc USDC. Proven on-chain. Buyer signs offline (~5ms, zero gas); the facilitator broadcasts and pays ~0.00218 USDC. |
-| `GatewayLive` | Circle Gateway Nanopayments. Gas-free both sides, $0.000001 minimum, batched settlement inside a TEE. Arc is Circle's canonical example chain. |
-| `RailTest` | In-memory, same semantics, real balance movement. Lets the entire settle pipeline be tested with no chain, faucet or network. |
+| `GatewayLive` | Pinned Arc-testnet Gateway authorization, local binding and signature checks, bounded facilitator verify/settle. Accepted per-call evidence is a Gateway transfer UUID, not a mined transaction or batch. |
+| `RailTest` | Simulated in-memory balances and explicit test references; no real funds or mining. |
 
-All three are held to one conformance suite (`packages/payments/test/rail.conformance.test.ts`), so the non-default rail cannot rot, and switching is a wiring change the compiler checks.
+All three share a conformance suite (`packages/payments/test/rail.conformance.test.ts`). The hub registry preserves the ordinary selected default (normally EIP-3009); a supported session chooses its rail explicitly. A built registry is not proof that an external provider currently supports a network. The pinned mainnet manifest is pending and fails closed; Gateway mainnet is not an automatic fallback.
+
+### Durable sessions and evidence categories
+
+F5's SQLite authority atomically admits a queued root and reserves its amount,
+then atomically commits its terminal job/receipt and spent accounting. A one-shot
+settlement barrier and nonce tombstones prevent local replay. Ambiguous execution
+or payment retains held authority; it is not crash-proof remote-acceptance proof.
+F6 delegates this authority without a second ledger. The F7/F8 routes require
+private session headers, and result retrieval validates one persisted job/receipt
+snapshot rather than combining unbound global reads.
+
+The F9 buyer captures origin, account, chain, budget and signer authority. Intentional
+calls issue once; repeated evaluation cannot pay again. Hub spent/held/remaining
+and buyer issued/confirmed/exposure are distinct from wallet USDC or Gateway
+available/pending credit. Close is neither withdrawal nor authorization revocation.
+Session membership covers admitted roots only; seller-funded child hires remain
+independent, sessionless calls. No session capability enters a hired sandbox.
+
+Receipt presentation uses each receipt's network and kind, not the process default.
+Only settled EIP-3009 with a ready agreeing manifest, nonzero full hash and legacy
+absent/onchain kind gets an inspection link. Children inherit root provenance but
+use their own settled/reference fields. Gateway UUIDs and TestRail references never
+become explorer links. Public session provenance is a derived boolean; private
+session IDs and fallback job-handle aliases remain excluded.
+
+[F12 offline evidence](./evidence/m6-gateway.md) used actual SDK, hub, SQLite,
+Broker, WebSocket and runner execution with finite external fixtures: twenty
+calls and twenty UUIDs, not one mined batch; fundsMoved:false, liveEvidence:NOT_RUN.
+The live entry is unimplemented and F13 fallback was not triggered. The consumed
+F1 live operation remains separately dated. [Funding](./sessions.md) is explicit
+and separately journaled: deposit credit attribution is still pending, and the
+current Minter identity mismatch refuses withdrawal before signing.
 
 ## Arc specifics that shape the code
 
 - **USDC is both the native gas token (18 decimals) and an ERC-20 (6 decimals) at the same address** (`0x3600…0000`). Every price, payment and receipt in this codebase is 6-decimal atomic units; `packages/core/src/money.ts` speaks nothing else, and gas math is kept separate.
 - **The public RPC rate-limits.** viem's default receipt polling triggers `-32011 request limit reached`. We poll one receipt per tick with exponential backoff and never use `waitForTransactionReceipt`.
-- **Gateway requires ≥7 days of authorization validity**, so all rails advertise the same `maxTimeoutSeconds` (604900) and a buyer can sign once for either.
+- **The pinned Gateway signer uses a 604900-second expiry and ten-minute backdate**, matched to the reviewed SDK. This is a local interoperability policy, not proof that every future provider requires that window or accepts delayed submissions.
 - **Circle's spending policies are mainnet-only**, so buyer-side caps (`--max-amount`) are ours.
 
 ## Discovery and the buyer surface
@@ -67,7 +99,14 @@ Three documents, all generated from the live listing set so none can advertise a
 
 `accepts[]` in the OpenAPI document is derived from the `PaymentRequirements` schema the rail itself constructs, not hand-written — the first live probe caught a hand-written version documenting `maxAmountRequired`, an x402 v1 field name this rail does not emit.
 
-The buyer side is an **MCP server** (`packages/buyer/src/mcp.ts`, `bunx arcade-mcp`): list → describe → quote → call, over stdio because the process holds a spending key. Its tool arguments are Effect Schemas, with `JSONSchema.make` producing what the agent reads and `Schema.decodeUnknownEither` enforcing what its call is held to, so the advertised contract and the runtime check cannot disagree. Two spending ceilings and the result-fencing rule are covered in [`threat-model.md`](./threat-model.md) T-SPEND-001 and T-EXEC-003.
+The buyer side has an **eight-tool MCP server** (`packages/buyer/src/mcp.ts`): list,
+describe, quote, call, receipts, budget, open session and close session. Effect
+Schemas describe and validate arguments. Its serialized queue captures the intended
+lane/session handle, refusing stale work rather than rebinding it to a new session
+or ordinary purchase. Per-call, process and hub ceilings stack; close/release never
+erase issued exposure. Active-session quotes use the captured actual-input path
+without signing; calls probe afresh. ENS-by-name and sandbox hire are not session
+routes. See the [buyer guide](./buyer-guide.md#sessions) for actual SDK/MCP shapes.
 
 ## The chain
 
@@ -88,4 +127,4 @@ Why it matters structurally: an API never buys another API, so an API marketplac
 ## Deviations from the plan
 
 - **`Bun.serve` instead of `@effect/platform` HttpApi.** Runners need a real websocket server; Bun provides it natively with fewer moving parts, and all logic remains Effect. OpenAPI is still derived from the same Effect Schemas (`JSONSchema.make` at `/openapi.json`), so the discovery surface cannot drift from the domain model.
-- **Server-rendered HTML instead of the React SPA at commit 1.** `apps/web` (TanStack Start) lands Jul 29; until then `apps/hub/src/ui.ts` is the real surface, showing live listings and the receipt feed.
+- **Server-rendered receipt fallback.** `apps/hub/src/ui.ts` remains the self-contained hub surface alongside `apps/web` (TanStack Start). Later web integration must preserve public field exclusions, explicit reference kinds and the boolean-only session marker.

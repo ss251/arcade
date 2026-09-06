@@ -47,7 +47,7 @@ The claim that seller code never leaves the seller's machine is unfalsifiable on
 | execution | on the MacBook — `[runner] job job_57bed392… succeeded` |
 | secrecy assertions | hub log carries no engine/entry/egress · hub API exposes no private field |
 
-Re-runnable evidence: `bun run scripts/g1-live-settle.ts` and `scripts/e2e-two-machine.sh`.
+Historical evidence scripts: `scripts/g1-live-settle.ts` and `scripts/e2e-two-machine.sh`. Their funded operations require separate reviewed authority; these records are not permission to replay them.
 
 ---
 
@@ -56,20 +56,20 @@ Re-runnable evidence: `bun run scripts/g1-live-settle.ts` and `scripts/e2e-two-m
 ```bash
 bun install
 
-# 1. hub
-ARCADE_RAIL=eip3009 ARCADE_FACILITATOR_KEY=0x<funded-arc-testnet-key> bun run hub
+# 1. hub — provide the reviewed facilitator credential securely in this process's environment
+ARCADE_RAIL=eip3009 bun --no-env-file apps/hub/src/server.ts
 
 # 2. seller (any machine — it dials out, no open ports)
-bun run arcade init --hub http://<hub-host>:8787   # wallet + config + hub check, one command
+bun run arcade init --hub http://127.0.0.1:8787   # use an owned HTTPS origin for another machine
 bun run arcade status                              # identity, hub, skills, earnings
 bun run arcade start
 
-# 3. buyer
-ARCADE_BUYER_KEY=0x<testnet-key> bun run arcade-buy usdc-flow-check \
+# 3. buyer — provide the reviewed ARCADE_BUYER_KEY securely, not in this command
+bun --no-env-file packages/buyer/src/cli.ts usdc-flow-check --hub http://127.0.0.1:8787 \
   --input '{"address":"0xAeB742d58cc7F5CF656fCD9Beb07Bf0C1ACa6f5b"}' --max-amount 0.05
 ```
 
-Fund a testnet address at [faucet.circle.com](https://faucet.circle.com) (Arc Testnet, 20 USDC per address / 2h).
+Use only separately approved testnet identities and spending bounds. Wallet funds and Gateway credit are different; [explicit funding](docs/sessions.md) has separate journal, gas and identity gates. Never place private keys in source, command arguments, committed configuration or logs.
 
 See exactly what publishing would reveal — and what it wouldn't:
 
@@ -97,15 +97,35 @@ bun run arcade publish skills/usdc-flow-check
 4. Job is dispatched over websocket to the seller's runner; returns **202 + job_id** immediately, because real skills take 2s–7min.
 5. Runner executes in a sandbox with a scrubbed environment and hard bounds.
 6. Output is validated against the listing's declared `outputSchema`.
-7. **Only then** is the authorization settled on Arc.
+7. **Only then** is settlement attempted using the selected rail.
 
-If anything in 5–6 fails — refusal, timeout, bounds breach, empty or non-conforming output, runner death — the authorization is simply never broadcast. **That is the refund.** The buyer pays nothing and gets an honest unsettled receipt.
+An observed failure in steps 5–6 prevents a settlement attempt. A timeout or lost acknowledgement after signing or dispatch is different: it can leave payment uncertain. A failed response is not proof of no charge or revocation; preserve the original evidence and do not retry payment automatically.
+
+## Sessions and Gateway evidence
+
+Use `openSessionPromise({ hubUrl, account, budgetUsd: "0.20", rail: "gateway" })`
+from `@arcade/buyer`, then the captured handle's `quote`, `call`, `status` and
+`close`. `openSession` provides the same lifecycle as Effects. A session is a
+spending ceiling plus a selected rail—not escrow, prepaid credit or a discount.
+Each intentional call still signs once. Closing does not revoke authorizations,
+withdraw funds or reset local issued exposure. See the [SDK and MCP examples](docs/buyer-guide.md#sessions)
+and [explicit funding and session CLI](docs/sessions.md).
+
+[Gateway evidence](docs/evidence/m6-gateway.md) distinguishes the consumed F1 live
+operation from F12's **offline PASS**: twenty actual local runner executions,
+twenty distinct Gateway transfer UUIDs and a 200000-atomic session receipt.
+`fundsMoved:false`; live F12 is **NOT RUN** and its live entry is unimplemented.
+Twenty transfers are not one mined batch. F1 recipient pending-batch credit is
+not proof of available credit. The fallback track was not activated.
+
+The pinned Gateway configuration is Arc testnet only. Arc mainnet remains pending
+and refuses startup; enabling it is an owner-only review, not a rail fallback.
 
 ## Pricing and fees
 
 Sellers set a flat per-call price *and* hard work bounds (`maxTurns`, `maxTokens`, `maxToolCalls`, `timeoutSec`), so an open-ended agent run can't go margin-negative.
 
-The platform fee is **visible on every receipt**. It is accrued and swept rather than settled per call — two on-chain transactions would cost ~4.4% of a $0.10 call on this rail (measured: 0.00218 USDC per settlement). The sweep transaction hash is backfilled into every receipt it covers, so the take-rate stays individually auditable while being batched — the same trick Gateway itself uses.
+The platform fee is **visible on every receipt**. Ordinary EIP-3009 fee accrual/sweep records remain separately auditable. Session receipts are excluded from that legacy backfill; direct Gateway sessions have zero platform fee, while eligible EIP-3009 splitter sessions use the verified listing's bound fee. Neither fee batching nor a Gateway UUID proves that a particular Gateway batch mined.
 
 ## Agents hiring agents
 
@@ -150,7 +170,7 @@ Any agent that reads OpenAPI can find a skill, see its price *before* calling, a
 
 The document is standard OpenAPI 3.1 plus x402, and nothing proprietary: the payment challenge is documented as an ordinary `402` response, and everything the spec has no home for sits under a visibly-ours `x-arcade-` prefix.
 
-For agents there is also an **MCP server** — `bunx arcade-mcp`, six tools, list → describe → quote → call. It enforces a per-call ceiling *and* a cumulative session budget, both refusing before anything is signed, and it hands seller output to the model **fenced and labelled untrusted**, with the raw object in `structuredContent`. A buying agent acts on what it purchases, so a result is an injection vector aimed at the buyer; the safe path is the default one. See `packages/buyer/SKILL.md`, or `GET /skill.md` for a live catalogue generated from current listings.
+For agents there is also an **MCP server** — `bun --no-env-file packages/buyer/src/mcp.ts`, eight tools: list, describe, quote, call, receipts, budget, open session and close session. The per-call ceiling and process budget stack with the hub session ceiling; issued and uncertain exposure is not refunded by a failed response or close. Seller output is **fenced and labelled untrusted**, with the raw object in `structuredContent`. See the [buyer guide](docs/buyer-guide.md), or `GET /skill.md` for the live catalogue.
 
 One field is deliberate. `x-arcade-payment.settlement` is `on-validated-output`. x402 defines no failure semantics at all — its facilitator interface is verify, settle, supported, with no void, capture or refund — and no field anywhere by which a server can *declare* when it settles relative to delivering. Saying so costs two lines, and it is the difference between a courtesy and a contract.
 
@@ -166,23 +186,24 @@ One field is deliberate. `x-arcade-payment.settlement` is `on-validated-output`.
 | `skills/` | first-party listings |
 | `scripts/` | on-chain verification scripts, committed as evidence |
 
-Both payment rails are complete, conformance-tested `Layer`s of one `Rail` service — `ARCADE_RAIL=eip3009` (proven today) or `gateway` (Circle Nanopayments: gas-free, $0.000001 minimum). Choosing one is dependency injection, not a runtime branch, so neither path can silently rot.
+The conformance-tested rail registry keeps `ARCADE_RAIL=eip3009` as the ordinary default and lets a supported session select `gateway`, `eip3009` or simulated `test`. Registry availability is not independent provider support or settlement proof. Receipt links require a settled, kind-qualified EIP-3009 hash on the receipt's configured network; Gateway/Test references are never explorer transactions. Public session provenance is only a boolean marker, not the private session ID.
 
 ## Status
 
 | shipped | next |
 |---|---|
-| both rails + conformance suite · secrecy boundary + property tests · hub paywall/broker/settle · runner sandbox + engine adapters · buyer SDK/CLI · one-command onboarding · OpenAPI 3.1 discovery · MCP server + skill file · agents hiring agents · 633 tests | Gateway round-trip on Arc · web UI · container sandbox · ratings |
+| rail registry · durable hub sessions · captured buyer/MCP lifecycle · explicit funding runtime · controlled twenty-call offline evidence | live twenty-call session proof remains NOT RUN · Gateway credit attribution and withdrawal identity limits · mainnet owner review |
 
 ## Verify
 
 ```bash
-bun run test                                              # 633 tests (604 Vitest + 29 Bun)
-bun test packages/core/test/secrecy.property.test.ts      # the thesis
-bun test packages/payments/test/rail.conformance.test.ts  # all three rails agree
-bunx tsc --noEmit
-curl -s localhost:8787/listings/usdc-flow-check | jq 'has("engine")'   # must be false
-curl -s localhost:8787/openapi.json | jq '.paths | keys'               # one path per listing
+bun run test
+bun run test:vitest -- packages/core/test/secrecy.property.test.ts
+bun run test:vitest -- packages/payments/test/rail.conformance.test.ts
+bun run typecheck
+bun run web:build
+curl -s http://127.0.0.1:8787/listings/usdc-flow-check | jq 'has("engine")'   # must be false
+curl -s http://127.0.0.1:8787/openapi.json | jq '.paths | keys'               # one path per listing
 ```
 
 Built for the [Encode × Circle Programmable Money hackathon](https://www.encodeclub.com/programmes/arc-hackathon). Author: ss251.

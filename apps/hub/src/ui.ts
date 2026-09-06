@@ -1,6 +1,7 @@
 import { explorerTxUrl, formatPrice, type ObjectiveStats, type PublicListing, type Receipt, type ReceiptChild } from "@arcade/core"
 import type { ListingRecord, PayTest } from "./store.ts"
 import type { AgentEvidence } from "./erc8004.ts"
+import { hasSessionMarker, receiptChildExplorer, receiptExplorer } from "./receipt-reference.ts"
 
 /**
  * The public marketplace page — "settlement paper".
@@ -168,14 +169,20 @@ export const renderListingRows = (listings: ReadonlyArray<ListingView>): string 
     .join("")
 }
 
-/** A sub-hire under a root receipt — indented under its parent, in the same 7-column row. */
-const renderChildRow = (c: ReceiptChild): string => `
+/** A reference category is not a fresh observation of mining or available funds. */
+const renderReference = (rail: Receipt["rail"], reference: string | undefined, link: string | null): string => {
+  if (reference === undefined) return "—"
+  if (link !== null) return `<a href="${esc(link)}" target="_blank" rel="noreferrer">${esc(reference.slice(0, 10))}…</a>`
+  const label = rail === "gateway" ? "Gateway transfer" : rail === "test" ? "simulated" : "reference"
+  return `<span class="reference">${label} · ${esc(reference)}</span>`
+}
+
+/** A recorded sub-hire — no inherited session marker or public fallback job handle. */
+const renderChildRow = (root: Receipt, c: ReceiptChild): string => `
       <tr class="child">
-        <td colspan="7">↳ ${esc(c.skillId)} · ${esc(formatPrice(c.priceAtomic))} · ${
+        <td colspan="7">↳ ${esc(c.skillId === c.jobId ? "unknown-skill" : c.skillId)} · ${esc(formatPrice(c.priceAtomic))} · ${
           c.settled
-            ? c.settleTx === undefined
-              ? `<span class="settled">settled</span>`
-              : `<a href="${esc(explorerTxUrl(c.settleTx))}" target="_blank" rel="noreferrer">${esc(c.settleTx.slice(0, 10))}…</a>`
+            ? `<span class="settled">settled</span>${c.settleTx === undefined ? "" : ` · ${renderReference(root.rail, c.settleTx, receiptChildExplorer(root, c))}`}`
             : `<span class="unsettled">not settled</span>`
         }</td>
       </tr>`
@@ -190,8 +197,8 @@ export const renderReceiptRows = (receipts: ReadonlyArray<Receipt>, limit = 12):
     .map(
       (r) => `
       <tr>
-        <td class="skill">${esc(r.skillId)}${r.canary === true ? ' <span class="unrated">canary</span>' : ""}</td>
-        <td class="num">${r.settled ? esc(formatPrice(r.priceAtomic)) : `<span class="free">$0 charged</span>`}</td>
+        <td class="skill">${esc(r.skillId)}${r.canary === true ? ' <span class="unrated">canary</span>' : ""}${hasSessionMarker(r) ? ' <span class="unrated">session</span>' : ""}</td>
+        <td class="num">${r.settled ? esc(formatPrice(r.priceAtomic)) : `<span class="free" title="No settlement recorded; not a balance proof.">—</span>`}</td>
         <td class="num">${r.settled ? esc(formatPrice(r.sellerAtomic)) : "—"}</td>
         <td class="num">${r.settled ? esc(formatPrice(r.feeAtomic)) : "—"}</td>
         <td class="num">${esc(secs(r.latencyMs))}</td>
@@ -200,12 +207,8 @@ export const renderReceiptRows = (receipts: ReadonlyArray<Receipt>, limit = 12):
             ? `<span class="settled">settled</span>`
             : `<span class="unsettled">not settled — ${esc(r.reason ?? "unknown")}</span>`
         }</td>
-        <td>${
-          r.settleTx === undefined
-            ? "—"
-            : `<a href="${esc(explorerTxUrl(r.settleTx))}" target="_blank" rel="noreferrer">${esc(r.settleTx.slice(0, 10))}…</a>`
-        }</td>
-      </tr>${(r.children ?? []).map(renderChildRow).join("")}`
+        <td>${renderReference(r.rail, r.settleTx, receiptExplorer(r))}</td>
+      </tr>${(r.children ?? []).map((c) => renderChildRow(r, c)).join("")}`
     )
     .join("")
 }
@@ -334,7 +337,9 @@ h2{font:600 11px/1 var(--sans);text-transform:uppercase;letter-spacing:.08em;
 /* Receipt tape: a ledger being written. Zebra and KPI tiles still refused; it now sits on
    the same surface as the listings so the page reads as objects rather than regions. */
 .tape{background:var(--card);border:1px solid var(--line);border-radius:8px;
-  box-shadow:var(--card-shadow);padding:4px 16px 8px}
+  box-shadow:var(--card-shadow);padding:4px 16px 8px;overflow-x:auto}
+.tape:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.tape table{min-width:640px}
 table{width:100%;border-collapse:collapse;font:13px/1.5 var(--mono)}
 th{text-align:left;font-weight:400;color:var(--slate);padding:0 10px 8px 0;
   border-bottom:1px solid var(--line);font-size:12px}
@@ -344,6 +349,7 @@ td.skill{color:var(--ink)}
 .settled{color:var(--stamp)}
 .unsettled{color:var(--refuse)}
 .free{color:var(--slate)}
+.reference{overflow-wrap:anywhere}
 /* A sub-hire under a root receipt: same row grammar, indented and quieter — it is evidence
    FOR the parent row, not a call of its own. */
 tr.child td{padding-top:0;padding-left:22px;color:var(--slate);font-size:12px}
@@ -422,60 +428,48 @@ export const renderIndex = (data: PageData): string => {
   const volume = settled.reduce((acc, r) => acc + r.priceAtomic, 0n)
   const feePct = (data.feeBps / 100).toFixed(data.feeBps % 100 === 0 ? 0 : 1)
 
-  // On the test rail every number on this page is real arithmetic over a simulated
-  // settlement — which is exactly the shape of a lie, because the page's whole argument is
-  // that its figures are evidence rather than claims. So the claim is WITHHELD rather than
-  // the page refused, the same move as an unverifiable fee splitter: run the sandbox, and
-  // say what it is. A screenshot taken here must not be able to pass as proof.
-  const simulated = data.rail === "test"
+  // Current default rail does not relabel persisted receipts from other rails.
+  const simulated = data.rail === "test" || data.receipts.some((r) => r.rail === "test")
 
   const body = `
   <header class="top">
     <span class="mark">ARCADE</span>
     <span class="meta"><span class="chain">${markSvg("m-arc", "Arc", 14)}${esc(data.network)}</span> · ${esc(data.rail)}<br>
-      ${settled.length} settled · <span class="chain">${markSvg("m-usdc", "USDC", 14)}${esc(formatPrice(volume))}</span> · fee ${esc(feePct)}%</span>
+      ${settled.length} settled · <span class="chain">${markSvg("m-usdc", "USDC", 14)}${esc(formatPrice(volume))}</span> · default fee ${esc(feePct)}%</span>
   </header>
   ${
     simulated
-      ? `<p class="sandbox"><b>Sandbox.</b> This deployment runs the simulated rail. No USDC
-    moves, and no transaction below exists on Arc — these figures are a working demonstration
-    of the mechanism, not evidence that it settled.</p>`
+      ? `<p class="sandbox"><b>Simulation disclosure.</b> TestRail rows are simulated. No USDC moves for TestRail rows;
+    they demonstrate the mechanism, not proof of a mined settlement. Other rows retain their own rail provenance.</p>`
       : ""
   }
-  <p class="law">Every price is public. ${
-    simulated
-      ? `Every statistic is computed from the receipts the pipeline actually produced, but on
-    this deployment those settlements are simulated.`
-      : `Every statistic is computed from settled on-chain
-    receipts, not claimed by the seller.`
-  } <b>Failed calls are never charged.</b></p>
+  <p class="law">Every price is public. Statistics are computed from recorded receipts,
+    not claimed by the seller. <b>Settlement is attempted only after output validation.</b>
+    An unknown paid outcome is not proof of no charge.</p>
 
   <h2>Listings</h2>
   <p class="note">ordered by settled calls · no paid placement</p>
   <div class="rows" id="listings">${renderListingRows(data.listings)}</div>
 
   <h2>Receipts</h2>
-  <p class="note">${
-    simulated
-      ? "simulated settlement · no row below is a transaction on Arc"
-      : `every row is a real transaction on Arc · the fee is split on chain and
-    readable off the contract`
-  }${
+  <p class="note">Reference links are for inspection, not fresh mining verification.
+    Gateway transfer references are not mined batch proof. TestRail rows are simulated.${
     data.treasuryIsSeller === true
       ? " · during the pilot the treasury is the operator, who is also the only seller"
       : ""
   }</p>
-  <div class="tape"><table>
+  <div class="tape" role="region" aria-label="Receipts (scroll horizontally for references)" tabindex="0"><table>
     <thead><tr>
       <th>skill</th><th class="num">price</th><th class="num">seller gets</th>
-      <th class="num">fee (${esc(feePct)}%)</th><th class="num">latency</th><th>status</th><th>tx</th>
+      <th class="num">fee</th><th class="num">latency</th><th>status</th><th>reference</th>
     </tr></thead>
     <tbody id="receipts">${renderReceiptRows(data.receipts)}</tbody>
   </table></div>
 
-  <footer>Settlement happens only after the output validates against the skill's declared
-    schema. A refusal, timeout or malformed result is never broadcast, so the payer keeps
-    their money and gets an unsettled receipt.</footer>`
+  <footer>A refusal, timeout or malformed result observed before settlement prevents a
+    settlement attempt. A timeout or lost acknowledgement after a payment is issued may
+    leave its outcome unknown; do not retry a payment automatically. A receipt records
+    the hub's observation, not revocation of an authorization or an independent balance proof.</footer>`
 
   // Polling that swaps the two live regions instead of reloading.
   //
@@ -518,7 +512,7 @@ export const renderMeta = (data: PageData): string => {
   const settled = data.receipts.filter((r) => r.settled)
   const volume = settled.reduce((acc, r) => acc + r.priceAtomic, 0n)
   const feePct = (data.feeBps / 100).toFixed(data.feeBps % 100 === 0 ? 0 : 1)
-  return `${esc(data.network)} · ${esc(data.rail)}<br>${settled.length} settled · ${esc(formatPrice(volume))} · fee ${esc(feePct)}%`
+  return `${esc(data.network)} · ${esc(data.rail)}<br>${settled.length} settled · ${esc(formatPrice(volume))} · default fee ${esc(feePct)}%`
 }
 
 // ── detail ──────────────────────────────────────────────────────────────────
@@ -561,7 +555,6 @@ export const renderListingPage = (
 ): string => {
   const { listing, seller, stats, ratingCount, ratingAverage } = view
   const b = listing.bounds
-  const feePct = (data.feeBps / 100).toFixed(data.feeBps % 100 === 0 ? 0 : 1)
 
   const bound = (label: string, value: string | undefined) =>
     value === undefined ? "" : `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`
@@ -626,10 +619,10 @@ export const renderListingPage = (
   <details><summary>output schema — settlement is gated on this</summary><pre>${esc(JSON.stringify(listing.outputSchema, null, 2))}</pre></details>
 
   <h2>Receipts for this skill</h2>
-  <div class="tape"><table>
+  <div class="tape" role="region" aria-label="Receipts (scroll horizontally for references)" tabindex="0"><table>
     <thead><tr>
       <th>skill</th><th class="num">price</th><th class="num">seller gets</th>
-      <th class="num">fee (${esc(feePct)}%)</th><th class="num">latency</th><th>status</th><th>tx</th>
+      <th class="num">fee</th><th class="num">latency</th><th>status</th><th>reference</th>
     </tr></thead>
     <tbody>${renderReceiptRows(receipts, 25)}</tbody>
   </table>
