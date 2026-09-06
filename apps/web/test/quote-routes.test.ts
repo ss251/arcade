@@ -1,175 +1,132 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { privateKeyToAccount } from "viem/accounts"
+import { recoverTypedDataAddress } from "viem"
+import { quotePurchaseContext } from "../src/lib/purchase-quote.ts"
+import { createPurchaseApprovalScope } from "../src/lib/purchase-approval.ts"
+import { runPurchase } from "../src/lib/purchase-run.ts"
+import { readOrdinaryResult } from "../src/lib/ordinary-job-http.ts"
+import { decodePurchaseOutcome } from "../src/lib/purchase-outcome.ts"
+import { KEY } from "../src/lib/job-store.ts"
 
-const HUB = "https://hub.example"
-const SELLER = `0x${"1".repeat(40)}`
-const PAYEE = `0x${"2".repeat(40)}`
-const ID = "usdc-flow-check"
-const NAME = `${ID}.seller.arcade.eth`
-const RESOURCE = `/x/${SELLER}/${ID}`
-const INPUT = { address: SELLER }
-const AUTH = { from: SELLER, to: PAYEE, value: "10000", validAfter: "0", validBefore: "2000000000", nonce: `0x${"a".repeat(64)}`, signature: `0x${"b".repeat(130)}` }
-const REQ = { scheme: "exact", amount: "10000", payTo: PAYEE, asset: "0x3600000000000000000000000000000000000000", network: "eip155:5042002", resource: HUB + RESOURCE, maxTimeoutSeconds: 604900 }
-const receipt = (settled = true) => ({ jobId: "job_1", skillId: ID, seller: SELLER, buyer: SELLER,
-  network: REQ.network, priceAtomic: "10000", settled, ...(settled ? { settleTx: `0x${"c".repeat(64)}` } : {}) })
-const request = (body: unknown, path = "quote") => new Request(`https://web.example/api/${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
-const stub = (paid?: { status: number; body: unknown }, pollBody: unknown = { job_id: "job_1", status: "succeeded", receipt: receipt() }) => {
-  const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-    const u = String(url)
-    if (u.includes("/listings/")) return Response.json({ id: ID, seller: SELLER, ensName: NAME, version: "0.1.0",
+const HUB = "https://hub.example", WEB = "https://web.example"
+const SELLER = `0x${"1".repeat(40)}`, PAYEE = `0x${"2".repeat(40)}`, ID = "usdc-flow-check"
+const NAME = `${ID}.seller.arcade.eth`, RESOURCE = `/x/${SELLER}/${ID}`, INPUT = { address: SELLER }
+const JOB = `job_${"a".repeat(32)}`, TOKEN = "b".repeat(32), HASH = `0x${"c".repeat(64)}`
+const REQ = { scheme: "exact", amount: "10000", payTo: PAYEE, asset: "0x3600000000000000000000000000000000000000",
+  network: "eip155:5042002", resource: HUB + RESOURCE, maxTimeoutSeconds: 604900, extra: { name: "USDC", version: "2" } }
+const request = (body: unknown) => new Request(WEB + "/api/quote", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+beforeEach(() => { vi.stubEnv("ARCADE_HUB", HUB); vi.stubEnv("ARCADE_NETWORK", "arc-testnet"); vi.stubGlobal("location", { origin: WEB }) })
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.useRealTimers(); vi.restoreAllMocks() })
+
+async function setup() {
+  const { handleQuote } = await import("../src/routes/api.quote.ts")
+  const account = privateKeyToAccount(`0x${"01".repeat(32)}`) // PUBLIC offline fixture, never an owner key.
+  const memory = new Map<string, string>(), inputs: unknown[] = []
+  vi.stubGlobal("window", { localStorage: { getItem: (k: string) => memory.get(k) ?? null, setItem: (k: string, v: string) => memory.set(k, v) } })
+  let signed = false, expired = false, expireAfterSigning = false, nonce = "", signature = ""
+  type Wire = Parameters<typeof account.signTypedData>[0]
+  let wire: Wire | undefined
+  const provider = { request: vi.fn(async ({ method, params }: { method: string; params?: ReadonlyArray<unknown> }) => {
+    if (method === "eth_chainId") return "0x4cef52"
+    if (method === "eth_accounts") return [account.address]
+    if (method !== "eth_signTypedData_v4") throw Error("unexpected offline fixture RPC")
+    wire = JSON.parse(params?.[1] as string) as Wire
+    signature = await account.signTypedData(wire); signed = true; return signature
+  }) }
+  const receipt = () => ({ jobId: JOB, skillId: ID, skillVersion: "1.0.0", seller: SELLER, buyer: account.address,
+    network: REQ.network, priceAtomic: "10000", sellerAtomic: "9500", feeAtomic: "500", feeBps: 500,
+    rail: "eip3009", settled: true, settleTx: HASH, authorizationNonce: nonce, latencyMs: 10, createdAtMs: Date.now() })
+  const f = vi.fn(async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const u = String(url), headers = new Headers(init?.headers)
+    if (u === WEB + "/api/quote") return handleQuote({ request: new Request(u, init) })
+    expect(init?.redirect).toBe("error"); expect(init?.credentials).toBe("omit")
+    if (u === HUB + "/listings/" + ID) return Response.json({ id: ID, seller: SELLER, ensName: NAME, version: "1.0.0",
       serviceName: "USDC Flow Check", description: "Public fixture", tags: [], price: "$0.01", inputSchema: {}, outputSchema: {}, bounds: { timeoutSec: 30 } })
-    if (u.includes("/names/")) return Response.json({ name: NAME, skillId: ID, seller: SELLER, endpoint: HUB + RESOURCE, payTo: PAYEE, chain: REQ.network, expired: false })
-    if (u.includes("/x/")) {
-      if (new Headers(init?.headers).has("payment-signature")) return Response.json(paid?.body ?? { job_id: "job_1", status: "succeeded", receipt: receipt() }, { status: paid?.status ?? 200 })
-      return Response.json({ x402Version: 2, accepts: [REQ] }, { status: 402 })
+    if (u === HUB + "/names/" + NAME) return Response.json({ name: NAME, skillId: ID, seller: SELLER,
+      endpoint: HUB + RESOURCE, payTo: PAYEE, chain: REQ.network, expired: expired || signed && expireAfterSigning })
+    if (u === HUB + RESOURCE) {
+      inputs.push(JSON.parse(String(init?.body)))
+      if (!headers.has("payment-signature")) return Response.json({ x402Version: 2, rail: "eip3009", accepts: [REQ] }, { status: 402 })
+      const payment = JSON.parse(atob(headers.get("payment-signature")!))
+      expect(payment.accepted).toEqual(REQ); expect(payment.payload.signature).toBe(signature)
+      expect(await recoverTypedDataAddress({ ...wire!, signature: signature as `0x${string}` })).toBe(account.address)
+      expect([...headers.keys()]).toEqual(["accept", "content-type", "payment-signature"])
+      nonce = payment.payload.authorization.nonce
+      return Response.json({ job_id: JOB, job_token: TOKEN, status: "queued", price: "$0.01",
+        poll_url: "https://ignored.example/never-follow?token=UNTRUSTED" }, { status: 202 })
     }
-    if (u.includes("/jobs/")) return Response.json(pollBody)
-    throw new Error("secret provider diagnostic")
+    if (u === HUB + "/jobs/" + JOB + "/result") {
+      expect([...headers]).toEqual([["accept", "application/json"], ["x-job-token", TOKEN]])
+      expect(memory.get(KEY)).toContain(TOKEN)
+      return Response.json({ job_id: JOB, status: "succeeded", receipt: receipt(), result: { checked: true } })
+    }
+    throw Error("PRIVATE_UNEXPECTED_URL")
   })
   vi.stubGlobal("fetch", f)
-  return f
+  return { f, memory, inputs, provider, account, handleQuote, receipt,
+    expire: () => { expired = true }, expireOnSignature: () => { expireAfterSigning = true } }
 }
-beforeEach(() => { vi.resetModules(); vi.stubEnv("ARCADE_HUB", HUB); vi.stubEnv("ARCADE_NETWORK", "arc-testnet") })
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.useRealTimers() })
 
-describe("web ENS quotes — actual route and browser transport", () => {
-  it("POST carries actual input and returns only the verified name", async () => {
-    const f = stub()
-    const { handleQuote } = await import("../src/routes/api.quote.ts")
-    const response = await handleQuote({ request: request({ skillId: ID, input: INPUT }) })
-    expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ skillId: ID, ensName: NAME, payTo: PAYEE, price: "$0.01" })
-    expect(JSON.parse(String(f.mock.calls.find(([url]) => String(url) === HUB + RESOURCE)?.[1]?.body))).toEqual(INPUT)
+describe("E13 actual-input ENS regression on direct browser boundaries", () => {
+  it("POST quotes actual input and returns the complete verified browser context", async () => {
+    const s = await setup(), context = await quotePurchaseContext(ID, INPUT)
+    expect(context).toMatchObject({ ensName: NAME, payTo: PAYEE, rail: "eip3009", requirements: REQ })
+    expect(s.inputs).toEqual([INPUT])
+    const [url, init] = s.f.mock.calls[0]!
+    expect(url).toBe(WEB + "/api/quote")
+    expect(init).toMatchObject({ method: "POST", redirect: "error", credentials: "omit", referrerPolicy: "no-referrer" })
+    expect(JSON.parse(String(init?.body))).toEqual({ skillId: ID, input: INPUT })
   })
-  it("browser requests are POST, omit credentials and redirects, and do not leak input into URL", async () => {
-    const f = vi.fn(async () => Response.json({ price: "$0.01", payTo: PAYEE, network: REQ.network, ensName: NAME }))
-    vi.stubGlobal("fetch", f)
-    const { fetchQuote } = await import("../src/components/chat.tsx")
-    expect(await fetchQuote(ID, INPUT)).toMatchObject({ ensName: NAME })
-    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
-    expect(url).toBe("/api/quote")
-    expect(init).toMatchObject({ method: "POST", redirect: "error", credentials: "omit" })
-    expect(JSON.parse(String(init.body))).toEqual({ skillId: ID, input: INPUT })
+  it("contains quote diagnostics and fails closed on expired ENS", async () => {
+    const s = await setup(); s.expire()
+    await expect(quotePurchaseContext(ID, INPUT)).rejects.toThrow(/^Purchase terms unavailable$/)
+    s.f.mockRejectedValue(Error("PRIVATE_PROVIDER_DIAGNOSTIC"))
+    const response = await s.handleQuote({ request: request({ skillId: ID, input: INPUT }) })
+    expect(response.status).toBe(502); expect(await response.text()).not.toMatch(/PRIVATE_|0x111111/)
   })
-  it("quote errors never echo private endpoint diagnostics or input", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("secret provider diagnostic") }))
-    const { handleQuote } = await import("../src/routes/api.quote.ts")
-    const response = await handleQuote({ request: request({ skillId: ID, input: INPUT }) })
-    expect(response.status).toBe(502)
-    expect(await response.text()).not.toMatch(/secret|0x111111/)
+  it.each([false, true])("rechecks actual-input ENS around signing (expire after signature: %s), never forwards stale terms", async after => {
+    const s = await setup(), context = await quotePurchaseContext(ID, INPUT)
+    const binding = { approvalId: "approval_e13", toolCallId: "call_e13", toolName: "arcade_call_skill",
+      skillId: ID, maxAmountUsd: "$0.02", input: INPUT }
+    const scope = createPurchaseApprovalScope(), token = scope.approve({ ...binding, context })!
+    if (after) s.expireOnSignature(); else s.expire()
+    const result = await runPurchase(scope, token, binding, { provider: s.provider, buyer: s.account.address })
+    expect(result.phase).toBe(after ? "unconfirmed" : "refused")
+    expect(s.provider.request.mock.calls.filter(([a]) => a.method === "eth_signTypedData_v4")).toHaveLength(after ? 1 : 0)
+    expect(s.f.mock.calls.filter(([, init]) => new Headers(init?.headers).has("payment-signature"))).toHaveLength(0)
+    expect(s.inputs.every(v => JSON.stringify(v) === JSON.stringify(INPUT))).toBe(true)
+    expect(JSON.stringify(result)).not.toMatch(/PRIVATE_|you were not charged/)
   })
-})
-
-describe("signed relay — no redirected payment or untrusted polling", () => {
-  it("refuses signed payee disagreement before sending any signature", async () => {
-    const f = stub()
-    const { handleSettle } = await import("../src/routes/api.settle.ts")
-    const response = await handleSettle({ request: request({ skillId: ID, input: INPUT, authorization: { ...AUTH, to: SELLER } }, "settle") })
-    expect(response.status).toBe(409)
-    expect(f.mock.calls.some(([, init]) => new Headers(init?.headers).has("payment-signature"))).toBe(false)
-  })
-  it("requotes actual input, verifies ENS, and forwards the authorization exactly once without ambient authority", async () => {
-    const f = stub()
-    const { handleSettle } = await import("../src/routes/api.settle.ts")
-    const response = await handleSettle({ request: request({ skillId: ID, input: INPUT, authorization: AUTH }, "settle") })
-    expect(response.status).toBe(200)
-    const paid = f.mock.calls.filter(([, init]) => new Headers(init?.headers).has("payment-signature"))
-    expect(paid).toHaveLength(1)
-    expect(paid[0]![1]).toMatchObject({ redirect: "error", credentials: "omit" })
-    for (const [url, init] of f.mock.calls.filter(([url]) => String(url).includes("/x/"))) {
-      expect(String(url)).toBe(HUB + RESOURCE)
-      expect(JSON.parse(String(init?.body))).toEqual(INPUT)
+  it("runs real quote/ENS/shared signer/direct POST/header recovery once, without sending private data to the web server", async () => {
+    const s = await setup(), context = await quotePurchaseContext(ID, INPUT)
+    const binding = { approvalId: "approval_e13", toolCallId: "call_e13", toolName: "arcade_call_skill",
+      skillId: ID, maxAmountUsd: "$0.02", input: INPUT }
+    const scope = createPurchaseApprovalScope(), token = scope.approve({ ...binding, context })!
+    const result = await runPurchase(scope, token, binding, { provider: s.provider, buyer: s.account.address })
+    expect(result).toMatchObject({ phase: "settled", recovery: "stored", outcome: { source: "hub", resultJson: '{"checked":true}' } })
+    expect(s.inputs).toEqual([INPUT, INPUT, INPUT, INPUT])
+    expect(s.f.mock.calls.filter(([, init]) => new Headers(init?.headers).has("payment-signature"))).toHaveLength(1)
+    expect(s.f.mock.calls.filter(([url]) => String(url).startsWith(WEB)).every(([, init]) => !String(init?.body).includes("signature"))).toBe(true)
+    expect(s.f.mock.calls.some(([url]) => String(url).includes("?") || String(url).includes("/api/settle"))).toBe(false)
+    expect(JSON.stringify(result)).not.toContain(TOKEN)
+    for (const status of ["bounds_exceeded", "runner_lost", "rejected"]) {
+      const { settleTx: ignored, ...receipt } = s.receipt()
+      const closed = decodePurchaseOutcome({ job_id: JOB, status, result: { private: "unpaid" }, receipt: { ...receipt, settled: false } },
+        { row: { jobId: JOB, token: TOKEN, hubOrigin: HUB, skillId: ID, priceAtomic: "10000", createdAtMs: Date.now(), realm: "ordinary" },
+          context, buyer: s.account.address, nonce: receipt.authorizationNonce })
+      expect(closed).toMatchObject({ settled: false, resultJson: null, reference: null })
     }
-    expect(f.mock.calls.some(([url]) => String(url) === `${HUB}/names/${NAME}`)).toBe(true)
   })
-  it.each([
-    "https://foreign.example/jobs/job_1/result",
-    `${HUB}/jobs/other/result`, `${HUB}/jobs/job_1`, `${HUB}/jobs/job_1/result?token=bad`,
-    `${HUB}/jobs/job_1/result?token=${"a".repeat(32)}&token=${"b".repeat(32)}`,
-    `${HUB}/x/${SELLER}/${ID}`, `${HUB}/jobs/job_1/result#fragment`,
-    `${HUB}/jobs/a/../job_1/result`, `https://user:password@hub.example/jobs/job_1/result`
-  ])("never follows an invalid poll target %s", async poll_url => {
+  it("allows a legitimate 15-second read-only long poll without another paid call", async () => {
     vi.useFakeTimers()
-    const f = stub({ status: 202, body: { job_id: "job_1", poll_url } })
-    const { handleSettle } = await import("../src/routes/api.settle.ts")
-    const result = handleSettle({ request: request({ skillId: ID, input: INPUT, authorization: AUTH }, "settle") })
-    await vi.advanceTimersByTimeAsync(1100)
-    expect((await result).status).toBe(502)
-    expect(f.mock.calls).toHaveLength(4) // listing, challenge, ENS, paid; never a poll
-  })
-  it("accepts only its correlated same-origin token poll and sends no payment header on GET", async () => {
-    vi.useFakeTimers()
-    const f = stub({ status: 202, body: { job_id: "job_1", poll_url: `${HUB}/jobs/job_1/result?token=${"a".repeat(32)}` } })
-    const { handleSettle } = await import("../src/routes/api.settle.ts")
-    const result = handleSettle({ request: request({ skillId: ID, input: INPUT, authorization: AUTH }, "settle") })
-    await vi.advanceTimersByTimeAsync(1100)
-    expect((await result).status).toBe(200)
-    const [, init] = f.mock.calls.at(-1)!
-    expect(init).toMatchObject({ redirect: "error", credentials: "omit" })
-    expect(new Headers(init?.headers).has("payment-signature")).toBe(false)
-  })
-  it("lets the hub's legitimate long-poll return after 15 seconds without resending payment", async () => {
-    vi.useFakeTimers()
-    const f = stub({ status: 202, body: { job_id: "job_1", poll_url: `${HUB}/jobs/job_1/result` } })
-    const original = f.getMockImplementation()!
-    f.mockImplementation((url, init) => String(url).includes("/jobs/")
-      ? new Promise(resolve => setTimeout(() => resolve(Response.json({
-          job_id: "job_1", status: "succeeded", result: { checked: true }, receipt: receipt()
-        })), 15_000))
-      : original(url, init))
-    const { handleSettle } = await import("../src/routes/api.settle.ts")
-    const result = handleSettle({ request: request({ skillId: ID, input: INPUT, authorization: AUTH }, "settle") })
-    await vi.advanceTimersByTimeAsync(16_001)
-    const response = await result
-    expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ body: { job_id: "job_1", receipt: { settled: true } } })
-    expect(f.mock.calls.filter(([, init]) => new Headers(init?.headers).has("payment-signature"))).toHaveLength(1)
-    expect(f.mock.calls.filter(([url]) => String(url).includes("/jobs/"))).toHaveLength(1)
-  })
-  it("retains the overall 90-second result deadline, cancels the stalled body, and never resends payment", async () => {
-    vi.useFakeTimers()
-    const cancel = vi.fn()
-    let pollSignal: AbortSignal | null | undefined
-    const f = stub({ status: 202, body: { job_id: "job_1", poll_url: `${HUB}/jobs/job_1/result` } })
-    const original = f.getMockImplementation()!
-    f.mockImplementation((url, init) => {
-      if (!String(url).includes("/jobs/")) return original(url, init)
-      pollSignal = init?.signal
-      return Promise.resolve(new Response(new ReadableStream({ cancel })))
-    })
-    const { handleSettle } = await import("../src/routes/api.settle.ts")
-    let finished = false
-    const result = handleSettle({ request: request({ skillId: ID, input: INPUT, authorization: AUTH }, "settle") }).then(response => { finished = true; return response })
-    await vi.advanceTimersByTimeAsync(89_999)
-    expect(finished).toBe(false)
-    expect(pollSignal?.aborted).toBe(false)
-    await vi.advanceTimersByTimeAsync(1)
-    expect(finished).toBe(true)
-    const response = await result
-    expect(response.status).toBe(502)
-    expect(await response.json()).toMatchObject({ error: "outcome_unconfirmed" })
-    expect(pollSignal?.aborted).toBe(true)
-    expect(cancel).toHaveBeenCalled()
-    expect(f.mock.calls.filter(([, init]) => new Headers(init?.headers).has("payment-signature"))).toHaveLength(1)
-    expect(f.mock.calls.filter(([url]) => String(url).includes("/jobs/"))).toHaveLength(1)
-  })
-  it.each(["bounds_exceeded", "runner_lost", "rejected"])("recognizes canonical terminal state %s", async status => {
-    vi.useFakeTimers()
-    stub({ status: 202, body: { job_id: "job_1", poll_url: `${HUB}/jobs/job_1/result` } }, { job_id: "job_1", status, receipt: receipt(false) })
-    const { handleSettle } = await import("../src/routes/api.settle.ts")
-    const result = handleSettle({ request: request({ skillId: ID, input: INPUT, authorization: AUTH }, "settle") })
-    await vi.advanceTimersByTimeAsync(1100)
-    expect((await result).status).toBe(200)
-  })
-  it.each([
-    { job_id: "job_1", status: "succeeded" },
-    { job_id: "job_1", status: "succeeded", receipt: { ...receipt(), jobId: "different" } },
-    { job_id: "job_1", status: "running", receipt: receipt() },
-    { job_id: "job_1", status: "failed", receipt: receipt() }
-  ])("never labels malformed or contradictory terminal response as success %j", async body => {
-    stub({ status: 200, body })
-    const { handleSettle } = await import("../src/routes/api.settle.ts")
-    const response = await handleSettle({ request: request({ skillId: ID, input: INPUT, authorization: AUTH }, "settle") })
-    expect(response.status).toBe(502)
-    expect(await response.text()).toContain("outcome_unconfirmed")
+    const f = vi.fn(() => new Promise<Response>(resolve => setTimeout(() => resolve(Response.json({ job_id: JOB, status: "pending" })), 15000)))
+    const row = { jobId: JOB, token: TOKEN, hubOrigin: HUB, skillId: ID, priceAtomic: "10000", createdAtMs: Date.now(), realm: "ordinary" as const }
+    const reading = readOrdinaryResult(row, {}, f as typeof fetch)
+    await vi.advanceTimersByTimeAsync(15000)
+    expect(await reading).toMatchObject({ status: 200, body: { job_id: JOB } })
+    expect(f).toHaveBeenCalledTimes(1); expect(vi.getTimerCount()).toBe(0)
   })
 })
+// Retired courier's hostile-URL/status/90s/correlation cases now reside at the
+// actual boundaries: ordinary-payment-http, ordinary-job-http, purchase-run,
+// purchase-outcome. settle-retired separately proves the old endpoint has zero IO.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
 import { Confirm } from "../src/components/confirm.tsx"
-import { SettlementFailure, SettlementOutcome, SettlementProgress } from "../src/components/chat.tsx"
+import { LivePurchaseView } from "../src/components/purchase.tsx"
 
 const base = {
   skillId: "usdc-flow-check", price: "$0.01",
@@ -45,26 +45,23 @@ describe("confirm card — verified ENS quote", () => {
     expect(html).toContain("Connect your wallet")
   })
   it("never turns an uncertain signed outcome into a no-charge promise", () => {
-    const html = renderToStaticMarkup(<SettlementFailure skillId={base.skillId} detail="The signed authorization may remain valid; check before retrying." />)
-    expect(html).toContain("outcome unconfirmed")
-    expect(html).not.toContain("not settled")
-    expect(html).not.toContain("you were not charged")
-    expect(html).toContain("check before retrying")
+    const html = renderToStaticMarkup(<LivePurchaseView view={{ phase: "unconfirmed",
+      message: "Purchase outcome unconfirmed. The signed authorization may remain valid; check before retrying." }} />)
+    expect(html).toContain("outcome unconfirmed"); expect(html).toContain("check before retrying")
+    expect(html).not.toContain("not settled"); expect(html).not.toContain("you were not charged")
   })
-  it("does not treat a remote failure report as proof a signed authorization cannot be redeemed", () => {
-    const html = renderToStaticMarkup(<SettlementOutcome skillId={base.skillId} price={base.price} outcome={{
-      status: "failed", detail: "nothing charged", receipt: { settled: false }, result: null
-    }} />)
-    expect(html).toContain("outcome unconfirmed")
-    expect(html).toContain("authorization may still be valid")
+  it("does not treat a hub failure report as independent proof a signature cannot be redeemed", () => {
+    const html = renderToStaticMarkup(<LivePurchaseView view={{ phase: "not_settled",
+      message: "The hub reports no settlement. This is not independent proof of no charge." }} />)
+    expect(html).toContain("not independent proof of no charge")
     expect(html).not.toContain("you were not charged")
   })
   it("does not claim payment acceptance or dispatch immediately after signing", () => {
-    const html = renderToStaticMarkup(<SettlementProgress skillId={base.skillId} price={base.price} phase="settling" />)
-    expect(html).toContain('role="status"')
-    expect(html).toContain("authorization signed; awaiting hub outcome")
-    expect(html).not.toContain("paid;")
-    expect(html).not.toContain("seller is running")
-    expect(renderToStaticMarkup(<SettlementProgress skillId={base.skillId} price={base.price} phase="signing" />)).toContain("waiting for your wallet to sign")
+    const html = renderToStaticMarkup(<LivePurchaseView view={{ phase: "submitting",
+      message: "Submitting once. Do not repeat the payment." }} />)
+    expect(html).toContain('role="status"'); expect(html).toContain("Submitting once")
+    expect(html).not.toContain("paid;"); expect(html).not.toContain("seller is running")
+    expect(renderToStaticMarkup(<LivePurchaseView view={{ phase: "signing",
+      message: "Review the exact authorization in your wallet." }} />)).toContain("Review the exact authorization")
   })
 })

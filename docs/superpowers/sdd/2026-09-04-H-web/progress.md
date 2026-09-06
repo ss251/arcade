@@ -506,3 +506,40 @@ Four new source/test pins and three unchanged ENS/Thread/style pins passed,
 along with prior H10a–b4 copies/source pins and F/Pages preservation. All local
 links resolve (97 prior-document links plus new records), with zero selected
 privacy findings. No additional gate or source change followed this audit.
+
+H10b6 — September6,2026: private live Chat/SDK approval lifecycle, bounded
+selected-wallet/complete quote, direct ordinary POST/recovery and closed live
+views replace the auto-mounted signing/courier path. Restored/preliminary/
+mismatched output cannot authorize. /api/settle is zero-IO410. Raw transcript
+claims are not receipts. Actual Confirm and H10b1–b4 helpers remain preserved.
+
+Failure-first checks fixed three answered-approval cases, two retirement cases,
+three prototype-named views, preliminary output and two malformed wallet cases.
+The [parent report](task-10b6-parent-report.md) preserves fixture/compiler setup
+corrections,82 initial integration tests,930 focused web passes plus isolated
+three-file socket recovery (11 tests/3files), and final42 focused/3 + exact14
+web/2fixture roots strict0. This is root self-review, not independent review.
+
+The final [native check](task-10b6-native-check.md) passed10 cases on real
+Chat/SDK/Confirm, keyless ENS derivation, production CORS, both offline domains
+and direct transport. Two simulated submissions/recoveries, four real preflights;
+a late third signature is not forwarded. Two module-loader startup failures and
+the earlier9-case run remain recorded. Both final1280-light/390-dark screenshots
+were read;20 exact owned PIDs absent/12ports refused/no profile processes remain.
+No actual funds, chain execution, live wallet, production hydration or deployment.
+
+Single frozen full gate94360 exit0:3,918Vitest/164/50.20s, Bun exit0 (numeric
+footer truncated, no fresh count claimed), root/web strict, client362ms/SSR155ms.
+No gate rerun or concurrent review/gate. Three bannered historical copies and
+18 source/test pins are ready for final preservation/privacy/link audit and
+atomic commit. H10c ordinary buyer recovery/session completeness/H11–14/H merge
+and deferred G8/G9, vendor tasks, I remain. No new spend/key/owner action/push.
+
+Final self-audit passed18 frozen source/test pins,3 exact bannered copies and
+97 new-document local links, with zero selected privacy-pattern findings.
+Prior H10a–b5 reports/source pins and F/Pages preservation pass; the changed
+quote-route comment and two migrated presentation tests explicitly verify their
+e87ae07 originals rather than silently changing historical pins. Report original
+SHA-256:8352df710a50285113be9c66131aa5a2c9b122fbd3f6a95a2aacf6023ac9b8d4;
+preflight:dd8f10e1ce29172f790de7f246a2191afb9edb293742e3155dae4d8e0568aff0;
+native check:f59422397d2edcfa0a2ae907b3c917ced40acb17c0b9dff6f380b348b6707a9a.

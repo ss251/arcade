@@ -520,9 +520,36 @@ the legacy query-token `poll_url` retained for old clients. Reads omit cookies,
 redirects, cache and Referer, bound JSON bodies and deadlines, and stop retrieval
 on abort. Aborting a read does **not** cancel an admitted job or revoke payment.
 
-This checkpoint does not migrate the active wallet/settlement UI, prove native
-browser CORS, or complete buyer/session recovery. Those H10 follow-ups remain
-pending. No deployed environment was changed or live purchase performed for H10a.
+H10a itself was passive support. H10b now wires the ordinary live Chat purchase
+flow described below. Buyer/session recovery remains separate. Neither checkpoint
+changed a deployed environment or performed a live purchase.
+
+### H10b live Chat purchases require fresh local confirmation
+
+A live confirmation captures the original tool/approval IDs, actual input, ceiling
+and complete displayed quote. The browser owns that one-use authority privately;
+SDK approval flags and restored transcripts cannot reconstruct it. Reopening an
+old pending card requires a fresh request. Unknown wallet/network/terms block the
+card. Connect/switch is an explicit action, never an effect of restored output.
+
+After matching final tool readiness, the browser rechecks the full actual-input/
+ENS quote, signs once with the selected account, rechecks again and POSTs directly
+to the captured hub origin. The old web /api/settle courier returns410 and never
+reads or forwards signed bodies. Configure the hub's exact web/public origins
+for CORS; missing support is not permission to fall back to the retired courier.
+
+Admission is saved to browser recovery storage before result retrieval. A storage
+failure stays visible: keep the tab open, because closing may lose job access.
+The live view presents complete escaped output and qualified hub-reported evidence,
+not an independently verified chain result; Gateway UUIDs are not mined hashes.
+Private signatures, recovery tokens and paid output are not sent back to the
+chat model or conversation history. Reload recovery UI is a subsequent H task.
+
+Closing/remounting cancels local continuations, not remote jobs or already-signed
+authorizations. Do not repeat an uncertain payment. The
+[H10b6 record](superpowers/sdd/2026-09-04-H-web/task-10b6-parent-report.md)
+separates the ten-case native loopback/SDK/CORS/offline-signer proof from live
+chain, real-wallet and production-deployment evidence, which it does not claim.
 
 ### Set the web service's Config File Path, or you get two hubs
 

@@ -209,7 +209,7 @@ const MAX_CALL_ATOMIC = parsePrice(process.env["ARCADE_MAX_CALL_USD"] ?? "$1.00"
  *
  * The honest answer is that connection is not this layer's fact to report. The wallet is
  * checked where it exists — `PendingPurchase` reads the provider and the chain, and
- * `walletBlocker` renders the reason on the card itself if it cannot be used. So the tool
+ * bounded selection checks render a fixed blocker on the card if unusable. So the tool
  * states the ceiling, which it does own, and describes where the wallet question is settled.
  */
 export const arcade_budget = tool({
@@ -238,7 +238,7 @@ export const READ_ONLY_TOOLS = {
 } as const
 
 /**
- * Tools that can spend. Empty until the purchase edge lands.
+ * Tools that prepare purchases; execution alone cannot sign or spend.
  *
  * This exists so the approval-secret guard can key off the FACT that a spending tool is
  * registered rather than off a flag someone has to remember to set. AI SDK 7 is explicit
@@ -287,17 +287,17 @@ const CallArgs = Schema.Struct({
  * The purchase edge. Returns a SIGNING REQUEST, never a completed purchase.
  *
  * This tool cannot spend on its own: it holds no key, and the visitor's wallet performs the
- * signature in their browser. What it produces is the exact payment requirements derived
- * from the arguments the visitor approved — see `purchase.ts` and T-EXEC-005 for why
- * derivation rather than validation is what makes the two bindings compose.
+ * signature in their browser. The output is a readiness signal, not signing authority.
+ * The browser also requires a live, one-use local confirmation and rechecks its own
+ * complete captured quote; output-supplied coordinates cannot redirect a signature.
  */
 export const arcade_call_skill = tool({
   description:
     "Prepare a purchase. THIS SPENDS THE VISITOR'S USDC once they approve and sign it in " +
     "their own wallet — this service holds no key and cannot pay on anyone's behalf. The " +
-    "payment is verified before any work starts and is only broadcast if the output " +
-    "validates against the skill's declared schema, so a refusal, timeout or malformed " +
-    "result leaves the balance untouched. Quote first if the price matters.",
+    "hub verifies payment before work and settles only after output validates. An " +
+    "uncertain outcome does not prove no charge; a signed authorization may remain valid. " +
+    "Quote first. The browser presents the private result; do not claim settlement from this tool's readiness signal.",
   inputSchema: std(CallArgs),
   execute: async ({ skillId, maxAmountUsd, input }, { toolCallId }) => {
     try {
@@ -311,8 +311,8 @@ export const arcade_call_skill = tool({
         // verified and the work dispatched.
         input: parsedInput,
         note:
-          "Nothing has been spent yet. This is what the visitor's wallet will be asked to " +
-          "sign; it was derived from the approved skill and ceiling, not supplied by you."
+          "Purchase preparation is ready; this is not a settlement result. Only a live " +
+          "browser confirmation can continue. The private result is displayed in the browser, not sent to this model."
       }
     } catch (e) {
       if (e instanceof PriceMovedAboveApproval) {

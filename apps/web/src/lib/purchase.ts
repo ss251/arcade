@@ -2,28 +2,14 @@ import { parsePrice, formatPrice } from "@arcade/core"
 import * as hub from "./hub.ts"
 
 /**
- * The purchase edge, built so the two bindings cannot disagree.
- *
- * `docs/threat-model.md` T-EXEC-005: this edge carries TWO cryptographic bindings covering
- * DIFFERENT facts. The AI SDK's approval HMAC binds *tool name + call id + input arguments*
- * — "the visitor agreed to buy skill X for at most $N". The EIP-3009 signature binds
- * *payTo + value + validBefore + nonce* — "pay this address this amount". Nothing ties one
- * to the other by construction, and if a client can hold an approval for one purchase and
- * sign a different one, the human gate is decorative.
- *
- * The resolution is single-copy rather than a cross-check. The server derives the payment
- * requirements FROM the approved arguments and hands the client only that. The client is
- * never in possession of an alternative to sign, so the mismatch is unconstructible instead
- * of detected — the same move as `SellerAuthored` and as deriving `hubWsUrl`, except this
- * time it prevents a second copy from existing rather than removing one that already did.
- *
- * ## What this function does NOT do
- *
- * It does not sign, and it holds no key. The signature happens in the visitor's browser
- * with the visitor's wallet — `packages/buyer/src/mcp.ts` states the rule this service
- * obeys: a process holding a spending key must not be exposed over a network, and this one
- * is exposed. What it returns is a signing REQUEST: the exact requirements, and nothing the
- * client could substitute.
+ * Server-side purchase preparation only; this module never signs or spends.
+ * Where configured, the SDK HMAC binds tool name/call ID/original arguments.
+ * Independently, the live browser requires a private one-use approval covering
+ * that binding and the complete displayed quote. It rechecks the quote before
+ * and after signing, then sends directly to the captured hub. SDK output alone
+ * is not authority, and restored history cannot reconstruct the browser permit.
+ * These derived public coordinates remain a readiness signal/compatibility
+ * surface; the browser does not sign output-supplied coordinates.
  */
 
 export class PriceMovedAboveApproval extends Error {
@@ -48,8 +34,8 @@ export interface SigningRequest {
   readonly amountAtomic: string
   readonly price: string
   /**
-   * The approval this request was derived from. Carried so the client's settle call can be
-   * matched against it, and so a request cannot be reused under a different approval.
+   * Original call identity. The browser also binds the SDK approval ID, input,
+   * ceiling and private quote; this public ID alone cannot authorize reuse.
    */
   readonly toolCallId: string
 }
@@ -75,9 +61,8 @@ export const deriveSigningRequest = async (
   }
 
   return {
-    // Every field below comes from the approved skillId's own challenge. None of it is
-    // client-supplied, which is what makes an approval-for-A / settle-B mismatch
-    // unconstructible rather than merely detected.
+    // Public preparation from the actual-input quote. The separate private
+    // browser permit and fresh quote comparisons enforce the payment binding.
     skillId: quote.skillId,
     resource: quote.resource,
     payTo: quote.payTo,

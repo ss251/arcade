@@ -1,5 +1,16 @@
 # Plan H — execution records
 
+Current task: [H10b6 live Chat purchase binding](task-10b6-brief.md), after
+H10b5 e87ae07. The [preflight](task-10b6-chat-preflight.md) and
+[parent report](task-10b6-parent-report.md) record the private one-use lifecycle,
+bounded selection, direct migration and zero-IO courier retirement. The actual
+[native check](task-10b6-native-check.md) passed ten final fixture cases across
+SDK/Confirm/two-origin CORS/offline rail signing, with all owned services stopped.
+This is not live-chain or production-wallet proof. The sole full gate passed
+3,918 Vitest/164, Bun exit0, root/web strict and client/SSR builds; final audit/
+commit follow. Buyer/session/H11–14/H merge remain.
+Earlier “current task” paragraphs below are preserved historical checkpoints.
+
 Current task: [H10b5 confirmation gesture lifetime](task-10b5-brief.md), after
 H10b4 `afe2026`. The [UI preflight](task-10b5-ui-preflight.md) preserves broader
 integration constraints. Its [parent/native report](task-10b5-parent-report.md)

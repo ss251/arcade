@@ -6,9 +6,10 @@ import { purchaseInput } from "../lib/purchase-input.ts"
 
 /**
  * A keyless snapshot for the card. The verified ENS name is emitted only after /names and
- * the actual-input 402 agree. Signing derivation and the relay repeat this shared check.
- * This is not an immutable payee approval: the existing HMAC binds the skill/input/ceiling,
- * and the wallet's own confirmation binds the freshly derived address and amount.
+ * the actual-input 402 agree. The live browser captures the complete context at
+ * confirmation and checks it again before signing and forwarding directly.
+ * SDK approvals alone are not payment authority; the private conversation owner is
+ * also required. A returned snapshot itself cannot authorize a payment.
  */
 export const handleQuote = async ({ request }: { request: Request }): Promise<Response> => {
   let skillId: string

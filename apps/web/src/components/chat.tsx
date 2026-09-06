@@ -1,15 +1,13 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useChat } from "@ai-sdk/react"
 import { lastAssistantMessageIsCompleteWithApprovalResponses } from "ai"
 import { MessageScroller } from "@shadcn/react/message-scroller"
 import { Streamdown } from "streamdown"
-import { Confirm } from "./confirm.tsx"
 import { COMMANDS, matchCommands, parseCommand, type Command } from "../lib/commands.ts"
 import type { StoredMessage } from "../lib/history.ts"
-import { getProvider, currentChainId, connect, walletBlocker } from "../lib/wallet.ts"
-import { signPayment } from "../lib/sign.ts"
-import { purchaseInput } from "../lib/purchase-input.ts"
-import { jsonFetch } from "../lib/hub-http.ts"
+import { ArchivedPurchase, LivePurchaseView, PendingPurchase, type PurchaseDecision } from "./purchase.tsx"
+import { capturePurchasePart, createPurchaseConversation } from "../lib/purchase-conversation.ts"
+import type { PurchaseView } from "../lib/purchase-run.ts"
 
 /**
  * The buying agent's chat surface.
@@ -136,96 +134,6 @@ const Quote = ({ skillId, price }: { skillId: string; price: string }) => (
   </div>
 )
 
-/**
- * What the buyer actually bought — verbatim, from the structured half.
- *
- * A purchased result exists twice: the fenced text the model reads, and the raw object only
- * code parses. If the chat rendered only the model's message, the person who paid would
- * receive a NARRATION of their purchase, with the least trustworthy component in the system
- * standing between them and the thing they bought.
- *
- * That is the figures problem with higher stakes. A price rendered from prose can be
- * checked against the hub in one click; a skill result cannot be checked against anything.
- * It is the only copy the buyer will ever have, and it would arrive paraphrased.
- *
- * It renders in the QUOTED voice for the same reason seller copy does — it is a stranger's
- * text, and the page says so by construction rather than by disclaimer. Fencing exists to
- * stop the MODEL from obeying it; the human is not the model, so nothing about fencing
- * argues for hiding it from the person who paid.
- *
- * Long results collapse behind a disclosure, never a truncation: "showing the first N
- * lines" is a claim about completeness, and the whole text is in the DOM either way, so it
- * stays selectable and copyable. A result you can read but not keep is half a purchase.
- */
-const asText = (result: unknown): string =>
-  typeof result === "string" ? result : JSON.stringify(result, null, 2)
-
-const Purchase = ({
-  skillId,
-  settled,
-  pricePaidUsdc,
-  settleTx,
-  reason,
-  result
-}: {
-  skillId: string
-  settled: boolean
-  pricePaidUsdc?: string | undefined
-  settleTx?: string | undefined
-  reason?: string | undefined
-  result: unknown
-}) => {
-  const text = asText(result)
-  const lines = text.split("\n").length
-  const long = lines > 12 || text.length > 1200
-
-  const body = (
-    <blockquote className="quoted">
-      <span className="quoted-label">
-        returned by the seller · {lines} line{lines === 1 ? "" : "s"}, complete
-      </span>
-      <pre className="result">{text}</pre>
-    </blockquote>
-  )
-
-  return (
-    <div className="tool-out">
-      <div className="tool-row">
-        <span className="tool-id">{skillId}</span>
-        {settled ? (
-          <span className="usdc">{pricePaidUsdc ?? ""}</span>
-        ) : (
-          <span className="unsettled">not settled</span>
-        )}
-      </div>
-      {settled ? null : (
-        <p className="tool-note">
-          {reason ?? "the job did not produce a valid result"} — you were not charged.
-        </p>
-      )}
-      {settleTx === undefined ? null : (
-        <p className="tool-note">
-          <a
-            href={`https://testnet.arcscan.app/tx/${settleTx}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            settled on Arc ↗
-          </a>
-        </p>
-      )}
-      {result === undefined || result === null ? null : long ? (
-        <details className="disclose">
-          <summary>show the full result ({lines} lines)</summary>
-          {body}
-        </details>
-      ) : (
-        body
-      )}
-    </div>
-  )
-}
-
 /** Read the structured half, defensively — a shape we do not recognise renders nothing. */
 const ToolOutput = ({ name, output }: { name: string; output: unknown }) => {
   if (output === null || typeof output !== "object") return null
@@ -240,36 +148,6 @@ const ToolOutput = ({ name, output }: { name: string; output: unknown }) => {
 
   if (name === "arcade_quote" && typeof o["price"] === "string" && typeof o["skillId"] === "string") {
     return <Quote skillId={o["skillId"] as string} price={o["price"] as string} />
-  }
-
-  if (name === "arcade_call_skill" && typeof o["skillId"] === "string") {
-    // A signing request is not a purchase. It is the point where the browser takes over,
-    // and rendering it as a "not settled" purchase — which the branch below would do —
-    // would report failure for something that has not been attempted yet.
-    if (o["awaitingSignature"] === true) return <Settlement request={o} />
-    if (o["refused"] === true) {
-      return (
-        <div className="tool-out">
-          <div className="tool-row">
-            <span className="tool-id">{o["skillId"] as string}</span>
-            <span className="unsettled">refused</span>
-          </div>
-          <p className="tool-note">
-            {typeof o["reason"] === "string" ? o["reason"] : "the purchase was refused"}
-          </p>
-        </div>
-      )
-    }
-    return (
-      <Purchase
-        skillId={o["skillId"] as string}
-        settled={o["settled"] === true}
-        pricePaidUsdc={typeof o["pricePaidUsdc"] === "string" ? o["pricePaidUsdc"] : undefined}
-        settleTx={typeof o["settleTx"] === "string" ? o["settleTx"] : undefined}
-        reason={typeof o["reason"] === "string" ? o["reason"] : undefined}
-        result={o["result"]}
-      />
-    )
   }
 
   return null
@@ -309,368 +187,6 @@ const TextPart = ({ text }: { text: string }) => {
   )
 }
 
-// ── the approval gate ───────────────────────────────────────────────────────
-
-/**
- * The confirmation card, at the moment the SDK asks for a decision.
- *
- * ## Why the card lives HERE and not after the tool runs
- *
- * `arcade_call_skill` is gated by `toolApproval` in `routes/api.chat.ts`, so the SDK pauses
- * BEFORE `execute` and emits a part in state `approval-requested`. That is the only moment a
- * human decision can still change the outcome — once `execute` has run, the signing request
- * exists and the question has already been answered. So the card is bound to that state,
- * and `addToolApprovalResponse` is how the answer gets back.
- *
- * ## What the card can and cannot know yet
- *
- * The approval covers `skillId` and `maxAmountUsd` — a ceiling. It does NOT carry `payTo`,
- * because the payee is derived from the endpoint's own challenge inside `execute`, after
- * this decision. But "verify who gets your money" is the card's entire job, so it asks the
- * endpoint directly (`/api/quote`, free, signs nothing) and shows the live terms.
- *
- * That display cannot drift into a wrong signature: the ceiling is what the approval HMAC
- * binds, every signed field is derived server-side from the approved skill, and
- * `PriceMovedAboveApproval` refuses outright if the endpoint has since asked for more. See
- * `routes/api.quote.ts` for the full argument.
- *
- * ## A missing wallet blocks the card rather than the button
- *
- * `walletBlocker` already owns this wording, and this is the surface it was written for.
- * Approving with no wallet installed would produce a signing request nothing can sign — a
- * dead end reached by consent, which is worse than a refusal, because the visitor would
- * believe they had bought something.
- */
-export type QuoteFn = (skillId: string, input?: unknown) => Promise<{
-  readonly price: string
-  readonly payTo: string
-  readonly network: string
-  readonly ensName?: string
-}>
-
-export const fetchQuote: QuoteFn = async (skillId, input) => {
-  try {
-    const res = await jsonFetch("/api/quote", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ skillId, input: purchaseInput(input) })
-    })
-    const body = res.body as Record<string, unknown> | null
-    if (res.status !== 200 || !body || typeof body["price"] !== "string" ||
-        typeof body["payTo"] !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(body["payTo"]) ||
-        typeof body["network"] !== "string" ||
-        (body["ensName"] !== undefined && (typeof body["ensName"] !== "string" || body["ensName"].length > 253))) throw new Error()
-    return { price: body["price"], payTo: body["payTo"], network: body["network"],
-      ...(body["ensName"] === undefined ? {} : { ensName: body["ensName"] as string }) }
-  } catch {
-    throw new Error("Payment terms or ENS verification are unavailable. Nothing was signed.")
-  }
-}
-
-export const PendingPurchase = ({
-  skillId,
-  input,
-  maxAmountUsd,
-  onDecide,
-  quote = fetchQuote
-}: {
-  skillId: string
-  input?: unknown
-  maxAmountUsd: string
-  onDecide: (approved: boolean) => void
-  /** Injected so the card renders in a test without a network. */
-  quote?: QuoteFn
-}) => {
-  const [terms, setTerms] = useState<Awaited<ReturnType<QuoteFn>> | undefined>(undefined)
-  const [failed, setFailed] = useState<string | undefined>(undefined)
-  const [wallet, setWallet] = useState<string | undefined>(undefined)
-  const [connecting, setConnecting] = useState(false)
-
-  /**
-   * Take the remedy the guard names: authorise an account and put the wallet on Arc.
-   *
-   * `connect` does both in one gesture — `eth_requestAccounts` then `ensureArc`, which adds
-   * the chain if the wallet does not have it. Re-reading the chain afterwards is what clears
-   * the block, and reading it rather than assuming success is the point: a visitor can
-   * dismiss the network prompt, and a card that unblocked itself on an unanswered prompt
-   * would hand them a hold-to-pay button that cannot produce a signature.
-   */
-  const takeRemedy = () => {
-    const p = getProvider()
-    if (p === undefined) return
-    setConnecting(true)
-    connect(p)
-      .then(() => currentChainId(p))
-      .then((id) => setWallet(walletBlocker(true, id)))
-      .catch((e: Error) =>
-        // A rejected prompt is a decision, not a fault. Say what is still true and leave the
-        // remedy available rather than reporting an error the visitor deliberately caused.
-        setWallet(
-          /denied|reject/i.test(e.message)
-            ? "The wallet prompt was dismissed, so nothing changed. Connecting will offer to add and switch to Arc testnet in one step."
-            : e.message
-        )
-      )
-      .finally(() => setConnecting(false))
-  }
-
-  useEffect(() => {
-    let live = true
-    setTerms(undefined)
-    setFailed(undefined)
-    quote(skillId, input).then(
-      (t) => live && setTerms(t),
-      (e: Error) => live && setFailed(e.message)
-    )
-    return () => {
-      live = false
-    }
-  }, [skillId, input, quote])
-
-  useEffect(() => {
-    let live = true
-    const p = getProvider()
-    if (p === undefined) {
-      setWallet(walletBlocker(false, undefined))
-      return
-    }
-    // Chain is read, never switched, at render time. Switching belongs to `connect`, which
-    // is a deliberate act — a card that silently reconfigured someone's wallet on appearing
-    // would be doing something they never asked for.
-    currentChainId(p).then(
-      (id) => live && setWallet(walletBlocker(true, id)),
-      () => live && setWallet(walletBlocker(true, undefined))
-    )
-    return () => {
-      live = false
-    }
-  }, [])
-
-  // The card is never rendered half-known. Until the endpoint has answered there is no
-  // price to hold a button against, and a card showing a blank amount is exactly the
-  // "success signal indistinguishable from nothing" this repo keeps deleting.
-  if (terms === undefined && failed === undefined) {
-    return (
-      <div className="tool-out">
-        <p className="tool-note">asking the endpoint what this costs…</p>
-      </div>
-    )
-  }
-
-  return (
-    <Confirm
-      skillId={skillId}
-      price={terms?.price ?? maxAmountUsd}
-      payTo={terms?.payTo ?? ""}
-      network={terms?.network ?? ""}
-      {...(terms?.ensName === undefined ? {} : { ensName: terms.ensName })}
-      blocked={
-        failed !== undefined
-          ? `The endpoint did not return payment terms, so there is nothing to sign: ${failed}`
-          : wallet
-      }
-      /*
-       * Offered only when a wallet exists to prompt. With no provider installed there is
-       * nothing for `connect` to talk to, so the card explains instead of dangling a button
-       * — and a failed quote is not a wallet problem, so connecting would not fix it either.
-       */
-      {...(failed === undefined && wallet !== undefined && getProvider() !== undefined
-        ? { onConnect: takeRemedy, connecting }
-        : {})}
-      onApprove={() => onDecide(true)}
-      onDeny={() => onDecide(false)}
-    />
-  )
-}
-
-/**
- * Sign, then settle — the half of the purchase that happens after approval.
- *
- * `arcade_call_skill` returns a signing REQUEST, never a completed purchase, so this is
- * where the money actually moves: the wallet signs in the browser, and the signature is
- * carried to the endpoint by `/api/settle` (see that file for why a courier is sound).
- *
- * ## It starts on its own, and the wallet is the gate
- *
- * There is no second button. The visitor already held one down to approve, and the wallet's
- * own prompt is a real confirmation that cannot be skipped or styled — asking them to click
- * an in-page "sign now" first would add a step that guards nothing, and a confirmation
- * people click through is how consent gets laundered.
- *
- * ## Run-once is a ref, not a state check
- *
- * Signing twice would ask the wallet twice and could put two authorizations on one purchase,
- * both spendable. A `useState` guard is not enough: React can run effects twice before a
- * state update commits, and the second run would read the stale value. The ref is set
- * synchronously, before any await.
- */
-/**
- * Read the hub's job response. Pure, exported, and tested — because reading it wrong is
- * exactly what went wrong.
- *
- * The hub answers `{job_id, status, result, detail?, receipt:{settled, settleTx, price…}}`.
- * The outcome lives under `receipt`; only `result` is top-level. Reading `settled` and
- * `settleTx` off the root made both `undefined`, so a settled purchase rendered
- * "not settled · you were not charged" directly above the complete result it had just paid
- * for and received. Every layer beneath was correct — the receipt said settled and the
- * transaction confirmed on Arc with status 0x1 — which is what made it the worst version of
- * this bug: the screen contradicted the chain, and the screen is what anyone would believe.
- *
- * It is a function rather than inline destructuring so the shape can be pinned by a test
- * without a network, a wallet, or a chain. The defect was never in the payment; it was in
- * four property lookups, and those are cheap to hold still.
- */
-export const readSettlement = (
-  body: Record<string, unknown>
-): {
-  readonly settled: boolean
-  readonly settleTx?: string | undefined
-  readonly reason?: string | undefined
-  readonly price?: string | undefined
-  readonly result: unknown
-} => {
-  const receipt = (body["receipt"] ?? {}) as Record<string, unknown>
-  const settled = receipt["settled"] === true
-  // `detail` is the hub's own sentence for a non-settlement and beats the raw reason code.
-  const reason =
-    typeof body["detail"] === "string"
-      ? body["detail"]
-      : typeof receipt["reason"] === "string"
-        ? receipt["reason"]
-        : undefined
-  return {
-    settled,
-    settleTx: typeof receipt["settleTx"] === "string" ? receipt["settleTx"] : undefined,
-    // A settled purchase has nothing to explain; carrying `reason: "ok"` onto it would put
-    // an apology under a success.
-    reason: settled ? undefined : reason,
-    price: typeof receipt["price"] === "string" ? receipt["price"] : undefined,
-    result: body["result"]
-  }
-}
-
-export const SettlementFailure = ({ skillId, detail }: { skillId: string; detail?: string | undefined }) => (
-  <div className="tool-out">
-    <div className="tool-row">
-      <span className="tool-id">{skillId}</span>
-      <span className="tool-note">outcome unconfirmed</span>
-    </div>
-    <p className="tool-note">{detail ?? "Check the hub's settlement record before retrying."}</p>
-  </div>
-)
-
-export const SettlementProgress = ({ skillId, price, phase }: {
-  skillId: string; price: string; phase: "signing" | "settling"
-}) => (
-  <div className="tool-out">
-    <div className="marker is-running" role="status">
-      <span className="marker-dot" aria-hidden="true" />
-      <span className="marker-name">{skillId}</span>
-      <span className="marker-doing">
-        {phase === "signing"
-          ? "waiting for your wallet to sign — no gas, no chain round-trip"
-          : "authorization signed; awaiting hub outcome"}
-      </span>
-      <span className="marker-state">{price}</span>
-    </div>
-  </div>
-)
-
-const Settlement = ({ request }: { request: Record<string, unknown> }) => {
-  const [phase, setPhase] = useState<"signing" | "settling" | "done" | "failed">("signing")
-  const [detail, setDetail] = useState<string | undefined>(undefined)
-  const [outcome, setOutcome] = useState<Record<string, unknown> | undefined>(undefined)
-  const started = useRef(false)
-
-  const skillId = typeof request["skillId"] === "string" ? request["skillId"] : ""
-  const payTo = typeof request["payTo"] === "string" ? request["payTo"] : ""
-  const amountAtomic = typeof request["amountAtomic"] === "string" ? request["amountAtomic"] : ""
-  const price = typeof request["price"] === "string" ? request["price"] : ""
-
-  useEffect(() => {
-    if (started.current) return
-    started.current = true
-
-    void (async () => {
-      const provider = getProvider()
-      if (provider === undefined) {
-        setPhase("failed")
-        setDetail(walletBlocker(false, undefined))
-        return
-      }
-      try {
-        const accounts = (await provider.request({
-          method: "eth_requestAccounts"
-        })) as ReadonlyArray<string>
-        const from = accounts[0]
-        if (from === undefined) throw new Error("no account was authorised")
-
-        const authorization = await signPayment(provider, { from, payTo, amountAtomic })
-        setPhase("settling")
-
-        const res = await fetch("/api/settle", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ skillId, authorization, input: request["input"] ?? {} })
-        })
-        const body = (await res.json()) as Record<string, unknown>
-        if (!res.ok) {
-          setPhase("failed")
-          setDetail(
-            typeof body["detail"] === "string"
-              ? body["detail"]
-              : `the endpoint returned HTTP ${res.status}`
-          )
-          return
-        }
-        setOutcome((body["body"] ?? body) as Record<string, unknown>)
-        setPhase("done")
-      } catch (e) {
-        setPhase("failed")
-        setDetail(String((e as Error)?.message ?? e))
-      }
-    })()
-  }, [skillId, payTo, amountAtomic])
-
-  if (phase === "signing" || phase === "settling") {
-    return <SettlementProgress skillId={skillId} price={price} phase={phase} />
-  }
-
-  if (phase === "failed") {
-    return <SettlementFailure skillId={skillId} detail={detail} />
-  }
-
-  return <SettlementOutcome skillId={skillId} price={price} outcome={outcome ?? {}} />
-}
-
-export const SettlementOutcome = ({ skillId, price, outcome }: {
-  skillId: string; price: string; outcome: Record<string, unknown>
-}) => {
-  const s = readSettlement(outcome)
-  if (!s.settled) return <SettlementFailure skillId={skillId}
-    detail="The hub reports no settlement. The signed authorization may still be valid; check the settlement record before retrying." />
-  return (
-    <Purchase
-      skillId={skillId}
-      settled={s.settled}
-      {...(s.settleTx === undefined ? {} : { settleTx: s.settleTx })}
-      {...(s.reason === undefined ? {} : { reason: s.reason })}
-      pricePaidUsdc={s.price ?? price}
-      result={s.result}
-    />
-  )
-}
-
-/** What the visitor decided, kept in the transcript so the record is not just the outcome. */
-const Decided = ({ approved }: { approved: boolean }) => (
-  <div className="tool-out">
-    <p className="tool-note">
-      {approved
-        ? "approved — deriving the payment terms from the endpoint’s own challenge"
-        : "declined · nothing was signed and nothing was spent"}
-    </p>
-  </div>
-)
-
 // ── the thread ──────────────────────────────────────────────────────────────
 
 /**
@@ -685,13 +201,11 @@ const Decided = ({ approved }: { approved: boolean }) => (
  */
 export const Thread = ({
   messages,
-  onApproval = () => {},
-  quote
+  renderPurchase
 }: {
   messages: ReadonlyArray<UIMessageLike>
-  /** Answer a pending approval. Defaulted so scripted transcripts render without a chat. */
-  onApproval?: (id: string, approved: boolean) => void
-  quote?: QuoteFn
+  /** Only the live Chat supplies an owner-backed renderer. Default is wholly passive. */
+  renderPurchase?: (part: UIMessageLike["parts"][number]) => ReactNode
 }) => {
   /*
    * The newest USER turn is the scroll anchor.
@@ -722,30 +236,10 @@ export const Thread = ({
               if (part.type.startsWith("tool-")) {
                 const name = part.type.slice("tool-".length)
 
-                // The card is the state, so it does not also get a marker above it saying
-                // the tool is running. Every other tool state does.
-                if (part.state === "approval-requested" && part.approval !== undefined) {
-                  const input = (part.input ?? {}) as Record<string, unknown>
-                  const skillId = typeof input["skillId"] === "string" ? input["skillId"] : ""
-                  const max =
-                    typeof input["maxAmountUsd"] === "string" ? input["maxAmountUsd"] : ""
-                  const id = part.approval.id
-                  return (
-                    <PendingPurchase
-                      key={i}
-                      skillId={skillId}
-                      input={input["input"]}
-                      maxAmountUsd={max}
-                      onDecide={(approved) => onApproval(id, approved)}
-                      {...(quote === undefined ? {} : { quote })}
-                    />
-                  )
+                if (name === "arcade_call_skill") {
+                  return <div key={i}>{m.role === "assistant" && renderPurchase
+                    ? renderPurchase(part) : <ArchivedPurchase />}</div>
                 }
-
-                if (part.state === "approval-responded" && part.approval !== undefined) {
-                  return <Decided key={i} approved={part.approval.approved === true} />
-                }
-
                 return (
                   <div key={i}>
                     <ToolMarker name={name} state={part.state ?? ""} />
@@ -771,11 +265,12 @@ export interface UIMessageLike {
     readonly type: string
     readonly text?: string | undefined
     readonly state?: string | undefined
-    /** The tool's structured result. THE authoritative copy of every figure. */
+    readonly toolCallId?: string | undefined
+    /** Structured tool claims, not private payment authority or verified settlement. */
     readonly output?: unknown
-    /** The arguments the approval covers — `skillId` and the ceiling, nothing else. */
+    /** Original arguments include actual input, skill and price ceiling. */
     readonly input?: unknown
-    /** Present only in the two approval states. `approved` is absent until answered. */
+    /** SDK retains approval on output states too. Flags alone cannot authorize payment. */
     readonly approval?: { readonly id: string; readonly approved?: boolean | undefined }
   }>
 }
@@ -811,6 +306,46 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
      */
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses
   })
+  type Owner = ReturnType<typeof createPurchaseConversation>
+  const ownerRef = useRef<{ id: string | undefined; owner: Owner } | undefined>(undefined)
+  const [owner, setOwner] = useState<Owner>()
+  const [purchaseViews, setPurchaseViews] = useState<Record<string, Readonly<PurchaseView>>>({})
+  const latest = useRef({ messages, addToolApprovalResponse })
+  latest.current = { messages, addToolApprovalResponse }
+  // Setup/cleanup/setup under StrictMode leaves one live owner, never a restored permit.
+  useEffect(() => {
+    const next = createPurchaseConversation(initial ?? [], (key, view) => {
+      if (ownerRef.current?.owner === next) setPurchaseViews(old => ({ ...old, [key]: view }))
+    })
+    ownerRef.current = { id, owner: next }; setOwner(next); setPurchaseViews({})
+    return () => { next.close(); if (ownerRef.current?.owner === next) ownerRef.current = undefined }
+  }, [id])
+  useEffect(() => {
+    const active = ownerRef.current
+    if (!active || active.id !== id) return
+    for (const message of messages) if (message.role === "assistant") {
+      for (const part of message.parts) void active.owner.receive(part)
+    }
+  }, [messages, id])
+  useEffect(() => { if (error !== undefined) ownerRef.current?.owner.cancelPending() }, [error])
+  const decide = useCallback<PurchaseDecision>((part, approved, context, wallet) => {
+    const active = ownerRef.current, captured = capturePurchasePart(part)
+    if (!active || active.id !== id || !captured || !latest.current.messages.some(m => m.role === "assistant" &&
+      m.parts.some(p => {
+        const current = capturePurchasePart(p)
+        return current?.state === "approval-requested" && JSON.stringify(current.binding) === JSON.stringify(captured.binding)
+      }))) return false
+    if (!(approved ? active.owner.approve(part, context, wallet) : active.owner.deny(part))) return false
+    const key = captured.binding.toolCallId
+    setPurchaseViews(old => ({ ...old, [key]: { phase: approved ? "checking" : "refused", message: approved
+      ? "Confirmation recorded. Waiting for tool validation."
+      : "Purchase declined in this conversation. No new authorization was requested by this decision." } }))
+    try {
+      void Promise.resolve(latest.current.addToolApprovalResponse({ id: captured.binding.approvalId, approved }))
+        .catch(() => active.owner.discard(key))
+    } catch { active.owner.discard(key); return false }
+    return true
+  }, [id])
   const [input, setInput] = useState("")
   // Which row the arrow keys are on. Reset whenever the candidate list changes.
   const [cursor, setCursor] = useState(0)
@@ -884,7 +419,17 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
               {messages.length === 0 ? <Empty chatLive={chatLive} hubUrl={hubUrl} /> : null}
               <Thread
                 messages={messages as ReadonlyArray<UIMessageLike>}
-                onApproval={(id, approved) => addToolApprovalResponse({ id, approved })}
+                renderPurchase={part => {
+                  const captured = capturePurchasePart(part), key = part.toolCallId
+                  // A malformed/replaced SDK part still gets its private progress,
+                  // but prototype names can never be mistaken for stored views.
+                  const view = key === undefined || !Object.hasOwn(purchaseViews, key) ? undefined : purchaseViews[key]
+                  if (view) return <LivePurchaseView view={view} />
+                  if (owner && ownerRef.current?.owner === owner && ownerRef.current.id === id && owner.canConfirm(part)) {
+                    return <PendingPurchase key={JSON.stringify(captured?.binding)} part={part} onDecision={decide} />
+                  }
+                  return <ArchivedPurchase />
+                }}
               />
             </MessageScroller.Content>
           </MessageScroller.Viewport>
@@ -896,7 +441,7 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
 
       {error !== undefined ? (
         <p className="chat-error" role="alert">
-          {error.message}
+          The chat request did not complete. Check any pending purchase before retrying.
         </p>
       ) : null}
 

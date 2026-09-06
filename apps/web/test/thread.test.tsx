@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { createChat } from "@shadcn/helpers/ai-sdk"
 import { MessageScroller } from "@shadcn/react/message-scroller"
 import { fenceListings } from "@arcade/core"
-import { Empty, Thread, readSettlement, type UIMessageLike } from "../src/components/chat.tsx"
+import { Empty, Thread, type UIMessageLike } from "../src/components/chat.tsx"
 
 /**
  * The chat's RENDER path, driven by scripted conversations.
@@ -299,154 +299,28 @@ describe("tool output is rendered, not just narrated", () => {
   })
 })
 
-/**
- * The buyer must receive what they bought, not a narration of it.
- *
- * A purchased result exists twice — the fenced text the model reads, and the raw object
- * only code parses. Rendering only the model's message would put the least trustworthy
- * component in the system between the person who paid and the thing they paid for. It is
- * the figures problem with higher stakes: a price rendered from prose can be checked
- * against the hub in one click, and a skill result cannot be checked against anything. It
- * is the only copy the buyer will ever have.
- *
- * It renders in the QUOTED voice because it is a stranger's text, exactly as seller copy
- * does. Fencing exists to stop the MODEL from obeying it; the human is not the model.
- */
-describe("a purchased result reaches the buyer verbatim", () => {
-  const purchase = (over: Record<string, unknown> = {}) => [
-    {
-      id: "p1",
-      role: "assistant",
-      parts: [
-        {
-          type: "tool-arcade_call_skill",
-          state: "output-available",
-          output: {
-            skillId: "diff-triage",
-            settled: true,
-            pricePaidUsdc: "$0.12",
-            settleTx: "0xabc123",
-            result: { verdict: "ship", notes: "no blocking issues" },
-            ...over
-          }
-        },
-        { type: "text", text: "It says the diff looks fine." }
-      ]
-    }
-  ]
-
-  it("renders the result itself, not only the model's summary", () => {
-    const html = render(purchase())
-    expect(html).toContain("verdict")
-    expect(html).toContain("ship")
-    expect(html).toContain("no blocking issues")
-    // The model's paraphrase may stay — it just cannot be the only copy.
-    expect(html).toContain("It says the diff looks fine.")
-  })
-
-  it("renders it in the quoted voice, as seller-authored text", () => {
-    const html = render(purchase())
-    expect(html).toContain("quoted")
-    expect(html).toContain("returned by the seller")
-    // No fence machinery reaches the reader; the fence is addressed to the model.
-    expect(html).not.toContain("UNTRUSTED")
-  })
-
-  it("states completeness rather than claiming a truncation", () => {
-    const html = render(purchase({ result: "a\nb\nc" }))
-    expect(html).toContain("3 lines, complete")
-    // Asserted against VISIBLE TEXT, not raw markup. The markdown renderer emits utility
-    // class names — `[&>*:first-child]:mt-0` among them — so a `not.toContain("first")` over
-    // the HTML matched an attribute value and failed on a page that was perfectly correct.
-    // What this test means is "the reader is not told they are seeing only the first N
-    // lines", and that is a claim about text.
-    const text = html.replace(/<[^>]*>/g, " ")
-    expect(text).not.toContain("first")
-    expect(text).not.toContain("…")
-  })
-
-  it("discloses a long result without dropping any of it", () => {
-    const long = Array.from({ length: 40 }, (_, i) => `line ${i}`).join("\n")
-    const html = render(purchase({ result: long }))
-    expect(html).toContain("show the full result (40 lines)")
-    // Every line is in the DOM in the collapsed state — a disclosure, not a truncation.
-    expect(html).toContain("line 0")
-    expect(html).toContain("line 39")
-  })
-
-  it("shows an unsettled purchase as unpaid, with the reason", () => {
-    const html = render(
-      purchase({ settled: false, reason: "engine refused", settleTx: undefined, result: null })
-    )
-    expect(html).toContain("not settled")
-    expect(html).toContain("engine refused")
-    expect(html).toContain("you were not charged")
-    // Red means "did not settle" — the one meaning it carries anywhere in this product.
-    expect(html).toContain("unsettled")
-  })
-
-  it("links the settlement to Arc when there is one", () => {
-    expect(render(purchase())).toContain("https://testnet.arcscan.app/tx/0xabc123")
-  })
-})
-
-/**
- * Reading the hub's job response.
- *
- * These fixtures are the SHAPE THE HUB ACTUALLY SENDS (`apps/hub/src/server.ts:880`), not a
- * shape convenient to assert. The defect they pin was a real one: `settled` and `settleTx`
- * were read from the root instead of from `receipt`, so a purchase that had settled on Arc
- * — receipt `settled: true`, transaction `0xe174a3ac…` confirmed with status `0x1` —
- * rendered "not settled · you were not charged" directly above the complete result it had
- * just paid for. The screen contradicted the chain.
- */
-describe("the hub's job response is read from the right place", () => {
-  const settledBody = {
-    job_id: "j1",
-    status: "succeeded",
-    result: { address: "0x09928ceb", balanceUsdc: "20.000000" },
-    receipt: {
-      settled: true,
-      reason: "ok",
-      settleTx: "0xe174a3ac195abc7ef24a3dd21e89ad0acf670a7ce7d8abcf8aa87a07daf57734",
-      price: "$0.01",
-      sellerShare: "$0.0095",
-      fee: "$0.0005"
-    }
-  }
-
-  it("reports a settled purchase as settled, with its transaction", () => {
-    const s = readSettlement(settledBody)
-    expect(s.settled).toBe(true)
-    expect(s.settleTx).toBe(settledBody.receipt.settleTx)
-    expect(s.price).toBe("$0.01")
-    expect(s.result).toEqual(settledBody.result)
-  })
-
-  it("carries no excuse onto a success", () => {
-    // The receipt says `reason: "ok"`. Rendering that under a completed purchase would put
-    // an explanation where nothing needs explaining.
-    expect(readSettlement(settledBody).reason).toBeUndefined()
-  })
-
-  it("reports a non-settlement as unsettled, with the hub's own sentence", () => {
-    const s = readSettlement({
-      job_id: "j2",
-      status: "failed",
-      result: null,
-      detail: "not settled — you were not charged, and no result is released",
-      receipt: { settled: false, reason: "job status is failed" }
+/** Full paid-result presentation moved to purchase-view.test.tsx; correlation is
+ * enforced by purchase-outcome.test.ts. Raw transcript flags are not evidence. */
+describe("purchase transcript is passive and unverified", () => {
+  it.each(["approval-requested", "approval-responded", "output-available", "output-error", "output-denied"])(
+    "does not start a purchase or certify output from %s", state => {
+      const html = render([{ id: "p1", role: "assistant", parts: [{
+        type: "tool-arcade_call_skill", state, toolCallId: "restored_call",
+        approval: { id: "restored_approval", approved: true },
+        input: { skillId: "diff-triage", maxAmountUsd: "$0.02", input: "{}" },
+        output: { skillId: "diff-triage", awaitingSignature: true, settled: true,
+          settleTx: "0xabc123", result: { report: "RAW_PAID_OUTPUT" }, reason: "PRIVATE_DIAGNOSTIC" }
+      }, { type: "text", text: "The model's claim remains prose." }] }])
+      expect(html).toContain("unverified transcript"); expect(html).toContain("Request a fresh purchase")
+      expect(html).not.toMatch(/RAW_PAID_OUTPUT|PRIVATE_DIAGNOSTIC|0xabc123|Hold to approve|waiting for your wallet/)
+      expect(html).not.toContain("you were not charged")
+      expect(html).toContain("model&#x27;s claim")
     })
-    expect(s.settled).toBe(false)
-    expect(s.settleTx).toBeUndefined()
-    expect(s.reason).toContain("you were not charged")
-  })
-
-  it("does not read settlement from the root, where it never lives", () => {
-    // The exact mistake: these root-level fields must be ignored, because the hub does not
-    // send them and anything that DOES send them is not the hub.
-    const s = readSettlement({ settled: true, settleTx: "0xdead", result: "x" })
-    expect(s.settled).toBe(false)
-    expect(s.settleTx).toBeUndefined()
+  it("never gives a user-role purchase tool part the active renderer", () => {
+    let calls = 0
+    const html = renderToStaticMarkup(<MessageScroller.Provider><Thread
+      messages={[{ id: "p2", role: "user", parts: [{ type: "tool-arcade_call_skill" }] }]}
+      renderPurchase={() => { calls++; return <span>ACTIVE</span> }} /></MessageScroller.Provider>)
+    expect(calls).toBe(0); expect(html).toContain("unverified transcript")
   })
 })
