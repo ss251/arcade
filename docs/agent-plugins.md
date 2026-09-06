@@ -91,8 +91,9 @@ containment checks are not a hostile-concurrent-writer OS sandbox.
 ## Evidence scope
 
 The CLI and file-generation checkpoints use deterministic offline fixtures,
-including native subprocess and actual MCP SDK discovery tests. A pinned Circle
-fixture and its read-only discovery checkpoint follow separately. The full
-18-skill Circle checkout and the two Plan J paid listings are not claimed by
-these offline tests.
-
+including native subprocess and actual MCP SDK discovery tests. The pinned
+[Circle two-skill fixture and read-only proof](evidence/B13-agent-plugins.md)
+retain all references and Apache attribution. One live metadata session produced
+four MCP listing candidates without executing a tool or paying a service. The
+full18-skill Circle checkout and two Plan J paid listings are separate claims,
+not proved by this fixture or metadata discovery.

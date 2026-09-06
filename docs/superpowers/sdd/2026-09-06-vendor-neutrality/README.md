@@ -10,7 +10,9 @@ single-threaded, no new spending or push.
   once: unchanged first-party skill/public listing, one API request, no payment.
 - Task3: [ingestion brief](task-3-brief.md), [inert-loader checkpoint](task-3a-report.md).
   [File-generation checkpoint](task-3b1-report.md), [CLI checkpoint](task-3b2-report.md).
-  The pinned Circle fixture/read-only evidence remain next. Unsupported types are reported.
+  [Pinned Circle fixture report](task-3b3-report.md) and
+  [read-only discovery evidence](../../../evidence/B13-agent-plugins.md).
+  Unsupported types are reported; full Plan J paid listings remain separate.
 
 The [public SDD index](../README.md) and [seller guide](../../../seller-guide.md)
 remain the entry points. Historical terminology updates are explicitly dated;

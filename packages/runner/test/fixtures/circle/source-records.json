@@ -1,0 +1,187 @@
+{
+  "repository": "https://github.com/circlefin/skills",
+  "revision": "26dc09ea0746a038c969c6f197feee1267f834b5",
+  "pluginVersion": "1.4.0",
+  "upstreamSkillCount": 18,
+  "includedSkills": [
+    "pay-via-agent-wallet",
+    "use-gateway"
+  ],
+  "files": [
+    {
+      "source": "LICENSE",
+      "path": "LICENSE",
+      "sourceGitBlobSha1": "4947287f7b5ccb5d1e8b7b2d3aa5d89f322c160d",
+      "sourceBytes": 10173,
+      "normalization": "append-final-lf"
+    },
+    {
+      "source": "plugins/circle/.codex-plugin/plugin.json",
+      "path": ".codex-plugin/plugin.json",
+      "sourceGitBlobSha1": "12d4d1963e7249ff41b0dccc3604f8c111fcffa6",
+      "sourceBytes": 1506,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/.mcp.json",
+      "path": ".mcp.json",
+      "sourceGitBlobSha1": "c318a448c22d710a77dab417d1d1391cd18acd59",
+      "sourceBytes": 100,
+      "normalization": "append-final-lf"
+    },
+    {
+      "source": "plugins/circle/assets/logo-square.svg",
+      "path": "assets/logo-square.svg",
+      "sourceGitBlobSha1": "2a55c3b281e28738ffada489838a2dfdb9402fce",
+      "sourceBytes": 4577,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/pay-via-agent-wallet/SKILL.md",
+      "path": "skills/pay-via-agent-wallet/SKILL.md",
+      "sourceGitBlobSha1": "1952a93632689549c0479666d64968af10bb62c4",
+      "sourceBytes": 15680,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/pay-via-agent-wallet/references/errors.md",
+      "path": "skills/pay-via-agent-wallet/references/errors.md",
+      "sourceGitBlobSha1": "9e36b86578474382bc8b25afac17a7cefa19ed45",
+      "sourceBytes": 6002,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/SKILL.md",
+      "path": "skills/use-gateway/SKILL.md",
+      "sourceGitBlobSha1": "2f1cd8736d56c1d6b91648b1370ba36748eeb5e2",
+      "sourceBytes": 11548,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/deposit-evm-browser-wallet.md",
+      "path": "skills/use-gateway/references/deposit-evm-browser-wallet.md",
+      "sourceGitBlobSha1": "d8e62dbd6a4a3a908aeeb85ba53f84451b5eac10",
+      "sourceBytes": 6479,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/deposit-evm-circle-wallet.md",
+      "path": "skills/use-gateway/references/deposit-evm-circle-wallet.md",
+      "sourceGitBlobSha1": "5e69e522276179af883523bbe5e2e955026b0414",
+      "sourceBytes": 4067,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/deposit-evm.md",
+      "path": "skills/use-gateway/references/deposit-evm.md",
+      "sourceGitBlobSha1": "94cefb677b061ecc6ee198908819a150a08e52dd",
+      "sourceBytes": 2981,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/deposit-solana-circle-wallet.md",
+      "path": "skills/use-gateway/references/deposit-solana-circle-wallet.md",
+      "sourceGitBlobSha1": "32ed72176a4022f7b3c4862ee4a855619797ad2f",
+      "sourceBytes": 6102,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/deposit-solana.md",
+      "path": "skills/use-gateway/references/deposit-solana.md",
+      "sourceGitBlobSha1": "445bc8266a94b6a8d2922bca33ebd8c61dee3a34",
+      "sourceBytes": 4644,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/evm-to-evm-browser-wallet.md",
+      "path": "skills/use-gateway/references/evm-to-evm-browser-wallet.md",
+      "sourceGitBlobSha1": "20197b618fb3ea65108dff9b4ddc0b54441d1b38",
+      "sourceBytes": 9532,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/evm-to-evm.md",
+      "path": "skills/use-gateway/references/evm-to-evm.md",
+      "sourceGitBlobSha1": "57a36328ceb01cd2b55748a2f1a4c5b02591bbae",
+      "sourceBytes": 6345,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/evm-to-solana-circle-wallet.md",
+      "path": "skills/use-gateway/references/evm-to-solana-circle-wallet.md",
+      "sourceGitBlobSha1": "1e1b187625ce06cc41445df9bc865801cb006088",
+      "sourceBytes": 14030,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/evm-to-solana.md",
+      "path": "skills/use-gateway/references/evm-to-solana.md",
+      "sourceGitBlobSha1": "9c0759c40ab0628965fdfbc177f442e2dd98b4dd",
+      "sourceBytes": 11466,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/query-balance.md",
+      "path": "skills/use-gateway/references/query-balance.md",
+      "sourceGitBlobSha1": "8c90cc58db4ab7898102268347e5434de10051d0",
+      "sourceBytes": 1517,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/solana-to-evm-circle-wallet.md",
+      "path": "skills/use-gateway/references/solana-to-evm-circle-wallet.md",
+      "sourceGitBlobSha1": "cb693346687a28ee569f996c98b989ac8b273cb2",
+      "sourceBytes": 10100,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/solana-to-evm.md",
+      "path": "skills/use-gateway/references/solana-to-evm.md",
+      "sourceGitBlobSha1": "714fcf293ab134642a0482970e28b61cfa91d699",
+      "sourceBytes": 10421,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/solana-to-solana-circle-wallet.md",
+      "path": "skills/use-gateway/references/solana-to-solana-circle-wallet.md",
+      "sourceGitBlobSha1": "ec4a3356f06d986bc8042e0dcf6185131e1c5d69",
+      "sourceBytes": 14564,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/solana-to-solana.md",
+      "path": "skills/use-gateway/references/solana-to-solana.md",
+      "sourceGitBlobSha1": "78260ea7117fb2cd09f9fa4432ba5513579da227",
+      "sourceBytes": 13956,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/transfer-evm-circle-wallet.md",
+      "path": "skills/use-gateway/references/transfer-evm-circle-wallet.md",
+      "sourceGitBlobSha1": "3fa737cecd862c533043b6af1bd06c0460ba6be3",
+      "sourceBytes": 7212,
+      "normalization": "none"
+    },
+    {
+      "source": "plugins/circle/skills/use-gateway/references/transfer-evm-delegate.md",
+      "path": "skills/use-gateway/references/transfer-evm-delegate.md",
+      "sourceGitBlobSha1": "e90cdc63c05d7ec7d03eacf44949e4e4f6fc26aa",
+      "sourceBytes": 7889,
+      "normalization": "none"
+    },
+    {
+      "source": "LICENSE",
+      "path": "skills/pay-via-agent-wallet/LICENSE",
+      "sourceGitBlobSha1": "4947287f7b5ccb5d1e8b7b2d3aa5d89f322c160d",
+      "sourceBytes": 10173,
+      "normalization": "append-final-lf"
+    },
+    {
+      "source": "LICENSE",
+      "path": "skills/use-gateway/LICENSE",
+      "sourceGitBlobSha1": "4947287f7b5ccb5d1e8b7b2d3aa5d89f322c160d",
+      "sourceBytes": 10173,
+      "normalization": "append-final-lf"
+    }
+  ]
+}
