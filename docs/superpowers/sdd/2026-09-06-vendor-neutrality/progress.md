@@ -1,5 +1,16 @@
 # Vendor-neutrality progress
 
+2026-09-07 00:36 IST — Task3B1 sole gate97468 PASS:4458Vitest198/63.55s,
+839Bun55/6114assert/163.86s,rootwebstrict0,client377ms/SSR207ms. Threepins,
+sevenpaths,twelvelinks,unchangedCLI+existingadapters/core/payments/locks,privacy/
+diffPASS. Atomic file-generation checkpoint/FFmain next. No gate replay.
+
+2026-09-07 00:29 IST — Task3B1 file snapshots/exclusive writer implemented,
+initial absent-module collection failure,86initial passes/four-root strict0,
+then255focused/4 after corrected byte-limit fixture plus disk/mutation/node
+regressions. ExistingCLI/MCP+OpenAPIwriter untouched; caps include zero-byte
+file/directory counts. Source freeze/sole max4fullgate next; CLI+B2 stillnext.
+
 2026-09-07 00:17 IST — Task3A sole gate56532 PASS:4422Vitest197/61.15s,
 839Bun55/6116assert/163.67s,rootwebstrict0,client356ms/SSR185ms. Eightfrozen
 source/fixture pins,12scopedpaths,verbatimparser/unchangedCLI+payments/projection,

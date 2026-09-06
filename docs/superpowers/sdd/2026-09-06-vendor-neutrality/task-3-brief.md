@@ -61,6 +61,10 @@ CLI behavior remains unchanged at this intermediate checkpoint.
 
 ## Commit B — preview and generation
 
+Execution split after the loader checkpoint: B1 isolates bounded source snapshots
+and exclusive nested file generation; B2 wires the CLI/adapters and pinned Circle
+fixture. Each is an atomic checkpoint with its own single sequential full gate.
+
 Wire arcade publish <plugin-dir> into existing adapters and public/private
 projection. Preserve singular directory behavior for directories with arcade.json.
 Preview by default; --json stays write-free; --yes is explicit local generation.

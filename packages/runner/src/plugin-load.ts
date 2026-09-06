@@ -88,7 +88,8 @@ const present = async (root: string, path: string): Promise<boolean> => {
 
 /** A file growing during a read cannot allocate beyond the limit. O_NONBLOCK
  * also prevents a concurrently substituted FIFO from blocking the process. */
-const readText = async (root: string, path: string, max: number): Promise<string> => {
+export const readPluginFileBytes = async (root: string, path: string, max: number): Promise<Uint8Array> => {
+  if (!Number.isSafeInteger(max) || max <= 0 || max > 16 * 1024 * 1024) return invalid()
   const before = await checkedPath(root, path, "file")
   if (before.stat.size > max) return invalid()
   const handle = await open(before.path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
@@ -107,9 +108,12 @@ const readText = async (root: string, path: string, max: number): Promise<string
     const after = await checkedPath(root, path, "file")
     if (after.stat.dev !== stat.dev || after.stat.ino !== stat.ino ||
       after.stat.size !== stat.size || after.stat.mtimeMs !== stat.mtimeMs) return invalid()
-    return new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, size))
+    // Retaining a tiny file must not retain the entire limit-sized scratch buffer.
+    return Uint8Array.from(buffer.subarray(0, size))
   } finally { await handle.close() }
 }
+const readText = async (root: string, path: string, max: number): Promise<string> =>
+  new TextDecoder("utf-8", { fatal: true }).decode(await readPluginFileBytes(root, path, max))
 const readJson = async (root: string, path: string): Promise<Record<string, unknown>> => {
   const value: unknown = JSON.parse(await readText(root, path, PLUGIN_LIMITS.jsonBytes))
   return object(value) ? value : invalid()
@@ -126,6 +130,10 @@ const childNames = async (root: string, path: string): Promise<string[]> => {
   if (before.stat.dev !== after.stat.dev || before.stat.ino !== after.stat.ino) return invalid()
   return result.sort()
 }
+
+/** Shared containment checks for the separate, opt-in file generation stage. */
+export const pluginPathInfo = checkedPath
+export const pluginDirectoryNames = childNames
 
 const metadataKeys = ["name", "version", "description", "author", "homepage", "repository", "license", "keywords"]
 const validateMetadata = (manifest: Record<string, unknown>): void => {
