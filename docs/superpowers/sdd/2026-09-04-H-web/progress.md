@@ -1,5 +1,16 @@
 # SDD ledger — Plan H
 
+2026-09-06 20:58 IST: H13b frozen full56747 exit0:4215Vitest185/58.12s,
+834Bun54/6091assert/162.89s,rootwebstrict0,client372msSSR177ms.214focused/9,
+exact11web+3fixture strict0. Native11-case behavior checks exposed visual
+address clipping/false-looking quote facts; corrected,11cases passed again;
+final2 scoped44px refusal/decline checks passed with zero wallet/payment IO.
+15PIDs absent/9ports refused/0ownedprofiles; screenshots read, no live proof.
+11new/21predecessor pins,CSSprefix,offlinekeylines,exactcopies,217links/privacy
+audit passed before final index entries. Root-only/no fan-out/reviews/gate
+overlap/fullrepeat/newspend/keys/ENS/production/push. Atomic commit next;
+H14/session gap/Hmerge/deferredG8G9/vendor/I remain. Owner gates unchanged.
+
 2026-09-06 20:22 IST: H13a keyless target/quote/tools complete, browser name
 binding still H13b. Pre-source 29 Red; strict roots/options fixed; producer-aligned
 priceAtomic null added to two old fixtures. Final focused209/9 and exact10strict0.

@@ -42,8 +42,10 @@ async function setup() {
     expect(init?.redirect).toBe("error"); expect(init?.credentials).toBe("omit")
     if (u === HUB + "/listings/" + ID) return Response.json({ id: ID, seller: SELLER, ensName: NAME, version: "1.0.0",
       serviceName: "USDC Flow Check", description: "Public fixture", tags: [], price: "$0.01", inputSchema: {}, outputSchema: {}, bounds: { timeoutSec: 30 } })
-    if (u === HUB + "/names/" + NAME) return Response.json({ name: NAME, skillId: ID, seller: SELLER,
-      endpoint: HUB + RESOURCE, payTo: PAYEE, chain: REQ.network, priceAtomic: null, expired: expired || signed && expireAfterSigning })
+    if (u === HUB + "/names/" + NAME) return expired || signed && expireAfterSigning
+      ? Response.json({ error: "ens_name_expired" }, { status: 404 })
+      : Response.json({ name: NAME, skillId: ID, seller: SELLER,
+        endpoint: HUB + RESOURCE, payTo: PAYEE, chain: REQ.network, priceAtomic: null, expired: false })
     if (u === HUB + RESOURCE) {
       inputs.push(JSON.parse(String(init?.body)))
       if (!headers.has("payment-signature")) return Response.json({ x402Version: 2, rail: "eip3009", accepts: [REQ] }, { status: 402 })
@@ -68,6 +70,34 @@ async function setup() {
 }
 
 describe("E13 actual-input ENS regression on direct browser boundaries", () => {
+  it("purchases by the original name through the real route, offline signer and direct recovery boundaries", async () => {
+    const s = await setup(), target = { name: NAME }, context = await quotePurchaseContext(target, INPUT)
+    const binding = { approvalId: "approval_name", toolCallId: "call_name", toolName: "arcade_call_skill",
+      ...target, maxAmountUsd: "$0.02", input: INPUT }
+    const scope = createPurchaseApprovalScope(), token = scope.approve({ ...binding, context })
+    expect(token).toBeDefined()
+    const result = await runPurchase(scope, token, binding, { provider: s.provider, buyer: s.account.address })
+    expect(result).toMatchObject({ phase: "settled", recovery: "stored", outcome: { source: "hub" } })
+    const web = s.f.mock.calls.filter(([url]) => String(url) === WEB + "/api/quote")
+    expect(web).toHaveLength(3)
+    expect(web.map(([, init]) => JSON.parse(String(init?.body)))).toEqual(new Array(3).fill({ name: NAME, input: INPUT }))
+    expect(s.f.mock.calls.filter(([, init]) => new Headers(init?.headers).has("payment-signature"))).toHaveLength(1)
+    expect(s.inputs).toEqual([INPUT, INPUT, INPUT, INPUT])
+    expect(s.provider.request.mock.calls.filter(([a]) => a.method === "eth_signTypedData_v4")).toHaveLength(1)
+    expect((await runPurchase(scope, token, binding, { provider: s.provider, buyer: s.account.address })).phase).toBe("refused")
+  })
+  it.each([false, true])("stops a named purchase on real typed expiry around signing (after: %s)", async after => {
+    const s = await setup(), context = await quotePurchaseContext({ name: NAME }, INPUT)
+    const binding = { approvalId: "approval_name", toolCallId: "call_name", toolName: "arcade_call_skill",
+      name: NAME, maxAmountUsd: "$0.02", input: INPUT }
+    const scope = createPurchaseApprovalScope(), token = scope.approve({ ...binding, context })
+    expect(token).toBeDefined()
+    if (after) s.expireOnSignature(); else s.expire()
+    const result = await runPurchase(scope, token, binding, { provider: s.provider, buyer: s.account.address })
+    expect(result.phase).toBe(after ? "unconfirmed" : "refused")
+    expect(s.provider.request.mock.calls.filter(([a]) => a.method === "eth_signTypedData_v4")).toHaveLength(after ? 1 : 0)
+    expect(s.f.mock.calls.filter(([, init]) => new Headers(init?.headers).has("payment-signature"))).toHaveLength(0)
+  })
   it("POST quotes actual input and returns the complete verified browser context", async () => {
     const s = await setup(), context = await quotePurchaseContext(ID, INPUT)
     expect(context).toMatchObject({ ensName: NAME, payTo: PAYEE, rail: "eip3009", requirements: REQ })
@@ -79,7 +109,8 @@ describe("E13 actual-input ENS regression on direct browser boundaries", () => {
   })
   it("contains quote diagnostics and fails closed on expired ENS", async () => {
     const s = await setup(); s.expire()
-    await expect(quotePurchaseContext(ID, INPUT)).rejects.toThrow(/^Purchase terms unavailable$/)
+    await expect(quotePurchaseContext(ID, INPUT)).rejects.toMatchObject({ code: "ens_name_expired",
+      message: "The ENS name has expired. Request a fresh resolution after renewal; no payment was started." })
     s.f.mockRejectedValue(Error("PRIVATE_PROVIDER_DIAGNOSTIC"))
     const response = await s.handleQuote({ request: request({ skillId: ID, input: INPUT }) })
     expect(response.status).toBe(502); expect(await response.text()).not.toMatch(/PRIVATE_|0x111111/)

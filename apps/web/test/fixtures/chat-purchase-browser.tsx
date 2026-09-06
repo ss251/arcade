@@ -37,7 +37,8 @@ const fixture = {
   async reset(mode = "normal", rail = "eip3009") {
     const response = await fetch("/fixture-control", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode, rail }) })
     if (!response.ok) throw Error("Fixture control failed")
-    revision++; initial = []; messages = []; methods.length = 0; chain = "0x4cef52"; holdSignature = mode === "hold-signature"; release = undefined
+    revision++; initial = []; messages = []; methods.length = 0; chain = "0x4cef52"
+    holdSignature = mode === "hold-signature" || mode === "name-hold-signature"; release = undefined
     render()
   },
   restore() { revision++; initial = JSON.parse(JSON.stringify(messages)); render() },

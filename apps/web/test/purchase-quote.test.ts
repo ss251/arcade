@@ -14,6 +14,38 @@ const body = () => ({ skillId: "diff-triage", price: "$0.01", amountAtomic: "100
 beforeEach(() => vi.stubGlobal("location", { origin: WEB }))
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); vi.useRealTimers() })
 describe("fixed same-origin keyless purchase quote", () => {
+  it("sends only the original name and actual input, binding both response projections", async () => {
+    const name = "diff-triage.seller.arcade.eth", value = body()
+    const f = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => Response.json({
+      ...value, ensName: name, browser: { ...value.browser, ensName: name }
+    }))
+    const result = await quotePurchaseContext({ name }, { diff: "owned input" }, {}, f)
+    expect(result.skillId).toBe("diff-triage"); expect(result.ensName).toBe(name)
+    expect(JSON.parse(String(f.mock.calls[0]?.[1]?.body))).toEqual({ name, input: { diff: "owned input" } })
+    expect(f).toHaveBeenCalledTimes(1)
+  })
+  it.each([undefined, "other.eth"])("refuses a different or missing explicitly requested name (%s)", async ensName => {
+    const b = body(), response = { ...b, ...(ensName ? { ensName } : {}), browser: { ...b.browser, ...(ensName ? { ensName } : {}) } }
+    await expect(quotePurchaseContext({ name: "diff-triage.seller.arcade.eth" }, {}, {}, async () => Response.json(response)))
+      .rejects.toThrow("Purchase terms unavailable")
+  })
+  it.each([{ name: "x.eth", skillId: "diff-triage" }, { name: "x.eth", endpoint: HUB }, { name: "bad" }])("refuses extra or ambiguous target fields %j before IO", async target => {
+    const f = vi.fn(async () => Response.json(body()))
+    await expect(quotePurchaseContext(target, {}, {}, f)).rejects.toThrow("Purchase terms unavailable")
+    expect(f).not.toHaveBeenCalled()
+  })
+  it("projects only typed expiry and validated mismatched public payees outside transport errors", async () => {
+    const target = { name: "diff-triage.seller.arcade.eth" }, other = "0x" + "4".repeat(40)
+    await expect(quotePurchaseContext(target, {}, {}, async () => Response.json({
+      error: "ens_name_expired", detail: "PRIVATE_CAUSE"
+    }, { status: 502 }))).rejects.toMatchObject({ code: "ens_name_expired", message: expect.stringContaining("expired") })
+    await expect(quotePurchaseContext(target, {}, {}, async () => Response.json({
+      error: "ens_payto_mismatch", ensPayTo: SELLER, challengePayTo: other, detail: "PRIVATE_CAUSE"
+    }, { status: 502 }))).rejects.toMatchObject({ code: "ens_payto_mismatch", message: expect.stringContaining(SELLER) })
+    await expect(quotePurchaseContext(target, {}, {}, async () => Response.json({
+      error: "ens_payto_mismatch", ensPayTo: "PRIVATE_CAUSE", challengePayTo: other
+    }, { status: 502 }))).rejects.toMatchObject({ message: "Purchase terms unavailable" })
+  })
   it("uses captured canonical actual input and returns the complete immutable context", async () => {
     const f = vi.fn(async () => Response.json(body()))
     const input = { z: true, a: "é" }

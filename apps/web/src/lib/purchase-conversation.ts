@@ -6,13 +6,17 @@ import { parsePrice } from "../../../../packages/core/src/money.ts"
 import { capturePurchaseInput, createPurchaseApprovalScope, type PurchaseApprovalToken } from "./purchase-approval.ts"
 import { runPurchase, type PurchaseView } from "./purchase-run.ts"
 import type { Eip1193Provider } from "./wallet.ts"
+import { capturePurchaseTarget, type PurchaseTarget } from "./purchase-target.ts"
+import { capturePurchaseContext } from "./purchase-context.ts"
+import { skillIdOk } from "./hub-decode.ts"
 
-export interface PurchaseBinding {
+export type PurchaseBinding = PurchaseTarget & {
   readonly approvalId: string; readonly toolCallId: string; readonly toolName: "arcade_call_skill"
-  readonly skillId: string; readonly maxAmountUsd: string; readonly input: string
+  readonly maxAmountUsd: string; readonly input: string
 }
 export interface PurchasePart {
   readonly binding: Readonly<PurchaseBinding>; readonly state: string; readonly approved: boolean; readonly ready: boolean
+  readonly preparedSkillId?: string
 }
 const record = (input: unknown): Record<string, unknown> => {
   if (input === null || typeof input !== "object" || Array.isArray(input) ||
@@ -36,30 +40,35 @@ const callId = (input: unknown): string | undefined => {
 export const capturePurchasePart = (input: unknown): Readonly<PurchasePart> | undefined => {
   try {
     const p = record(input), a = record(p.approval), args = record(p.input)
+    const target = capturePurchaseTarget(args)
     if (p.type !== "tool-arcade_call_skill" || !id(p.toolCallId) || !id(a.id) ||
       typeof p.state !== "string" || !["approval-requested", "approval-responded", "output-available", "output-error", "output-denied"].includes(p.state) ||
       p.state === "approval-requested" && Object.hasOwn(a, "approved") ||
       p.preliminary !== undefined && typeof p.preliminary !== "boolean" ||
       a.approved !== undefined && typeof a.approved !== "boolean" ||
-      typeof args.skillId !== "string" || args.skillId.length > 64 || !/^[a-z0-9][a-z0-9-]{1,63}$/.test(args.skillId) ||
+      !target ||
       typeof args.maxAmountUsd !== "string" || args.maxAmountUsd.length > 100 || parsePrice(args.maxAmountUsd) >= 1n << 256n) return undefined
     const captured = capturePurchaseInput(args.input === undefined ? {} : args.input)
     if (captured === undefined) return undefined
     let ready = false
+    let preparedSkillId: string | undefined
     if (p.state === "output-available" && a.approved === true && p.preliminary !== true) {
       const output = record(p.output)
-      ready = output.awaitingSignature === true && output.toolCallId === p.toolCallId && output.skillId === args.skillId
+      ready = output.awaitingSignature === true && output.toolCallId === p.toolCallId && skillIdOk(output.skillId) &&
+        (target.name === undefined ? output.skillId === target.skillId :
+          output.name === target.name && output.ensName === target.name)
+      if (ready) preparedSkillId = output.skillId as string
     }
     return Object.freeze({ binding: Object.freeze({ approvalId: a.id, toolCallId: p.toolCallId,
-      toolName: "arcade_call_skill", skillId: args.skillId, maxAmountUsd: args.maxAmountUsd, input: captured }),
-      state: p.state, approved: a.approved === true, ready })
+      toolName: "arcade_call_skill", ...target, maxAmountUsd: args.maxAmountUsd, input: captured }),
+      state: p.state, approved: a.approved === true, ready, ...(preparedSkillId === undefined ? {} : { preparedSkillId }) })
   } catch { return undefined }
 }
 
 export const createPurchaseConversation = (initial: unknown, onUpdate: (id: string, view: Readonly<PurchaseView>) => void,
   run: typeof runPurchase = runPurchase) => {
   const scope = createPurchaseApprovalScope(), retired = new Set<string>(), seen = new Set<string>()
-  const pending = new Map<string, { token: PurchaseApprovalToken; binding: Readonly<PurchaseBinding>; wallet: unknown }>()
+  const pending = new Map<string, { token: PurchaseApprovalToken; binding: Readonly<PurchaseBinding>; wallet: unknown; skillId: string }>()
   const active = new Set<AbortController>()
   let closed = false, tail: Promise<void> = Promise.resolve()
   const close = () => {
@@ -102,9 +111,11 @@ export const createPurchaseConversation = (initial: unknown, onUpdate: (id: stri
         const capturedWallet = Object.freeze({ buyer: w.buyer, provider: Object.freeze({
           request: (args: Parameters<Eip1193Provider["request"]>[0]) => request.call(provider, args)
         }) })
-        const token = scope.approve({ ...p.binding, context })
+        const capturedContext = capturePurchaseContext(context)
+        if (!capturedContext) return false
+        const token = scope.approve({ ...p.binding, context: capturedContext })
         if (!token) return false
-        seen.add(p.binding.toolCallId); pending.set(p.binding.toolCallId, { token, binding: p.binding, wallet: capturedWallet })
+        seen.add(p.binding.toolCallId); pending.set(p.binding.toolCallId, { token, binding: p.binding, wallet: capturedWallet, skillId: capturedContext.skillId })
         return true
       } catch { return false }
     },
@@ -123,7 +134,7 @@ export const createPurchaseConversation = (initial: unknown, onUpdate: (id: stri
       const p = capturePurchasePart(input)
       if (!p || JSON.stringify(p.binding) !== JSON.stringify(entry.binding)) { discard(key); return Promise.resolve() }
       if (p.state === "approval-requested" || p.state === "approval-responded" && p.approved) return Promise.resolve()
-      if (!p.ready) { discard(key); return Promise.resolve() }
+      if (!p.ready || p.preparedSkillId !== entry.skillId) { discard(key); return Promise.resolve() }
       pending.delete(key) // Before queueing/awaits/effect re-entry; duplicate output has no permit.
       const controller = new AbortController(); active.add(controller)
       const work = tail.then(async () => {

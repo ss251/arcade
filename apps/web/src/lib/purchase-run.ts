@@ -110,7 +110,8 @@ export const createPurchaseRunner = (runtime: PurchaseRuntime) => {
         if (signal.aborted) stop()
       })
       const unchanged = async () => {
-        const fresh = capturePurchaseContext(await step(25000, opts => quote(request.skillId, request.inputJson, opts)))
+        const target = request.name === undefined ? request.skillId : Object.freeze({ name: request.name })
+        const fresh = capturePurchaseContext(await step(25000, opts => quote(target, request.inputJson, opts)))
         return fresh !== undefined && JSON.stringify(fresh) === JSON.stringify(request.context)
       }
       view("checking", "Checking the approved purchase terms.")

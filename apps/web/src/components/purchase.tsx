@@ -3,7 +3,7 @@ import { formatPrice, parsePrice } from "../../../../packages/core/src/money.ts"
 import { Confirm } from "./confirm.tsx"
 import { capturePurchasePart } from "../lib/purchase-conversation.ts"
 import { capturePurchaseContext, type BrowserPurchaseContext } from "../lib/purchase-context.ts"
-import { quotePurchaseContext } from "../lib/purchase-quote.ts"
+import { PurchaseQuoteFailure, quotePurchaseContext } from "../lib/purchase-quote.ts"
 import { readPurchaseWallet, type SelectedPurchaseWallet } from "../lib/purchase-wallet.ts"
 import type { Eip1193Provider } from "../lib/wallet.ts"
 import type { PurchaseView } from "../lib/purchase-run.ts"
@@ -44,6 +44,7 @@ export type PurchaseDecision = (part: unknown, approved: boolean, context?: Brow
   wallet?: Readonly<SelectedPurchaseWallet>) => boolean
 const provider = () => (globalThis as { ethereum?: Eip1193Provider }).ethereum
 const WALLET_BLOCK = "Connect a wallet on the quoted network before approving."
+const TERMS_BLOCK = "Complete payment terms or verified ENS records are unavailable, unsupported, or above the approved ceiling. Request a fresh quote."
 
 /** Mounted only by a live conversation owner, never a generic transcript renderer.
  * The caller keys this component by the complete original decision binding.
@@ -53,7 +54,7 @@ export const PendingPurchase = ({ part, onDecision, quote = quotePurchaseContext
 }) => {
   const captured = capturePurchasePart(part), binding = captured?.binding, bindingKey = JSON.stringify(binding)
   const [terms, setTerms] = useState<BrowserPurchaseContext>()
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState<string>()
   const [wallet, setWallet] = useState<Readonly<SelectedPurchaseWallet>>()
   const [walletBlock, setWalletBlock] = useState(WALLET_BLOCK)
   const [connecting, setConnecting] = useState(false)
@@ -64,15 +65,16 @@ export const PendingPurchase = ({ part, onDecision, quote = quotePurchaseContext
 
   useEffect(() => {
     const c = new AbortController()
-    setTerms(undefined); setFailed(false)
-    if (!binding) { setFailed(true); return () => c.abort() }
-    quote(binding.skillId, binding.input, { signal: c.signal }).then(value => {
+    setTerms(undefined); setFailed(undefined)
+    if (!binding) { setFailed(TERMS_BLOCK); return () => c.abort() }
+    const target = binding.name === undefined ? binding.skillId : { name: binding.name }
+    quote(target, binding.input, { signal: c.signal }).then(value => {
       if (c.signal.aborted) return
       const context = capturePurchaseContext(value)
-      if (!context || context.skillId !== binding.skillId || context.rail === "test" ||
-        BigInt(context.amountAtomic) > parsePrice(binding.maxAmountUsd)) { setFailed(true); return }
+      if (!context || (binding.name === undefined ? context.skillId !== binding.skillId : context.ensName !== binding.name) || context.rail === "test" ||
+        BigInt(context.amountAtomic) > parsePrice(binding.maxAmountUsd)) { setFailed(TERMS_BLOCK); return }
       setTerms(context)
-    }, () => { if (!c.signal.aborted) setFailed(true) })
+    }, error => { if (!c.signal.aborted) setFailed(error instanceof PurchaseQuoteFailure ? error.message : TERMS_BLOCK) })
     return () => c.abort()
   }, [bindingKey, quote])
 
@@ -121,11 +123,17 @@ export const PendingPurchase = ({ part, onDecision, quote = quotePurchaseContext
   if (!binding || captured?.state !== "approval-requested") return <ArchivedPurchase />
   if (decisionFailed) return <p className="tool-note" role="alert">This decision could not be applied. Request a fresh purchase; do not repeat an existing payment.</p>
   if (!terms && !failed) return <div className="tool-out"><p className="tool-note">asking the endpoint what this costs…</p></div>
+  if (!terms) return <div className="tool-out">
+    <p className="tool-note">requested {binding.name ? "ENS name" : "skill"} <span className="measured">{binding.name ?? binding.skillId}</span></p>
+    <p className="tool-note">Proposed ceiling {binding.maxAmountUsd}. No verified quote.</p>
+    <p className="confirm-blocked purchase-refusal" role="alert">{failed}</p>
+    <button type="button" className="deny" onClick={deny}>no</button>
+    <details className="disclose"><summary>review exact purchase input</summary><pre className="result">{binding.input}</pre></details>
+  </div>
   return <div>
-    <Confirm decisionKey={decisionKey} skillId={binding.skillId} price={terms ? formatPrice(BigInt(terms.amountAtomic)) : binding.maxAmountUsd}
-      payTo={terms?.payTo ?? ""} network={terms?.network ?? ""} ensName={terms?.ensName}
-      blocked={failed ? "Complete payment terms or verified ENS records are unavailable, unsupported, or above the approved ceiling. Request a fresh quote."
-        : wallet ? undefined : walletBlock} connecting={connecting}
+    <Confirm decisionKey={decisionKey} skillId={terms.skillId} price={formatPrice(BigInt(terms.amountAtomic))}
+      payTo={terms.payTo} network={terms.network} ensName={terms.ensName}
+      blocked={failed ?? (wallet ? undefined : walletBlock)} connecting={connecting}
       {...(!failed && terms && !wallet && provider() ? { onConnect: () => select(true) } : {})}
       onApprove={approve} onDeny={deny} />
     {wallet ? <p className="tool-note">selected buyer <span className="measured">{wallet.buyer}</span></p> : null}

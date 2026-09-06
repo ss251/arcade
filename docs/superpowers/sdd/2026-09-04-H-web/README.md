@@ -1,5 +1,13 @@
 # Plan H — execution records
 
+Current task: [H13b original-name browser approval](task-13b-brief.md), after
+2d9b67e. The [parent report](task-13b-parent-report.md) and
+[native check](task-13b-native-check.md) record one-use original-name binding,
+pre/post-sign verification, readable typed refusal and zero wallet IO on failure.
+214 focused checks, final strict and the sole4,215Vitest/834Bun/strict/build gate
+passed. All15 owned native PIDs/9ports closed. Offline signing/synthetic receipts
+only. H14 owner ranking/capture and durable sessions remain separate.
+
 Current task: [H13a keyless ENS targets](task-13a-brief.md), after f689ba6.
 The [parent report](task-13a-parent-report.md) records original-name resolution,
 actual-input 402 correlation, typed refusals and the free resolver tool. One full

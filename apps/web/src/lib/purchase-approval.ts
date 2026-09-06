@@ -4,12 +4,14 @@
  */
 import { parsePrice } from "../../../../packages/core/src/money.ts"
 import { capturePurchaseContext, type BrowserPurchaseContext } from "./purchase-context.ts"
+import { capturePurchaseTarget, type PurchaseTarget } from "./purchase-target.ts"
 
 declare const approvalBrand: unique symbol
 export interface PurchaseApprovalToken { readonly [approvalBrand]: true }
 export interface ApprovedPurchase {
   readonly approvalId: string; readonly toolCallId: string; readonly toolName: "arcade_call_skill"
   readonly skillId: string; readonly ceilingAtomic: string; readonly inputJson: string
+  readonly name?: string
   readonly context: BrowserPurchaseContext
 }
 export interface PurchaseApprovalScope {
@@ -21,7 +23,7 @@ export interface PurchaseApprovalScope {
 }
 
 const LIMIT = 131072, MAX_NODES = 16384, MAX_DEPTH = 32, MAX_APPROVALS = 128, TTL = 300000
-const fields = ["approvalId", "toolCallId", "toolName", "skillId", "maxAmountUsd", "input"] as const
+const fields = ["approvalId", "toolCallId", "toolName", "maxAmountUsd", "input"] as const
 const fail = (): never => { throw 0 }
 const own = (input: unknown, allowed: readonly string[]): Record<string, unknown> => {
   if (input === null || typeof input !== "object" || Array.isArray(input) ||
@@ -110,23 +112,24 @@ export const capturePurchaseInput = (input: unknown): string | undefined => {
   try { return canonicalInput(input) } catch { return undefined }
 }
 
-type Binding = Omit<ApprovedPurchase, "context">
+type Binding = Omit<ApprovedPurchase, "context" | "skillId" | "name"> & PurchaseTarget
 const captureBinding = (v: Record<string, unknown>): Binding => {
+  const target = capturePurchaseTarget(v)
   if (!text(v.approvalId, 512) || !v.approvalId || !text(v.toolCallId, 512) || !v.toolCallId ||
-    v.toolName !== "arcade_call_skill" || !text(v.skillId, 64) || !/^[a-z0-9][a-z0-9-]{1,63}$/.test(v.skillId) ||
+    v.toolName !== "arcade_call_skill" || !target ||
     !text(v.maxAmountUsd, 100)) return fail()
   const ceiling = parsePrice(v.maxAmountUsd)
   if (ceiling >= 1n << 256n) return fail()
   return { approvalId: v.approvalId, toolCallId: v.toolCallId, toolName: v.toolName,
-    skillId: v.skillId, ceilingAtomic: ceiling.toString(), inputJson: canonicalInput(v.input) }
+    ...target, ceilingAtomic: ceiling.toString(), inputJson: canonicalInput(v.input) }
 }
 const matches = (a: Binding, b: Binding): boolean => a.approvalId === b.approvalId &&
-  a.toolCallId === b.toolCallId && a.toolName === b.toolName && a.skillId === b.skillId &&
+  a.toolCallId === b.toolCallId && a.toolName === b.toolName && a.skillId === b.skillId && a.name === b.name &&
   a.ceilingAtomic === b.ceilingAtomic && a.inputJson === b.inputJson
 
 export const createPurchaseApprovalScope = (now: () => number = () => performance.now()): PurchaseApprovalScope => {
   let closed = false, lastTime = -1
-  let pending = new WeakMap<object, { request: ApprovedPurchase; expiresAt: number }>()
+  let pending = new WeakMap<object, { binding: Binding; request: ApprovedPurchase; expiresAt: number }>()
   const seen = new Set<string>()
   const close = () => { closed = true; pending = new WeakMap() }
   const clock = () => {
@@ -138,17 +141,20 @@ export const createPurchaseApprovalScope = (now: () => number = () => performanc
     approve(value: unknown): PurchaseApprovalToken | undefined {
       if (closed) return undefined
       try {
-        const raw = own(value, [...fields, "context"]), binding = captureBinding(raw)
+        const target = capturePurchaseTarget(value)
+        if (!target) return undefined
+        const raw = own(value, [...fields, ...Object.keys(target), "context"]), binding = captureBinding(raw)
         const context = capturePurchaseContext(raw.context)
-        if (!context || context.rail === "test" || context.skillId !== binding.skillId ||
+        if (!context || context.rail === "test" ||
+          (binding.name === undefined ? context.skillId !== binding.skillId : context.ensName !== binding.name) ||
           BigInt(context.amountAtomic) > BigInt(binding.ceilingAtomic)) return undefined
         // Length-delimited identities remain injective even if SDK identifiers
         // contain delimiters or newlines; neither is used as public display text.
         const key = `${binding.approvalId.length}:${binding.approvalId}${binding.toolCallId.length}:${binding.toolCallId}`
         if (seen.has(key) || seen.size >= MAX_APPROVALS) return undefined
         const at = clock(), token = Object.freeze(Object.create(null)) as PurchaseApprovalToken
-        const request: ApprovedPurchase = Object.freeze({ ...binding, context })
-        seen.add(key); pending.set(token, { request, expiresAt: at + TTL })
+        const request: ApprovedPurchase = Object.freeze({ ...binding, skillId: context.skillId, context })
+        seen.add(key); pending.set(token, { binding: Object.freeze(binding), request, expiresAt: at + TTL })
         return token
       } catch { return undefined }
     },
@@ -158,8 +164,10 @@ export const createPurchaseApprovalScope = (now: () => number = () => performanc
       if (!captured) return undefined
       pending.delete(token) // Consume before any validation or downstream wallet work.
       try {
-        const current = captureBinding(own(binding, fields))
-        if (!matches(captured.request, current) || clock() >= captured.expiresAt) return undefined
+        const target = capturePurchaseTarget(binding)
+        if (!target) return undefined
+        const current = captureBinding(own(binding, [...fields, ...Object.keys(target)]))
+        if (!matches(captured.binding, current) || clock() >= captured.expiresAt) return undefined
         return captured.request
       } catch { return undefined }
     },

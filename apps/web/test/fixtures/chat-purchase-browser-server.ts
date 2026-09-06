@@ -17,7 +17,7 @@ import { deriveSigningRequest } from "../../src/lib/purchase.ts"
 const SELLER = `0x${"3".repeat(40)}`, ID = "diff-triage", NAME = ID + ".seller.arcade.eth"
 const account = privateKeyToAccount(`0x${"01".repeat(32)}`) // PUBLIC offline fixture, never fund.
 const resource = "/x/" + SELLER + "/" + ID, jobs = new Map<string, { token: string; receipt: Record<string, unknown> }>()
-let mode = "normal", rail = "eip3009", calls = 0, paid = 0, quotes = 0, results = 0, preflights = 0, recoveries = 0
+let mode = "normal", rail = "eip3009", calls = 0, paid = 0, quotes = 0, results = 0, preflights = 0, recoveries = 0, nameReads = 0
 let privateInModel = false, paymentAtWeb = false, wrongOrigin = false, leakedUrl = false
 const privateValues: string[] = [], events: { method: string; path: string; headers: string[] }[] = []
 let policy: ReturnType<typeof makeBrowserCors> | undefined
@@ -34,8 +34,12 @@ const hub = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(req): Promis
     if (url.pathname === "/listings/" + ID) return Response.json({ id: ID, seller: SELLER, ensName: NAME,
       version: "1.0.0", serviceName: "Fixture diff triage", description: "Offline fixture", tags: [],
       price: "$0.01", inputSchema: {}, outputSchema: {}, bounds: { timeoutSec: 30 } })
-    if (url.pathname === "/names/" + NAME) return Response.json({ name: NAME, skillId: ID, seller: SELLER,
-      endpoint: hub.url.origin + resource, payTo: SELLER, chain: chain.caip2, priceAtomic: null, expired: false })
+    if (url.pathname === "/names/" + NAME) {
+      nameReads++
+      if (mode === "name-expired") return Response.json({ error: "ens_name_expired", cause: "PRIVATE_FIXTURE_DIAGNOSTIC" }, { status: 404 })
+      return Response.json({ name: NAME, skillId: ID, seller: SELLER, endpoint: hub.url.origin + resource,
+        payTo: mode === "name-mismatch" ? "0x" + "4".repeat(40) : SELLER, chain: chain.caip2, priceAtomic: null, expired: false })
+    }
     if (url.pathname === resource && req.method === "POST") {
       const input = await req.json() as { diff?: unknown }
       if (input.diff !== "native fixture input") return Response.json({ error: "wrong_fixture_input" }, { status: 400 })
@@ -90,10 +94,12 @@ const web = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(req): Promis
   if (path === "/diagnostics.js") return new Response('window.__fixtureErrors=[];addEventListener("error",e=>window.__fixtureErrors.push(String(e.message).slice(0,500)));addEventListener("unhandledrejection",e=>window.__fixtureErrors.push(String(e.reason).slice(0,500)));', { headers: { "content-type": "text/javascript" } })
   if (path === "/api/quote" && req.method === "POST") return handleQuote({ request: req })
   if (path === "/api/settle") return handleSettle({ request: req })
-  if (path === "/fixture-stats") return Response.json({ calls, paid, quotes, results, preflights, recoveries, privateInModel, paymentAtWeb, wrongOrigin, leakedUrl, events })
+  if (path === "/fixture-stats") return Response.json({ calls, paid, quotes, results, preflights, recoveries, nameReads, privateInModel, paymentAtWeb, wrongOrigin, leakedUrl, events })
   if (path === "/fixture-control" && req.method === "POST") {
     const value = await req.json() as { mode: string; rail: string }
-    if (!["normal", "mismatch", "preliminary", "hold-signature", "sdk-error"].includes(value.mode) || !["eip3009", "gateway"].includes(value.rail)) return new Response(null, { status: 400 })
+    if (!["normal", "mismatch", "preliminary", "hold-signature", "sdk-error", "name-normal", "name-expired", "name-mismatch",
+      "name-output-mismatch", "name-expire-after-readiness", "name-hold-signature"].includes(value.mode) ||
+      !["eip3009", "gateway"].includes(value.rail)) return new Response(null, { status: 400 })
     mode = value.mode; rail = value.rail; return new Response(null, { status: 204 })
   }
   if (path === "/api/chat" && req.method === "POST") {
@@ -109,15 +115,18 @@ const web = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(req): Promis
         const derived = await deriveSigningRequest({ ...responded.input, input: JSON.parse(responded.input.input), toolCallId: responded.toolCallId })
         chunks.push({ type: "tool-output-available", toolCallId: responded.toolCallId, preliminary: mode === "preliminary",
           output: { ...derived, awaitingSignature: true, toolCallId: mode === "mismatch" ? "wrong_call" : responded.toolCallId,
+            ...(mode === "name-output-mismatch" ? { skillId: "wrong-skill" } : {}),
             payTo: "UNTRUSTED_OUTPUT_PAYEE", amountAtomic: "999999" } })
         // Genuine SDK duplicate output chunk; no second local permit exists.
         chunks.push(chunks.at(-1)!)
+        if (mode === "name-expire-after-readiness") mode = "name-expired"
       } else chunks.push({ type: "tool-output-denied", toolCallId: responded.toolCallId })
     } else {
       calls++; const call = "fixture_call_" + calls
       chunks.push({ type: "start", messageId: "fixture_message_" + calls }, { type: "start-step" },
         { type: "tool-input-available", toolCallId: call, toolName: "arcade_call_skill",
-          input: { skillId: ID, maxAmountUsd: "$0.02", input: '{"diff":"native fixture input"}' } },
+          input: { ...(mode.startsWith("name-") ? { name: NAME } : { skillId: ID }),
+            maxAmountUsd: "$0.02", input: '{"diff":"native fixture input"}' } },
         { type: "tool-approval-request", toolCallId: call, approvalId: "approval_" + call })
     }
     chunks.push({ type: "finish-step" }, { type: "finish", finishReason: responded ? "stop" : "tool-calls" })

@@ -1553,6 +1553,32 @@ complete marketplace coverage or independently revalidated chain timestamps is
 claimed. G1/G6 deployments and A9 purchases remain consumed; no new wallet key,
 paid query or operation was needed for this historical readback.
 
+### ENS-name purchases in Chat — H13
+
+Ask Chat to hire an exact ENS name, or use an explicit skill id; a call must
+supply exactly one target and a maximum price. Resolution is reported by the
+configured hub, not an independent browser on-chain attestation. A resolver
+tool can inspect names without buying; only a fresh local confirmation can
+authorize payment.
+
+A valid card shows the resolved skill id, verified name, actual-input payment
+quote and full payee. The 402 quote sets the price; an ENS text price is not
+payment authority. The private approval retains the original name and rechecks
+its complete binding before and after signing. Changing the name to an alias
+or id cannot reuse that approval. Restored/duplicated model output cannot sign.
+
+Expiry or validated payee disagreement blocks confirmation and makes no wallet
+request. Failed resolution shows only the proposed ceiling, explicitly not a
+verified quote. Renew/reconfigure through the appropriate owner procedure,
+then ask for a new quote; this UI does not renew ENS or silently fall back to id.
+If terms change while a wallet signature is pending, it is not forwarded and
+the UI reports an unconfirmed outcome. Do not automatically repeat a payment.
+
+[Implementation and test limits](superpowers/sdd/2026-09-04-H-web/task-13b-parent-report.md)
+and [offline native evidence](superpowers/sdd/2026-09-04-H-web/task-13b-native-check.md).
+The fixture evidence is not a live wallet/chain purchase or a production URL
+re-point. Earlier ENS live approvals remain consumed.
+
 ### Local publishing preview — H12
 
 Open `/publish` for the passive setup explanation. To enable metadata previews,
