@@ -399,3 +399,34 @@ Final single-threaded audit passed: new exact bannered report with original hash
 both frozen signer pins, retained H10b1 copy/two source pins and all prior H10a
 copies/18 source pins/14 H8/H9/F/Pages pins. The index links resolve (88 prior-
 document links plus the new documents), with zero selected privacy findings.
+
+## H10b3 — one-shot browser submission and recovery coordinates
+
+H10b2 committed `ddb7eca`. Parent extracted H10a's shared complete-response
+mechanics behind closed result/tree/POST wrappers. Ordinary reads retain their
+49 unchanged tests, fixed paths/header tokens and actual tree decoder. New POST
+captures original context/input/signed bytes, uses UTF8 base64 and exactly one
+request, accepts only correlated queued202, ignores poll_url, and returns only a
+frozen H9 recovery row. Approval/signature recovery and storage remain separate.
+
+Initial101 focused/2 passed; self-review exposed four real clock defects.
+Finite/nonnegative/nondecreasing monotonic checks and non-backward admission
+timestamps fixed them. Final217 focused/5 and exact five-root strict0 passed.
+The sole full gate passed3,773 Vitest/155 (48.42s),834 Bun/54/6,093 assertions
+(162.68s), root/web strict and client319ms/SSR150ms, using explicit max4 limits
+and sequential Bun. No repeated/overlapping gate or independent-review claim.
+
+The actual ordinary producer omits optional settleRefKind; the next controller
+must distinguish absence from contradictory presence and correlate quote rail/
+network and signed nonce. No native-browser flow, active UI/relay migration,
+new live payment/key, production change, mainnet action or push is claimed.
+Public copy/source audit and the nine-path local commit follow; H is unmerged.
+
+Final single-threaded audit passed both exact bannered copies: report original
+`3936c1c4a8594853f76f61f607c09a13717545dbcb4ed97f77fa68a748d238eb`,
+preflight original
+`af0d614ac5bb0f8b7e113c36cf332bbe525998e7545abc944f44479265299a3d`.
+All four new source pins passed; the prior read wrapper was verified at the exact
+H10b2 commit and its replacement explicitly accounted for. Other prior H10a/
+H10b1/H10b2/F/Pages pins and copies remain intact. Local links resolve (91 prior-
+document links plus new documents); selected privacy-pattern findings were zero.

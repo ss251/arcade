@@ -1,5 +1,12 @@
 # Plan H — execution records
 
+Current task: [H10b3 one-shot browser POST/recovery transport](task-10b3-brief.md),
+after H10b2 `ddb7eca`. The [preflight](task-10b3-transport-preflight.md) records
+actual producer shapes and the optional ordinary reference-kind correction.
+The [parent report](task-10b3-parent-report.md) records217 focused tests, four
+clock regressions/fixes and the sole full gate. Active UI/controller integration
+and native browser proof remain separate; single-threaded, H still unmerged.
+
 Current task: [H10b2 rail-correct browser signing boundary](task-10b2-brief.md),
 after H10b1 `ef44e50`. Its [parent report](task-10b2-parent-report.md) records
 the null-deadline regression/fix, separate fixture corrections,164 focused tests,
