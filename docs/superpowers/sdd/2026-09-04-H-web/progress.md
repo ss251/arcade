@@ -1,5 +1,18 @@
 # SDD ledger — Plan H
 
+2026-09-06 19:54 IST: H12b3 sole39211gate exit0:4140Vitest182/57.66s,
+834Bun54/6091assert/163.02s,rootwebstrict0,client347msSSR176ms. No fullrepeat
+or source change. Four runtime markers absent37clientJS/present46serverJS.
+11sourcepins/ff0fab3CSSprefix/exactnative+readinesscopies/128links/newprivacy PASS;
+H11 style/router checked historically,37otherH11/H12b1b2/H12a pins preserved.
+Atomic commit next; H13/H14/session gap/Hmerge/deferredG/vendor/I remain.
+
+2026-09-06 19:48 IST: H12b3 source/native frozen afterff0fab3.28focused/2,
+actual Start route and11exactstrict0 PASS. Native10/screenshot5/5PIDsabsent/
+2portsrefused/0ownedprofiles; injected late-fetch delivery explicitly separated
+from real child cancellation evidence. Eleven source pins frozen; sole full gate
+39211 underway. No concurrent browser/gate, delegate, keys/spend/live MCP/push.
+
 2026-09-06 19:16 IST: H12b2 sole66574 gate exit0:4111Vitest179/54.21s,
 834Bun54/6091assert/164.40s,rootwebstrict0,client347msSSR161ms. No fullrepeat,
 source change or concurrent job. Final publication audit/atomic commit next,

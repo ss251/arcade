@@ -12,8 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BuyerRouteImport } from './routes/buyer'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as PublishRouteImport } from './routes/publish'
 import { Route as SellerRouteImport } from './routes/seller'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
+import { Route as ApiPublishPreviewRouteImport } from './routes/api.publish-preview'
 import { Route as ApiQuoteRouteImport } from './routes/api.quote'
 import { Route as ApiSettleRouteImport } from './routes/api.settle'
 import { Route as SkillNameRouteImport } from './routes/skill.$name'
@@ -33,6 +35,11 @@ const ChatRoute = ChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PublishRoute = PublishRouteImport.update({
+  id: '/publish',
+  path: '/publish',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SellerRoute = SellerRouteImport.update({
   id: '/seller',
   path: '/seller',
@@ -41,6 +48,11 @@ const SellerRoute = SellerRouteImport.update({
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublishPreviewRoute = ApiPublishPreviewRouteImport.update({
+  id: '/api/publish-preview',
+  path: '/api/publish-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiQuoteRoute = ApiQuoteRouteImport.update({
@@ -63,8 +75,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/buyer': typeof BuyerRoute
   '/chat': typeof ChatRoute
+  '/publish': typeof PublishRoute
   '/seller': typeof SellerRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/publish-preview': typeof ApiPublishPreviewRoute
   '/api/quote': typeof ApiQuoteRoute
   '/api/settle': typeof ApiSettleRoute
   '/skill/$name': typeof SkillNameRoute
@@ -73,8 +87,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/buyer': typeof BuyerRoute
   '/chat': typeof ChatRoute
+  '/publish': typeof PublishRoute
   '/seller': typeof SellerRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/publish-preview': typeof ApiPublishPreviewRoute
   '/api/quote': typeof ApiQuoteRoute
   '/api/settle': typeof ApiSettleRoute
   '/skill/$name': typeof SkillNameRoute
@@ -84,8 +100,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/buyer': typeof BuyerRoute
   '/chat': typeof ChatRoute
+  '/publish': typeof PublishRoute
   '/seller': typeof SellerRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/publish-preview': typeof ApiPublishPreviewRoute
   '/api/quote': typeof ApiQuoteRoute
   '/api/settle': typeof ApiSettleRoute
   '/skill/$name': typeof SkillNameRoute
@@ -96,8 +114,10 @@ export interface FileRouteTypes {
     | '/'
     | '/buyer'
     | '/chat'
+    | '/publish'
     | '/seller'
     | '/api/chat'
+    | '/api/publish-preview'
     | '/api/quote'
     | '/api/settle'
     | '/skill/$name'
@@ -106,8 +126,10 @@ export interface FileRouteTypes {
     | '/'
     | '/buyer'
     | '/chat'
+    | '/publish'
     | '/seller'
     | '/api/chat'
+    | '/api/publish-preview'
     | '/api/quote'
     | '/api/settle'
     | '/skill/$name'
@@ -116,8 +138,10 @@ export interface FileRouteTypes {
     | '/'
     | '/buyer'
     | '/chat'
+    | '/publish'
     | '/seller'
     | '/api/chat'
+    | '/api/publish-preview'
     | '/api/quote'
     | '/api/settle'
     | '/skill/$name'
@@ -127,8 +151,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BuyerRoute: typeof BuyerRoute
   ChatRoute: typeof ChatRoute
+  PublishRoute: typeof PublishRoute
   SellerRoute: typeof SellerRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiPublishPreviewRoute: typeof ApiPublishPreviewRoute
   ApiQuoteRoute: typeof ApiQuoteRoute
   ApiSettleRoute: typeof ApiSettleRoute
   SkillNameRoute: typeof SkillNameRoute
@@ -157,6 +183,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/publish': {
+      id: '/publish'
+      path: '/publish'
+      fullPath: '/publish'
+      preLoaderRoute: typeof PublishRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/seller': {
       id: '/seller'
       path: '/seller'
@@ -169,6 +202,13 @@ declare module '@tanstack/react-router' {
       path: '/api/chat'
       fullPath: '/api/chat'
       preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/publish-preview': {
+      id: '/api/publish-preview'
+      path: '/api/publish-preview'
+      fullPath: '/api/publish-preview'
+      preLoaderRoute: typeof ApiPublishPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/quote': {
@@ -199,8 +239,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BuyerRoute: BuyerRoute,
   ChatRoute: ChatRoute,
+  PublishRoute: PublishRoute,
   SellerRoute: SellerRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiPublishPreviewRoute: ApiPublishPreviewRoute,
   ApiQuoteRoute: ApiQuoteRoute,
   ApiSettleRoute: ApiSettleRoute,
   SkillNameRoute: SkillNameRoute,

@@ -1,5 +1,12 @@
 # Plan H — execution records
 
+Current task: [H12b3 local wizard](task-12b3-brief.md) afterff0fab3.
+[Parent report](task-12b3-parent-report.md):28 focused checks, actual Start route,
+11-root strict0 and [native10](task-12b3-native-check.md), five captures inspected,
+all owned services stopped. Sole full gate passed4,140 Vitest/834 Bun, strict and
+client/SSR builds. Actual37-client/46-server bundle audit excludes the launcher
+from client output. No live MCP/model/wallet/generated listing/production change.
+
 Current task: [H12b2 local runtime](task-12b2-brief.md) after6bf0831.
 The [parent report](task-12b2-parent-report.md) records real snapshot CLI/process
 cleanup, actual Vite config and an ephemeral Bun entrypoint socket with stub SSR.

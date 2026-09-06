@@ -1552,3 +1552,41 @@ the separate local-review/gate status. No dashboard Synced/current-head status,
 complete marketplace coverage or independently revalidated chain timestamps is
 claimed. G1/G6 deployments and A9 purchases remain consumed; no new wallet key,
 paid query or operation was needed for this historical readback.
+
+### Local publishing preview — H12
+
+Open `/publish` for the passive setup explanation. To enable metadata previews,
+run this from the root of a trusted ARCADE checkout:
+
+```sh
+ARCADE_PUBLISH_LOCAL=1 ARCADE_REPO_ROOT="$PWD" ARCADE_PUBLISH_BUN="$(command -v bun)" bun --no-env-file run --cwd apps/web dev --host 127.0.0.1
+```
+
+Open the printed numeric-loopback URL. Known hosting markers and unsafe listener
+overrides refuse local mode. Do not expose the listener through a proxy/tunnel.
+Disable the flag and stop the local server when finished; no production setting
+is changed by this command. The trusted checkout, dependencies and Bun executable
+are not an OS sandbox for malicious local code.
+
+Choose a relative skill directory (selected arcade.json only), local OpenAPI JSON,
+or explicit `mcp://host/path` HTTPS discovery endpoint. No browser-supplied stdio
+commands, absolute/private paths, keys, auth overrides or generation flags are
+accepted. The child receives a private snapshot/empty home and no inherited
+credentials. MCP discovery is real metadata IO to the declared endpoint, not a
+model/tool invocation or a guarantee that a server's read-only annotation is true.
+
+Previewing writes no listing or runner configuration. Generated batches are
+unwritten and use CLI defaults (including$0.05 per listing); inspect every entry,
+auth binding and manual command before generating. Starting a runner serves every
+eligible listing in the chosen directory and can perform configured registration
+steps. The page never performs these actions for you.
+
+Public/private columns describe the hub boundary. Full private metadata is shown
+on this local page and may contain literal sensitive text; do not share it blindly.
+No preview is put in the URL, chat or localStorage. Edit, clear, cancel or navigate
+away to discard it. Cancellation hides output immediately, but a cancelled server
+preview may retain its bounded process lock until cleanup finishes; retry only
+explicitly after it closes. No automatic retry, key lookup or paid call occurs.
+
+[Implementation/evidence limits](superpowers/sdd/2026-09-04-H-web/task-12b3-parent-report.md)
+and [native check](superpowers/sdd/2026-09-04-H-web/task-12b3-native-check.md).
