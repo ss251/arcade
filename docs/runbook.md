@@ -1553,6 +1553,36 @@ complete marketplace coverage or independently revalidated chain timestamps is
 claimed. G1/G6 deployments and A9 purchases remain consumed; no new wallet key,
 paid query or operation was needed for this historical readback.
 
+### Optional Graph evidence routes — G8
+
+Set `ARCADE_GRAPH_URL` to the chosen Studio query URL to enable read-only
+index observations; unset/invalid means Graph-off. `ARCADE_GRAPH_KEY` is optional
+and sent only as a Bearer header. Read it inside the consuming hub process
+command from the owner's Keychain, never from a committed env file, URL or log.
+`ARCADE_GRAPH_TTL_MS` defaults to30000 (valid integer1–300000); invalid values
+disable the Graph service. This is ordinary Studio querying, not Base x402.
+
+`GET /graph/stats` returns source subgraph plus actual indexedBlock and indexed
+aggregates when the configured provider passes decoding. Otherwise it returns
+source hub plus only local settlementCount and settledVolumeAtomic. Missing
+indexed tree/agent/feedback fields are absent, not zero. If the local fallback
+also fails, the route returns503 graph_stats_unavailable. `GET /stats` remains
+the hub ledger: its local numbers are never relabelled by an index health probe.
+
+Catalogue and detail responses can include four optional graph fields:
+agentId, settlementCount, feedbackCount, validationPassCount. Reads are bounded
+to256 input IDs/deduplicated, four concurrent requests, one five-second batch
+deadline; larger catalogues still render but omit optional Graph evidence.
+Provider errors or timeouts omit evidence and never affect settlement. G7's
+cache can be stale; listing evidence does not claim a fresh indexedBlock.
+
+These are reports from the configured index, not direct independent chain
+verification or proof every feedback item is payment-backed. G6's retained pilot
+run had a null Marketplace and no canonical listing rows; that is expected
+fallback/absence, not a populated dashboard. This hub implementation does not
+by itself add Graph fields to the web presentation. No deployment or paid query
+is part of enabling these local code paths.
+
 ### Read-only web screenshots — H14
 
 Build the web once with the current dependencies and no secret environment

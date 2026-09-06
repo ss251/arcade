@@ -1,5 +1,20 @@
 # SDD ledger — Plan G
 
+2026-09-06 22:03 IST: G8 sole68140 fullgate exited0:4249Vitest188/58.46s,
+872Bun58/6383assert/163.54s,rootwebstrict0,client363msSSR208ms. Four frozen
+sourcepins/nine scoped paths/187local links/privacy/preservation PASS. No full
+repeat; final atomic commit/fast-forward next, then G9 and web Graph display.
+
+
+2026-09-06 21:58 IST: G8 source frozen after main/H1f39c34 merge.17focused
+Vitest +5actualBun/23assert +exact4rootsstrict0; missing-route/key Reds and
+fixture-only delisting correction recorded in [report](task-8-parent-report.md).
+Actual index /graph/stats separate from unchanged hub /stats; optional4field
+listing evidence max256IDs/max4/five-second bound. Sole full gate and atomic
+commit next, then G9/web Graph follow-up/vendor/I. Root-only/no fan-out/reviews/
+gate overlap/newkeys/spend/approval replay/production/mainnet/push.
+
+
 Plan: [2026-09-04-G-graph](../../plans/2026-09-04-G-graph.md).
 
 ## Latest local checkpoint — September 6, G5 in progress

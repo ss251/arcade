@@ -36,6 +36,9 @@ import { privateKeyToAccount, generatePrivateKey } from "viem/accounts"
 import { BrokerLive, BrokerTag, type RunnerConn } from "./broker.ts"
 import { StoreTag, type ListingRecord } from "./store.ts"
 import { StoreFromEnv } from "./store-sqlite.ts"
+import { GraphFromEnv, GraphTag } from "./graph.ts"
+import { graphEvidenceOf, graphStatsPayload } from "./graph-routes.ts"
+export { graphEvidenceOf, graphStatsPayload } from "./graph-routes.ts"
 import { Erc8004FromEnv, Erc8004Tag, verifyAgentClaims } from "./erc8004.ts"
 import { agentRegistrationFor } from "./agent-registration.ts"
 import { listingEvidence } from "./listing-evidence.ts"
@@ -307,7 +310,7 @@ const RailsLayer = Layer.unwrapEffect(Effect.gen(function* () {
     ? [yield* RailTag.pipe(Effect.provide(railLayer("gateway")))] : []
   return railsLayerFrom(fallback, others)
 }))
-const AppLive = Layer.mergeAll(StoreLayer, BrokerLive, RailsLayer, Erc8004Layer,
+const AppLive = Layer.mergeAll(StoreLayer, BrokerLive, RailsLayer, Erc8004Layer, GraphFromEnv(),
   AttestLive.pipe(Layer.provide(Layer.merge(StoreLayer, Erc8004Layer))))
 
 const json = (body: unknown, status = 200) =>
@@ -400,13 +403,14 @@ const splitterFacts = async (address: string): Promise<SplitterFacts | undefined
 }
 
 const main = Effect.gen(function* () {
-  const runtime = yield* Effect.runtime<StoreTag | BrokerTag | RailTag | RailsTag | Erc8004Tag | AttestTag>()
+  const runtime = yield* Effect.runtime<StoreTag | BrokerTag | RailTag | RailsTag | Erc8004Tag | AttestTag | GraphTag>()
   const run = Runtime.runPromise(runtime)
   const store = yield* StoreTag
   const broker = yield* BrokerTag
   const rail = yield* RailTag
   const rails = yield* RailsTag
   const erc8004 = yield* Erc8004Tag
+  const graph = yield* GraphTag
 
   // One read-only observer per hub lifetime. Discovery may use the observation;
   // no ENS lookup is awaited by the paid or settlement paths below.
@@ -921,7 +925,9 @@ const main = Effect.gen(function* () {
       if (path === "/listings" && req.method === "GET") {
         const all = (await run(store.allListings)).filter((record) => record.delisted !== true)
           .filter(record => !ensWatch.isExpired(record.listing.id, record.seller))
+        const indexed = await run(graphEvidenceOf(graph, all.map(record => record.listing.id)))
         return json(all.map(r => {
+          const evidence = indexed.get(r.listing.id)
           const ensName = ensWatch.nameFor({ id: r.listing.id, seller: r.seller })
           const test = r.payTested
           const reference = test?.settleTx
@@ -933,6 +939,7 @@ const main = Effect.gen(function* () {
           const payTested = test === undefined ? null : { atMs: test.atMs, ok: test.ok, jobId: "",
             ...(publicReference === undefined ? {} : { settleTx: publicReference }) }
           return { ...r.listing, seller: r.seller, payTested, delisted: r.delisted === true,
+            ...(evidence === undefined ? {} : { graph: evidence }),
             ...(ensName === undefined ? {} : { ensName }) }
         }))
       }
@@ -984,7 +991,9 @@ const main = Effect.gen(function* () {
         const avg =
           ratings.length === 0 ? null : ratings.reduce((a, r) => a + r.stars, 0) / ratings.length
         const identity = await run(listingEvidence(res.right, erc8004, chainConfig, rail.name))
+        const indexed = (await run(graphEvidenceOf(graph, [res.right.listing.id]))).get(res.right.listing.id)
         return json({ ...res.right.listing, seller: res.right.seller, stats, ratings: { count: ratings.length, average: avg },
+          ...(indexed === undefined ? {} : { graph: indexed }),
           ...(identity === undefined ? {} : { erc8004: identity }),
           ensName: ensWatch.nameFor({ id: res.right.listing.id, seller: res.right.seller }) ?? null,
           ensExpired: ensWatch.isExpired(res.right.listing.id, res.right.seller),
@@ -999,6 +1008,14 @@ const main = Effect.gen(function* () {
         // Historical receipt evidence survives listing disconnection; no job tokens,
         // private output or reconstructed parent/child edges are exposed here.
         return json(listingReceiptFeed(await run(store.allReceipts), listingReceipts[1]!, limit))
+      }
+
+      if (path === "/graph/stats" && req.method === "GET") {
+        const payload = await run(graphStatsPayload(graph, store.allReceipts.pipe(Effect.map(receipts => {
+          const settled = receipts.filter(receipt => receipt.settled)
+          return { settlementCount: settled.length, settledVolumeAtomic: settled.reduce((sum, receipt) => sum + receipt.priceAtomic, 0n) }
+        }))).pipe(Effect.exit))
+        return payload._tag === "Success" ? json(payload.value) : json({ error: "graph_stats_unavailable" }, 503)
       }
 
       if (path === "/stats" && req.method === "GET") {

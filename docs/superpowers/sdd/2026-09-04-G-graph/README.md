@@ -1,5 +1,19 @@
 # Plan G — execution records
 
+## September 6 — G8 after the H code merge
+
+H's tested code checkpoint merged into main1f39c34, retaining open owner review
+and durable-session decisions. G8's [brief](task-8-brief.md) and
+[parent report](task-8-parent-report.md) describe the actual hub route changes:
+indexed aggregates stay separate from local /stats; listing evidence is optional,
+bounded and never relabelled payment/feedback proof. Focused17Vitest and5Bun/23
+plus exact4rootstrict passed. Sole fullgate4249Vitest/872Bun/6383assert,rootweb
+strict and client/SSRbuilds passed; four pins/187links/privacy audit passed. The
+atomic commit follows. Web Graph
+display and G9 MCP wording are separate follow-ups. Earlier checkpoints below
+are historical; G1–7/G10–14 already merged before H. No new spend or push.
+
+
 Task 1's local smoke scaffold, source-contract tests, pinned code generation and
 WASM build passed. The later September 5 indexed-match checkpoint now satisfies
 G1's deployment and known-runbook query requirement: both historical transactions
