@@ -451,3 +451,33 @@ Initial public audit CLEAN covered12 exact historical copies,23 substitutions,
 Two final runtime copies add one locator substitution; the final18-file delta
 audit and atomic commit follow. Current Minter identity and exact API-credit
 attribution remain technical acceptance limits, not authority to spend again.
+
+### F12 offline execution checkpoint
+
+F11 committed325bd47. Actual F12 offline runs exercise the real buyer/Gateway/
+hub/runner/WebSocket/native script and SQLite with finite external fixtures.
+Parent's separate CLI run and post-exit read-only journal/database inspection
+agree on20 results,87 records, original closed artifact and global1/20/20/20.
+See the [brief](task-12-brief.md) and [parent review](task-12-parent-review.md).
+
+The initial24Bun/102 assertions remain a dated checkpoint. A later explicit
+header-observation review found an evidence gap, not a production SDK failure.
+The new auditor initially assumed a probe preceded F9's status request and
+stopped before signing; correction passes26Bun/123 assertions including a fresh
+actual20 run, plus exact3-root strict0. Independent correction review, root full
+test/type gate and final public audit precede commit. F14 source stays held.
+
+No operational keys or moved funds; live mode unimplemented/NOT RUN. Transfer
+UUIDs do not prove a mined batch. F13 fallback not triggered, no new spending,
+approval replay, production re-point, mainnet flip or push.
+
+### F12 final full-gate checkpoint
+
+At06:20IST the sole complete gate exited0: Vitest phase passed (123 cached file
+results, zero failed; aggregate test count truncated),529Bun/41files/4681assertions,
+root and web strict TypeScript. The final actual twenty-call test passed4.009s.
+These Bun counts include ignored historical review fixtures, including the private
+probe guard; do not sum them again or claim all529 are public-checkout coverage.
+All six executable/source hashes and original115-line F1 evidence prefix match.
+Parent read final author and independent reviews; header correction CLEAN.
+Final historical-copy audit and atomic F12 commit follow; no F14 source yet.

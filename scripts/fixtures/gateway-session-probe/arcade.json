@@ -1,0 +1,23 @@
+{
+  "id": "gateway-session-probe",
+  "version": "1.0.0",
+  "serviceName": "gateway-session-probe",
+  "description": "Dedicated offline runner evidence probe; no chain or provider data.",
+  "tags": ["offline", "fixture"],
+  "price": "$0.01",
+  "bounds": { "timeoutSec": 5 },
+  "inputSchema": {
+    "type": "object", "additionalProperties": false, "required": ["index"],
+    "properties": { "index": { "type": "integer", "minimum": 1, "maximum": 20 } }
+  },
+  "outputSchema": {
+    "type": "object", "additionalProperties": false, "required": ["index", "proof"],
+    "properties": {
+      "index": { "type": "integer", "minimum": 1, "maximum": 20 },
+      "proof": { "const": "offline-runner-probe" }
+    }
+  },
+  "engine": { "adapter": "script", "credential": "none", "entry": "run.ts", "capabilities": [] },
+  "secrets": [],
+  "egress": []
+}

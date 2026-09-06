@@ -1,0 +1,27 @@
+// Reviewed inert source includes its own guard; the executed copy is byte-identical.
+// No provider, network, filesystem, credential or child process is used.
+const parent = process.ppid
+if (parent <= 1) process.exit(92)
+const hard = setTimeout(() => process.exit(92), 4000)
+const orphan = setInterval(() => { if (process.ppid !== parent) process.exit(92) }, 100)
+try {
+  const reader = Bun.stdin.stream().getReader()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  for (;;) {
+    const part = await reader.read()
+    if (part.done) break
+    length += part.value.byteLength
+    if (length > 16384) throw Error()
+    chunks.push(part.value)
+  }
+  reader.releaseLock()
+  const envelope = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)))
+  const input = envelope.input
+  if (input === null || typeof input !== "object" || Array.isArray(input) ||
+    Object.keys(input).length !== 1 || !Number.isInteger(input.index) || input.index < 1 || input.index > 20) throw Error()
+  await new Promise<void>((resolve, reject) => process.stdout.write(JSON.stringify({
+    output: { index: input.index, proof: "offline-runner-probe" }, stopReason: "end_turn", costUsd: 0
+  }), error => error ? reject(Error()) : resolve()))
+} catch { process.exitCode = 1 }
+finally { clearTimeout(hard); clearInterval(orphan) }

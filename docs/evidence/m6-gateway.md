@@ -113,3 +113,65 @@ bypass the guard, or retry the whole deposit/settle operation.**
 See the [F1 report](../superpowers/sdd/2026-09-04-F-gateway-sessions/task-1-report.md)
 for genuine test failures, review and the local verification boundary. Actual
 deposit/transfer evidence will be appended only after the separately approved run.
+
+## F12 — offline twenty-call session evidence, September 6, 2026
+
+**Offline PASS; fundsMoved:false; liveEvidence:NOT_RUN.** This addition does not
+change the dated F1 result or reuse its consumed spending approval. The F12 live
+entry is not implemented: `--live`, missing arguments and unknown options refuse.
+There is no implicit deposit, withdrawal, funding, fallback rail or replacement
+session.
+
+From the repository root, with permission to bind owned loopback listeners:
+
+```sh
+sh scripts/e2e-gateway-session.sh --offline
+```
+
+The [harness](../../scripts/e2e-gateway-session.ts) runs the actual Promise buyer
+SDK, Gateway signing and verification, hub boot, Broker, native WebSocket,
+`startDaemon`, `execSkill` and SQLite. Only external boot RPC and facilitator
+responses are finite local fixtures; unexpected requests prevent PASS. The buyer
+and seller are distinct deliberately public deterministic fixture identities.
+No live chain balance was queried and no operational key was read.
+
+The dedicated childless `gateway-session-probe` script executes twenty original
+inputs at 10000 atomic USDC each. Its 200000-atomic session ceiling is local
+authorization accounting, not a wallet or Gateway balance. Independent signer,
+paid-forward, runner launch/exit/result, hub begin/finish and facilitator counters
+must all equal twenty. Twenty distinct `gateway-transfer` UUIDs are required;
+they prove neither one batch nor mined settlement, available credit or live funds
+movement. No fee sweep, attestation, canary, ENS, AI or child purchase runs.
+
+Before opening the session, a fresh private journal records the fixed policy and
+actual manifest, original probe, executed copy and implementation hashes. Every
+call, signer entry and paid forward is preceded by an fsynced one-shot record.
+Any uncertain call stops the sequence without fill-in or a finally-close. A lost
+close acknowledgement permits only the same handle's bounded read-only status
+check. Failed attempts remain separate; their journals are not resumable HTTP
+capabilities.
+
+The outbound request audit also checks the same private session headers across
+status, probe, paid retry, result and close requests, plus per-job result-token
+continuity. Public/open requests must omit those capabilities. Expected values
+stay in memory only; this observes the SDK boundary without replacing hub auth.
+
+PASS follows writer shutdown, exact owned-process cleanup and listener refusal.
+An independent read-only SQLite connection then requires globally exactly one
+session and twenty calls, jobs and receipts, using 2/21-row sentinel limits. It
+checks canonical stored data, indexed columns, original input/output digests,
+nonces, UUIDs, lineage, amounts and times against the original closed artifact.
+The complete closed artifact is retained in an exclusive 0600 private file; the
+87-record journal is re-read and hash-chain checked. Public output contains only
+counts, amounts, hashes and explicit evidence limits—no tokens or private IDs.
+
+The focused author gate passed **26 Bun tests / 123 assertions**, including the
+actual twenty-execution run, malformed control EOF, stop-on-uncertainty, lost-close
+read recovery, artifact correlation and process guards. Exact nested TypeScript
+checking of the three implementation/test roots passed. The committed probe's
+four-second stalled-input guard and parent-death disappearance were exercised;
+observing an orphan disappear is not a claim that the observer reaped it. This
+is a cooperative local-process/filesystem test, not a hostile-script OS sandbox
+or proof of arbitrary storage-fault recovery. Mainnet and live twenty-call proof
+remain untested. Parent review and full-repository gates are recorded separately
+in the F12 SDD artifacts.

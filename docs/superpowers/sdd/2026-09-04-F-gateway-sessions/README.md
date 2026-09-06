@@ -152,3 +152,16 @@ without attributing it to that narrower review. Initial publication audit was
 CLEAN12 exact copies/23 substitutions/15 files; two final historical runtime
 copies and the [parent gate record](task-11-parent-review.md) now receive the
 final delta audit before commit. Technical live-acceptance limits remain.
+
+F11 subsequently committed as `325bd47`. F12's [brief](task-12-brief.md) records
+actual twenty-call offline execution and independent post-exit persisted proof.
+The final header-observation audit passes26Bun/123 assertions and exact nested
+strict typing; parent full gate and final historical-copy audit precede commit.
+Twenty Gateway references are not one mined batch. Live mode remains
+unimplemented/NOT RUN; F14 and full-F merge gates remain separate.
+
+F12's later complete test/type gate passes: Vitest123 files with no failed cached
+results,529Bun/4681assertions/41files and root/web strict0. Bun includes retained
+private review fixtures; exact Vitest test count was truncated, not inferred.
+Independent correction review is CLEAN; six final source hashes are unchanged.
+Final public-copy audit precedes the atomic offline checkpoint commit.
