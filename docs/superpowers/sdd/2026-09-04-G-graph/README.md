@@ -1,5 +1,22 @@
 # Plan G — execution records
 
+## September 6 — G9 MCP index evidence
+
+G8 is committed/merged as c5a5389. G9's [brief](task-9-brief.md) and
+[parent report](task-9-parent-report.md) record a shared inert four-field decoder
+and qualified describe output.88 focused checks and4rootstrict passed after
+four actual output Reds. Sole full gate/public audit/commit follow. These
+hub-reported index counts are not independent verification or automatic proof
+feedback is payment-backed; web Graph presentation remains separate.
+
+Later sole fullgate4272Vitest/872Bun/rootwebstrict/build passed. A subsequently
+reproduced detail-ID mismatch was corrected and final89focused/4strict roots
+passed; full gate predates that one-line guard, with no duplicate full sweep.
+Eight sourcepins/189links/privacy and unchanged buying suffix passed. Final
+atomic commit follows; exact chronology is retained in the parent report.
+
+
+
 ## September 6 — G8 after the H code merge
 
 H's tested code checkpoint merged into main1f39c34, retaining open owner review

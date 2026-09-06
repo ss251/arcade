@@ -19,6 +19,8 @@ import {
   type ChainConfig
 } from "@arcade/core"
 import { PaymentRequirements } from "@arcade/payments"
+import { checkedGraphEvidence, graphEvidenceLine } from "./graph-evidence.ts"
+export { graphEvidenceLine, type GraphEvidence } from "./graph-evidence.ts"
 import { callSkill, openSession, BuyerSessionFailure, type BuyerSession, type BuyerSessionStatus, type SessionReceiptJson } from "./index.ts"
 import { EnsNameExpired, EnsResolutionUnavailable, ensRefusal, parseArcadeEndpoint, resolveEnsListing, sepoliaEnsReader, type EnsListing } from "./ens-policy.ts"
 
@@ -258,6 +260,7 @@ interface Listing {
   readonly stats?: Record<string, unknown>
   readonly ratings?: Record<string, unknown>
   readonly erc8004?: Erc8004Evidence
+  readonly graph?: unknown
 }
 
 const listings = async (): Promise<ReadonlyArray<Listing>> =>
@@ -870,9 +873,12 @@ const dispatch = async (toolName: string, rawArgs: unknown, signal?: AbortSignal
       // available: …" rather than a bare 404 the agent has to guess at.
       await findListing(skillId)
       const detail = (await hubJson(`/listings/${skillId}`)) as Listing
+      if (detail.id !== skillId) throw new Error("Listing detail identity mismatch")
       const evidence = checkedErc8004Evidence(detail.erc8004)?.evidence
-      const { erc8004: _untrustedEvidence, ...withoutEvidence } = detail
-      const publicDetail = { ...withoutEvidence, ...(evidence === undefined ? {} : { erc8004: evidence }) }
+      const indexed = checkedGraphEvidence(detail.graph), graphLine = graphEvidenceLine(indexed)
+      const { erc8004: _untrustedEvidence, graph: _untrustedGraph, ...withoutEvidence } = detail
+      const publicDetail = { ...withoutEvidence, ...(evidence === undefined ? {} : { erc8004: evidence }),
+        ...(indexed === undefined ? {} : { graph: indexed }) }
       return ok(
         `${skillId} — ${detail.price}/call, seller ${detail.seller}\n\n` +
           // Name and description are the seller's, so they are quoted rather than spoken.
@@ -881,6 +887,7 @@ const dispatch = async (toolName: string, rawArgs: unknown, signal?: AbortSignal
           `OUTPUT SCHEMA\n${JSON.stringify(detail.outputSchema, null, 2)}\n\n` +
           `BOUNDS (the seller's declared limits for one call)\n${JSON.stringify(detail.bounds, null, 2)}\n\n` +
           `MEASURED STATS\n${JSON.stringify(detail.stats ?? {}, null, 2)}\n\n` +
+          (graphLine === "" ? "" : `${graphLine}\n\n`) +
           `${renderErc8004Evidence(detail.erc8004)}\n\n` +
           `RATINGS (only wallets that paid for a call can leave one)\n${JSON.stringify(detail.ratings ?? {}, null, 2)}`,
         { skill: publicDetail }

@@ -1,5 +1,20 @@
 # SDD ledger — Plan G
 
+2026-09-06 22:15 IST: G9 sole69025 gate passed4272Vitest190/57.29s,
+872Bun58/6385assert/162.73s,rootwebstrict0,build340/192ms. After gate, actual
+detail-ID mismatch Red corrected with one fixed refusal. Final89focused/4files
+and4rootstrict0; no full sweep repeated, so final guard is targeted-validated.
+Eight sourcepins/189links/privacy/unchanged buying suffix PASS. Atomic commit
+and mainfast-forward next; web Graph display then vendor/I, ownerH choices pending.
+
+
+2026-09-06 22:09 IST: G9 source frozen after c5a5389. Four actual MCP output
+Reds corrected;88focused/4files and exact4rootstrict0. Qualified index line and
+same4field structured projection; invalid raw graph removed, seller fencing and
+D facts retained. Sole full max4 gate next; no parallel review/browser/gate,
+real keys/spend/Graph/deployment/push. Web Graph presentation remains follow-up.
+
+
 2026-09-06 22:03 IST: G8 sole68140 fullgate exited0:4249Vitest188/58.46s,
 872Bun58/6383assert/163.54s,rootwebstrict0,client363msSSR208ms. Four frozen
 sourcepins/nine scoped paths/187local links/privacy/preservation PASS. No full
