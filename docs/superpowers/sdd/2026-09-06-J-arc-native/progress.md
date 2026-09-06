@@ -1,5 +1,21 @@
 # Plan J progress
 
+2026-09-07 02:49 IST — Task2 DONE_WITH_CONCERNS. Sole90663 all4,597Vitest
+passed but unchanged H8 cleanup failed; isolated9PASS/causeunproved. Remaining
+14338 Bun822PASS/27FAIL/55/168.26s exposed actual Graph discovery compatibility
+regression. Real-constructor fixture + bounded vanilla selection corrected it;
+63focused/130assert/342ms and10-rootstrict0PASS. Original9pins unchanged.
+Unreached65473root/webtypes+client364ms/SSR194msPASS, no full replay.
+18-pathscope/privacy audit, atomic commit and exactFFmain next; J3 follows.
+No new keys/payments/agents/push; H10/H14/G15 remain open.
+
+2026-09-07 02:33 IST — Task1B mergedc760062. Task2 prepared public challenges,
+registry items/resources +OpenAPIextensions/currentmetadata+planaliases,
+per-listingflags andobservedENSfallback implemented. PublicAPIpreflight and
+actualCLIsearchcaptured (firstCLIcaptureparserfailed,secondretained);terms
+unchanged,no paidrequest.81focused/4/5.61s,19native/284assert/6.51s,8-root
+strict0PASS. Scope/freeze/sole4workerfullgate next;nootherJliveapprovalconsumed.
+
 2026-09-07 02:13 IST — Task1B DONE_WITH_CONCERNS. Sole17003:4578VitestPASS,
 7FAIL/203/64.76s from old Gateway-named/USDC-metadata HTTP fakes. Production
 13pins unchanged; sixfixture/testfiles corrected,12targeted/3/5.30s and19-root
@@ -26,9 +42,10 @@ implemented after32genuineReds/4passes; array-table test shape corrected,then
 121focused/5/3.15sPASS. Strict/audit/solefullgate/atomiccommitnext. Tasks1B–12
 notrun; later escrow-state/Circlepayer/queued202 assumptions explicitly flagged.
 
-- Task1 DONE_WITH_CONCERNS:1A MERGED;1B complete with recorded split verification,
-  atomic commit/merge pending. No live Circle/escrow claim.
-- Task2 NOT_STARTED: registry-shaped discovery.
+- Task1 MERGED:1A98d6e64,1Bc760062. 1B retains recorded split verification.
+  No live Circle/escrow claim.
+- Task2 DONE_WITH_CONCERNS: registry-shaped discovery and Graph compatibility
+  implemented; split verification recorded. Atomic commit/merge next.
 - Task3 NOT_STARTED: buyer funded/preferred accept selection.
 - Task4 NOT_RUN: Circle CLI inspect/estimate/bounded testnet pay proof.
 - Task5 NOT_STARTED: Unified Balance delegate funding and separate live proof.

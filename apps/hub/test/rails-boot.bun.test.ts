@@ -60,6 +60,14 @@ describe("actual F4 boot and constructed rail inventory", () => {
       const accepts = (await challenge.json()).accepts
       expect(accepts).toHaveLength(rail === "eip3009" ? 2 : 1)
       expect(accepts[0].extra.name).toBe(rail === "test" ? "USDC" : "GatewayWalletBatched")
+      const registry = await (await get(origin, "/.well-known/x402")).json()
+      expect(registry.items).toEqual(registry.resources)
+      const item = registry.items.find((item: { resource: string }) => item.resource.endsWith("/first"))
+      expect(item.accepts).toEqual(accepts)
+      expect(item).toMatchObject({ type: "http", x402Version: 2, metadata: { provider: { name: `0x${"2".repeat(40)}`, category: "INFRASTRUCTURE" },
+        supportsCircleGateway: rail !== "test", supportsVanillax402: rail === "eip3009", siwx: false } })
+      expect(openapi["x-circle-discovery"].items).toEqual(registry.items)
+      expect(openapi.paths[`/x/0x${"2".repeat(40)}/first`].post["x-circle-metadata"]).toEqual(item.metadata)
       if (rail === "eip3009") {
         expect(stats.eip[0]).toMatchObject({ chainId: 5042002, rpcUrl: "http://127.0.0.1:1", facilitator: privateKeyToAccount(KEY).address })
         expect(stats.eip[0]).not.toHaveProperty("feeSplitter")
@@ -70,6 +78,7 @@ describe("actual F4 boot and constructed rail inventory", () => {
           expect(accepts).toHaveLength(2)
           expect(accepts[0]).toMatchObject({ payTo: `0x${seller!.repeat(40)}`, extra: { name: "GatewayWalletBatched" } })
           expect(accepts[1]).toMatchObject({ payTo: `0x${splitter!.repeat(40)}`, extra: { name: "USDC", feeSplitterVersion: 2 } })
+          expect(registry.items.find((item: { resource: string }) => item.resource.endsWith(`/${id}`)).accepts).toEqual(accepts)
         }
       }
       expect((await (await get(origin, "/__rails_fixture")).json()).networkRequests).toBe(0)
@@ -188,6 +197,12 @@ describe("J1 native ordinary-route selection (offline named rails)", () => {
         expect(response.status).toBe(402); expect(await response.json()).toEqual({ error: "unsupported_rail" })
       }
       expect(await probe(origin, pathFor("only-erc8183"))).toMatchObject({ error: "unsupported_rail", accepts: [] })
+      const registry = await (await get(origin, "/.well-known/x402")).json()
+      for (const name of ["gateway", "eip3009", "erc8183"]) {
+        const item = registry.items.find((i: { resource: string }) => i.resource.endsWith(`/only-${name}`))
+        expect(item.accepts).toEqual((await probe(origin, pathFor(`only-${name}`))).accepts)
+        expect(item.metadata).toMatchObject({ supportsCircleGateway: name === "gateway", supportsVanillax402: name === "eip3009" })
+      }
       expect(await stats(origin)).toMatchObject({ verifies: [], settlements: [], dispatches: 0, jobWrites: 0, reservations: 0, networkRequests: 0 })
     })
   }, 10000)

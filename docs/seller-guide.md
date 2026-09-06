@@ -201,14 +201,17 @@ A skill is a directory containing `arcade.json` and your code.
 Plan J metadata checkpoint: tags may be omitted (empty), or contain up to ten
 lowercase alphanumeric slugs separated by single hyphens, each at most32 chars.
 This replaces the earlier five-printable-tag rule; invalid old tags must be
-edited explicitly, not silently normalized. Categories are CREATIVE,
-DATA_ENRICHMENT, FINANCIAL_ANALYSIS, INFRASTRUCTURE, PREDICTION_MARKETS and
-WEB_SEARCH_RESEARCH. Rails must be a nonempty, duplicate-free subset of gateway,
+edited explicitly, not silently normalized. Current Circle categories are
+CREATIVE, FINANCIAL_ANALYSIS, INFRASTRUCTURE, PREDICTION_MARKETS,
+WEB_SEARCH_RESEARCH and SOCIAL_INTELLIGENCE. The earlier approved
+DATA_ENRICHMENT value remains accepted for compatibility; it is not silently
+reclassified. Rails must be a nonempty, duplicate-free subset of gateway,
 eip3009 and erc8183. Their declaration grants no credentials or payment authority.
-Omitted rail/category fields remain absent on the public wire. The multi-rail
-challenge will apply gateway/eip3009 and INFRASTRUCTURE defaults as the next
-Plan J checkpoint; this metadata change alone does not activate escrow or alter
-the hub's payment routing.
+Omitted rail/category fields remain absent on the public listing wire. Root
+challenges default to built Gateway/exact rails, in that order; discovery uses
+INFRASTRUCTURE when category is omitted. Escrow is not activated by metadata.
+The [Circle discovery contract](circle-discovery.md) describes actual selectable
+rail flags, schema aliases and the limits of the registry-shaped claim.
 
 Read `{ jobId, input }` as JSON on **stdin**. Write `{ output, stopReason, usage }` as JSON on **stdout**. Anything on **stderr** is streamed to the hub as a job log (and shown to you, not the buyer).
 

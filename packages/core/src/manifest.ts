@@ -56,7 +56,7 @@ export const ListingRails = Schema.Array(ListingRail).pipe(
   Schema.filter(rails => new Set(rails).size === rails.length, { message: () => "rails must not contain duplicates" })
 )
 export const ListingCategory = Schema.Literal(
-  "CREATIVE", "DATA_ENRICHMENT", "FINANCIAL_ANALYSIS", "INFRASTRUCTURE", "PREDICTION_MARKETS", "WEB_SEARCH_RESEARCH"
+  "CREATIVE", "DATA_ENRICHMENT", "FINANCIAL_ANALYSIS", "INFRASTRUCTURE", "PREDICTION_MARKETS", "WEB_SEARCH_RESEARCH", "SOCIAL_INTELLIGENCE"
 )
 
 export const IconUrl = Schema.String.pipe(

@@ -1,0 +1,109 @@
+{
+  "provenance": {
+    "command": [
+      "circle",
+      "services",
+      "search",
+      "--type",
+      "http",
+      "--limit",
+      "1",
+      "--offset",
+      "0",
+      "--output",
+      "json"
+    ],
+    "startedAt": "2026-09-06T20:48:52.770Z",
+    "finishedAt": "2026-09-06T20:48:54.277Z",
+    "exitCode": 0,
+    "stdoutBytes": 2679,
+    "stdoutSha256": "68fbc2ee1e639bbf5a9dba3f2475e151194308c60cb4ff8e14e5b3edc8998c3a",
+    "termsUnchanged": true,
+    "source": "https://api.circle.com/v2/x402/discovery/resources",
+    "scrubbed": [
+      "resource/provider URLs",
+      "provider name/descriptions/tags",
+      "payees and fee payer"
+    ],
+    "scope": "Public registry metadata only. Merchant endpoint never called; no payment, wallet command or terms acceptance.",
+    "captureNote": "First successful CLI invocation was not retained because the capture parser expected bare JSON; this retained invocation decodes the CLI data envelope. One separate keyless API preflight preceded both. No paid request."
+  },
+  "item": {
+    "resource": "https://registry-fixture.example/quote",
+    "type": "http",
+    "x402Version": 2,
+    "lastUpdated": "2026-08-28T14:37:34.535Z",
+    "accepts": [
+      {
+        "scheme": "exact",
+        "network": "eip155:8453",
+        "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "payTo": "0x1111111111111111111111111111111111111111",
+        "amount": "10000",
+        "maxTimeoutSeconds": 300,
+        "extra": {
+          "name": "USD Coin",
+          "version": "2"
+        }
+      },
+      {
+        "scheme": "exact",
+        "network": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+        "asset": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "payTo": "11111111111111111111111111111111",
+        "amount": "10000",
+        "maxTimeoutSeconds": 300,
+        "extra": {
+          "feePayer": "11111111111111111111111111111111"
+        }
+      }
+    ],
+    "metadata": {
+      "provider": {
+        "name": "Registry fixture",
+        "website": "https://registry-fixture.example",
+        "docsUrl": "https://registry-fixture.example/docs",
+        "description": "Public discovery shape fixture",
+        "category": "INFRASTRUCTURE",
+        "tags": [
+          "x402",
+          "schema-fixture"
+        ]
+      },
+      "path": "/quote",
+      "method": "POST",
+      "description": "Read-only schema fixture",
+      "mimeType": "application/json",
+      "input": {
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "type": "http",
+        "method": "POST",
+        "bodyType": "json"
+      },
+      "output": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "json"
+          },
+          "example": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "siwx": false,
+      "supportsVanillax402": true,
+      "supportsCircleGateway": false
+    }
+  }
+}

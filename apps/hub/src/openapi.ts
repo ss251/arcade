@@ -18,9 +18,8 @@ import { PaymentPayload, PaymentRequirements } from "@arcade/payments"
  *
  * **Standard OpenAPI plus x402, and nothing proprietary.** The payment challenge is
  * documented as a normal `402` response whose body is the x402 envelope the hub already
- * emits. Everything that has no home in the OpenAPI spec proper lives under an `x-arcade-`
- * prefix, clearly ours — this document does not pretend to implement any vendor's
- * discovery extension.
+ * emits. ARCADE extensions use `x-arcade-`; Circle registry-shaped metadata lives
+ * under `x-circle-` so this remains valid OpenAPI, not an assertion of registry intake.
  *
  * The listings this is built from are `PublicListing`s, so the secrecy boundary holds here
  * by construction: there is no field on the input type in which an engine, entry point,
@@ -40,6 +39,11 @@ export interface ListingRecord {
    */
   readonly feeSplitter?: string | undefined
   readonly delisted?: boolean | undefined
+  /** Exact unsigned root choices, prepared from built rails before rendering.
+   * Missing data fails closed; the renderer never invents payment requirements. */
+  readonly accepts?: ReadonlyArray<PaymentRequirements> | undefined
+  /** Supplied only from the hub's existing matching, nonexpired ENS observation. */
+  readonly sellerEnsName?: string | undefined
 }
 
 export interface OpenApiParams {
@@ -77,6 +81,27 @@ const asSchemaObject = (schema: unknown): Record<string, unknown> =>
   typeof schema === "object" && schema !== null && !Array.isArray(schema)
     ? (schema as Record<string, unknown>)
     : { description: "seller-declared schema" }
+
+const metadataFor = (params: OpenApiParams, record: ListingRecord) => {
+  const { listing, seller } = record, accepts = record.accepts ?? []
+  const path = `/x/${seller}/${listing.id}`, page = `${params.origin}/skill/${listing.id}`
+  return {
+    provider: { name: record.sellerEnsName ?? seller, website: page, docsUrl: page,
+      description: listing.description, category: listing.category ?? "INFRASTRUCTURE", tags: [...listing.tags] },
+    path, method: "POST", description: listing.description, mimeType: "application/json",
+    input: { type: "http", method: "POST", bodyType: "json", body: listing.inputSchema }, output: listing.outputSchema,
+    // Compatibility aliases requested by the plan. Current registry uses input/output.
+    inputSchema: listing.inputSchema, outputSchema: listing.outputSchema, siwx: false,
+    supportsVanillax402: params.rail !== "test" && accepts.some(a => a.scheme === "exact" && a.extra["name"] !== "GatewayWalletBatched"),
+    supportsCircleGateway: params.rail !== "test" && accepts.some(a => a.scheme === "exact" && a.extra["name"] === "GatewayWalletBatched")
+  }
+}
+const registryItems = (params: OpenApiParams) => liveListings(params.listings).map(record => ({
+  resource: `${params.origin}/x/${record.seller}/${record.listing.id}`, type: "http", x402Version: 2,
+  accepts: [...(record.accepts ?? [])], metadata: metadataFor(params, record),
+  // Preserve existing ARCADE discovery aliases for older clients.
+  method: "POST", description: record.listing.description, outputSchema: record.listing.outputSchema
+}))
 
 export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => {
   const { listings: allListings, origin, rail, network, asset } = params
@@ -147,7 +172,8 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
     }
   }
 
-  for (const { listing, seller } of listings) {
+  for (const record of listings) {
+    const { listing, seller } = record
     const path = `/x/${seller}/${listing.id}`
     const inputName = `Input_${listing.id.replace(/-/g, "_")}`
     const outputName = `Output_${listing.id.replace(/-/g, "_")}`
@@ -185,6 +211,7 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
         "x-arcade-skill-id": listing.id,
         "x-arcade-skill-version": listing.version,
         "x-arcade-bounds": bounds,
+        "x-circle-metadata": metadataFor(params, record),
         // Inlined rather than $ref'd: this is an extension, and extension-internal
         // references are not reliably resolved by generic OpenAPI tooling.
         "x-arcade-output-schema": asSchemaObject(listing.outputSchema),
@@ -366,6 +393,7 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
         "The signed authorization is verified before any work starts and broadcast only " +
         "after the output validates against the listing's declared schema."
     },
+    "x-circle-discovery": { x402Version: 2, items: registryItems(params) },
     paths,
     components: { schemas }
   }
@@ -441,33 +469,11 @@ phrased. The MCP server fences results for exactly this reason.
 /**
  * `/.well-known/x402` — the protocol-level discovery document.
  *
- * Deliberately minimal and mirrors the exact envelope the paid endpoints already return on
- * a 402, so a client that can parse one can parse the other. OpenAPI above is the rich
- * surface; this exists for clients that speak x402 and nothing else.
+ * Registry-shaped items plus the older resources alias. Prepared accepts are
+ * exactly the root challenge choices, including domain and validity metadata.
+ * This is a local discovery contract, not proof of Circle marketplace listing.
  */
-export const buildWellKnownX402 = (params: OpenApiParams): Record<string, unknown> => ({
-  x402Version: 2,
-  rail: params.rail,
-  rails: [...(params.rails ?? [params.rail])],
-  resources: liveListings(params.listings).map(({ listing, seller, feeSplitter }) => ({
-    resource: `${params.origin}/x/${seller}/${listing.id}`,
-    method: "POST",
-    description: listing.description,
-    accepts: [
-      {
-        scheme: "exact",
-        network: params.network,
-        asset: params.asset,
-        // Gateway pays the seller EOA; EIP-3009 routes through its per-listing splitter.
-        payTo: params.rail === "gateway" ? seller : feeSplitter ?? seller,
-        // `amount`, matching what the rail puts on the wire. This document advertises what
-        // a call will cost; the authoritative requirements — including the signing domain
-        // and validity window — come from the 402 the endpoint itself returns.
-        amount: parsePrice(listing.price).toString(),
-        resource: `${params.origin}/x/${seller}/${listing.id}`,
-        description: listing.description
-      }
-    ],
-    outputSchema: listing.outputSchema
-  }))
-})
+export const buildWellKnownX402 = (params: OpenApiParams): Record<string, unknown> => {
+  const items = registryItems(params)
+  return { x402Version: 2, rail: params.rail, rails: [...(params.rails ?? [params.rail])], items, resources: items }
+}

@@ -67,7 +67,7 @@ See spec §1 (table with evidence). Re-verify only what a task names; do not re-
 - [x] `apps/hub/src/challenge.ts`: `buildAccepts(rails, listing, input)` → ordered `PaymentRequirements[]`: Gateway first when `rails.get("gateway")` exists, then `eip3009`, then `erc8183` when the listing declares it and `rails.get("erc8183")` exists. Unit tests for every combination, including a hub booted without Gateway.
 - [x] `server.ts`: the 402 body is `{x402Version: 2, error: "payment required", accepts: buildAccepts(...)}`; `verify` picks the rail whose `name` matches `payload.accepted` (`extra.name === "GatewayWalletBatched"` → gateway; `scheme === "erc8183"` → erc8183; else eip3009). Refuse with `402 unsupported_rail` when no built rail matches.
 - [x] Regression: the existing single-rail tests keep passing with `accepts.length === 1` when only one rail is built.
-- [ ] Commit: `feat(hub,payments): advertise every built rail in one 402 and dispatch verification by the accepted requirements`.
+- [x] Commit: `feat(hub,payments): advertise every built rail in one 402 and dispatch verification by the accepted requirements`. Landed as98d6e64 +c760062.
 
 Execution note: split into metadata98d6e64 and challenge/dispatch checkpoints.
 Unknown schemes never fall through to exact; echoed terms are bound before
@@ -79,9 +79,18 @@ unreached-stage results; no full gate replay or live proof is claimed.
 
 ### Task 2: Registry-shaped discovery (J1)
 
-- [ ] `openapi.ts`: `/.well-known/x402` items gain `metadata` exactly per spec §1 registry shape (`provider`, `path`, `method: "POST"`, `mimeType: "application/json"`, `inputSchema`, `outputSchema`, `supportsVanillax402: true`, `supportsCircleGateway: rails.names.includes("gateway")`) and `type: "http"`. `provider.name` = seller ENS name when known else address; `website`/`docsUrl` = the listing page URL.
-- [ ] Snapshot test against a fixture item copied from a real `circle services search` result (`docs/evidence/J/registry-item-sample.json`, scrubbed) to prove field parity.
-- [ ] Commit: `feat(hub): registry-shaped x402 discovery metadata`.
+- [x] `openapi.ts`: registry-shaped metadata/type, observed seller ENS/address fallback and listing-page links, with the source-backed clarifications below.
+- [x] Snapshot test against a fixture item copied from a real `circle services search` result (`docs/evidence/J/registry-item-sample.json`, scrubbed) to prove field parity.
+- [x] Commit checkpoint: `feat(hub): registry-shaped x402 discovery metadata`; split verification and Graph consumer compatibility correction are recorded in the [Task2 report](../sdd/2026-09-06-J-arc-native/task-2-report.md), not claimed as a green first full run.
+
+Execution clarification from the current primary reference and retained CLI
+sample: upstream metadata uses input/output/siwx. Emit those fields plus explicit
+inputSchema/outputSchema aliases. Canonical items retain the resources alias;
+OpenAPI uses valid x-circle extensions. Capability flags must follow the actual
+per-listing accepts, not promise vanilla on a Gateway-only/unavailable hub.
+Test mode advertises neither production capability. Add current documented
+SOCIAL_INTELLIGENCE while retaining the earlier DATA_ENRICHMENT input unchanged.
+See [Task2 brief](../sdd/2026-09-06-J-arc-native/task-2-brief.md).
 
 ### Task 3: Buyer SDK accept selection (J1)
 

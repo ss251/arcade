@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
 import { SkillManifest, parsePrice, toPublicListing, ARC_CAIP2, USDC_ADDRESS } from "@arcade/core"
+import { PaymentRequirements } from "@arcade/payments"
 import { buildAgentSkill, buildOpenApi, buildWellKnownX402, liveListings, type ListingRecord } from "../src/openapi.ts"
 
 /**
@@ -54,8 +55,16 @@ const record = (over: Record<string, unknown> = {}): ListingRecord => ({
   seller: SELLER
 })
 
+// Renderers now consume prepared challenges; they do not invent a rail/domain.
+// Native boot tests compare these fields against actual live-rail constructors.
+const prepared = (rec: ListingRecord, origin: string): ListingRecord => ({ ...rec,
+  accepts: [PaymentRequirements.make({ scheme: "exact", network: ARC_CAIP2, asset: USDC_ADDRESS,
+    amount: parsePrice(rec.listing.price).toString(), payTo: rec.feeSplitter ?? rec.seller,
+    resource: `${origin}/x/${rec.seller}/${rec.listing.id}`, description: rec.listing.description,
+    maxTimeoutSeconds: 604900, extra: { name: "USDC", version: "2" } })] })
+
 const params = (listings: ReadonlyArray<ListingRecord>) => ({
-  listings,
+  listings: listings.map(rec => prepared(rec, "https://hub.example")),
   origin: "https://hub.example",
   rail: "eip3009",
   network: ARC_CAIP2,
@@ -338,7 +347,7 @@ describe("discovery agrees with the challenge", () => {
 
   const params = (feeSplitter?: string) => ({
     listings: [
-      { listing: toPublicListing(manifest()), seller: SELLER, ...(feeSplitter === undefined ? {} : { feeSplitter }) }
+      prepared({ listing: toPublicListing(manifest()), seller: SELLER, ...(feeSplitter === undefined ? {} : { feeSplitter }) }, PUBLIC)
     ],
     origin: PUBLIC,
     rail: "eip3009",

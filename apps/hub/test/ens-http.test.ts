@@ -56,18 +56,27 @@ describe("actual hub ENS discovery (offline simulation)", () => {
       expect(detail).toMatchObject({ ensName: name, ensExpired: false, delisted: false, payTested: null })
       const doc = await (await request(`${base}/listings/ens-live/agent-registration.json`)).json()
       expect(doc.ens).toBe(name)
+      const provider = async () => {
+        const registry = await (await request(`${base}/.well-known/x402`)).json()
+        return registry.items.find((item: { resource: string }) => item.resource.endsWith("/ens-live")).metadata.provider.name
+      }
+      expect(await provider()).toBe("demo-seller.arcade.eth")
       const missingDoc = await (await request(`${base}/listings/ens-gone/agent-registration.json`)).json()
       expect(missingDoc.ens).toBeUndefined()
       await request(`${base}/__ens_fixture/missing`)
       await eventually(async () => (await (await request(`${base}/listings/ens-live`)).json()).ensExpired === true)
+      expect(await provider()).toBe(seller)
       await request(`${base}/__ens_fixture/live`)
       await eventually(async () => (await (await request(`${base}/listings/ens-live`)).json()).ensExpired === false)
+      expect(await provider()).toBe("demo-seller.arcade.eth")
     })
   }, 20_000)
   it("does no ENS work without a configured root", async () => {
     await withHub(false, async base => {
       const rows = await (await request(`${base}/listings`)).json()
       expect(rows).toHaveLength(3); expect(rows.every((row: object) => !("ensName" in row))).toBe(true)
+      const registry = await (await request(`${base}/.well-known/x402`)).json()
+      expect(registry.items.every((item: { metadata: { provider: { name: string } } }) => item.metadata.provider.name === seller)).toBe(true)
       expect(await (await request(`${base}/listings/ens-live`)).json()).toMatchObject({ ensName: null, ensExpired: false })
       expect(await (await request(`${base}/__ens_fixture/status`)).json()).toMatchObject({ reads: 0, metadataWrites: 0 })
     })

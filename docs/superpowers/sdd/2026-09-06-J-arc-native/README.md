@@ -8,6 +8,8 @@ evidence remain separate open work; this index does not mark them accepted.
 - [Twelve-task plan](../../plans/2026-09-06-J-arc-native.md).
 - [Task 1 brief](task-1-brief.md), [manifest checkpoint](task-1a-report.md),
   [challenge/dispatch checkpoint](task-1b-report.md).
+- [Task 2 brief](task-2-brief.md), [discovery record](task-2-report.md),
+  [discovery contract](../../../circle-discovery.md).
 - [Progress ledger](progress.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per

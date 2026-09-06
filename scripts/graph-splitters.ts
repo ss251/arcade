@@ -83,14 +83,15 @@ export function decodeSplitterDiscovery(hubOrigin: string, listings: unknown, we
   try {
     const hub = origin(hubOrigin), catalogue = capture(listings), doc = object(capture(wellKnown))
     if (!Array.isArray(catalogue)) return fail("discovery_invalid")
-    keys(doc, ["x402Version", "rail", "rails", "resources"])
-    if (doc.x402Version !== 2 || doc.rail !== "eip3009" || !Array.isArray(doc.rails) || doc.rails.length > 3 ||
+    keys(doc, ["x402Version", "rail", "rails", "resources"], ["items"])
+    if (doc.x402Version !== 2 || doc.rail !== "eip3009" || !Array.isArray(doc.rails) || doc.rails.length > 4 ||
         !doc.rails.includes("eip3009") || new Set(doc.rails).size !== doc.rails.length ||
-        doc.rails.some(rail => typeof rail !== "string" || !["eip3009", "gateway", "test"].includes(rail)) || !Array.isArray(doc.resources)) return fail("discovery_invalid")
+        doc.rails.some(rail => typeof rail !== "string" || !["eip3009", "gateway", "test", "erc8183"].includes(rail)) || !Array.isArray(doc.resources) ||
+        doc.items !== undefined && !Array.isArray(doc.items)) return fail("discovery_invalid")
     const byPath = new Map<string, RecordData>()
     for (const entry of catalogue) {
       const listing = object(entry)
-      keys(listing, ["id", "seller", "price", "version", "serviceName", "description", "tags", "bounds", "inputSchema", "outputSchema"], ["iconUrl", "replaces", "canaryInput", "ensName"])
+      keys(listing, ["id", "seller", "price", "version", "serviceName", "description", "tags", "bounds", "inputSchema", "outputSchema"], ["iconUrl", "replaces", "canaryInput", "ensName", "rails", "category"])
       const path = `${hub}/x/${address(listing.seller)}/${skill(listing.id)}`
       if (byPath.has(path) || typeof listing.description !== "string") return fail("discovery_invalid")
       price(listing.price)
@@ -99,28 +100,44 @@ export function decodeSplitterDiscovery(hubOrigin: string, listings: unknown, we
     const seen = new Set<string>(), candidates = new Map<string, { address: string; seller: string; listingIds: string[] }>()
     for (const entry of doc.resources) {
       const resource = object(entry)
-      keys(resource, ["resource", "method", "description", "accepts", "outputSchema"])
-      if (typeof resource.resource !== "string" || resource.method !== "POST" || typeof resource.description !== "string" || !Array.isArray(resource.accepts) || resource.accepts.length !== 1) return fail("discovery_invalid")
+      keys(resource, ["resource", "method", "description", "accepts", "outputSchema"], ["type", "x402Version", "metadata"])
+      if (typeof resource.resource !== "string" || resource.method !== "POST" || typeof resource.description !== "string" || !Array.isArray(resource.accepts) || resource.accepts.length > 3 ||
+          resource.type !== undefined && resource.type !== "http" || resource.x402Version !== undefined && resource.x402Version !== 2) return fail("discovery_invalid")
       const path = resource.resource
       const match = path.startsWith(`${hub}/x/`) ? /^(0x[0-9a-fA-F]{40})\/([a-z0-9][a-z0-9-]{1,63})$/.exec(path.slice(hub.length + 3)) : null
       if (!match) return fail("discovery_invalid")
       const canonicalPath = `${hub}/x/${address(match[1])}/${skill(match[2])}`
       if (seen.has(canonicalPath)) return fail("discovery_invalid")
       seen.add(canonicalPath)
-      const accept = object(resource.accepts[0])
-      keys(accept, ["scheme", "network", "asset", "payTo", "amount", "resource", "description"])
-      if (accept.scheme !== "exact" || accept.network !== "eip155:5042002" || address(accept.asset) !== ASSET || accept.resource !== path || accept.description !== resource.description) return fail("discovery_invalid")
-      const atomic = amount(accept.amount), payTo = address(accept.payTo)
       const listing = byPath.get(canonicalPath)
+      const kinds = new Set<string>(); let vanilla: RecordData | undefined
+      for (const value of resource.accepts) {
+        const accept = object(value)
+        keys(accept, ["scheme", "network", "asset", "payTo", "amount", "resource", "description"], ["maxTimeoutSeconds", "mimeType", "extra"])
+        if (accept.scheme !== "exact" && accept.scheme !== "erc8183" || accept.network !== "eip155:5042002" || address(accept.asset) !== ASSET || accept.resource !== path || accept.description !== resource.description) return fail("discovery_invalid")
+        const atomic = amount(accept.amount); address(accept.payTo)
+        if (listing && atomic !== price(listing.price)) return fail("discovery_invalid")
+        if (accept.maxTimeoutSeconds !== undefined && (typeof accept.maxTimeoutSeconds !== "number" || !Number.isSafeInteger(accept.maxTimeoutSeconds) || accept.maxTimeoutSeconds <= 0) ||
+            accept.mimeType !== undefined && accept.mimeType !== "application/json") return fail("discovery_invalid")
+        const extra = accept.extra === undefined ? undefined : object(accept.extra)
+        const kind = accept.scheme === "erc8183" ? "erc8183" : extra?.name === "GatewayWalletBatched" ? "gateway" : "eip3009"
+        if (kinds.has(kind)) return fail("discovery_invalid")
+        kinds.add(kind)
+        if (kind !== "eip3009") continue // Neither destination is a FeeSplitter announcement.
+        if (extra && (extra.name !== "USDC" || extra.version !== "2" || extra.feeSplitter !== undefined && address(extra.feeSplitter) !== address(accept.payTo))) return fail("discovery_invalid")
+        vanilla = accept
+      }
       // Discovery currently retains ENS-expired resources that /listings omits.
       if (!listing) continue
-      if (atomic !== price(listing.price) || resource.description !== listing.description || JSON.stringify(resource.outputSchema) !== JSON.stringify(listing.outputSchema)) return fail("discovery_invalid")
+      if (resource.description !== listing.description || JSON.stringify(resource.outputSchema) !== JSON.stringify(listing.outputSchema)) return fail("discovery_invalid")
+      byPath.delete(canonicalPath)
+      if (!vanilla) continue
+      const payTo = address(vanilla.payTo)
       const seller = address(listing.seller), pin = approvedSplitterPin(payTo)
       if (!pin || pin.seller !== seller) return fail("unapproved_splitter")
       const candidate = candidates.get(payTo) ?? { address: payTo, seller, listingIds: [] }
       if (candidate.seller !== seller) return fail("unapproved_splitter")
       candidate.listingIds.push(skill(listing.id)); candidates.set(payTo, candidate)
-      byPath.delete(canonicalPath)
     }
     if (byPath.size !== 0) return fail("discovery_invalid")
     const result = [...candidates.values()].sort((a, b) => a.address < b.address ? -1 : 1).map(candidate => Object.freeze({ ...candidate, listingIds: Object.freeze(candidate.listingIds.sort()) }))

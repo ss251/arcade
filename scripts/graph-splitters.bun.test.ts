@@ -3,8 +3,11 @@ import { mkdtemp, readFile, writeFile, rm, readdir, copyFile, mkdir } from "node
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { Schema } from "effect"
-import { SkillManifest, toPublicListing } from "../packages/core/src/index.ts"
+import { Effect, Schema } from "effect"
+import { SkillManifest, toPublicListing, loadChainConfig } from "../packages/core/src/index.ts"
+import { makeEip3009Rail, makeGatewayRail } from "../packages/payments/src/index.ts"
+import { prepareDiscoveryListings } from "../apps/hub/src/discovery.ts"
+import { makeRails } from "../apps/hub/src/rails.ts"
 import { buildWellKnownX402 } from "../apps/hub/src/openapi.ts"
 import { decodeSplitterDiscovery, planSplitterUpdate, updateSplitterList, parseSplitterArgs, type SplitterFetch } from "./graph-splitters.ts"
 
@@ -15,6 +18,10 @@ const SELLER = "0xcf821769ed3c0e55e152745377bb833d7155a78a"
 const ASSET = "0x3600000000000000000000000000000000000000"
 const existing = { splitters: [{ address: PILOT, startBlock: 0 }] }
 const wire = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
+const domainOf = (accept: Record<string, unknown>) => (accept.extra as Record<string, unknown> | undefined)?.name
+// Real offline challenge constructors; public account cannot sign or submit.
+const exactRail = makeEip3009Rail({ chain: loadChainConfig(), rpcUrl: "https://unused.example", facilitator: { address: SELLER, type: "json-rpc" } })
+const gatewayRail = makeGatewayRail()
 function fixture(prices = ["$0.25"], rail = "eip3009", seller = SELLER) {
   const records = prices.map((price, i) => ({ seller, feeSplitter: A9,
     listing: toPublicListing(Schema.decodeUnknownSync(SkillManifest)({
@@ -24,16 +31,57 @@ function fixture(prices = ["$0.25"], rail = "eip3009", seller = SELLER) {
       engine: { adapter: "claude-api", entry: "agent.ts", credential: "api-key", capabilities: [] }
     }))
   }))
+  const prepared = Effect.runSync(prepareDiscoveryListings(makeRails(exactRail, [gatewayRail]), records, ORIGIN))
   return { listings: wire(records.map(({ listing, seller }) => ({ ...listing, seller }))),
-    document: wire(buildWellKnownX402({ listings: records, origin: ORIGIN, rail, rails: [rail, ...(rail === "eip3009" ? ["gateway"] : [])], network: "eip155:5042002", asset: ASSET })) }
+    document: wire(buildWellKnownX402({ listings: prepared, origin: ORIGIN, rail, rails: [rail, ...(rail === "eip3009" ? ["gateway"] : [])], network: "eip155:5042002", asset: ASSET })) }
 }
 function first(f: ReturnType<typeof fixture>) {
   const resource = (f.document.resources as Array<Record<string, unknown>>)[0]!
-  return { resource, accept: (resource.accepts as Array<Record<string, unknown>>)[0]! }
+  return { resource, accept: (resource.accepts as Array<Record<string, unknown>>).find(a => a.scheme === "exact" && domainOf(a) !== "GatewayWalletBatched")! }
 }
 const discovery = (f = fixture()) => decodeSplitterDiscovery(ORIGIN, f.listings, f.document)
 
 describe("G6 current discovery join", () => {
+  test("selects the second vanilla accept, never the first Gateway seller destination", () => {
+    const f = fixture(), accepts = first(f).resource.accepts as Array<Record<string, unknown>>
+    expect(accepts.map(domainOf)).toEqual(["GatewayWalletBatched", "USDC"])
+    expect(accepts[0]!.payTo).toBe(SELLER)
+    expect(discovery(f).candidates.map(c => c.address)).toEqual([A9])
+  })
+  test("does not promote non-splitter-only or unavailable listing accepts", () => {
+    for (const kind of ["gateway", "erc8183", "unavailable"]) {
+      const f = fixture(), r = first(f).resource, accepts = r.accepts as Array<Record<string, unknown>>
+      r.accepts = kind === "gateway" ? [accepts[0]] : kind === "erc8183" ? [{ ...accepts[1], scheme: "erc8183" }] : []
+      expect(discovery(f)).toEqual({ kind: "empty", candidates: [] })
+    }
+  })
+  test("preserves legacy single-accept discovery without introducing unreviewed pins", () => {
+    const f = fixture(), r = first(f).resource, a = first(f).accept
+    r.accepts = [a]
+    for (const field of ["type", "x402Version", "metadata"]) delete r[field]
+    for (const field of ["extra", "maxTimeoutSeconds", "mimeType"]) delete a[field]
+    delete f.document.items
+    expect(discovery(f).candidates.map(c => c.address)).toEqual([A9])
+  })
+  test("handles optional public category/rails and never derives authority from registry metadata", () => {
+    const f = fixture()
+    Object.assign(f.listings[0]!, { category: "INFRASTRUCTURE", rails: ["gateway", "eip3009"] })
+    first(f).resource.metadata = { provider: { name: "Untrusted provider", feeSplitter: PILOT } }
+    expect(discovery(f).candidates.map(c => c.address)).toEqual([A9])
+  })
+  test("rejects duplicate Gateway, unknown schemes, changed prices and inconsistent exact domains", () => {
+    for (const mutate of [
+      (r: Record<string, unknown>, a: Array<Record<string, unknown>>) => { r.accepts = [a[0], a[0], a[1]] },
+      (_r: Record<string, unknown>, a: Array<Record<string, unknown>>) => { a[0]!.scheme = "unknown" },
+      (_r: Record<string, unknown>, a: Array<Record<string, unknown>>) => { a[0]!.amount = "1" },
+      (_r: Record<string, unknown>, a: Array<Record<string, unknown>>) => { a[1]!.extra = { name: "Unknown", version: "2" } },
+      (_r: Record<string, unknown>, a: Array<Record<string, unknown>>) => { (a[1]!.extra as Record<string, unknown>).feeSplitter = PILOT }
+    ]) {
+      const f = fixture(), r = first(f).resource
+      mutate(r, r.accepts as Array<Record<string, unknown>>)
+      expect(() => discovery(f)).toThrow("discovery_invalid")
+    }
+  })
   test("joins actual public producer output, aggregates skills without assigning historical listing ownership", () => {
     const f = fixture(["$0.25", "$001.020000", "0.000001", "$9007199254740993.123456"])
     const result = discovery(f)
@@ -94,6 +142,7 @@ describe("G6 current discovery join", () => {
   })
   test("requires immutable approved seller binding, no arbitrary announced splitter authority", () => {
     const f = fixture(); first(f).accept.payTo = PILOT
+    ;(first(f).accept.extra as Record<string, unknown>).feeSplitter = PILOT
     expect(() => discovery(f)).toThrow("unapproved_splitter")
   })
   test("fixed diagnostics capture own JSON data without invoking accessors or raw proxy errors", () => {

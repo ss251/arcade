@@ -46,6 +46,7 @@ import { AttestLive, AttestTag } from "./attest.ts"
 import { runJob } from "./pipeline.ts"
 import { RailsTag, railsLayerFrom } from "./rails.ts"
 import { challengeChoices, matchesRequirements, paymentRailName } from "./challenge.ts"
+import { prepareDiscoveryListings } from "./discovery.ts"
 import { makeSessions } from "./sessions.ts"
 import { makeSessionRoutes, timingSafeTokenOk } from "./server-sessions.ts"
 import { makeSessionCallRoutes } from "./server-session-calls.ts"
@@ -905,9 +906,18 @@ const main = Effect.gen(function* () {
       // origin has to be the one buyers can reach, not the socket the hub is bound to.
       if (path === "/openapi.json" || path === "/.well-known/x402" || path === "/skill.md") {
         const listings = await run(store.allListings)
+        const origin = publicOrigin(url)
         const discovery = {
-          listings,
-          origin: publicOrigin(url),
+          listings: path === "/skill.md" ? listings : await run(prepareDiscoveryListings(rails, listings, origin, record => {
+            const name = record.ensName
+            // No new ENS read here: do not turn a configured label, expired name,
+            // or another publication's persisted observation into provider identity.
+            if (name === undefined || ensWatch.isExpired(record.listing.id, record.seller) ||
+              name !== ensWatch.nameFor({ id: record.listing.id, seller: record.seller,
+                runnerId: record.runnerId, publishedAtMs: record.publishedAtMs })) return undefined
+            return name.slice(name.indexOf(".") + 1)
+          })),
+          origin,
           rail: rail.name,
           rails: rails.names,
           network: ARC_CAIP2,
