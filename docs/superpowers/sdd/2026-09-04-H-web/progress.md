@@ -3,7 +3,7 @@
 2026-09-06 17:54 IST: H11 final gate/audit complete. Sole53132 sweep4,012pass/
 1obsolete navigation404 expectation/171files/52.07s. Unknown-route target fixed,
 404 assertion retained; targeted nav+seller2/2 passed, no full Vitest repeat.
-Remaining31049exit0:834Bun54/6093assert/163.45s,rootwebstrict0,client349msSSR166ms.
+Remaining31049exit0:834Bun54/6091assert/163.45s,rootwebstrict0,client349msSSR166ms.
 Final39 source pins/104 public links/readiness text/CSS prefix/privacy PASS.
 Local atomic commit next. All native processes stopped; no keys/spend/push.
 

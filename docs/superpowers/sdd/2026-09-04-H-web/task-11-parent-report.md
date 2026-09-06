@@ -80,7 +80,7 @@ sweep or production-source change. The additional test fingerprint is
 18a8a24c52fafc545dae25ce26caf5e2a09d14874ef2f09b3c2cb322ebc2b054.
 
 Not-yet-run stages31049 then exited0 at17:54IST:834 Bun tests/54 files,
-6,093 assertions/163.45s; root and web strict TypeScript0; client349ms/SSR166ms.
+6,091 assertions/163.45s; root and web strict TypeScript0; client349ms/SSR166ms.
 Final self-audit passed39 source/test pins,104 public local links, the complete
 prior stylesheet prefix and historical readiness text (terminal blank lines
 normalized only), with no selected privacy findings. No simultaneous gate,
