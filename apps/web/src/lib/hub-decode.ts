@@ -1,5 +1,9 @@
 /** Public JSON decoders. Explicit projections, no hub boot, IO, keys or payment authority. */
-import { dnsNameOf, formatPrice, loadChainConfig, NON_SETTLING } from "@arcade/core"
+// Exact inert imports: the core barrel eagerly selects a server-side network.
+import { dnsNameOf } from "../../../../packages/core/src/ens.ts"
+import { formatPrice } from "../../../../packages/core/src/money.ts"
+import { loadChainConfig } from "../../../../packages/core/src/chain-config.ts"
+import { NON_SETTLING } from "../../../../packages/core/src/job.ts"
 import { settlementReferenceKind, type SettlementReferenceKind } from "./format.ts"
 
 export interface PayTest { readonly atMs: number; readonly jobId: string; readonly ok: boolean; readonly settleTx?: string }

@@ -46,6 +46,8 @@ import { makeSessions } from "./sessions.ts"
 import { makeSessionRoutes, timingSafeTokenOk } from "./server-sessions.ts"
 import { makeSessionCallRoutes } from "./server-session-calls.ts"
 import { sessionRefusal } from "./server-sessions.ts"
+import { makeBrowserCors } from "./browser-cors.ts"
+import { ordinaryReadScope, readOrdinaryBody } from "./ordinary-http.ts"
 import { inputGate } from "./input-gate.ts"
 import { payTestSkipReason } from "./canary-input.ts"
 import { canaryFromEnv, canaryLoop } from "./canary.ts"
@@ -222,7 +224,11 @@ const preflight = (): void => {
  * One function rather than two `??` expressions, because two places computing the same fact
  * is how they came to disagree.
  */
-const publicOrigin = (url: URL): string => process.env["ARCADE_PUBLIC_URL"] ?? url.origin
+const browserCors = (() => {
+  try { return makeBrowserCors(process.env["ARCADE_WEB_ORIGIN"], process.env["ARCADE_PUBLIC_URL"]) }
+  catch { console.error("[hub] refusing to start: browser transport configuration invalid"); process.exit(2) }
+})()
+const publicOrigin = (url: URL): string => browserCors.publicOrigin ?? process.env["ARCADE_PUBLIC_URL"] ?? url.origin
 
 let facilitatorAccount: ReturnType<typeof privateKeyToAccount> | undefined
 const facilitator = (): ReturnType<typeof privateKeyToAccount> => {
@@ -783,6 +789,7 @@ const main = Effect.gen(function* () {
     },
 
     async fetch(req) {
+      return browserCors.handle(req, async () => {
       const url = new URL(req.url)
       const path = url.pathname
 
@@ -1117,7 +1124,9 @@ const main = Effect.gen(function* () {
         if (found._tag === "Left") return json({ error: "not_found" }, 404)
         const { listing, seller } = found.right
 
-        const rawBody = await req.text()
+        let rawBody: string
+        try { rawBody = await readOrdinaryBody(req) }
+        catch { return json({ error: "input_invalid" }, 400) }
         let input: unknown
         try {
           input = rawBody === "" ? {} : JSON.parse(rawBody)
@@ -1172,7 +1181,7 @@ const main = Effect.gen(function* () {
         if (header === null) {
           const requirements = await run(rail.challenge({ priceAtomic, resource, payTo: seller, description: listing.description, ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }), ...(found.right.splitterVersion === undefined ? {} : { feeSplitterVersion: found.right.splitterVersion }) }))
           return json(
-            { x402Version: 2, error: "payment required", accepts: [requirements] },
+            { x402Version: 2, error: "payment required", rail: rail.name, accepts: [requirements] },
             402
           )
         }
@@ -1287,17 +1296,19 @@ const main = Effect.gen(function* () {
           )
         )
 
-        return json(
+        const accepted = json(
           {
             job_id: jobId,
             status: "queued",
-            poll_url: `${url.origin}/jobs/${jobId}/result?token=${jobToken(jobId)}`,
+            poll_url: `${browserCors.publicOrigin ?? url.origin}/jobs/${jobId}/result?token=${jobToken(jobId)}`,
             // The capability to read this job's result. Held only by whoever paid for it.
             job_token: jobToken(jobId),
             price: formatPrice(priceAtomic)
           },
           202
         )
+        accepted.headers.set("cache-control", "private, no-store")
+        return accepted
       }
 
       // Long-poll for a job result.
@@ -1305,12 +1316,17 @@ const main = Effect.gen(function* () {
       if (resultMatch !== null && req.method === "GET") {
         const jobId = resultMatch[1]!
         if (!jobTokenOk(jobId, tokenFrom(req, url))) return sessionRefusal("not_found", 404)
+        const retrieval = ordinaryReadScope(req.signal)
+        const resultJson = (body: unknown, status = 200) => {
+          const response = json(body, status); response.headers.set("cache-control", "private, no-store"); return response
+        }
+        try {
         const deadline = Date.now() + 120_000
         while (Date.now() < deadline) {
-          const receipts = await run(store.allReceipts)
+          const receipts = await retrieval.read(signal => run(store.allReceipts, { signal }))
           const receipt = receipts.find((r) => r.jobId === jobId)
           if (receipt !== undefined) {
-            const job = await run(store.getJob(jobId))
+            const job = await retrieval.read(signal => run(store.getJob(jobId), { signal }))
             // The payload is released only against a SETTLED receipt. Previously a receipt
             // merely EXISTING was enough — and the pipeline writes one on every terminal
             // outcome, settled or not. So a job whose settlement failed still handed over
@@ -1318,7 +1334,7 @@ const main = Effect.gen(function* () {
             // a failed job leaves the buyer's balance untouched; it has to also leave the
             // buyer without the goods, or "non-settlement is the refund" is a transfer.
             const delivered = receipt.settled === true
-            return json({
+            return resultJson({
               job_id: jobId,
               status: job?.outcome?.status ?? (receipt.settled ? "succeeded" : "failed"),
               result: delivered ? (job?.outcome?.output ?? null) : null,
@@ -1348,9 +1364,13 @@ const main = Effect.gen(function* () {
               }
             })
           }
-          await Bun.sleep(300)
+          await retrieval.read(signal => run(Effect.sleep(300), { signal }))
         }
-        return json({ job_id: jobId, status: "pending" }, 202)
+        return resultJson({ job_id: jobId, status: "pending" }, 202)
+        } catch {
+          return retrieval.expired() && !req.signal.aborted ? resultJson({ job_id: jobId, status: "pending" }, 202)
+            : resultJson({ error: "result_unavailable" }, 503)
+        } finally { retrieval.close() }
       }
 
       if (path === "/trees" || path.startsWith("/trees/")) {
@@ -1365,13 +1385,17 @@ const main = Effect.gen(function* () {
         // Root capability only, checked before any ledger read. The builder also
         // refuses to promote a child with its own otherwise-valid job capability.
         if (!jobTokenOk(rootJobId, tokenFrom(req, url))) return treeJson({ error: "not_found" }, 404)
-        const result = await run(store.allReceipts.pipe(
+        const retrieval = ordinaryReadScope(req.signal, 10000)
+        try {
+        const result = await retrieval.read(signal => run(store.allReceipts.pipe(
           Effect.map(receipts => buildTreeView(rootJobId, receipts)),
           Effect.exit
-        ))
+        ), { signal }))
         if (result._tag === "Failure") return treeJson({ error: "tree_unavailable" }, 503)
         if (result.value === undefined) return treeJson({ error: "not_found" }, 404)
         return treeJson(result.value)
+        } catch { return treeJson({ error: "tree_unavailable" }, 503) }
+        finally { retrieval.close() }
       }
 
       // `POST /publish` used to live here, behind `ARCADE_PUBLISH_TOKEN` defaulting to
@@ -1386,6 +1410,7 @@ const main = Effect.gen(function* () {
       // dev-token" as a hole and a deployer sets it believing it protects something.
       // Neither was true, and both are worse than no route.
       return json({ error: "not_found" }, 404)
+      })
     }
   })
 

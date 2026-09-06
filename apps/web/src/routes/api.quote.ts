@@ -28,6 +28,7 @@ export const handleQuote = async ({ request }: { request: Request }): Promise<Re
     return Response.json({
       skillId: q.skillId, price: formatPrice(BigInt(q.amountAtomic)), amountAtomic: q.amountAtomic,
       payTo: q.payTo, network: q.network, asset: q.asset,
+      ...(q.browser === undefined ? {} : { browser: q.browser }),
       ...(q.ensName === undefined ? {} : { ensName: q.ensName })
     })
   } catch {

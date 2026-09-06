@@ -1,4 +1,7 @@
-import { USDC_DECIMALS } from "./chain.ts"
+// USDC payment math has a fixed ERC-20 scale, independently of network selection.
+// ChainConfig enforces Schema.Literal(6) for every supported manifest. Importing
+// these pure helpers must not eagerly select server environment via chain.ts.
+const USDC_DECIMALS = 6 as const
 
 /**
  * USDC money math. Everything here is **6-decimal atomic units** (the ERC-20 interface),

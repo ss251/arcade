@@ -15,7 +15,8 @@
 import { Schema } from "effect"
 import { dnsNameOf, loadChainConfig } from "@arcade/core"
 import { PaymentRequirements } from "@arcade/payments"
-import { hubJson, hubOrigin } from "./hub-http.ts"
+import { hubJson, hubOrigin, jsonFetch } from "./hub-http.ts"
+import { capturePurchaseContext, type BrowserPurchaseContext, type BrowserPurchaseRail } from "./purchase-context.ts"
 import { purchaseInput } from "./purchase-input.ts"
 import { addressOk, decodeListing, decodeListings, decodeName, decodeReceipts, decodeSellerSummary, decodeStats,
   decodeTree, nameOk, rootIdOk, skillIdOk } from "./hub-decode.ts"
@@ -88,6 +89,8 @@ export const resolveName = async (name: string): Promise<ResolvedName> => {
 }
 
 export interface Quote {
+  /** Passive public context only; absent on legacy/unsupported browser challenges. */
+  readonly browser?: BrowserPurchaseContext
   /** Checked via /names against this quote, not copied from an advertised listing. */
   readonly ensName?: string
   readonly skillId: string
@@ -120,25 +123,34 @@ export interface Quote {
  */
 export const quote = async (skillId: string, input: unknown = {}): Promise<Quote> => {
   if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(skillId)) throw new Error("Invalid skill identifier")
+  const issuer = hubOrigin(), cfg = loadChainConfig()
   const body = JSON.stringify(purchaseInput(input))
-  const listing = await describeSkill(skillId)
+  // Quote alone captures its issuer/config once; public H4 reads remain unchanged.
+  const detail = await jsonFetch(`${issuer}/listings/${skillId}`, { method: "GET", headers: { accept: "application/json" } }, 25_000)
+  if (detail.status !== 200) throw new Error("Invalid listing identity")
+  const listing = decodeListing(detail.body, skillId)
   const address = (value: unknown): value is string => typeof value === "string" &&
     /^0x[0-9a-fA-F]{40}$/.test(value) && !/^0x0{40}$/i.test(value)
   if (!listing || listing.id !== skillId || !address(listing.seller)) throw new Error("Invalid listing identity")
   const resource = `/x/${listing.seller}/${listing.id}`
-  const endpoint = hubOrigin() + resource
+  const endpoint = issuer + resource
   let requirement: PaymentRequirements
   let original: Record<string, unknown>
+  let rail: BrowserPurchaseRail | undefined
   try {
-    const response = await hubJson(resource, {
+    const response = await jsonFetch(endpoint, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body
     })
     const challenge = Schema.decodeUnknownSync(Schema.Struct({ x402Version: Schema.Literal(2), accepts: Schema.Array(PaymentRequirements) }))(response.body)
+    const reported = Object.getOwnPropertyDescriptor(response.body, "rail")
+    if (reported !== undefined) {
+      if (!("value" in reported) || !["eip3009", "gateway", "test"].includes(reported.value)) throw new Error()
+      rail = reported.value as BrowserPurchaseRail
+    }
     if (response.status !== 402 || challenge.accepts.length !== 1) throw new Error()
     requirement = challenge.accepts[0]!
-    const cfg = loadChainConfig()
     if (cfg.status !== "ready" || requirement.network !== cfg.caip2 || requirement.asset.toLowerCase() !== cfg.usdc.address.toLowerCase() ||
         !address(requirement.payTo) || requirement.resource !== endpoint ||
         !/^[1-9][0-9]{0,77}$/.test(requirement.amount) || BigInt(requirement.amount) >= 1n << 256n ||
@@ -152,7 +164,7 @@ export const quote = async (skillId: string, input: unknown = {}): Promise<Quote
     try {
       if (typeof listing.ensName !== "string" || !/^[a-z0-9.-]+\.eth$/.test(listing.ensName)) throw new Error()
       dnsNameOf(listing.ensName)
-      const resolved = await hubJson(`/names/${listing.ensName}`, { headers: { accept: "application/json" } })
+      const resolved = await jsonFetch(`${issuer}/names/${listing.ensName}`, { headers: { accept: "application/json" } })
       const n = resolved.body as Record<string, unknown> | null
       if (resolved.status !== 200 || !n || n["name"] !== listing.ensName || n["expired"] !== false ||
           n["skillId"] !== skillId || !address(n["seller"]) || n["seller"].toLowerCase() !== listing.seller.toLowerCase() ||
@@ -161,7 +173,7 @@ export const quote = async (skillId: string, input: unknown = {}): Promise<Quote
       ensName = listing.ensName
     } catch { throw new Error("ENS resolution unavailable or inconsistent; nothing was signed") }
   }
-  return {
+  const quoted = {
     skillId: listing.id,
     seller: listing.seller,
     amountAtomic: requirement.amount,
@@ -172,4 +184,6 @@ export const quote = async (skillId: string, input: unknown = {}): Promise<Quote
     requirements: original,
     ...(ensName === undefined ? {} : { ensName })
   }
+  const browser = rail === undefined ? undefined : capturePurchaseContext({ ...quoted, hubOrigin: issuer, rail })
+  return { ...quoted, ...(browser === undefined ? {} : { browser }) }
 }

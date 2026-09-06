@@ -155,6 +155,7 @@ refuses to start when `ARCADE_PUBLIC_URL` is set and the load-bearing ones are m
 | variable | on | why it is load-bearing |
 |---|---|---|
 | `ARCADE_PUBLIC_URL` | hub | The origin written into every 402 challenge and into `/openapi.json`. Behind a proxy it must be the URL buyers can reach, not the socket Bun bound — otherwise the challenge names an unreachable resource. **Setting it is also the signal that this is a public deployment**, which turns on the refusals below. |
+| `ARCADE_WEB_ORIGIN` | hub | Opt-in ordinary browser transport: one exact canonical HTTPS origin (no trailing slash), or HTTP literal `127.0.0.1`/`[::1]` for isolated development. When set, also requires a canonical `ARCADE_PUBLIC_URL`; both are captured at startup. Absent closes requests carrying `Origin`; malformed configuration refuses startup. No wildcard, cookies, session/hire capability support or production change is implied. |
 | `ARCADE_HUB_SECRET` | hub | Job tokens are `HMAC(secret, jobId)`. Unset, a fresh secret is minted **every boot**, so every buyer holding a 202 loses access to work they already paid for. Harmless while the store was in RAM (the receipt died too); with `ARCADE_DB` set, this is what strands paying buyers. Pin it. |
 | `ARCADE_FACILITATOR_KEY` | hub | The key that broadcasts settlements. Unset, the hub generates an ephemeral one with no gas and **every settlement fails after the work is already done** — the seller has burned inference and nobody gets paid. |
 | `ARCADE_DB` | hub | Path to the sqlite file, **which must be inside a mounted volume**. Container filesystems are ephemeral: point it anywhere else and sqlite writes into the container, receipts persist across a process restart *inside* it, and durability fails only on redeploys — which nobody thinks of as restarts, and which happen on every push. Provision and mount the volume **before the first deploy**, because the first thing you do after one is push a fix. DoD "a receipt survives a restart" is only true on a host with a volume; the sqlite Layer alone does not get you there. **Now enforced** — see below. |
@@ -502,6 +503,26 @@ than a deployment pointed at nothing.
 
 On boot it logs the hub it resolved (`[web] hub: …`), so a local run never leaves you
 guessing which hub you were actually watching.
+
+### H10a ordinary browser transport is passive support
+
+The hub's opt-in browser policy permits only ordinary purchase-resource POSTs
+and header-token result/tree GETs from the configured web origin. OPTIONS and
+forbidden origin/authority headers are handled before application IO. Native
+no-`Origin` CLI and F protocols retain their own authentication. This is a browser
+transport policy, not buyer authentication or fresh purchase approval.
+
+Ordinary 402 responses report the selected rail explicitly. The keyless quote
+API includes optional public `browser` context only when all coordinates and
+requirements are supported; missing legacy context does not imply EIP-3009.
+New passive browser readers use the captured hub origin and `x-job-token`, never
+the legacy query-token `poll_url` retained for old clients. Reads omit cookies,
+redirects, cache and Referer, bound JSON bodies and deadlines, and stop retrieval
+on abort. Aborting a read does **not** cancel an admitted job or revoke payment.
+
+This checkpoint does not migrate the active wallet/settlement UI, prove native
+browser CORS, or complete buyer/session recovery. Those H10 follow-ups remain
+pending. No deployed environment was changed or live purchase performed for H10a.
 
 ### Set the web service's Config File Path, or you get two hubs
 

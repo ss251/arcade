@@ -308,3 +308,41 @@ exact copies/original pins, four literal home substitutions, two source/test pin
 ten unchanged H8 pins, 67 local links and zero selected privacy-pattern findings
 across nine public documents. Pages configuration retained. Atomic H9 commit next;
 H10 remains separately scoped preparation, with H still unmerged and no new spend.
+
+## H10a — passive protocol support released
+
+H9 committed `7cc4409`. Parent accepted the corrected H10a brief: default-closed,
+explicit ordinary browser CORS and captured public hub origin; reported rail in
+the 402 body; private/abort-aware ordinary retrieval and bounded input; complete
+public quote context and fixed-origin header-only browser reads. The quote issuer
+and selected chain are captured once. Browser context never drops unknown extra
+requirement fields and pretends the changed object was the original challenge.
+
+Hub and web authors own separate slices; independent readiness review is separate.
+No active signing/submission/relay or UI change is released in H10a, no F capability
+export and no native-browser success is claimed. Three exact historical preflight
+copies preserve the source-composition findings and explicit session limitations.
+One full H10a gate follows only after frozen source and independent acceptance.
+
+H10a hub author/reviewer acceptance passed, including actual Store Effect abort
+and a genuine finite-empty-stream regression/fix. Web author332 focused and
+initial reviewer337 passed; reviewer then reproduced three fresh-import failures
+through the shared core dependency. Parent's two-source import/USDC-scale fix
+passed reviewer354 focused/11 and exact15strict0. Original reports remain intact;
+the final reviewer result was relayed before the owner load alert interrupted
+the pending report append. Parent's integration record preserves that distinction.
+
+The owner machine-load restriction immediately stopped delegated work. No fan-out
+or parallel reviews until lifted. Root's sole full H10a gate used explicit
+Vitest maxWorkers4/minWorkers1/maxConcurrency4, sequential Bun max-concurrency4,
+then strict/build stages. PASS: 3,608 Vitest/152 (59.15s), 834 Bun/54/6,093 assertions
+(168.31s), root/web strict, client423ms/SSR231ms. No sweep repeated. Nine scrubbed
+historical copies preserve chronology and limitations; final audit/commit follows.
+No native browser CORS, active wallet migration or F session recovery is claimed.
+H remains unmerged, with no new spend, real key, production change or push.
+
+Root's final H10a audit passed: nine byte-exact bannered historical copies/original
+hashes, 14 literal home substitutions, all18 source/test pins, 14 retained H8/H9/F/
+Pages pins, 84 local links across13 public documents, and zero selected privacy-
+pattern findings. This publication audit was single-threaded; no parallel review
+or repeated full gate was started. The atomic local H10a commit follows.

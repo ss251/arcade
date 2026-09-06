@@ -1,5 +1,21 @@
 # Plan H — execution records
 
+Current task: [H10a passive browser protocol support](task-10a-brief.md), after H9
+`7cc4409`. Hub CORS/protocol and corrected web quote/read transport reviews passed;
+the single four-worker-bounded full gate and final publication audit passed. The
+atomic commit follows. Active purchase migration, buyer UI and session
+completeness remain separate; no H10 completion or native browser proof yet.
+
+- [H10 purchase-authority preflight and refinements](task-10-authority-preflight.md)
+- [H10 transport/CORS preflight and public-origin correction](task-10-transport-preflight.md)
+- [H10 session completeness boundary](task-10-session-preflight.md)
+- [H10a independent review preparation](task-10a-review-preparation.md)
+- [H10a hub author chronology](task-10a-hub-author-report.md)
+- [H10a web author chronology](task-10a-web-author-report.md)
+- [H10a independent hub review](task-10a-hub-independent-review.md)
+- [H10a initial independent web review](task-10a-web-independent-review.md)
+- [H10a parent correction, relayed final review and full gate](task-10a-parent-integration.md)
+
 Current task: [H9 ordinary browser recovery store](task-9-brief.md), after committed
 H8 `b7fee76`. Implementation and independent frozen review passed 80 focused tests
 and exact strict checks. The single full gate and final publication audit passed;

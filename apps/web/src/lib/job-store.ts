@@ -54,7 +54,7 @@ const captureScope = (input: unknown): JobScope | undefined => {
   return v !== undefined && originOk(v.hubOrigin) && v.realm === "ordinary"
     ? { hubOrigin: v.hubOrigin, realm: v.realm } : undefined
 }
-const captureJob = (input: unknown): StoredJob | undefined => {
+export const captureStoredJob = (input: unknown): StoredJob | undefined => {
   const v = own(input, fields)
   if (v === undefined || !jobIdOk(v.jobId) || typeof v.token !== "string" || v.token.length !== 32 || !/^[a-f0-9]{32}$/.test(v.token) ||
     typeof v.skillId !== "string" || v.skillId.length < 2 || v.skillId.length > 64 || !/^[a-z0-9][a-z0-9-]{1,63}$/.test(v.skillId) ||
@@ -89,7 +89,7 @@ const read = (): Snapshot => {
     if (!Array.isArray(value) || value.length > MAX_ROWS) throw 0
     const rows: StoredJob[] = []
     for (const input of value) {
-      const row = captureJob(input)
+      const row = captureStoredJob(input)
       if (row === undefined || rows.some(r => identity(r, row, row.jobId))) throw 0
       rows.push(row)
     }
@@ -114,7 +114,7 @@ const encode = (rows: readonly StoredJob[]): string => `[${rows.map(row =>
   `{${fields.map(key => `${JSON.stringify(key)}:${JSON.stringify(row[key])}`).join(",")}}`).join(",")}]`
 
 export const remember = (input: unknown): RememberOutcome => {
-  const row = captureJob(input)
+  const row = captureStoredJob(input)
   if (row === undefined) return { status: "invalid" }
   const snapshot = read()
   if (snapshot.status === "unavailable") return { status: "unavailable" }
