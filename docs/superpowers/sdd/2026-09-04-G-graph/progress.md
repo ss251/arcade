@@ -404,3 +404,24 @@ source hashes remained unchanged; no full-gate or native-AS repeat was performed
 Ten sanitized historical copies now include the [parent review](task-6-parent-review.md).
 Final public audit/local commit follow; the upload, one-shot deployment and live
 indexed A9 evidence are still separate unperformed steps at this checkpoint.
+
+## September 6 — G6 upload/deployment recorded, indexed acceptance open
+
+G6 local implementation committed as `8532df81d965c7ebf675cc4a40462a89d9412c2f`.
+One reviewed keyless upload completed03:59:52.062UTC and the fresh v0.1.0 Studio
+deployment was acknowledged04:01:17.711UTC. The three-phase owned journal and
+exact build/CID/version correlation passed independent retained-record review.
+No consumed G1/G6 operation was repeated, and no payment or payer-key lookup
+occurred. The [live brief](task-6-live-brief.md) links three new exact report copies.
+
+The first exact-A9 query was refused. Metadata-only diagnostics at04:05 and04:08
+returned a GraphQL startup error rather than indexed data. Task6 live acceptance,
+G merge and later H integration remain pending. A separate evidence-commit full
+gate/audit follows; no index height, tree, Marketplace totals or Synced claim is
+fabricated. Preserve observations and check progress without redeploying.
+
+Later: indexing started;04:14:55UTC block10795110 and04:22:41UTC block16005110
+both match the exact CID with no indexing errors. Still below A9 block60523612.
+The sole evidence-commit gate passed2941 Vitest/131 files,829 Bun/51 files/
+5770 assertions and root/web strict. The [parent evidence review](task-6-live-parent-review.md)
+preserves its limited acceptance; final publication audit/local commit follow.

@@ -1404,3 +1404,31 @@ record exact CID/version, query URL, `_meta` height/no errors, the three known A
 occurrences and tree, and actual `marketplace: null`. Studio Synced/current-head
 status must not be inferred from a historical-event match. No new payment is
 needed for this evidence.
+
+### Later G6 acknowledgment and startup observation
+
+The preceding not-deployed checkpoint is now historical. One reviewed public
+upload completed at 2026-09-06 03:59:52.062 UTC with CID
+`QmWL6jCCNvRkmB3mvPaxvMH7931AvQ5Y7jmBzCJ2gdpjHF`. The fresh one-shot Studio
+deployment was acknowledged at **04:01:17.711 UTC** for
+`arcade-ledger-arc-testnet` / `v0.1.0`, returning this exact
+[query endpoint](https://api.studio.thegraph.com/query/1721684/arcade-ledger-arc-testnet/v0.1.0).
+This G6 operation and the older G1 operation are consumed: no replay, new journal
+to repeat an uncertain dispatch, or automatic redeploy. No wallet payment occurred.
+
+**Indexed proof is still pending.** The initial A9 query at 04:03:58.766 UTC was
+refused despite HTTP200. Subsequent bounded metadata diagnostics returned one
+GraphQL error, with the 04:08:15.957 UTC response identifying this CID as not yet
+started syncing. No `_meta` block or Marketplace document was returned; do not
+invent a block, zero-valued counters, no-error/Synced state or indexed tree.
+See the [G6 live checkpoint](superpowers/sdd/2026-09-04-G-graph/task-6-live-brief.md)
+for the retained observations and independent source/journal reviews. Wait for
+index progress and make a separately selected read-only observation. Do not
+repeat A9 or spend the separately budgeted Base query allowance for this proof.
+
+**Indexing subsequently started:** the 04:14:55.681 UTC keyless metadata response
+matches the exact G6 CID and reports block10795110, hash
+`0xa3fe77d8b06c834e3bd6a4600b6e1314ea74b46a05f8810a815133a9ec6964d7`,
+with no indexing errors. This is progress, not the required A9 block60523612
+event/tree match or current-head synchronization. Marketplace was not queried
+in this metadata-only observation; no value is invented for it.

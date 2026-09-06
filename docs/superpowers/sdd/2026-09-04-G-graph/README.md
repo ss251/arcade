@@ -143,3 +143,17 @@ child cleanup before operation return. The sole parent gate/build exited0:
 Graph WASM build. The [parent review](task-6-parent-review.md) records this later
 acceptance with unchanged source hashes. Final public audit and local commit
 follow; no new deployment or indexed proof is implied.
+
+## September 6 — G6 fresh deployment acknowledged
+
+Local G6 committed as `8532df81d965c7ebf675cc4a40462a89d9412c2f`. The later
+[live checkpoint](task-6-live-brief.md) records one reviewed public upload and
+one acknowledged v0.1.0 Studio deployment, followed by refused/startup readbacks.
+The exact CID has not yet produced the required indexed A9 proof. Three new
+historical reports preserve offline query review and independent retained-record
+deployment checks; no live indexing or complete Task6 acceptance is inferred.
+
+The later [parent evidence review](task-6-live-parent-review.md) records the sole
+evidence-commit gate PASS:2941 Vitest,829 Bun/5770 assertions, root/web strict.
+Metadata at04:22:41UTC reached16005110 with the exact CID/no indexing errors,
+still below A9. Final publication audit/local evidence commit follow.

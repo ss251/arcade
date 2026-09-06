@@ -1,8 +1,8 @@
 # ARCADE ledger
 
-Current local work is the [G6 selected-emitter build](#september-6-2026--g6-selected-emitter-ledger).
-The dated G1 sections preserve the acknowledged historical smoke deployment;
-they are not a claim that later local source is already deployed.
+Latest status: [G6 deployment acknowledged, indexing pending](#september-6-2026--g6-deployment-acknowledged-indexing-pending).
+The dated local/G1 sections below are historical checkpoints. Neither a successful
+build nor an acknowledgment proves the later indexed-event acceptance gate.
 
 ## Historical G1 smoke checkpoint
 
@@ -441,3 +441,34 @@ Building does not upload. Any deliberate public IPFS upload and one fresh Studio
 deployment follow source review, offline checks and the parent gate. No such
 remote operation is claimed yet by this local checkpoint. Existing A9 settlements
 will supply the indexing proof; do not buy them again to refresh the subgraph.
+
+## September 6, 2026 — G6 deployment acknowledged, indexing pending
+
+The local implementation committed as `8532df81d965c7ebf675cc4a40462a89d9412c2f`.
+One public upload returned CID `QmWL6jCCNvRkmB3mvPaxvMH7931AvQ5Y7jmBzCJ2gdpjHF`
+at 03:59:52.062 UTC with all reviewed build hashes unchanged. The bounded
+consumer's single fresh deployment was acknowledged at **04:01:17.711 UTC**,
+slug `arcade-ledger-arc-testnet`, version `v0.1.0`, with the exact returned
+[Studio query URL](https://api.studio.thegraph.com/query/1721684/arcade-ledger-arc-testnet/v0.1.0).
+The key stayed inside the consumer; the fresh journal retains all three phases.
+**This deployment operation is consumed. Do not rerun it or the G1 operation.**
+
+At 04:03:58.766 UTC, the first keyless exact-A9 query returned HTTP200 but failed
+the strict proof. Separate metadata reads at 04:05:36.266 and 04:08:15.957 UTC
+returned one GraphQL error; the latter explicitly reported that this exact CID
+had not started syncing. No indexed height, event/tree match, no-error state,
+Marketplace result or Studio Synced claim is available from these reads.
+This is startup evidence, not a proven unsupported-network failure.
+
+The [live checkpoint](../docs/superpowers/sdd/2026-09-04-G-graph/task-6-live-brief.md)
+preserves exact facts, hashes and independent local reviews. Task6 live acceptance
+stays open. Later readback must match existing A9 events and this exact CID;
+wait/check indexing, never buy again or automatically redeploy. Registry templates
+remain inactive, and canonical per-skill/Marketplace data remain unavailable.
+
+At **04:14:55.681 UTC**, a separate keyless metadata read returned the exact CID,
+block **10795110**, hash
+`0xa3fe77d8b06c834e3bd6a4600b6e1314ea74b46a05f8810a815133a9ec6964d7`,
+and `hasIndexingErrors:false`. Indexing has started; this supersedes the startup
+absence, not the missing A9 proof. The required historical height is60523612.
+The read does not establish current-head/Studio-Synced status or event contents.
