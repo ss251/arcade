@@ -1,0 +1,9 @@
+# GitHub Pages (Jekyll) builds this folder from `main`. The spec-driven-development records
+# under superpowers/ and the live-run evidence under evidence/ contain code with `{{ }}` that
+# Jekyll's Liquid templater misreads as template syntax and aborts the build. They stay in the
+# repo (ETHGlobal requires committed specs/plans); they are simply not rendered by Pages.
+exclude:
+  - superpowers/
+  - evidence/
+  - .text-widths.json
+  - "*.excalidraw"
