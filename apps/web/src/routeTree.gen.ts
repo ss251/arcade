@@ -14,6 +14,7 @@ import { Route as ChatRouteImport } from './routes/chat'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiQuoteRouteImport } from './routes/api.quote'
 import { Route as ApiSettleRouteImport } from './routes/api.settle'
+import { Route as SkillNameRouteImport } from './routes/skill.$name'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +41,11 @@ const ApiSettleRoute = ApiSettleRouteImport.update({
   path: '/api/settle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SkillNameRoute = SkillNameRouteImport.update({
+  id: '/skill/$name',
+  path: '/skill/$name',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/quote': typeof ApiQuoteRoute
   '/api/settle': typeof ApiSettleRoute
+  '/skill/$name': typeof SkillNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/quote': typeof ApiQuoteRoute
   '/api/settle': typeof ApiSettleRoute
+  '/skill/$name': typeof SkillNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,23 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/quote': typeof ApiQuoteRoute
   '/api/settle': typeof ApiSettleRoute
+  '/skill/$name': typeof SkillNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/chat' | '/api/chat' | '/api/quote' | '/api/settle'
+  fullPaths:
+    '/' | '/chat' | '/api/chat' | '/api/quote' | '/api/settle' | '/skill/$name'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chat' | '/api/chat' | '/api/quote' | '/api/settle'
-  id: '__root__' | '/' | '/chat' | '/api/chat' | '/api/quote' | '/api/settle'
+  to:
+    '/' | '/chat' | '/api/chat' | '/api/quote' | '/api/settle' | '/skill/$name'
+  id:
+    | '__root__'
+    | '/'
+    | '/chat'
+    | '/api/chat'
+    | '/api/quote'
+    | '/api/settle'
+    | '/skill/$name'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +95,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiQuoteRoute: typeof ApiQuoteRoute
   ApiSettleRoute: typeof ApiSettleRoute
+  SkillNameRoute: typeof SkillNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -116,6 +135,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSettleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/skill/$name': {
+      id: '/skill/$name'
+      path: '/skill/$name'
+      fullPath: '/skill/$name'
+      preLoaderRoute: typeof SkillNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -125,6 +151,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiQuoteRoute: ApiQuoteRoute,
   ApiSettleRoute: ApiSettleRoute,
+  SkillNameRoute: SkillNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

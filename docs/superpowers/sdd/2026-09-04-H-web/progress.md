@@ -248,3 +248,31 @@ after the separate frozen subgraph install. Root/web strict and actual client/
 SSR builds passed334ms/145ms. No full sweep was repeated or relabelled all-green.
 Source/public review accepted; atomic integration commit next, then H8. No H
 main merge, new live authority, payment, production deployment or push occurred.
+
+## H8 — focused and native acceptance
+
+Integration committed as2580f40. H8 now exposes public listing detail through a
+validated server-function projection; private pay-test IDs never enter hydration
+data, and public descendants remain flat. The loader passed42focused tests after
+genuine ENS-binding, observation-time and metadata/count regressions; UI passed
+112focused tests including39new cases after its standalone stale-count regression.
+Actual Start/H4 routing passed9tests with21route observations and exact requests,
+serialized privacy and clean teardown. An additional fixture-only exit143failure
+was corrected without touching production Vite code. Exact strict checks passed.
+
+Both cross-source reviews are CLEAN. Parent's actual native browser matrix passed
+16cases across desktop/mobile and light/dark, including keyboard disclosure and
+contained schema scrolling. One hidden-tab wheel timeout required the documented
+owned-tab activation and one retry; no product change. All five owned processes
+are absent and all three ports refused. The historical reports preserve separate
+setup failures, genuine regressions and unexecuted evidence limits. The single
+full H8 gate is running; final publication audit and atomic commit remain next.
+H9/H10 have readiness only; no buyer capability or session UI is claimed here.
+
+The single full H8 gate subsequently passed3,343Vitest/145files and823Bun/53files
+with5,917assertions, strict root/web TypeScript and actual client/SSR builds
+(562ms/361ms). No full sweep was repeated. Seven reviewed historical copies use
+the standard banner, exact bodies/EOF and five explicit privacy substitutions.
+Final audit then verified seven original pins/exact copies, ten frozen source/test
+pins, 64 local links and zero selected privacy-pattern findings across ten public
+documents. Atomic H8 commit follows, with H still unmerged.

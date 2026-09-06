@@ -1,5 +1,19 @@
 # Plan H — execution records
 
+Current task: [H8 public listing detail](task-8-brief.md), following committed
+F/H integration `2580f40`. Loader/UI and actual-route checks, cross-source review,
+the 16-case native browser matrix, separate full gate and final public audit passed.
+The atomic commit follows; H is still unmerged. The sections below preserve
+earlier checkpoints.
+
+- [H8 original readiness and contract corrections](task-8-readiness.md)
+- [H8 loader author record](task-8-data-report.md)
+- [H8 UI author record](task-8-ui-report.md)
+- [H8 actual-route fixture record](task-8-route-report.md)
+- [H8 native-browser record](task-8-browser-report.md)
+- [H8 independent loader/route review](task-8-data-independent-review.md)
+- [H8 independent UI/route review](task-8-ui-independent-review.md)
+
 Current integration: [F/H provenance and session safeguards](task-7-integration.md).
 H1–H7 are rebased onto main; the follow-up records the exact full-sweep failures,
 focused repairs and completed strict/build checks. H remains unmerged. The
