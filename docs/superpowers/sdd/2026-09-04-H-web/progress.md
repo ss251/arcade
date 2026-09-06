@@ -1,5 +1,19 @@
 # SDD ledger — Plan H
 
+2026-09-06 21:34 IST: H14 source/capture frozen; sole86002fullgate exit0:
+4232Vitest187/56.25s,834Bun54/6091assert/162.00s,rootwebstrict0,client
+build completed (duration truncated),SSR174ms.17focused/2 +5rootstrict0.
+Three full-Chrome0frame attempts stopped/cleaned; Page.navigate deadline, no
+proven display-error cause. Actual wrapper200/1095ms/2GETs. Installed headless
+shell captured12frames, final version-recording12frames inspected; all15PIDs/
+10ports/0profiles stopped. Public catalogue4listings; stats/seller/receipt/
+identity unavailable; buyerempty, publishpassive, chatdisabled without credentials.
+Six source pins unchanged through gate; no web UI/source changes or fullrepeat.
+Private twelve-frame review sheet uses repo tokens; owner ranking/real-wallet
+recording pending. Atomic tool/evidence commit next, then durable session gap,
+Hmerge/deferredG8G9/vendor/I. Root-only/no fan-out/parallelreviews/gates, keys,
+newspend/approval replay/production ENS/mainnet/push. Earlier records historical.
+
 2026-09-06 20:58 IST: H13b frozen full56747 exit0:4215Vitest185/58.12s,
 834Bun54/6091assert/162.89s,rootwebstrict0,client372msSSR177ms.214focused/9,
 exact11web+3fixture strict0. Native11-case behavior checks exposed visual

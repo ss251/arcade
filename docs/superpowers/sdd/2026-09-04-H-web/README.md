@@ -1,5 +1,13 @@
 # Plan H — execution records
 
+Current task: [H14 read-only capture tool](task-14-brief.md), after780f958.
+The [parent report](task-14-parent-report.md) and
+[timestamped observations](task-14-native-evidence.json) record twelve actual
+light/dark frames, missing live feeds without fabricated values, three failed
+full-Chrome attempts and successful installed headless-shell captures. All15
+owned PIDs/10ports closed. Sole4,232Vitest/834Bun/strict/build gate passed.
+Owner visual ranking, funded-wallet demo and durable sessions remain pending.
+
 Current task: [H13b original-name browser approval](task-13b-brief.md), after
 2d9b67e. The [parent report](task-13b-parent-report.md) and
 [native check](task-13b-native-check.md) record one-use original-name binding,

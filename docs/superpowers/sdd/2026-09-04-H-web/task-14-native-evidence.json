@@ -1,0 +1,268 @@
+{
+  "version": 1,
+  "startedAt": "2026-09-06T15:56:13.480Z",
+  "endedAt": "2026-09-06T15:56:20.367Z",
+  "source": {
+    "hub": "https://arcade-hub-production.up.railway.app",
+    "seller": "0xcf821769ED3c0E55e152745377bb833d7155A78a",
+    "skill": "diff-triage"
+  },
+  "scope": "Read-only public feeds in a fresh keyless profile. Buyer has no saved jobs; publish is passive. No live wallet, model or payment. Human must inspect all frames.",
+  "builtServerSha256": "7782db2ce4a3f0c133bfe8429e0a6b26b8ea9f5f0a44b848319de0c92c99bf9f",
+  "browserVersion": {
+    "product": "HeadlessChrome/151.0.7922.34",
+    "revision": "@782af9cb30a53f54487e5d2e44738645a8ec457c"
+  },
+  "status": "captured",
+  "humanReview": "pending",
+  "independentCleanup": {
+    "ownedRuns": 5,
+    "absentPids": 15,
+    "refusedPorts": 10,
+    "remainingOwnedProfileProcesses": 0
+  },
+  "frames": [
+    {
+      "name": "market",
+      "scheme": "light",
+      "file": "market-light.png",
+      "capturedAt": "2026-09-06T15:56:15.385Z",
+      "sha256": "0864a756ce308cdfc8a79547715c6e17fe201a5dd925513f005e9f97a730ad92",
+      "observed": {
+        "url": "/",
+        "title": "ARCADE — buy a skill",
+        "dark": false,
+        "paper": "rgb(250, 249, 246)",
+        "width": 1440,
+        "documentWidth": 1440,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\nSkills, prices, and recorded outcomes.\n\nTotals are unavailable right now.\n\nSource: the hub's public catalogue and recorded totals. Records can include test and hub-owned canary traffic; these are not independent on-chain or customer-demand measurements. Catalogue names and pay-test annotations are reported by the hub, not independently verified here.\n\nWallet Risk Note\n$0.05\n\nA short counterparty note on an Arc address: is it a contract, has it ever moved funds, does it hold enough to settle. Buys its on-chain facts from another listing on this marketplace rather than reading the chain itself, so each call settles twice.\n\nwallet-risk-note\npay-test status unavailable\ncall statistics unavailable\nDiff Triage\n$0.12\n\nStructured triage of a code diff: what it changes, what could break, which tests are missing, and whether it is safe to merge. Pay per diff — no seat, no per-user licence.\n\ndiff-triage\npay-test status unavailable\ncall statistics unavailable\nUSDC Flow Check\n$0.01\n\nLive USDC activity for an address on Arc: balance, recent transfer count, and first/last seen block. No API key, no account, pay per call.\n\nusdc-flow-check\npay-test status unavailable\ncall statistics unavailable\nCounterparty Brief\n$0.25\n\nDue-diligence brief on a company: legal identity, business model, funding and regulatory posture, plus red flags — each claim carried back to a cited source. Pay per brief, no seat, no contract.\n\ncounterparty-brief\npay-test status unavailable\ncall statistics unavailable",
+        "errors": [],
+        "storageKeys": [],
+        "wallet": false
+      }
+    },
+    {
+      "name": "skill",
+      "scheme": "light",
+      "file": "skill-light.png",
+      "capturedAt": "2026-09-06T15:56:16.006Z",
+      "sha256": "6da9bb846b74e513065eb86c3e0029029b4727bcd6453ac8b2a5fb0f8d30b36b",
+      "observed": {
+        "url": "/skill/diff-triage",
+        "title": "ARCADE — buy a skill",
+        "dark": false,
+        "paper": "rgb(250, 249, 246)",
+        "width": 1440,
+        "documentWidth": 1425,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\n\nskill specification · diff-triage\n\nDiff Triage\n\n$0.12\nper call\n\nStructured triage of a code diff: what it changes, what could break, which tests are missing, and whether it is safe to merge. Pay per diff — no seat, no per-user licence.\n\nVersion 0.1.0\n\nSeller 0xcf821769ED3c0E55e152745377bb833d7155A78a\n\nOpen chat\n\nAvailability and payment are checked separately. This page does not authorize a purchase.\n\nContract & bounds\n\nSeller-declared schemas and limits, shown as data.\n\ninput\noutput\nDeclared bounds\nPay-test history\n\nRecorded hub tests, not a current availability guarantee. References have no reported rail/network here and are not linked.\n\nPay-test history unavailable.\n\nsettlement evidence\n\nHub-reported observations. These do not establish purchase availability.\n\nERC-8004 identity\nIdentity evidence unavailable\nFreshness\nEvidence freshness unavailable\nValidation observations\nValidation count unavailable\nFeedback observations\nFeedback count unavailable\nWhat these counts cover\nRecent public records\n\nUp to 20 returned hub receipt records. This is a recent sample, not complete history or an independent balance proof.\n\nRecent records unavailable. Other listing information may still be shown.",
+        "errors": [],
+        "storageKeys": [],
+        "wallet": false
+      }
+    },
+    {
+      "name": "seller",
+      "scheme": "light",
+      "file": "seller-light.png",
+      "capturedAt": "2026-09-06T15:56:16.590Z",
+      "sha256": "51bba18719727683933e494bccc8280e76ad2a2349b5b1d2c4236aca8402d666",
+      "observed": {
+        "url": "/seller?address=0xcf821769ED3c0E55e152745377bb833d7155A78a",
+        "title": "ARCADE — buy a skill",
+        "dark": false,
+        "paper": "rgb(250, 249, 246)",
+        "width": 1440,
+        "documentWidth": 1440,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\nWhat the ledger says a seller earns.\nPublic seller address\nShow seller\nUse wallet address\n\nOptional wallet address selection, not authentication. No signing, chain switch or payment. The public address is saved in the page URL.\n\nSeller summary unavailable. This is not a zero-income or empty-ledger result.",
+        "errors": [],
+        "storageKeys": [],
+        "wallet": false
+      }
+    },
+    {
+      "name": "buyer",
+      "scheme": "light",
+      "file": "buyer-light.png",
+      "capturedAt": "2026-09-06T15:56:16.843Z",
+      "sha256": "d8dc5cb3c0cf5cf6b2d04f5fcb8bb527ea1f7e6ccdbb97d5f0fd686f5847308a",
+      "observed": {
+        "url": "/buyer",
+        "title": "ARCADE — buy a skill",
+        "dark": false,
+        "paper": "rgb(250, 249, 246)",
+        "width": 1440,
+        "documentWidth": 1440,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\nWhat this browser can recover.\n\nSaved access to accepted ordinary jobs. Accepted prices are not confirmed spending.\n\nThis is not an account-wide history. Clearing site data, changing browser origin or a hub secret rotation can lose recovery. Same-origin scripts can read browser storage; it is not an XSS boundary.\n\nSaved jobs\nRefresh saved access\n\nNo saved jobs on this browser. An accepted ordinary purchase in chat can save recovery access here.\n\nSessions\n\nSession recovery is unavailable here. Ordinary saved jobs do not contain session capabilities or verified session budgets. This is not a zero-spend or empty-session report.\n\nForget all saved ordinary access…",
+        "errors": [],
+        "storageKeys": [],
+        "wallet": false
+      }
+    },
+    {
+      "name": "publish",
+      "scheme": "light",
+      "file": "publish-light.png",
+      "capturedAt": "2026-09-06T15:56:17.092Z",
+      "sha256": "7238d50220f78576c21f47608fe1360c560388ee528756b6abecfb197c02863d",
+      "observed": {
+        "url": "/publish",
+        "title": "ARCADE — buy a skill",
+        "dark": false,
+        "paper": "rgb(250, 249, 246)",
+        "width": 1440,
+        "documentWidth": 1440,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\nInspect the boundary before you publish.\nPublishing runs locally\n\nThis hosted/default page cannot read your files or launch the publishing CLI. From the root of your trusted ARCADE checkout, enable an isolated local preview:\n\nARCADE_PUBLISH_LOCAL=1 ARCADE_REPO_ROOT=\"$PWD\" ARCADE_PUBLISH_BUN=\"$(command -v bun)\" bun --no-env-file run --cwd apps/web dev --host 127.0.0.1\n\nOpen the printed 127.0.0.1 URL. Keep the listener local and inspect the checkout and dependencies first. This is not a sandbox for malicious local code. No key is needed for metadata previews.",
+        "errors": [],
+        "storageKeys": [],
+        "wallet": false
+      }
+    },
+    {
+      "name": "chat",
+      "scheme": "light",
+      "file": "chat-light.png",
+      "capturedAt": "2026-09-06T15:56:17.458Z",
+      "sha256": "d6affd368ad12b039d486bd0636136e7057d52a969571936bfc36fb452681b96",
+      "observed": {
+        "url": "/chat",
+        "title": "ARCADE — buy a skill",
+        "dark": false,
+        "paper": "rgb(250, 249, 246)",
+        "width": 1440,
+        "documentWidth": 1440,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\n\nsettlement receipts ↗ · your wallet, your signature\n\nThe chat is not live on this deployment. The marketplace it reads from is: every listing, price and settled receipt is on the hub, and each receipt links to its transaction on Arc.\n\nListing, describing and quoting are free and sign nothing. A purchase is signed by your own wallet, in your browser — ARCADE never holds funds.\n\nsend",
+        "errors": [],
+        "storageKeys": [
+          "arcade.conversations.v1"
+        ],
+        "wallet": false
+      }
+    },
+    {
+      "name": "market",
+      "scheme": "dark",
+      "file": "market-dark.png",
+      "capturedAt": "2026-09-06T15:56:18.121Z",
+      "sha256": "a9b36e016520cbadf2d512f6cf339334a39f1264db80a09f08584d6805b5f1e2",
+      "observed": {
+        "url": "/",
+        "title": "ARCADE — buy a skill",
+        "dark": true,
+        "paper": "rgb(22, 21, 19)",
+        "width": 1440,
+        "documentWidth": 1440,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\nSkills, prices, and recorded outcomes.\n\nTotals are unavailable right now.\n\nSource: the hub's public catalogue and recorded totals. Records can include test and hub-owned canary traffic; these are not independent on-chain or customer-demand measurements. Catalogue names and pay-test annotations are reported by the hub, not independently verified here.\n\nWallet Risk Note\n$0.05\n\nA short counterparty note on an Arc address: is it a contract, has it ever moved funds, does it hold enough to settle. Buys its on-chain facts from another listing on this marketplace rather than reading the chain itself, so each call settles twice.\n\nwallet-risk-note\npay-test status unavailable\ncall statistics unavailable\nDiff Triage\n$0.12\n\nStructured triage of a code diff: what it changes, what could break, which tests are missing, and whether it is safe to merge. Pay per diff — no seat, no per-user licence.\n\ndiff-triage\npay-test status unavailable\ncall statistics unavailable\nUSDC Flow Check\n$0.01\n\nLive USDC activity for an address on Arc: balance, recent transfer count, and first/last seen block. No API key, no account, pay per call.\n\nusdc-flow-check\npay-test status unavailable\ncall statistics unavailable\nCounterparty Brief\n$0.25\n\nDue-diligence brief on a company: legal identity, business model, funding and regulatory posture, plus red flags — each claim carried back to a cited source. Pay per brief, no seat, no contract.\n\ncounterparty-brief\npay-test status unavailable\ncall statistics unavailable",
+        "errors": [],
+        "storageKeys": [
+          "arcade.conversations.v1"
+        ],
+        "wallet": false
+      }
+    },
+    {
+      "name": "skill",
+      "scheme": "dark",
+      "file": "skill-dark.png",
+      "capturedAt": "2026-09-06T15:56:18.825Z",
+      "sha256": "7b49e2b94fb9c770b022076c48fac00db05d27a006723227a87d60e56b11cd1b",
+      "observed": {
+        "url": "/skill/diff-triage",
+        "title": "ARCADE — buy a skill",
+        "dark": true,
+        "paper": "rgb(22, 21, 19)",
+        "width": 1440,
+        "documentWidth": 1425,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\n\nskill specification · diff-triage\n\nDiff Triage\n\n$0.12\nper call\n\nStructured triage of a code diff: what it changes, what could break, which tests are missing, and whether it is safe to merge. Pay per diff — no seat, no per-user licence.\n\nVersion 0.1.0\n\nSeller 0xcf821769ED3c0E55e152745377bb833d7155A78a\n\nOpen chat\n\nAvailability and payment are checked separately. This page does not authorize a purchase.\n\nContract & bounds\n\nSeller-declared schemas and limits, shown as data.\n\ninput\noutput\nDeclared bounds\nPay-test history\n\nRecorded hub tests, not a current availability guarantee. References have no reported rail/network here and are not linked.\n\nPay-test history unavailable.\n\nsettlement evidence\n\nHub-reported observations. These do not establish purchase availability.\n\nERC-8004 identity\nIdentity evidence unavailable\nFreshness\nEvidence freshness unavailable\nValidation observations\nValidation count unavailable\nFeedback observations\nFeedback count unavailable\nWhat these counts cover\nRecent public records\n\nUp to 20 returned hub receipt records. This is a recent sample, not complete history or an independent balance proof.\n\nRecent records unavailable. Other listing information may still be shown.",
+        "errors": [],
+        "storageKeys": [
+          "arcade.conversations.v1"
+        ],
+        "wallet": false
+      }
+    },
+    {
+      "name": "seller",
+      "scheme": "dark",
+      "file": "seller-dark.png",
+      "capturedAt": "2026-09-06T15:56:19.561Z",
+      "sha256": "7ba69eca224f9d2a6ab5cf699c2a14c9a157a1bbe838916207918832619fefc5",
+      "observed": {
+        "url": "/seller?address=0xcf821769ED3c0E55e152745377bb833d7155A78a",
+        "title": "ARCADE — buy a skill",
+        "dark": true,
+        "paper": "rgb(22, 21, 19)",
+        "width": 1440,
+        "documentWidth": 1440,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\nWhat the ledger says a seller earns.\nPublic seller address\nShow seller\nUse wallet address\n\nOptional wallet address selection, not authentication. No signing, chain switch or payment. The public address is saved in the page URL.\n\nSeller summary unavailable. This is not a zero-income or empty-ledger result.",
+        "errors": [],
+        "storageKeys": [
+          "arcade.conversations.v1"
+        ],
+        "wallet": false
+      }
+    },
+    {
+      "name": "buyer",
+      "scheme": "dark",
+      "file": "buyer-dark.png",
+      "capturedAt": "2026-09-06T15:56:19.817Z",
+      "sha256": "fddec775e0d2442c66f3cfa335df927cf750e5e0330ee2f582ca37735de34bd2",
+      "observed": {
+        "url": "/buyer",
+        "title": "ARCADE — buy a skill",
+        "dark": true,
+        "paper": "rgb(22, 21, 19)",
+        "width": 1440,
+        "documentWidth": 1440,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\nWhat this browser can recover.\n\nSaved access to accepted ordinary jobs. Accepted prices are not confirmed spending.\n\nThis is not an account-wide history. Clearing site data, changing browser origin or a hub secret rotation can lose recovery. Same-origin scripts can read browser storage; it is not an XSS boundary.\n\nSaved jobs\nRefresh saved access\n\nNo saved jobs on this browser. An accepted ordinary purchase in chat can save recovery access here.\n\nSessions\n\nSession recovery is unavailable here. Ordinary saved jobs do not contain session capabilities or verified session budgets. This is not a zero-spend or empty-session report.\n\nForget all saved ordinary access…",
+        "errors": [],
+        "storageKeys": [
+          "arcade.conversations.v1"
+        ],
+        "wallet": false
+      }
+    },
+    {
+      "name": "publish",
+      "scheme": "dark",
+      "file": "publish-dark.png",
+      "capturedAt": "2026-09-06T15:56:20.084Z",
+      "sha256": "bb4e679fc6201b24b8fbea40c5ea047eee20ce14ddac9d55f2e949f490011391",
+      "observed": {
+        "url": "/publish",
+        "title": "ARCADE — buy a skill",
+        "dark": true,
+        "paper": "rgb(22, 21, 19)",
+        "width": 1440,
+        "documentWidth": 1440,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\nInspect the boundary before you publish.\nPublishing runs locally\n\nThis hosted/default page cannot read your files or launch the publishing CLI. From the root of your trusted ARCADE checkout, enable an isolated local preview:\n\nARCADE_PUBLISH_LOCAL=1 ARCADE_REPO_ROOT=\"$PWD\" ARCADE_PUBLISH_BUN=\"$(command -v bun)\" bun --no-env-file run --cwd apps/web dev --host 127.0.0.1\n\nOpen the printed 127.0.0.1 URL. Keep the listener local and inspect the checkout and dependencies first. This is not a sandbox for malicious local code. No key is needed for metadata previews.",
+        "errors": [],
+        "storageKeys": [
+          "arcade.conversations.v1"
+        ],
+        "wallet": false
+      }
+    },
+    {
+      "name": "chat",
+      "scheme": "dark",
+      "file": "chat-dark.png",
+      "capturedAt": "2026-09-06T15:56:20.334Z",
+      "sha256": "e02502ca572e0e22d19219141680de2096ca030461ad71a57c04f751b88c8c8b",
+      "observed": {
+        "url": "/chat",
+        "title": "ARCADE — buy a skill",
+        "dark": true,
+        "paper": "rgb(22, 21, 19)",
+        "width": 1440,
+        "documentWidth": 1440,
+        "text": "ARCADE\nmarket\nchat\nseller\nbuyer\npublish\n\nsettlement receipts ↗ · your wallet, your signature\n\nThe chat is not live on this deployment. The marketplace it reads from is: every listing, price and settled receipt is on the hub, and each receipt links to its transaction on Arc.\n\nListing, describing and quoting are free and sign nothing. A purchase is signed by your own wallet, in your browser — ARCADE never holds funds.\n\nsend",
+        "errors": [],
+        "storageKeys": [
+          "arcade.conversations.v1"
+        ],
+        "wallet": false
+      }
+    }
+  ]
+}

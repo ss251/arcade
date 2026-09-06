@@ -1553,6 +1553,47 @@ complete marketplace coverage or independently revalidated chain timestamps is
 claimed. G1/G6 deployments and A9 purchases remain consumed; no new wallet key,
 paid query or operation was needed for this historical readback.
 
+### Read-only web screenshots — H14
+
+Build the web once with the current dependencies and no secret environment
+files; the screenshot utility itself never builds or installs packages. Choose
+an installed trusted Chrome or Chrome headless-shell executable, then run from
+the repo root:
+
+```sh
+./scripts/web-screens.sh --hub https://arcade-hub-production.up.railway.app --seller 0xcf821769ED3c0E55e152745377bb833d7155A78a --skill diff-triage --chrome /ABSOLUTE/TRUSTED/CHROME
+```
+
+The Chrome path is deliberately a placeholder, not an install command. All four
+options are required. An exact HTTP loopback hub origin can be selected instead
+of the shown public hub. Do not put credentials in URLs or arguments. The tool
+uses a fresh empty profile/home and a screenshot-only local GET server around
+the existing build; no saved wallet/jobs, model call, quote, payment, private-job
+read or local CLI preview is enabled. This is not a normal interactive demo host.
+
+The printed fresh temporary directory contains shots/market|skill|seller|buyer|
+publish|chat-light|dark.png (twelve1440x1000 viewport frames), capture.json with
+source/time/version/computed scheme and image hashes, and bounded private Chrome
+diagnostics. Review all frames and the cleanup result. A captured status means
+screenshots exist and scheme checks passed, not that live data is complete or a
+human approved the design. Keep outputs private and never commit them. The
+temporary web and browser stop after the run; no production URL is changed.
+
+On this Mac, full Chrome reached a blank renderer but timed out on Page.navigate;
+the already-installed headless-shell binary succeeded with the same source. No
+exact root cause is claimed, and the script does not auto-fallback or retry.
+Select a different already-installed trusted executable explicitly if needed.
+No platform, display or browser-profile reconfiguration is required by the tool.
+
+The recorded live hub lacked totals/seller/receipt/evidence feeds; unavailable
+states are intentional evidence, not a filled ledger. Buyer is empty in the new
+profile, publish passive, chat disabled. Owner visual ranking, chosen polish and
+a separately owner-driven funded-wallet recording remain pending. Do not reuse
+earlier one-shot approvals or assume the screenshots authorize a new purchase.
+
+[Recorded validation and limits](superpowers/sdd/2026-09-04-H-web/task-14-parent-report.md)
+and [timestamped observations](superpowers/sdd/2026-09-04-H-web/task-14-native-evidence.json).
+
 ### ENS-name purchases in Chat — H13
 
 Ask Chat to hire an exact ENS name, or use an explicit skill id; a call must
