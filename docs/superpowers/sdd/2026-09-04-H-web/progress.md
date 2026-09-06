@@ -2,6 +2,18 @@
 
 Plan: [2026-09-04-H-web](../../plans/2026-09-04-H-web.md).
 
+2026-09-06 17:15 IST: H10c2 ordinary buyer UI frozen after `57fbfe0`. Passive
+actual Start SSR returned200 with zero hub reads; focused50/3 and exact6web/
+2fixture roots strict0. Native16 final cases passed after real forget-scope and
+keyboard checks; all30 exact PIDs absent/18ports refused across six attempts,
+four final images read. Sole full Vitest90086:3,967pass/1CSS-prefix failure/167
+files/50.56s. Buyer styles moved to EOF, complete old CSS prefix preserved;
+unchanged affected tests49/2 passed, final native16 passed again. No full sweep
+rerun. Remaining75663 exit0:834Bun54/6093assert/163.46s,rootwebstrict0,
+client329msSSR163ms. See [report](task-10c2-parent-report.md) and
+[native evidence](task-10c2-native-check.md). Local commit next, H11 follows;
+sessions/H11–14/H merge remain separate. No keys/spend/production action/push.
+
 2026-09-06 16:47 IST: H10c1 frozen after H10b6 `6937ce9`. Historical recovery
 foundation keeps ordinary authority private and reads only on explicit request;
 saved-row correlation is not original signature provenance.39 focused tests,

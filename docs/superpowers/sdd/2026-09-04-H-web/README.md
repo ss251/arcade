@@ -1,5 +1,15 @@
 # Plan H — execution records
 
+Current task: [H10c2 ordinary buyer page](task-10c2-brief.md), after H10c1
+`57fbfe0`. The [parent report](task-10c2-parent-report.md) and
+[native check](task-10c2-native-check.md) record passive actual Start SSR,
+explicit direct recovery, local-only forgetting,16 final native cases and exact
+cleanup. The sole full Vitest sweep had one CSS-prefix regression, corrected
+without changing its assertion;49 affected tests and native checks passed.
+Remaining stages passed834 Bun/54,root/web strict0 and client/SSR builds, without
+a second full Vitest sweep.
+Ordinary recovery is implemented; sessions and H11–14 remain separate.
+
 Current task: [H10c1 saved-job recovery foundation](task-10c1-brief.md), after
 committed H10b6 `6937ce9`. The [parent report](task-10c1-parent-report.md) separates
 issuing-hub historical claims from original signature provenance. Passive direct

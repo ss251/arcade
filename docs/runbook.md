@@ -521,7 +521,7 @@ redirects, cache and Referer, bound JSON bodies and deadlines, and stop retrieva
 on abort. Aborting a read does **not** cancel an admitted job or revoke payment.
 
 H10a itself was passive support. H10b now wires the ordinary live Chat purchase
-flow described below. Buyer/session recovery remains separate. Neither checkpoint
+flow described below. H10c ordinary recovery follows below; sessions remain separate. Neither checkpoint
 changed a deployed environment or performed a live purchase.
 
 ### H10b live Chat purchases require fresh local confirmation
@@ -543,13 +543,41 @@ failure stays visible: keep the tab open, because closing may lose job access.
 The live view presents complete escaped output and qualified hub-reported evidence,
 not an independently verified chain result; Gateway UUIDs are not mined hashes.
 Private signatures, recovery tokens and paid output are not sent back to the
-chat model or conversation history. Reload recovery UI is a subsequent H task.
+chat model or conversation history. Reloaded ordinary jobs can use the H10c page below.
 
 Closing/remounting cancels local continuations, not remote jobs or already-signed
 authorizations. Do not repeat an uncertain payment. The
 [H10b6 record](superpowers/sdd/2026-09-04-H-web/task-10b6-parent-report.md)
 separates the ten-case native loopback/SDK/CORS/offline-signer proof from live
 chain, real-wallet and production-deployment evidence, which it does not claim.
+
+### H10c ordinary recovery stays in this browser
+
+Open `/buyer` on the same browser origin that saved the admission. Loading,
+unreadable, unavailable and genuinely empty storage have distinct messages.
+Selecting a saved job shows its full issuing hub, skill, job ID and accepted
+price; it does not contact the hub. Check that saved origin before requesting
+the result or receipt tree. Each button performs one direct header-token read,
+with no automatic retry. Result reads may take up to 90 seconds. CORS must permit
+the exact web origin; do not move capabilities to a web-server proxy as a fix.
+
+Accepted amounts are not summed as spending. Recovered outcomes are issuing-hub
+claims matched to saved job/skill/price, not to the original signed buyer/nonce
+absent from the store. They are not independent chain proof, wallet balances or
+refund evidence. Gateway UUIDs are not mined hashes. Full result JSON is escaped,
+selectable and keyboard-scrollable; receipt trees retain incomplete-evidence flags.
+
+Refresh, selection replacement, storage notification and leaving the page clear
+the current evidence and abort reads, not jobs or signed authorizations. Explicit
+forget controls remove only local ordinary recovery access, never revoke tokens,
+cancel jobs or refund payments. Without another saved copy this can lose result
+access; unavailable storage or a failed write is not claimed as successful removal.
+Session recovery remains unavailable here, not a fabricated session-budget view.
+
+The [H10c2 report](superpowers/sdd/2026-09-04-H-web/task-10c2-parent-report.md)
+records actual passive Start SSR plus16 native synthetic recovery cases. Those
+loopback URLs served only during their owned run and stopped after cleanup; this
+is not live payment, real-wallet or production-deployment evidence.
 
 ### Set the web service's Config File Path, or you get two hubs
 

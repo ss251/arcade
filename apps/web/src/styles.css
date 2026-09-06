@@ -1431,3 +1431,37 @@ a {
 @media (max-width: 36rem) {
   .skill-page .skill-facts > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }
+
+/* Ordinary buyer recovery shares ARCADE tokens; controls never confer payment authority. */
+.wrap.buyer-page { height: auto; min-height: 100dvh; gap: 0; }
+.buyer-page h1 { font-size: clamp(1.75rem, 4vw, 2.25rem); line-height: 1.2; margin: 0 0 12px; font-weight: 650; }
+.buyer-page h2 { font-size: 1.125rem; margin: 0 0 12px; font-weight: 650; }
+.buyer-page h3 { font-size: 1rem; margin: 0 0 8px; font-weight: 650; }
+.buyer-page p { margin: 8px 0; overflow-wrap: anywhere; }
+.buyer-page > section { margin-top: 28px; min-width: 0; }
+.buyer-page .buyer-intro { font-size: 1rem; }
+.buyer-page .buyer-note { color: var(--slate); font-size: 0.8125rem; max-width: 78ch; }
+.buyer-code { font-family: var(--mono); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.buyer-money { color: var(--usdc); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.buyer-heading, .buyer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.buyer-heading { justify-content: space-between; margin-bottom: 12px; }
+.buyer-heading h2 { margin: 0; }
+.buyer-page button { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; min-height: 44px; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
+.buyer-page button:disabled { color: var(--slate); cursor: default; }
+.buyer-page button:focus-visible, .buyer-page summary:focus-visible, .buyer-page a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.buyer-jobs { display: grid; gap: 12px; list-style: none; padding: 0; margin: 0; }
+.buyer-jobs li { min-width: 0; }
+.buyer-page .buyer-job { width: 100%; text-align: left; display: grid; grid-template-columns: minmax(0, 1fr) fit-content(40%); gap: 6px 16px; padding: 16px; }
+.buyer-job[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
+.buyer-job-title { font-weight: 650; }
+.buyer-job-origin, .buyer-job-id, .buyer-job .buyer-note { grid-column: 1 / -1; }
+.buyer-recovery { border-top: 1px solid var(--line); padding-top: 24px; }
+.buyer-recovery > section { margin: 24px 0; min-width: 0; }
+.buyer-page summary { min-height: 44px; padding: 10px 0; cursor: pointer; overflow-wrap: anywhere; }
+.buyer-output { white-space: pre-wrap; overflow-wrap: anywhere; font: 0.8125rem/1.6 var(--mono); background: var(--card); padding: 16px; border: 1px solid var(--line); border-radius: 6px; max-height: 32rem; overflow-y: auto; }
+.buyer-output:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.buyer-forget { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 24px; }
+@media (max-width: 480px) {
+  .buyer-page .buyer-job { grid-template-columns: minmax(0, 1fr); }
+  .buyer-page .buyer-job .buyer-money { grid-column: 1; }
+}
