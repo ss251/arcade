@@ -271,3 +271,45 @@ banner-only report copy and46local-filelinks/privacy were independently checked.
 The [parent review](task-2-parent-review.md) separates those actual checks from
 unperformed graph-node runtime/indexing proof. Ready for the atomic local G2
 commit; no deployment, G3–6 source release or early main merge follows implicitly.
+
+## September 6 — G3 bounded source and publication checkpoint
+
+Following the successful Plan F main gates and clean G rebase, parent explicitly
+released Task 3's staged manifest and four inactive ABI subsets. The earlier G2
+commit-pending and G3-unreleased checkpoints above remain historical, not current
+source status. The [G3 brief](task-3-brief.md) records the narrow scope and links
+the seven preserved historical artifacts.
+
+ABI author and independent reviewer each passed the same 21 Bun tests /
+38 assertions and exact one-root strict check. Renderer author and reviewer
+passed the 89-test /192-assertion manifest/scaffold/schema selection and exact
+four-root strict check. These repetitions are not summed into unique coverage.
+Their reports distinguish genuine collected failures from immediately passing
+mutation guards and test-harness corrections.
+
+Parent's actual pinned codegen and WASM build repeat subsequently passed. The
+active manifest remains one v1 FeeSplitterSmoke pilot with no registry sources
+or dynamic templates; its historical startBlock zero exception is explicit.
+The current provider-snapshot provenance review preserves its pre-upgrade,
+runtime-code and complete-history limitations. No new deployment/indexing proof
+or marketplace aggregate population follows from these local checks.
+
+Seven bannered copies use exactly six approved literal privacy/link substitutions.
+No raw provenance JSON, private executable, key material or private G2 readiness
+record is included. The separate full G3 repository test/type gate is still in
+progress at this checkpoint; final parent review, gate result and atomic commit
+will be recorded separately. No live operation, spending, push or complete Plan G
+publication is claimed.
+
+### G3 later complete parent gate
+
+Parent's sole full repository test/type gate subsequently exited zero:
+2,941 Vitest tests /131 files, 673 Bun tests /47 files /5,138 expect calls, and
+root/web strict checks. Actual pinned codegen/WASM had already passed separately.
+The earlier pending checkpoint is retained as history. Final parent review
+publication and the atomic G3 commit remain pending; no new deployment, indexed
+result, spending, push or complete Plan G archive is claimed.
+
+The [G3 parent review](task-3-parent-review.md) is now included as an eighth exact
+historical copy, with no substitutions. Its frozen full gate and actual build are
+complete; final publication audit and the separate atomic commit follow.

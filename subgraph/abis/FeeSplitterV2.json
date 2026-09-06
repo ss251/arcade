@@ -1,0 +1,19 @@
+[
+  { "anonymous": false, "name": "Settled", "type": "event", "inputs": [
+    { "indexed": true, "name": "buyer", "type": "address" },
+    { "indexed": false, "name": "total", "type": "uint256" },
+    { "indexed": false, "name": "sellerAmount", "type": "uint256" },
+    { "indexed": false, "name": "feeAmount", "type": "uint256" },
+    { "indexed": true, "name": "nonce", "type": "bytes32" }
+  ]},
+  { "anonymous": false, "name": "SettledTree", "type": "event", "inputs": [
+    { "indexed": true, "name": "buyer", "type": "address" },
+    { "indexed": false, "name": "total", "type": "uint256" },
+    { "indexed": false, "name": "sellerAmount", "type": "uint256" },
+    { "indexed": false, "name": "feeAmount", "type": "uint256" },
+    { "indexed": true, "name": "nonce", "type": "bytes32" },
+    { "indexed": true, "name": "treeHash", "type": "bytes32" },
+    { "indexed": false, "name": "childCount", "type": "uint32" },
+    { "indexed": false, "name": "childTotalAtomic", "type": "uint256" }
+  ]}
+]

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
+import { renderManifest } from "../build-manifest.ts"
 import {
   buildASTSchema, Kind, parse, print, validate,
   type ObjectTypeDefinitionNode
@@ -176,7 +177,7 @@ describe("G2 ledger schema contract (offline)", () => {
   })
 
   test("declares only the existing settlement and its required emitter in the smoke manifest", () => {
-    const manifest = Bun.YAML.parse(text("../subgraph.yaml"))
+    const manifest = Bun.YAML.parse(renderManifest(text("../subgraph.template.yaml"), JSON.parse(text("../../config/chains/arc-testnet.json")), JSON.parse(text("../splitters.json"))))
     expect(manifest).toMatchObject({ dataSources: [{ mapping: { entities: ["Settlement", "Splitter"] } }] })
   })
 

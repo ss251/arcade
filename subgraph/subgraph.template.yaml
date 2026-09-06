@@ -1,0 +1,7 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: never
+schema:
+  file: ./schema.graphql
+dataSources:
+{{SPLITTER_SOURCES}}

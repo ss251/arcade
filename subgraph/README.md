@@ -214,3 +214,52 @@ Only an actual supported-network rejection can trigger the plan's fallback: reta
 statistics, record the sanitized rejection, and separately scope the independent Graph
 cost-of-goods half. No fallback or fully-synced result is inferred here. Canonical F-before-G
 merge order remains in force.
+
+## September 6, 2026 — G3 local staging
+
+G2 committed as `9c691d1`, rebased unchanged to `0d79dbd` after full F merged
+and passed all four main gates at `68bb915`. Earlier checkpoints above remain
+historical; this section releases local G3 work, not a new Studio deployment.
+
+The active generated manifest contains **1 pilot source; 0 registry sources;
+0 dynamic templates**. Its existing `FeeSplitterSmoke` handler and v1 ABI remain
+unchanged. Four new event-only ABIs are staged for later real G4/G5 mappings,
+including Identity `Transfer`; active pilot codegen does not validate their use.
+No Marketplace row, canonical listing binding or metadata-authorized template
+is created. Arbitrary metadata is not proof of seller or hub listing ownership.
+
+`subgraph.yaml` is generated from the committed template/list and explicitly
+pinned Arc testnet configuration. `prune: never` preserves indexed history but
+does not invent missing coverage. The pilot's zero start remains the historical
+smoke exception, not its verified creation height. Only that pilot is supported
+at this stage; malformed/duplicate/extra inputs or different emitters fail closed.
+The renderer validates the complete YAML before atomically replacing its output.
+It has no ambient network selector, automatic dotenv read, credential or network
+operation. This is a cooperative local-filesystem tool, not hostile-storage isolation.
+
+From `subgraph/`, using the already installed pinned toolchain:
+
+```sh
+bun --no-env-file run manifest
+bun --no-env-file test ./checks/manifest.bun.test.ts ./checks/abis.bun.test.ts ./checks/scaffold.bun.test.ts ./checks/schema.bun.test.ts
+bun --no-env-file run build
+```
+
+Build first regenerates the manifest and event/schema types, then compiles the
+active WASM. Tests render in memory and use owned temporary layouts; a fresh
+checkout needs no pre-existing ignored YAML. Importing the renderer does not write.
+Invalid inputs preserve a prior output and the actual CLI reports fixed diagnostics.
+No deployment command is needed for these gates; do not replay the consumed G1 run.
+
+Parent's separate keyless September 6 explorer/RPC checkpoint found the planned
+registry event subsets match the explorer ABIs for the implementations selected
+by ERC1967 slots at Arc block `60670577`. The explorer's last reported upgrade
+for each proxy agrees with that current slot. This is current implementation-ABI
+corroboration, not an independent archival receipt or pre-upgrade compatibility
+proof. The public RPC returned null for all three registry creation receipts and
+the pilot's creation receipt. The existing V2 splitter creation receipt is available
+and matches block `60460646`, its runbook hash and address. Explorer-reported creation
+and upgrade boundaries will be kept distinct before later source activation.
+
+No paid query, new payment, registry write, deployment or mainnet action occurred.
+G4/G5 mapping execution, source activation and G6 evidence remain separate work.

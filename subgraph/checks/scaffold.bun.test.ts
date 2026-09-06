@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { createHash } from "node:crypto"
+import { renderManifest } from "../build-manifest.ts"
 
 const text = (relative: string): string => readFileSync(new URL(relative, import.meta.url), "utf8")
 const json = (relative: string): unknown => JSON.parse(text(relative))
@@ -11,7 +12,7 @@ describe("G1 offline smoke scaffold", () => {
       name: "arcade-subgraph", private: true,
       dependencies: { "@graphprotocol/graph-cli": "0.98.1", "@graphprotocol/graph-ts": "0.38.2" },
       devDependencies: { "matchstick-as": "0.6.0" },
-      scripts: { codegen: "graph codegen subgraph.yaml", build: "graph build subgraph.yaml" }
+      scripts: { codegen: "bun --no-env-file run manifest && graph codegen subgraph.yaml", build: "bun --no-env-file run codegen && graph build subgraph.yaml" }
     })
     expect(json("../../package.json")).toHaveProperty("workspaces", ["packages/*", "apps/*"])
   })
@@ -30,8 +31,8 @@ describe("G1 offline smoke scaffold", () => {
   test("binds the sole smoke source to the runbook pilot and exact event handler", () => {
     const address = "0xf95c8afefae677fdcfc7bd5b8aaaf3702db99206"
     expect(text("../../docs/runbook.md")).toContain(address)
-    expect(Bun.YAML.parse(text("../subgraph.yaml"))).toEqual({
-      specVersion: "1.0.0", schema: { file: "./schema.graphql" },
+    expect(Bun.YAML.parse(renderManifest(text("../subgraph.template.yaml"), json("../../config/chains/arc-testnet.json"), json("../splitters.json")))).toEqual({
+      specVersion: "1.0.0", indexerHints: { prune: "never" }, schema: { file: "./schema.graphql" },
       dataSources: [{ kind: "ethereum", name: "FeeSplitterSmoke", network: "arc-testnet",
         source: { address, abi: "FeeSplitter", startBlock: 0 },
         mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",

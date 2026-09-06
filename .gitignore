@@ -87,3 +87,6 @@ design/*
 # Local executor handoff/status files; may contain operational state and owner-only actions.
 handoff/
 .claude/handoff/
+
+# Deterministic G3 manifest output; committed template/list remain source inputs.
+subgraph/subgraph.yaml

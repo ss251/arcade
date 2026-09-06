@@ -1,0 +1,23 @@
+[
+  { "anonymous": false, "name": "Registered", "type": "event", "inputs": [
+    { "indexed": true, "name": "agentId", "type": "uint256" },
+    { "indexed": false, "name": "agentURI", "type": "string" },
+    { "indexed": true, "name": "owner", "type": "address" }
+  ]},
+  { "anonymous": false, "name": "URIUpdated", "type": "event", "inputs": [
+    { "indexed": true, "name": "agentId", "type": "uint256" },
+    { "indexed": false, "name": "newURI", "type": "string" },
+    { "indexed": true, "name": "updatedBy", "type": "address" }
+  ]},
+  { "anonymous": false, "name": "MetadataSet", "type": "event", "inputs": [
+    { "indexed": true, "name": "agentId", "type": "uint256" },
+    { "indexed": true, "name": "indexedMetadataKey", "type": "string" },
+    { "indexed": false, "name": "metadataKey", "type": "string" },
+    { "indexed": false, "name": "metadataValue", "type": "bytes" }
+  ]},
+  { "anonymous": false, "name": "Transfer", "type": "event", "inputs": [
+    { "indexed": true, "name": "from", "type": "address" },
+    { "indexed": true, "name": "to", "type": "address" },
+    { "indexed": true, "name": "tokenId", "type": "uint256" }
+  ]}
+]

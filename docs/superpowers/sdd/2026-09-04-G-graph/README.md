@@ -53,3 +53,26 @@ This worktree must not merge ahead of Plan F.
 Only reviewed execution artifacts are published. Private research, credentials,
 owner handoffs, runtime state and internal executable helpers remain excluded.
 Historical pending statements are superseded only by dated evidence, not rewritten.
+
+## September 6 — G3 local staging checkpoint
+
+The earlier unreleased-G3 statement above is now historical. After Plan F merged
+and main's gates passed, G rebased cleanly and Task 3's bounded local source was
+released. The [G3 brief](task-3-brief.md) links seven historical preparation,
+implementation and independent-review records. Exact inactive ABI checks and
+the single-pilot renderer passed their focused selections and independent
+reviews; parent's actual pinned codegen/WASM repeat also passed.
+
+The separate complete G3 test/type gate is in progress, with final acceptance and
+the atomic G3 commit pending here. No new registry source/template activation,
+deployment, upload or indexed result is claimed. This is a selected G3 archive,
+not completion of all Plan G execution records; G2 private preparation and raw
+provenance evidence remain retained outside the public copies.
+
+### Later G3 parent full gate
+
+The sole complete gate subsequently exited zero: 2,941 Vitest tests /131 files,
+673 Bun tests /47 files /5,138 expect calls, and root/web strict checks. This
+supersedes the immediately preceding gate-pending checkpoint. The codegen/WASM
+repeat also passed; final parent review publication and the atomic G3 commit
+remain pending, with no new live or indexing claim.
