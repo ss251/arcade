@@ -430,3 +430,41 @@ All four new source pins passed; the prior read wrapper was verified at the exac
 H10b2 commit and its replacement explicitly accounted for. Other prior H10a/
 H10b1/H10b2/F/Pages pins and copies remain intact. Local links resolve (91 prior-
 document links plus new documents); selected privacy-pattern findings were zero.
+
+## H10b4 — private fresh-approved purchase composition
+
+H10b3 committed `6101146`. Parent composed synchronous one-use consumption,
+fixed same-origin actual-input/ENS quotes before/after signing, one direct POST,
+store-before-poll and bounded read-only recovery. The terminal projection matches
+original terms and signed nonce and distinguishes hub-reported nonsettlement,
+on-chain-shaped hashes and Gateway UUIDs without claiming independent proof.
+Only the passive input-capture export changes prior H10b1 source; its approval
+logic/tests and all H10b2/H10b3 primitives are retained.
+
+Final153 focused/4 files and exact8-root strict0 passed. Actual shared EIP3009
+and Gateway signers compose with public fixture keys and intercepted HTTP/memory
+storage; no native-browser or live-payment claim. Initial strict3 diagnostics
+were fixed; supplemental behavior tests passed first-time. Parent self-review
+only under the owner machine-load restriction, no independent review claim.
+
+The sole full Vitest sweep failed on sandbox-denied local sockets:18 failed/
+140 passed files;89 failed/3,774 passed/19 skipped tests (3,882 total),51 errors,
+157.01s. After it closed, exactly18 affected files passed145 tests/16.64s with
+local-socket permission. Other140 passing files were not rerun. That continuation
+and original clean files cover all3,882 cases, but are not one clean sweep.
+The previously unrun sequential Bun phase passed834/54/6,091 assertions/164.08s,
+root/web strict0 and client311ms/SSR147ms passed. Frozen source was unchanged.
+
+No overlapping gate, delegate, new spend/key, approval replay, production ENS or
+mainnet change or push. Public-copy/pin audit and the local atomic commit follow.
+H remains unmerged; active Chat/Confirm/SDK migration, courier retirement, native
+two-origin/re-entry/restore proof, buyer/session completeness and H11–14 remain.
+
+Final self-audit passed both exact bannered copies, original report hash
+`f7fbd1fe58a802e9755def4318e032cb98f005c9dca614556688543d0e5852a5`
+and preflight hash
+`821741ffb49eabe1420dd690d1502b50aa67dcf989e94dec2d4c8f9c08fffd03`.
+Eight frozen source/test pins, prior source/copy pins and retained F/Pages pins
+passed; the H10b1 source replacement was verified against exact H10b3 commit
+bytes. Local links resolve (94 prior-document links plus new documents), with
+zero selected privacy-pattern findings. No source/gate rerun followed the audit.

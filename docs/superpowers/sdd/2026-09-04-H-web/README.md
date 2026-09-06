@@ -1,5 +1,14 @@
 # Plan H — execution records
 
+Current task: [H10b4 private purchase composition](task-10b4-brief.md), after
+H10b3 `6101146`. The [preflight](task-10b4-controller-preflight.md) binds original
+approval/input/quote to one signature/POST and browser recovery. The
+[parent report](task-10b4-parent-report.md) records153 focused tests, both real
+fixture rail signers, exact strict, the sandbox-failed full sweep and its bounded
+18-file recovery followed by the remaining gates. No full-suite rerun or source
+change during verification. Active UI/courier migration and native proof remain
+separate; single-threaded and H still unmerged. Earlier checkpoints follow.
+
 Current task: [H10b3 one-shot browser POST/recovery transport](task-10b3-brief.md),
 after H10b2 `ddb7eca`. The [preflight](task-10b3-transport-preflight.md) records
 actual producer shapes and the optional ordinary reference-kind correction.

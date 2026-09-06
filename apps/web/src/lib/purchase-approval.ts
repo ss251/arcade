@@ -105,6 +105,11 @@ const canonicalInput = (input: unknown): string => {
   return visit(input, 0)
 }
 
+/** Passive bounded input snapshot for the quote/UI adapter; never approval authority. */
+export const capturePurchaseInput = (input: unknown): string | undefined => {
+  try { return canonicalInput(input) } catch { return undefined }
+}
+
 type Binding = Omit<ApprovedPurchase, "context">
 const captureBinding = (v: Record<string, unknown>): Binding => {
   if (!text(v.approvalId, 512) || !v.approvalId || !text(v.toolCallId, 512) || !v.toolCallId ||
