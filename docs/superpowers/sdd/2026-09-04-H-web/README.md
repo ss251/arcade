@@ -1,5 +1,13 @@
 # Plan H — execution records
 
+Current task: [H11 public seller dashboard](task-11-brief.md), after `65e38c0`.
+The [parent report](task-11-parent-report.md) records actual accounting semantics,
+selected-address correlation and fixed errors. [Native evidence](task-11-native-check.md)
+passed16 final actual Start/synthetic-provider cases; all owned services stopped.
+Sole full Vitest passed4,012 with one obsolete seller-is-missing test; updated
+only its unknown-route target, then2 affected route checks passed. Remaining
+834 Bun/root+web strict/client+SSR stages passed. Earlier checkpoints are historical.
+
 Current task: [H10c2 ordinary buyer page](task-10c2-brief.md), after H10c1
 `57fbfe0`. The [parent report](task-10c2-parent-report.md) and
 [native check](task-10c2-native-check.md) record passive actual Start SSR,

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BuyerRouteImport } from './routes/buyer'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as SellerRouteImport } from './routes/seller'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiQuoteRouteImport } from './routes/api.quote'
 import { Route as ApiSettleRouteImport } from './routes/api.settle'
@@ -30,6 +31,11 @@ const BuyerRoute = BuyerRouteImport.update({
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SellerRoute = SellerRouteImport.update({
+  id: '/seller',
+  path: '/seller',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/buyer': typeof BuyerRoute
   '/chat': typeof ChatRoute
+  '/seller': typeof SellerRoute
   '/api/chat': typeof ApiChatRoute
   '/api/quote': typeof ApiQuoteRoute
   '/api/settle': typeof ApiSettleRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/buyer': typeof BuyerRoute
   '/chat': typeof ChatRoute
+  '/seller': typeof SellerRoute
   '/api/chat': typeof ApiChatRoute
   '/api/quote': typeof ApiQuoteRoute
   '/api/settle': typeof ApiSettleRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/buyer': typeof BuyerRoute
   '/chat': typeof ChatRoute
+  '/seller': typeof SellerRoute
   '/api/chat': typeof ApiChatRoute
   '/api/quote': typeof ApiQuoteRoute
   '/api/settle': typeof ApiSettleRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/buyer'
     | '/chat'
+    | '/seller'
     | '/api/chat'
     | '/api/quote'
     | '/api/settle'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/buyer'
     | '/chat'
+    | '/seller'
     | '/api/chat'
     | '/api/quote'
     | '/api/settle'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/buyer'
     | '/chat'
+    | '/seller'
     | '/api/chat'
     | '/api/quote'
     | '/api/settle'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BuyerRoute: typeof BuyerRoute
   ChatRoute: typeof ChatRoute
+  SellerRoute: typeof SellerRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiQuoteRoute: typeof ApiQuoteRoute
   ApiSettleRoute: typeof ApiSettleRoute
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/seller': {
+      id: '/seller'
+      path: '/seller'
+      fullPath: '/seller'
+      preLoaderRoute: typeof SellerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BuyerRoute: BuyerRoute,
   ChatRoute: ChatRoute,
+  SellerRoute: SellerRoute,
   ApiChatRoute: ApiChatRoute,
   ApiQuoteRoute: ApiQuoteRoute,
   ApiSettleRoute: ApiSettleRoute,

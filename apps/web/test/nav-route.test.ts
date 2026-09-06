@@ -27,7 +27,8 @@ it("serves chat at /chat while / is only the H6 shell, with keyless facts and or
     const market = await get("/"), marketHtml = await market.text()
     expect(market.status).toBe(200); expect(marketHtml).toContain('aria-label="Sections"')
     expect(marketHtml).not.toContain('class="composer"'); expect(marketHtml).not.toContain("settlement receipts")
-    const invalid = await get("/seller"); expect(invalid.status).toBe(404)
+    // Seller is now a real route (H11); keep the unknown-route 404 invariant.
+    const invalid = await get("/__missing-route"); expect(invalid.status).toBe(404)
     const api = await fetch(origin + "/api/chat", { method: "POST", body: "{}", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(3000) })
     expect(api.status).toBe(503)
   } finally {

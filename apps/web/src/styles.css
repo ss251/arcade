@@ -1465,3 +1465,31 @@ a {
   .buyer-page .buyer-job { grid-template-columns: minmax(0, 1fr); }
   .buyer-page .buyer-job .buyer-money { grid-column: 1; }
 }
+
+/* H11 seller-page: additive public ledger presentation, never a financial proof. */
+.wrap.seller-page { height: auto; min-height: 100dvh; gap: 0; }
+.seller-page h1 { font-size: clamp(1.75rem, 4vw, 2.25rem); line-height: 1.2; margin: 0 0 24px; font-weight: 650; }
+.seller-page h2 { font-size: 1.125rem; margin: 0 0 16px; }
+.seller-page h3 { font-size: 1rem; margin: 0; }
+.seller-page p { margin: 10px 0; overflow-wrap: anywhere; }
+.seller-page .seller-note { color: var(--slate); font-size: 0.8125rem; max-width: 78ch; }
+.seller-code { font: 0.8125rem/1.6 var(--mono); overflow-wrap: anywhere; }
+.seller-money { color: var(--usdc); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.seller-unknown { color: var(--slate); }
+.seller-page .is-refused { border-left: 3px solid var(--refuse); padding-left: 8px; }
+.seller-address { margin-bottom: 24px; }
+.seller-address label { display: block; margin-bottom: 8px; font-weight: 600; }
+.seller-form-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.seller-form-controls input { flex: 1 1 300px; min-width: 0; max-width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); font: 0.875rem/1.5 var(--mono); }
+.seller-page button { min-height: 44px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
+.seller-page button:disabled { color: var(--slate); cursor: default; }
+.seller-page :is(input, button, summary, a):focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.seller-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 20px 24px; margin: 24px 0; }
+.seller-totals > div { min-width: 0; display: grid; gap: 4px; }
+.seller-totals span { font-size: 0.8125rem; color: var(--slate); }
+.seller-totals strong { font-size: 1.5rem; font-weight: 650; }
+.seller-listings { margin-top: 32px; }
+.seller-listings ul { list-style: none; margin: 0; padding: 0; }
+.seller-listings li { border-top: 1px solid var(--line); padding: 24px 0; min-width: 0; }
+.seller-listing-heading { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: baseline; gap: 8px 24px; }
+.seller-page summary { min-height: 44px; padding: 10px 0; cursor: pointer; overflow-wrap: anywhere; }

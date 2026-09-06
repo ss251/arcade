@@ -1,5 +1,20 @@
 # SDD ledger — Plan H
 
+2026-09-06 17:54 IST: H11 final gate/audit complete. Sole53132 sweep4,012pass/
+1obsolete navigation404 expectation/171files/52.07s. Unknown-route target fixed,
+404 assertion retained; targeted nav+seller2/2 passed, no full Vitest repeat.
+Remaining31049exit0:834Bun54/6093assert/163.45s,rootwebstrict0,client349msSSR166ms.
+Final39 source pins/104 public links/readiness text/CSS prefix/privacy PASS.
+Local atomic commit next. All native processes stopped; no keys/spend/push.
+
+2026-09-06 17:47 IST: H11 seller source frozen after65e38c0;44 focused logic/
+presentation plus final13 route/presentation tests passed, exact10web/2fixture
+strict0. Actual Start native16 passed;4 captures read,20PIDs/9distinct ports
+stopped. Stale-address behavior Red fixed; driver/fixture failures recorded in
+[parent report](task-11-parent-report.md) and [native check](task-11-native-check.md).
+26 predecessor source pins and complete old CSS prefix preserved. Sole full gate
+next; root-only/max4, no parallel reviews/gates, no keys/spend/production/push.
+
 Plan: [2026-09-04-H-web](../../plans/2026-09-04-H-web.md).
 
 2026-09-06 17:15 IST: H10c2 ordinary buyer UI frozen after `57fbfe0`. Passive

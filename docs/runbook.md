@@ -579,6 +579,30 @@ records actual passive Start SSR plus16 native synthetic recovery cases. Those
 loopback URLs served only during their owned run and stopped after cleanup; this
 is not live payment, real-wallet or production-deployment evidence.
 
+### H11 public seller summary
+
+Open `/seller?address=<public-nonzero-address>` or enter a public seller address.
+The page does not require a wallet. The optional wallet button requests an account
+only after a click, never authenticates, signs, changes chains or pays. Typing or
+selecting a newer address cancels the pending selection; late results cannot
+replace it. A bookmarked address is public and deliberately remains in the URL.
+
+The page reads one hub summary, without polling. Missing/invalid selection and
+unavailable reads are distinct from a valid empty ledger. Null costs and margin
+remain unavailable; known partial subtotals do not fill unknown amounts with zero.
+Inference includes reported failed-job overhead; listing margin per settled call
+uses the stated denominator. Historical totals may remain without current listings.
+These are hub-recorded totals, potentially including tests/canaries, not customer
+demand, wallet balance, independent chain proof or evidence of a refund.
+
+ENS/identity/runner statements stay qualified hub reports; missing expiry is
+unknown, and agent #0 differs from no identity. Listing hashes lack sufficient
+rail/network context here, so they are unlinked text rather than guessed explorers.
+The [H11 report](superpowers/sdd/2026-09-04-H-web/task-11-parent-report.md) and
+[native check](superpowers/sdd/2026-09-04-H-web/task-11-native-check.md) distinguish
+actual Start interaction with synthetic data/provider from real-wallet/chain proof.
+Their loopback URLs served only during the run and stopped after cleanup.
+
 ### Set the web service's Config File Path, or you get two hubs
 
 Railway's monorepo guide says it outright: **"The Railway Config File does not follow the
