@@ -13,7 +13,7 @@ verify payment  →  execute in sandbox  →  validate output  →  settle
 This ordering is the product's core guarantee in both directions:
 
 - **Validation precedes settlement.** An observed refusal, timeout, bounds breach, empty result or schema mismatch before settlement prevents an attempt. A timeout or lost acknowledgement after issuing payment is uncertain, not proof of no charge; no automatic payment retry is safe.
-- **Verification precedes work.** Signature, funds, validity-window and replay checks happen before dispatch. Verification is not escrow or a guarantee that a later settlement succeeds.
+- **Verification precedes work.** Signature, funds, validity-window and replay checks happen before dispatch. On the authorization rails this is not escrow or a guarantee that later settlement succeeds. The separately opt-in escrow path instead verifies already-funded on-chain job state before work; it is implemented offline, not deployed.
 
 ### Why this rules out Circle's Express middleware
 
@@ -38,15 +38,66 @@ That decision is why the hub is `Bun.serve` + Effect rather than Express, and it
 
 ## Rails
 
-`Rail` is a `Context.Tag` service with three complete `Layer` implementations:
+`Rail` is a `Context.Tag` service for the existing exact, Gateway and test paths.
+Escrow has a dedicated payload/service contract and is not coerced into an
+EIP-3009 authorization:
 
 | layer | what |
 |---|---|
 | `EIP3009Live` | `transferWithAuthorization` on Arc USDC. Proven on-chain. Buyer signs offline (~5ms, zero gas); the facilitator broadcasts and pays ~0.00218 USDC. |
 | `GatewayLive` | Pinned Arc-testnet Gateway authorization, local binding and signature checks, bounded facilitator verify/settle. Accepted per-call evidence is a Gateway transfer UUID, not a mined transaction or batch. |
 | `RailTest` | Simulated in-memory balances and explicit test references; no real funds or mining. |
+| `erc8183` (dedicated opt-in service) | Offline guarded root lifecycle, exact pinned deployment identity and durable action journals. Buyer funds before work; hub evaluates complete/reject. No usable deployment or live proof yet. |
 
-All three share a conformance suite (`packages/payments/test/rail.conformance.test.ts`). The hub registry preserves the ordinary selected default (normally EIP-3009); a supported session chooses its rail explicitly. A built registry is not proof that an external provider currently supports a network. The pinned mainnet manifest is pending and fails closed; Gateway mainnet is not an automatic fallback.
+The three ordinary rails share `packages/payments/test/rail.conformance.test.ts`;
+escrow has its separate request/action/proof suites. Root challenges advertise
+only built, listed, eligible choices in Gateway → exact → escrow order. The
+buyer preference is an ordered allow-list, not permission to sign arbitrary
+accepts or fall back after dispatch; Gateway needs observed available credit,
+and escrow additionally needs explicit local deployment/gas/journal ownership.
+Child hires retain their ordinary default and cannot become escrow children;
+sessions keep their selected supported rail. Registry construction is not
+provider liveness. The pending mainnet configuration still fails closed.
+
+### Escrow and delegated funding delta (offline implementation)
+
+These Mermaid sources describe implemented paths, not a live transaction trace.
+Plan I will render the updated architecture; the existing README raster is not
+evidence of this delta. Configuration/approval prerequisites remain in the
+[escrow guide](erc8183-escrow.md) and [funding guide](unified-balance-funding.md).
+
+```mermaid
+graph LR
+  Buyer["Buyer: pinned identity and private journal"] --> Create["Create job and commit request hash"]
+  Create --> Budget["Runner signs budget; hub relays"]
+  Budget --> Fund["Buyer exact approval and funding"]
+  Fund --> Verify["Hub verifies funded job and admits once"]
+  Verify --> Run["Seller runner executes"]
+  Run --> Evaluate{"Hub validates output and closes tree"}
+  Evaluate -->|success| Submit["Runner signs submit; hub relays"]
+  Submit --> Complete["Complete: seller and fee transfers plus hook commitment"]
+  Evaluate -->|observed failure| Reject["Reject: contract principal refund"]
+  Evaluate -.->|unresolved tree| Reconcile["Retain journal and reconcile; never automatic replay"]
+  Submit -.->|uncertain result| Reconcile
+  Complete -.->|uncertain result| Reconcile
+  Reject -.->|uncertain result| Reconcile
+```
+
+```mermaid
+graph LR
+  Owner["Owner retains source Gateway custody"] --> Grant["Separate owner-approved per-chain delegate grant"]
+  Grant --> Ready["Check delegate readiness and available balance"]
+  Ready --> Terms["Bind explicit amount, fees and finite burn height"]
+  Terms --> Spend["Delegate signs one journaled spend to Arc testnet"]
+  Spend --> Observe["Verify delivery separately before a paid call"]
+```
+
+The grant is continuing source authority, not a per-call cap or permission for
+automatic deposits. SDK success alone is not independent delivery proof. J5 live
+is paused at the existing signing/read deadline. Escrow deployment is blocked
+by the oversized approved artifact plus the treasury checkpoint; its hub is an
+admin-configured evaluator, not an immutable neutral verifier. Funding can incur
+gas even if execution later fails; principal refund does not refund those costs.
 
 ### Durable sessions and evidence categories
 
@@ -66,11 +117,15 @@ Session membership covers admitted roots only; seller-funded child hires remain
 independent, sessionless calls. No session capability enters a hired sandbox.
 
 Receipt presentation uses each receipt's network and kind, not the process default.
-Only settled EIP-3009 with a ready agreeing manifest, nonzero full hash and legacy
-absent/onchain kind gets an inspection link. Children inherit root provenance but
-use their own settled/reference fields. Gateway UUIDs and TestRail references never
-become explorer links. Public session provenance is a derived boolean; private
-session IDs and fallback job-handle aliases remain excluded.
+The generic link helper admits only settled EIP-3009 with a ready agreeing
+manifest, nonzero full hash and legacy absent/onchain kind. The dedicated
+public escrow view separately checks coherent Arc-root terminal metadata,
+matching quoted/actual amounts, state and exact complete/refund URLs; it
+rechecks props and labels all evidence as hub-reported. Its compact descendants
+have no inherited escrow transaction links. Create/fund references are absent
+from that public feed. Gateway UUIDs and TestRail references never become mined
+explorer links. Public session provenance is a derived boolean; private session
+IDs, capabilities and fallback job-handle aliases remain excluded.
 
 [F12 offline evidence](./evidence/m6-gateway.md) used actual SDK, hub, SQLite,
 Broker, WebSocket and runner execution with finite external fixtures: twenty

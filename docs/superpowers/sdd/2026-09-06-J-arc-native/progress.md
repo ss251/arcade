@@ -1,5 +1,22 @@
 # Plan J progress
 
+2026-09-08 01:19 IST — J12 sole53049fullgatePASS5327Vitest242/68.94s;
+1362Bun92/11713assert191.55s;root/webstrict/clientSSR330/161ms.11docs paths,
+214local links/privacy0; frozen content rechecked before atomiccommit/mainFF.
+Pinned full source preview is proven, not live listings. PlanI next: reuse the
+existing CLI prerequisite record, keep live capture/pay paused, prepare honest
+offline packaging. No authorization change, keys, chain RPC, spend or push.
+
+2026-09-08 01:07 IST — J11C2 mainc5fdb47. J12 offline source/docs implemented:
+public GitHub commit/tree plus clean detached full Circle checkout verified;
+18skills recognized,25mappings/23unique source blobs matched. Native CLI two
+previews/19files/exit0; separate handler samepublicdigest/fetch0. No listing
+generation or instruction execution. Raw upstream license context documented.
+Runbook/README/datedcontinuity/architecture source updated; Mermaid installed
+parser needs DOM, so no parse/render claim. PlanI rendering remains explicit.
+Link/privacy freeze and sole4workerfullgate next, then atomic mainFF. All live
+pauses/approval budgets unchanged; no wallet/modelkeys/RPC/spend/deploy/push.
+
 2026-09-08 00:50 IST — J11C2 sole20753fullgatePASS5327Vitest242/69.89s;
 1362Bun92/11711assert191.65s;root/webstrict/clientSSR317/184ms.15paths146
 links/privacy0;9source/testpins recheck before atomiccommit/exact-one mainFF.

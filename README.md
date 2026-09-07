@@ -133,6 +133,17 @@ not proof of available credit. The fallback track was not activated.
 The pinned Gateway configuration is Arc testnet only. Arc mainnet remains pending
 and refuses startup; enabling it is an owner-only review, not a rail fallback.
 
+## Arc-native continuation: implemented paths, paused live proofs
+
+Plan J adds Circle-shaped discovery and ordered rail selection, explicit
+owner-delegated Unified Balance funding, and a guarded root ERC-8183 runtime
+with hub/runner/buyer wiring. The funding and escrow paths are tested offline,
+not live-proven: Circle CLI pay remains paused, and the pinned escrow artifact
+is oversized and not deployed. The web shows declared rails and qualified
+public terminal receipts, not a browser escrow signer or independent chain proof.
+See the [rail/dialect status](docs/runbook.md#plan-j--rails-circle-dialect-and-evidence),
+[deployment limits](docs/erc8183-escrow.md) and [full Circle source preview](docs/evidence/J/circle-full-source-preview.md).
+
 ## Pricing and fees
 
 Sellers set a flat per-call price *and* hard work bounds (`maxTurns`, `maxTokens`, `maxToolCalls`, `timeoutSec`), so an open-ended agent run can't go margin-negative.

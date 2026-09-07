@@ -337,10 +337,15 @@ and Task10 chain proof remain separate.
 
 ### Task 12: Circle plugin fixture (J4) and docs/claims
 
-- [ ] Point the queued Agent Plugins ingest at a pinned checkout of `circlefin/skills` (`plugins/circle`); publish `pay-via-agent-wallet` and `use-gateway` live on the default rail; evidence next to B13.
-- [ ] `docs/runbook.md` "Rails" table (gateway · eip3009 · erc8183: when, cost, who pays gas, what is committed on chain); "Circle dialect" section (inspect/pay commands); "Why our own ERC-8183 instance" paragraph (spec §7.1) with Circle's reference address; `README.md` and `docs/CONTINUITY.md` rows; claims exactly as spec §9.
-- [ ] `docs/architecture.md` diagram gains the escrow path and the delegate funding path (Plan I Task 6 will render it).
-- [ ] Commit: `docs: rails, Circle dialect, escrow and delegate funding`.
+[J12 brief](../sdd/2026-09-06-J-arc-native/task-12-brief.md) and
+[offline checkpoint](../sdd/2026-09-06-J-arc-native/task-12-report.md) separate
+source preview/documentation from paid listings and unproved spec claims.
+
+- [x] Full pinned `circlefin/skills` checkout, all18 skill folders recognized; native CLI selected two previews;25mapped source blobs verified; no instruction execution or network discovery. [Evidence](../../evidence/J/circle-full-source-preview.md).
+- [ ] Serve/purchase `pay-via-agent-wallet` and `use-gateway` live on the default rail; preview does not satisfy this requirement.
+- [x] Runbook rails/fees/gas/evidence table, Circle command shapes and actual pause, separate escrow rationale, README/dated continuity. Spec §9 wording is not asserted while live prerequisites are unmet.
+- [x] Architecture Mermaid source gains escrow and delegate paths. Rendering/DOM-backed validation/visual verification remains Plan I Task6; no rendered delta is claimed.
+- [x] Offline checkpoint commit: source preview and qualified rail/docs claims; sole four-worker gate passed (5,327 Vitest,1,362 Bun, typechecks, client/SSR). Live tasks above remain open.
 
 ---
 

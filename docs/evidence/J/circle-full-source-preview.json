@@ -1,0 +1,104 @@
+{
+  "kind": "arcade:circle-full-source-preview:v1",
+  "observedOn": "2026-09-08 IST",
+  "runtimeBase": "c5fdb475cf5c07a35ba632d3af613b5ac6cf3f78",
+  "repository": "https://github.com/circlefin/skills",
+  "revision": "26dc09ea0746a038c969c6f197feee1267f834b5",
+  "tree": "d7aac48698e88448de5ead3f7d3d53a0011990e0",
+  "fullPluginSkills": [
+    "accept-agent-payments",
+    "agent-wallet-policy",
+    "bridge-stablecoin",
+    "fund-agent-wallet",
+    "pay-via-agent-wallet",
+    "recover-eco-funds",
+    "swap-tokens",
+    "unify-balance",
+    "use-agent-wallet",
+    "use-arc",
+    "use-circle-cli",
+    "use-circle-wallets",
+    "use-developer-controlled-wallets",
+    "use-gateway",
+    "use-modular-wallets",
+    "use-smart-contract-platform",
+    "use-usdc",
+    "use-user-controlled-wallets"
+  ],
+  "matchedSourceMappings": 25,
+  "uniqueSourceBlobs": 23,
+  "format": "codex-compat",
+  "issues": [],
+  "selected": [
+    {
+      "id": "circle-skill-skills-pay-via-agent-wallet-f6f56305eaf4",
+      "name": "pay-via-agent-wallet",
+      "price": "$0.05",
+      "files": [
+        "SKILL.md",
+        "references/errors.md"
+      ],
+      "capabilities": [],
+      "secrets": [],
+      "modelConfigured": false
+    },
+    {
+      "id": "circle-skill-skills-use-gateway-6751f91116c6",
+      "name": "use-gateway",
+      "price": "$0.05",
+      "files": [
+        "SKILL.md",
+        "references/deposit-evm-browser-wallet.md",
+        "references/deposit-evm-circle-wallet.md",
+        "references/deposit-evm.md",
+        "references/deposit-solana-circle-wallet.md",
+        "references/deposit-solana.md",
+        "references/evm-to-evm-browser-wallet.md",
+        "references/evm-to-evm.md",
+        "references/evm-to-solana-circle-wallet.md",
+        "references/evm-to-solana.md",
+        "references/query-balance.md",
+        "references/solana-to-evm-circle-wallet.md",
+        "references/solana-to-evm.md",
+        "references/solana-to-solana-circle-wallet.md",
+        "references/solana-to-solana.md",
+        "references/transfer-evm-circle-wallet.md",
+        "references/transfer-evm-delegate.md"
+      ],
+      "capabilities": [],
+      "secrets": [],
+      "modelConfigured": false
+    }
+  ],
+  "nativeExit": 0,
+  "handlerNetworkCalls": 0,
+  "outputAbsent": true,
+  "walletConfigAbsent": true,
+  "sourceClean": true,
+  "publicProjectionSha256": "3749b8f550d807521c6f94ef80daef36d9bc2977eb7482457a1da19672d51dc5",
+  "warnings": [
+    "Review generic input/output schemas, API-key/model configuration, capabilities and third-party licensing before serving",
+    "Skill descriptions longer than the public limit are clipped; source SKILL.md stays unchanged"
+  ],
+  "scope": {
+    "fullCheckout": true,
+    "nativePreviewOnly": true,
+    "selectedSkillCount": 2,
+    "generatedListings": false,
+    "servedListings": false,
+    "pluginInstalled": false,
+    "modelExecuted": false,
+    "walletInstructionsExecuted": false,
+    "paidCalls": 0,
+    "chainRpcCalls": 0
+  },
+  "limits": {
+    "nativeCliTimeoutMs": 15000,
+    "nativeCliMaxOutputBytes": 524288
+  },
+  "caveats": [
+    "Native CLI used a clean environment and fresh private HOME in the restricted execution sandbox; zero fetch calls were separately counted in the handler run, not independently instrumented in the native child.",
+    "Upstream selected skill directories lack repository-level LICENSE; retain the upstream license and attribution separately before redistribution.",
+    "Full skill inventory recognition does not prove execution of every skill or Circle CLI pay interoperability."
+  ]
+}

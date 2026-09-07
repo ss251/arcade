@@ -1698,3 +1698,94 @@ explicitly after it closes. No automatic retry, key lookup or paid call occurs.
 
 [Implementation/evidence limits](superpowers/sdd/2026-09-04-H-web/task-12b3-parent-report.md)
 and [native check](superpowers/sdd/2026-09-04-H-web/task-12b3-native-check.md).
+
+## Plan J — Rails, Circle dialect and evidence
+
+September8 checkpoint: ordered root selection, registry-shaped discovery,
+explicit Unified Balance funding and the guarded escrow runtime are implemented.
+J4 Circle CLI pay and J5 delegate live proofs are paused. J6's approved escrow
+artifact exceeds EIP-170 and its treasury checkpoint is unresolved; there is
+no ARCADE escrow deployment, live source activation or Task10 proof. Do not
+promote offline tests or spec §9's target wording into live product claims.
+
+### Rails
+
+| Rail | When selectable | Price, fee and gas | Public evidence |
+| --- | --- | --- | --- |
+| Gateway | Built and declared; buyer has observed available Gateway credit. Preferred for small calls; balance observation is not a reservation. | Per-call price; direct Gateway has zero ARCADE platform fee. No buyer transaction per authorization; credit deposit/withdrawal has separate authority, costs and gas. | Accepted transfer UUID, not a mined transaction or committed batch/tree. F1 acceptance and pending batch are distinct from F12's offline session evidence. |
+| Vanilla exact / EIP-3009 | Built and declared, trusted USDC/domain/payee terms; used when selected within the buyer's allow-list. | Buyer signs without gas; facilitator pays relay gas. Eligible FeeSplitterV2 listings apply their bound fee; legacy accrual/sweep remains separate. | Matching on-chain transfer/settlement reference; eligible V2 root path commits the receipt tree. Verify the actual receipt rather than treating any hash as proof. |
+| ERC-8183 escrow | Root only, explicit listing opt-in and verified deployment/config/journals; buyer config separately permits gas. Implemented offline, currently not live-selectable here. | Quoted principal plus separately capped gas. Concrete buyer sends create, exact approval and fund; hub relays budget/submit and complete/reject. Current policy500bps platform fee, zero evaluator fee. A principal refund does not reimburse gas. | Complete can emit the hook's tree/receipt commitment and actual payout events; reject can refund principal. Public UI distinguishes reported settled/refunded/uncertain; live proof is NOT_RUN. |
+
+An unpaid actual-input root402 lists eligible choices in Gateway → exact →
+escrow order, not every hypothetical implementation. Generic discovery lacks
+input-bound escrow terms and cannot invent a signable escrow challenge. Listing
+labels are declarations, not current offers. `preferRail` is an ordered
+allow-list; preference alone never enables escrow gas spending. CLI/MCP escrow
+requires explicit rail/config plus one owned private purchase journal. Session
+and child-hire routes retain their existing supported rails; no escrow session
+or child route is implied. See [discovery](circle-discovery.md),
+[buyer/config proofs](erc8183-escrow.md#explicit-private-buyer-command-offline-integration-live-remains-paused)
+and [Gateway evidence](evidence/m6-gateway.md).
+
+### Circle dialect — inspect/pay remain a distinct live gate
+
+The documented command shapes below are for a later explicitly cleared run,
+not evidence they succeeded against ARCADE and not authorization to execute:
+
+```text
+circle services inspect LISTING_URL --output json
+circle services pay LISTING_URL -X POST --address AGENT_WALLET --chain ARC-TESTNET --max-amount 0.01 --data INPUT_JSON
+```
+
+J4 has made no services-pay call or signature. Therefore there is no exact
+sent validBefore and no observed live refusal. CLI1.0.0 source clamps Gateway
+to2592000seconds and echoes that timeout; ARCADE advertises604900. The predicted
+first root refusal is HTTP402/payment_invalid/requirements_mismatch before
+Gateway verification. Gateway separately bounds validBefore to verifier-now
+plus604900 and span to605500. Root vanilla EIP-3009 checks that now is inside
+the interval, with no maximum lifetime; that path does not require a validity
+change for this issue. Root-only is not vanilla-only: a dual-accept CLI chooses
+Gateway. All existing validity, session, cap and replay rules stay unchanged.
+Use the [source-only refusal trace](evidence/J/circle-cli-preflight.md) for exact
+historical file/line references and limits; it is not a failed live payment.
+
+The CLI's202 response is acceptance, not ARCADE job completion; private result
+polling and terminal/chain verification remain necessary. Its inspection may
+source metadata from the public registry; label any local discovery override.
+Circle-shaped discovery does not register ARCADE in Circle's marketplace.
+
+### Why our own ERC-8183 instance
+
+The Sep6 probes recorded Circle's Arc-testnet reference
+`0x0747EEf0706327138c69792bF28Cd525089e4583` as an older ABI with zero platform
+fee, no authorization variant and an owner-controlled hook whitelist ARCADE
+cannot change. It cannot supply ARCADE's treasury fee, receipt hook and
+sign-only runner/hub relay contract. The approved separate pinned proxy/hook
+design addresses those needs, but its current implementation is oversized and
+not deployed. Do not replace the identity pins with Circle's reference address.
+See the [probe/spec](superpowers/specs/2026-09-06-arc-native-settlement-design.md#1-verified-facts-this-design-is-built-on)
+and [build/deployment refusal](erc8183-escrow.md).
+
+The proxy is admin-upgradeable: pause, fee changes, hook detachment and emergency
+withdrawal remain possible. A fee transfer failure can revert completion.
+The hook commits evaluator-supplied metadata, not independent off-chain truth.
+Neither a failed HTTP response nor a timeout proves a refund. Preserve durable
+uncertain intent; never rotate/delete journals to retry a payment.
+
+### Delegate funding, plugin supply and remaining evidence
+
+The [Unified Balance guide](unified-balance-funding.md) specifies the explicit
+per-source owner grant, ready-state checks, amount/fee/gas/burn-height bounds,
+one transfer dispatch and durable journal. A grant is continuing source-spend
+authority, not a per-call cap. SDK return is not independent delivery proof;
+the J5 live prerequisite remains paused without changing its deadline.
+
+[Full pinned Circle source preview](evidence/J/circle-full-source-preview.md)
+recognized18 skills and selected two at proposed price$0.05 each, without
+creating or serving listings. No model/MCP/wallet instruction ran. Two live
+paid listings remain NOT_RUN; preserve upstream licensing before distribution.
+The [web receipt observation](evidence/J/public-escrow-browser.md) is synthetic
+read-only evidence with stopped loopback URLs, not a live escrow proof. Public
+create/fund references remain unavailable. Plan I still owns rendered architecture,
+final evidence packaging, video and submission; owner-only production/mainnet
+actions and GitHub push are not performed by this documentation.

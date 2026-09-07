@@ -30,6 +30,28 @@ Plan I is cross-cutting packaging as well as part of M9: continuity, architectur
 
 M1's free-route follow-ups are now merged through `c6f6676` in three atomic Codex-attributed commits. The full B13 local live script passed all three adapters (`succeeded / end_turn`, exit 0); the [dated execution record](superpowers/sdd/2026-09-04-B-publish-adapters/free-route-integration.md) separates that result from dummy-provider tests and the earlier paid FX call. It is not hub output-schema, payment or independently verified provider-billing proof. The frozen table and attribution counts in this document retain their original `f300b79` checkpoint rather than silently changing history. Plans F–I are not made complete by this follow-up.
 
+### Dated Plan J follow-up — September 8, 2026
+
+The original nine-move checkpoint above remains frozen; this is a later
+owner-approved extension, not a rewrite of inherited history. Plans now execute
+A–B–C–D–E–F–G–H–J–I. At c5fdb47, the following J code is on main:
+
+| Plan J addition | Implemented and evidenced | Not established |
+| --- | --- | --- |
+| Circle-shaped discovery and buyer rail selection | Shared ordered root accepts and registry-shaped metadata; bounded buyer allow-list and Gateway credit selection | Circle CLI live inspect/pay; public Circle marketplace membership |
+| Owner-delegated Unified Balance funding | Explicit source/delegate/amount, durable journal and guarded SDK/CLI; offline integration | Live grant/deposit/delivery/purchase, paused at the unchanged read/signing deadline |
+| Root ERC-8183 escrow | Pinned source/hook, guarded hub/runner pipeline, buyer SDK/CLI/MCP, exact proof and gas-inclusive budget checks | Deployment: approved implementation exceeds EIP-170; owner treasury checkpoint; Task10 live settlement/refund proof |
+| Escrow index/web | Inactive mapping templates with actual Matchstick tests; declared rail filter and qualified public terminal receipt UI with native browser checks | Live source activation/Studio redeploy, public create/fund history, browser escrow signer or independent chain verification |
+
+The [full pinned Circle checkout preview](evidence/J/circle-full-source-preview.md)
+subsequently recognized18 source skill folders and previewed the two selected
+listings without executing instructions or spending. This extends the earlier
+excerpt evidence, not proof of two live paid listings. The [rail runbook](runbook.md#plan-j--rails-circle-dialect-and-evidence)
+keeps amounts, fees, custody and evidence categories distinct. No Plan J live
+payment approval was replayed, no validity/cap/replay rule was widened, and no
+mainnet operation or GitHub push is claimed by this follow-up. Plan I packaging,
+owner acceptance/capture and submission remain separate.
+
 ## Evidence and limits
 
 The [runbook](runbook.md) records the actual hashes, amounts, refusal observations, cleanup and deviations: [lineage](runbook.md#plan-a--evidence-lineage), [adapter evidence](runbook.md#plan-b--evidence-publish-adapters), [pay-tests](runbook.md#plan-c--evidence-automatic-delisting-and-recovery), [ERC-8004](runbook.md#plan-d--erc-8004-identity-and-settlement-evidence) and [ENS](runbook.md#ens-namespaces-sepolia). Use those measured amounts rather than the plan's earlier demo estimates.
