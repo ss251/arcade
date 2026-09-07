@@ -1,5 +1,17 @@
 # Plan J progress
 
+2026-09-07 22:23 IST — J9C2A sole42275 fullgatePASS5,258Vitest240/75.44s;
+1,324Bun90/11,584assert194.08s;root/webstrict/clientSSR. Focused61Bun4/
+1386assert6.19s;8-rootstrict0.14paths144links/privacy0;8frozen code/test
+pins checked before atomiccommit/exact-one mainFF. MCP J9C2B next; no live,
+ownerkeys, realRPC, spending, existing validity/cap/replay changes or push.
+
+2026-09-07 22:15 IST — J9C2A private owner config/strict CLI implemented.
+Actual CLI→SDK→ports/loopback/SQLite synthetic purchase and journal-qualified
+JSON evidence pass, with cancellation before close and used-file keyless refusal.
+61focusedBun4/1383assertPASS5.88s; final strict/freeze/sole gate next. MCP
+gas-inclusive accounting remains J9C2B. No live/ownerkey/realRPC/spending/push.
+
 2026-09-07 22:01 IST — J9C1 sole81562 fullgatePASS5,258Vitest240/73.86s;
 1,292Bun88/11,128assert194.14s;root/webstrict/clientSSR. Focused107Vitest4
 PASS1.12s;36Bun4/1216assert10.23s;9-rootstrict0.15paths141links/privacy0;

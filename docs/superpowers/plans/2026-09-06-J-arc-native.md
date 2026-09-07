@@ -284,6 +284,12 @@ Its local funding/queued evidence contains all four transaction proofs and
 cannot be forged by remote result fields. No live deployment was activated;
 private CLI/MCP configuration and gas-inclusive accounting remain J9C2.
 
+[J9C2A](../sdd/2026-09-06-J-arc-native/task-9c2a-report.md) adds read-only
+owner config, empty-file-before-key checks, strict opt-in CLI and joined signal
+cleanup. CLI JSON evidence is independently reconstructed from the private
+journal, not trusted from remote fields; principal and configured gas ceilings
+are separate and explicit. Actual MCP gas-inclusive accounting remains J9C2B.
+
 - [x] `fetch-with-payment.ts` opt-in `erc8183` branch uses the durable create/budget/approve/fund/root driver, closed input+capability envelopes and exact local principal/gas limits. Independently verify all four transaction proofs, save the private202 before returning and expose local funding/queued evidence. Backoff is read-only, never a repeated write.
 - [ ] MCP and CLI expose `rail: "erc8183"`; hire-by-name unchanged (payTo lock still applies).
 - [x] Actual SDK/Arc-port/owned-loopback/private-SQLite composition against synthetic RPC; pre-gas ENS/current-listing refusals and full local-versus-health identity mismatch. Armed `/healthz` exposes full public pins, not just evaluator.

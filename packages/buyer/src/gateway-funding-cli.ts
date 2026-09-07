@@ -92,6 +92,7 @@ const HELP = "Explicit funding commands (Arc testnet only):\n" +
   "gateway-reconcile|gateway-finalize --address ADDRESS --journal /ABS/PRIVATE/FILE.jsonl\n" +
   "Journal parent must already be an owned mode-0700 canonical real directory; it does not select the account-claim root.\n" +
   "session --help\n" +
+  "arcade-buy --rail erc8183 --help (explicit private-journal escrow purchase; principal plus configured gas)\n" +
   "fund --help (owner Unified Balance delegation; separate funding flow)\n" +
   "No key flags, implicit funding, withdraw-all or automatic retry. Withdrawal requires matching deployed Wallet and Minter identity; current Minter mismatches the reviewed build.\n"
 

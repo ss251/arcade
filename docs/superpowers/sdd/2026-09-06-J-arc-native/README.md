@@ -61,6 +61,7 @@ evidence remain separate open work; this index does not mark them accepted.
   [Driver brief](task-9b3-brief.md), [bounded coordinator and HTTP checkpoint](task-9b3-report.md).
   [Concrete port brief](task-9b4-brief.md), [Arc ports and owned-loopback composition](task-9b4-report.md).
   [SDK/command brief](task-9c-brief.md), [actual SDK and armed health](task-9c1-report.md).
+  [Private command brief](task-9c2-brief.md), [owner config and strict CLI](task-9c2a-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

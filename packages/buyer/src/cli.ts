@@ -92,8 +92,9 @@ if (Exit.isFailure(exit)) {
 return 0
 }
 
+const escrowRequested = (args: readonly string[]) => args.some(a => a.startsWith("--rail") || a.startsWith("--name"))
 /** Reserved strict commands cannot fall through to the permissive legacy parser. */
-export const buyerMain = async (raw: readonly string[], env: Readonly<Record<string, string | undefined>>): Promise<number> => {
+export const buyerMain = async (raw: readonly string[], env: Readonly<Record<string, string | undefined>>, signal?: AbortSignal): Promise<number> => {
   const { fundingMain, captureCliArgv } = await import("./gateway-funding-cli.ts")
   let args: readonly string[]
   try { args = captureCliArgv(raw) } catch { return fundingMain([], { env, role: "buyer" }) }
@@ -104,11 +105,19 @@ export const buyerMain = async (raw: readonly string[], env: Readonly<Record<str
   if (args[0] === "session" || args[0] === "--help" || args[0]?.startsWith("gateway-")) {
     return fundingMain(args, { env, role: "buyer" })
   }
+  if (escrowRequested(args)) {
+    const { escrowBuyerMain } = await import("./erc8183-cli.ts")
+    return escrowBuyerMain(args, { env, ...(signal === undefined ? {} : { signal }) })
+  }
   return legacyBuyerMain(args, env)
 }
 
 if (import.meta.main) {
-  if (process.argv[2] === "fund" || process.argv[2] === "session" || process.argv[2] === "--help" || process.argv[2]?.startsWith("gateway-")) {
+  const args = process.argv.slice(2)
+  if (!["fund", "session", "--help"].includes(args[0] ?? "") && !args[0]?.startsWith("gateway-") && escrowRequested(args)) {
+    const { runOwnedEscrowBuyerCli } = await import("./erc8183-cli.ts")
+    await runOwnedEscrowBuyerCli(signal => buyerMain(args, process.env, signal))
+  } else if (process.argv[2] === "fund" || process.argv[2] === "session" || process.argv[2] === "--help" || process.argv[2]?.startsWith("gateway-")) {
     const { runOwnedFundingCli } = await import("./gateway-funding-cli.ts")
     await runOwnedFundingCli(() => buyerMain(process.argv.slice(2), process.env))
   } else process.exitCode = await buyerMain(process.argv.slice(2), process.env)

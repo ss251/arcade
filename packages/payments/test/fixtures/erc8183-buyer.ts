@@ -10,7 +10,9 @@ import { assertEscrowBuyerSigned } from "../../src/erc8183-buyer-evidence.ts"
 import { buildEscrowRequirements } from "../../src/erc8183-wire.ts"
 export const addr = (n: number) => ("0x" + n.toString(16).padStart(40, "0")) as Hex
 export const hash = (n: number) => ("0x" + n.toString(16).padStart(64, "0")) as Hex
-export const buyer = privateKeyToAccount(generatePrivateKey()), provider = privateKeyToAccount(generatePrivateKey()),
+/** Ephemeral fixture material only, generated in memory; never an owner credential. */
+export const ephemeralBuyerKey = generatePrivateKey()
+export const buyer = privateKeyToAccount(ephemeralBuyerKey), provider = privateKeyToAccount(generatePrivateKey()),
   evaluator = privateKeyToAccount(generatePrivateKey())
 export async function buyerFixture(kind: "create" | "approve" | "fund" | "budget" = "create", options: { origin?: string } = {}) {
   const identity = { chainId: 5042002, escrow: addr(10), implementation: addr(11), hook: addr(12),

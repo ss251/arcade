@@ -1,21 +1,22 @@
 import { describe, expect, spyOn, test } from "bun:test"
 import { Effect } from "effect"
-import { chmodSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
+import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { decodeFunctionData, encodeFunctionResult, erc20Abi, hashDomain, keccak256, parseTransaction, toHex, type Hex } from "viem"
 import { formatPrice, loadChainConfig } from "@arcade/core"
 import { callSkill } from "../../buyer/src/index.ts"
+import { escrowBuyerMain } from "../../buyer/src/erc8183-cli.ts"
 import { createEscrowBuyerChain } from "../src/erc8183-buyer-chain.ts"
 import { createEscrowBuyerDriver } from "../src/erc8183-buyer-driver.ts"
 import { openEscrowBuyerJournal } from "../src/erc8183-buyer-journal.ts"
 import { ERC8183_ABI, ARCADE_JOB_HOOK_ABI } from "../src/erc8183-abi.ts"
 import { ESCROW_RPC_URL } from "../src/erc8183-rpc.ts"
-import { buyerFixture, buyer, hash } from "./fixtures/erc8183-buyer.ts"
+import { buyerFixture, buyer, hash, ephemeralBuyerKey } from "./fixtures/erc8183-buyer.ts"
 type Kind = "create" | "budget" | "approve" | "fund"
 const kinds = ["create", "budget", "approve", "fund"] as const
 const abi = [...ERC8183_ABI, ...ARCADE_JOB_HOOK_ABI, ...erc20Abi] as const
-async function scenario(badBudget: boolean, sdk = false) {
+async function scenario(badBudget: boolean, sdk: boolean | "cli" = false) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "arcade-buyer-runtime-test-"))); chmodSync(dir, 0o700)
   const owned = openEscrowBuyerJournal(join(dir, "purchase.sqlite")), controller = new AbortController(),
     jobId = "job_" + "a".repeat(32), token = "b".repeat(32), httpCalls: string[] = [], sends: string[] = []
@@ -123,6 +124,24 @@ async function scenario(badBudget: boolean, sdk = false) {
         if (!(array instanceof Uint8Array)) throw Error("unexpected fixture RNG")
         array.fill(0); array[array.length - 1] = 77; return array
       })
+      if (sdk === "cli") {
+        const lines: string[] = [], configPath = join(dir, "buyer.json")
+        writeFileSync(configPath, JSON.stringify({ identity: id, buyer: buyer.address, gasBudgetWei: "6000000", expiresInSeconds: 1800, operationTimeoutMs: 15000 }), { mode: 0o600 })
+        const env = new Proxy({ ARCADE_BUYER_ESCROW_CONFIG: configPath, ARCADE_BUYER_ESCROW_JOURNAL: join(dir, "purchase.sqlite"), ARCADE_BUYER_KEY: ephemeralBuyerKey },
+          { get(t, p) { if (p === "ARCADE_BUYER_KEY") acquisitions++; return t[p as keyof typeof t] } })
+        const code = await escrowBuyerMain(["skill", "--rail", "erc8183", "--hub", server.url.origin, "--seller", f.intent.call.provider,
+          "--input", '{"fixture":true}', "--max-amount", "0.30"], { env, rpcFetch, nowSeconds,
+          fetch: (async (url, init) => { expect(new URL(String(url)).origin).toBe(server.url.origin); return globalThis.fetch(url, init) }) as typeof globalThis.fetch,
+          write: async line => { lines.push(line) } })
+        expect(code).toBe(0); expect(lines).toHaveLength(1)
+        const out = JSON.parse(lines[0]!)
+        expect(out).toMatchObject({ jobId, maximumExposureAtomic: "300001", evidence: { fundedAtomic: "300000", buyerGasWei: "600000",
+          buyerGasAtomic: "1", settlementVerified: false, refundVerified: false } })
+        expect(lines[0]).not.toContain(ephemeralBuyerKey); expect(lines[0]).not.toContain(token); expect(lines[0]).not.toContain(configPath)
+        const state = await owned.journal.inspect(); if (!("proofs" in state)) throw Error("fixture journal empty")
+        return { response: Response.json({ jobId, authorizedRail: "erc8183" }), evidence: { rail: "erc8183" as const, state: "funded_and_queued" as const,
+          intentId: state.intentId, jobId: state.proofs[0]!.jobId, fundedAtomic: state.proofs[3]!.fundedAtomic, buyerGasWei: state.spentGasWei, proofs: state.proofs } }
+      }
       const out = await Effect.runPromise(callSkill({ hubUrl: server.url.origin, seller: f.intent.call.provider, skillId: "skill", input: { fixture: true },
         account: { ...buyer, signTransaction: async (t: Parameters<typeof buyer.signTransaction>[0]) => { acquisitions++; return buyer.signTransaction(t) } }, maxAmountAtomic: 300000n, preferRail: ["erc8183"],
         escrow: { identity: id, gasBudgetWei: 6000000n, expiresInSeconds: 1800, operationTimeoutMs: 15000, journal: owned.journal, rpcFetch, nowSeconds },
@@ -139,7 +158,7 @@ async function scenario(badBudget: boolean, sdk = false) {
       const result = await execute()
       expect(result.evidence).toMatchObject({ state: "funded_and_queued", fundedAtomic: 300000n, buyerGasWei: 600000n })
       expect(result.evidence.proofs.map(p => p.kind)).toEqual([...kinds])
-      expect(sends).toEqual(["create", "approve", "fund"]); expect(acquisitions).toBe(3)
+      expect(sends).toEqual(["create", "approve", "fund"]); expect(acquisitions).toBe(sdk === "cli" ? 1 : 3)
       expect(httpCalls).toEqual(sdk ? ["listing", "probe", "health", "budget", "root", "poll"] : ["health", "budget", "root"]); expect(requests).toBeGreaterThan(150)
       expect((await owned.journal.readAccepted())?.token).toBe(token)
       expect(await result.response.json()).toMatchObject(sdk ? { jobId, authorizedRail: "erc8183" } : { job_id: jobId, job_token: token })
@@ -150,4 +169,5 @@ describe("buyer driver + real Arc ports + owned loopback + private SQLite (synth
   test("records one create/budget/approve/fund/root sequence and privately retains the actual202", () => scenario(false))
   test("an invalid actual HTTP budget response stops before buyer approval", () => scenario(true))
   test("actual SDK independently captures listing, probes, buys and polls without trusting remote funding fields", () => scenario(false, true))
+  test("actual strict CLI uses private owner configuration and exports journal-qualified JSON-safe funding proof", () => scenario(false, "cli"))
 })

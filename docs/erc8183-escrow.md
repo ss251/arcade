@@ -257,4 +257,32 @@ transactions, input and bearer capabilities; never publish that file. Keep the
 journal open until the Effect finishes (including interruption cleanup). A used
 file cannot automatically make another purchase. Reconcile uncertainty before
 any owner-directed retry. CLI/MCP private configuration and gas-inclusive
-accounting remain J9C2; the live deployment is blocked.
+accounting are described below; the live deployment is blocked.
+
+## Explicit private buyer command (offline integration; live remains paused)
+
+[J9C2A](superpowers/sdd/2026-09-06-J-arc-native/task-9c2a-report.md) adds strict
+CLI dispatch. Help is keyless: `arcade-buy --rail erc8183 --help`. Once deployment
+and the particular live proof are cleared, the owner supplies an existing
+mode0700 directory, mode0600 config and a fresh per-purchase `.sqlite` path via
+`ARCADE_BUYER_ESCROW_CONFIG` and `ARCADE_BUYER_ESCROW_JOURNAL`. Config has exactly
+`identity` (all ten local public pins), `buyer` (expected address),
+`gasBudgetWei` (positive decimal string), `expiresInSeconds` and
+`operationTimeoutMs` (1..300000). No automatic path creation or key discovery.
+Only `ARCADE_BUYER_KEY` inside the consuming process selects the signing key;
+its address must match `buyer`. Never put keys in argv or this config.
+
+```text
+arcade-buy SKILL --rail erc8183 --hub ORIGIN --seller ADDRESS --input JSON --max-amount USDC
+arcade-buy --name NAME --rail erc8183 --input JSON --max-amount USDC [--hub EXPECTED_ORIGIN]
+```
+
+`--max-amount` caps principal; the separately configured native gas budget is
+additional exposure. JSON output reports both and their combined conservative
+USDC-micro-unit ceiling (native gas rounds upward). It includes only funding
+evidence revalidated from the owned journal, plus explicitly hub-reported status
+and fenced seller data. `settlementVerified` and `refundVerified` remain false.
+No terminal claim or refund is inferred from hub prose. Signals join SDK cleanup
+before close; the owning process retains a330second hard fuse. A used file refuses
+before a key read. Never rename/remove/rotate it merely to retry uncertainty.
+Private MCP opt-in and gas-inclusive session accounting remain J9C2B.
