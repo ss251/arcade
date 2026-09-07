@@ -1,5 +1,17 @@
 # SDD ledger — Plan G
 
+2026-09-08 04:45 IST — G15C sole13090 gate PASS:5327Vitest242/69.34s;
+1457Bun98/12181assert197.59s;root/webstrict/clientSSR352/162ms. Six paths,
+three links/privacy0; two scripts and brief pins fixed after result annotations.
+Atomic commit/mainFF next; all balance observations synthetic. No actual RPC,
+key, budget/spend, payment policy change, duplicate full gate or push.
+
+2026-09-08 04:39 IST — G15C bounded four-read balance observer implemented,
+explicit transport/no ambient network. Missing-export and final unchecked-clock
+Reds recorded;35Bun219assert327ms and2rootsstrict0 passed. Empty-chunk and
+late-response cancellation bounded. Sole full gate next; actual RPC/balance/
+signing/operational state NOT_RUN. Existing payment policy/format unchanged.
+
 2026-09-08 04:31 IST — G15B sole46408 gate PASS:5327Vitest242/70.35s;
 1448Bun98/12111assert197.13s;root/webstrict/clientSSR346/171ms. Six paths,
 three links/privacy0; two scripts and brief pins fixed after result annotations.

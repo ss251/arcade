@@ -88,6 +88,127 @@ export function checkGraphBalance(balanceAtomic: string) {
   return Object.freeze({ balanceAtomic, minimumBeforeAtomic: minimum.toString(), floorAtomic: floor.toString() })
 }
 
+export const GRAPH_COGS_RPC = "https://mainnet.base.org"
+export type GraphBalanceTransport = (url: string, init: RequestInit) => Promise<Response>
+export interface GraphBalanceObservation {
+  readonly chain: "eip155:8453"
+  readonly payer: string
+  readonly token: string
+  readonly balanceAtomic: string
+  readonly blockNumber: string
+  readonly blockHash: string
+  readonly blockTimestamp: number
+  readonly observedAt: number
+  readonly responseHashes: readonly string[]
+}
+/** Four bounded reads from one RPC, never a payment or independent consensus
+ * proof. No default transport: CLI/import cannot accidentally access mainnet. */
+export async function readGraphBalance(transport: GraphBalanceTransport, options: {
+  readonly signal?: AbortSignal
+  readonly now?: () => number
+  readonly timeoutMs?: number
+} = {}): Promise<GraphBalanceObservation> {
+  const controller = new AbortController(), abort = () => controller.abort()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    insist(typeof transport === "function")
+    const now = options.now ?? Date.now, timeout = options.timeoutMs ?? 5000
+    insist(typeof now === "function" && Number.isSafeInteger(timeout) && timeout >= 1 && timeout <= 5000)
+    const started = now(), deadline = started + timeout
+    insist(Number.isSafeInteger(started) && started > 0 && Number.isSafeInteger(deadline))
+    const active = () => {
+      const current = now()
+      insist(!controller.signal.aborted && !options.signal?.aborted && Number.isSafeInteger(current) &&
+        current >= started && current < deadline)
+      return current
+    }
+    active()
+    options.signal?.addEventListener("abort", abort, { once: true })
+    timer = setTimeout(abort, timeout)
+    const until = async <T>(pending: Promise<T>): Promise<T> => {
+      void pending.catch(() => {}) // An abort can predate installing the race.
+      active()
+      let cancel: (() => void) | undefined
+      try {
+        const stopped = new Promise<never>((_, reject) => {
+          cancel = () => reject(new Error("aborted")); controller.signal.addEventListener("abort", cancel, { once: true })
+        })
+        const result = await Promise.race([pending, stopped]); active(); return result
+      } finally { if (cancel) controller.signal.removeEventListener("abort", cancel) }
+    }
+    const responseHashes: string[] = []
+    let sequence = 0
+    const rpc = async (method: string, params: unknown[]): Promise<unknown> => {
+      active(); insist(++sequence <= 4)
+      const id = sequence
+      const pending = Promise.resolve().then(() => {
+        active()
+        return transport(GRAPH_COGS_RPC, { method: "POST", body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+          headers: { "content-type": "application/json", "accept-encoding": "identity" },
+          redirect: "error", credentials: "omit", signal: controller.signal })
+      })
+      // A noncooperative test/provider may resolve after the caller's deadline.
+      // Cancel its body; never follow it with another request.
+      void pending.then(response => {
+        if (controller.signal.aborted) void response.body?.cancel().catch(() => {})
+      }, () => {}).catch(() => {})
+      let response: Response | undefined, reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+      try {
+        response = await until(pending)
+        insist(response.status === 200 && !response.redirected && (!response.url || response.url === GRAPH_COGS_RPC))
+        insist(response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() === "application/json")
+        const encoding = response.headers.get("content-encoding"), length = response.headers.get("content-length")
+        insist(encoding === null || encoding.toLowerCase() === "identity")
+        insist(length === null || /^(0|[1-9][0-9]{0,5})$/.test(length) && Number(length) <= 131072)
+        reader = response.body?.getReader(); insist(reader)
+        const parts: Uint8Array[] = []; let size = 0, chunks = 0
+        for (;;) {
+          const next = await until(reader.read())
+          if (next.done) break
+          insist(++chunks <= 256)
+          size += next.value.byteLength; insist(size <= 131072)
+          parts.push(next.value)
+        }
+        insist(length === null || size === Number(length))
+        const bytes = Buffer.concat(parts), text = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+        // Prevent silent BOM stripping from changing the hashed observation.
+        insist(Buffer.from(text).equals(bytes))
+        const envelope: unknown = JSON.parse(text)
+        insist(envelope !== null && typeof envelope === "object" && !Array.isArray(envelope))
+        const row = envelope as Record<string, unknown>, names = Object.keys(row)
+        insist(names.length === 3 && names.every(name => ["jsonrpc", "id", "result"].includes(name)) &&
+          row.jsonrpc === "2.0" && row.id === id && Object.hasOwn(row, "result"))
+        responseHashes.push(hash(text)); return row.result
+      } finally {
+        if (reader) void reader.cancel().catch(() => {})
+        else void response?.body?.cancel().catch(() => {})
+      }
+    }
+    const captureBlock = (value: unknown) => {
+      insist(value !== null && typeof value === "object" && !Array.isArray(value))
+      const block = value as Record<string, unknown>, quantity = /^0x(?:0|[1-9a-f][0-9a-f]{0,63})$/
+      insist(typeof block.number === "string" && quantity.test(block.number) && BigInt(block.number) > 0n &&
+        typeof block.hash === "string" && /^0x[0-9a-f]{64}$/.test(block.hash) && !/^0x0{64}$/.test(block.hash) &&
+        typeof block.timestamp === "string" && quantity.test(block.timestamp) && BigInt(block.timestamp) <= BigInt(Number.MAX_SAFE_INTEGER))
+      const timestamp = Number(BigInt(block.timestamp))
+      insist(Math.abs(Math.floor(now() / 1000) - timestamp) <= 30)
+      return { number: block.number, hash: block.hash, timestamp }
+    }
+    insist(await rpc("eth_chainId", []) === "0x2105")
+    const block = captureBlock(await rpc("eth_getBlockByNumber", ["latest", false]))
+    const data = "0x70a08231" + GRAPH_COGS_POLICY.payer.slice(2).padStart(64, "0")
+    const rawBalance = await rpc("eth_call", [{ to: GRAPH_COGS_POLICY.token, data }, block.number])
+    insist(typeof rawBalance === "string" && /^0x[0-9a-fA-F]{64}$/.test(rawBalance))
+    const repeated = captureBlock(await rpc("eth_getBlockByNumber", [block.number, false]))
+    insist(repeated.number === block.number && repeated.hash === block.hash && repeated.timestamp === block.timestamp)
+    const finishedAt = active()
+    return Object.freeze({ chain: GRAPH_COGS_POLICY.chain, payer: GRAPH_COGS_POLICY.payer, token: GRAPH_COGS_POLICY.token,
+      balanceAtomic: BigInt(rawBalance).toString(), blockNumber: BigInt(block.number).toString(), blockHash: block.hash,
+      blockTimestamp: block.timestamp, observedAt: finishedAt, responseHashes: Object.freeze(responseHashes) })
+  } catch { throw new Error("graph_cogs_balance_unavailable") }
+  finally { controller.abort(); if (timer !== undefined) clearTimeout(timer); options.signal?.removeEventListener("abort", abort) }
+}
+
 /** Explicit read-only inspection path, NOT the eventual fixed live authority
  * namespace. No creation, chmod, recovery, cache refresh or missing-state reset. */
 function readPrivateBudgetText(path: string): string {

@@ -4,7 +4,7 @@ import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSyn
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
-import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, type GraphReservationWriter } from "./e2e-graph-cogs.ts"
+import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, type GraphReservationWriter, type GraphBalanceTransport } from "./e2e-graph-cogs.ts"
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 const header = () => JSON.stringify({ format: "arcade-graph-reservations-v1", policyHash: GRAPH_COGS_POLICY_HASH })
@@ -257,3 +257,119 @@ test("writer initialization refuses a public or aliased parent before creating s
   expect(() => initializeGraphReservationState(alias)).toThrow("graph_cogs_writer_refused")
   expect(readdirSync(sub)).toEqual([])
 }))
+
+const observedAt = 1_800_000_000_000
+const block = () => ({ number: "0x123", hash: "0x" + "a".repeat(64), timestamp: "0x" + Math.floor(observedAt / 1000).toString(16) })
+type RpcCall = { url: string; init: RequestInit; id: number; method: string; params: unknown[] }
+function balanceTransport(change?: (call: RpcCall, value: unknown) => Response | undefined) {
+  const calls: RpcCall[] = []
+  const fetch: GraphBalanceTransport = async (url, init) => {
+    const body = JSON.parse(String(init.body)) as { id: number; method: string; params: unknown[] }
+    const call = { url, init, ...body }; calls.push(call)
+    const value: unknown = body.method === "eth_chainId" ? "0x2105" :
+      body.method === "eth_call" ? "0x" + (1000000n).toString(16).padStart(64, "0") : block()
+    return change?.(call, value) ?? new Response(JSON.stringify({ result: value, id: body.id, jsonrpc: "2.0" }), { headers: { "content-type": "application/json" } })
+  }
+  return { fetch, calls }
+}
+test("balance observation pins all four readonly requests to one payer/token/block", async () => {
+  const transport = balanceTransport()
+  const result = await readGraphBalance(transport.fetch, { now: () => observedAt })
+  expect(transport.calls.map(call => call.method)).toEqual(["eth_chainId", "eth_getBlockByNumber", "eth_call", "eth_getBlockByNumber"])
+  expect(transport.calls.map(call => call.id)).toEqual([1, 2, 3, 4])
+  for (const call of transport.calls) {
+    expect(call.url).toBe(GRAPH_COGS_RPC); expect(call.init.method).toBe("POST")
+    expect(call.init.redirect).toBe("error"); expect(call.init.credentials).toBe("omit")
+  }
+  expect(transport.calls[2]!.params).toEqual([{ to: GRAPH_COGS_POLICY.token, data: "0x70a08231" + GRAPH_COGS_POLICY.payer.slice(2).padStart(64, "0") }, "0x123"])
+  expect(transport.calls[3]!.params).toEqual(["0x123", false])
+  expect(result).toMatchObject({ chain: "eip155:8453", payer: GRAPH_COGS_POLICY.payer, token: GRAPH_COGS_POLICY.token,
+    balanceAtomic: "1000000", blockNumber: "291", blockHash: block().hash, blockTimestamp: observedAt / 1000, observedAt })
+  expect(result.responseHashes).toHaveLength(4); expect(Object.isFrozen(result)).toBe(true); expect(Object.isFrozen(result.responseHashes)).toBe(true)
+})
+test("valid low balances are retained as observations, not silently admitted", async () => {
+  const t = balanceTransport((call, value) => call.method === "eth_call" ?
+    new Response(JSON.stringify({ jsonrpc: "2.0", id: call.id, result: "0x" + (899999n).toString(16).padStart(64, "0") }), { headers: { "content-type": "application/json" } }) : undefined)
+  const observed = await readGraphBalance(t.fetch, { now: () => observedAt })
+  expect(observed.balanceAtomic).toBe("899999")
+  expect(() => checkGraphBalance(observed.balanceAtomic)).toThrow("graph_cogs_balance_refused")
+})
+test("wrong chain or envelope ID refuses before any balance request", async () => {
+  for (const body of [{ jsonrpc: "2.0", id: 1, result: "0x1" }, { jsonrpc: "2.0", id: 2, result: "0x2105" },
+    { jsonrpc: "2.0", id: 1, result: "0x2105", error: null }]) {
+    const t = balanceTransport(() => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } }))
+    await expect(readGraphBalance(t.fetch, { now: () => observedAt })).rejects.toThrow("graph_cogs_balance_unavailable")
+    expect(t.calls).toHaveLength(1)
+  }
+})
+test("short quantities, malformed data and changed or stale blocks refuse without retries", async () => {
+  for (const invalid of ["0x1", "0x" + "0".repeat(63), "0x" + "g".repeat(64), 1000000]) {
+    const t = balanceTransport(call => call.method === "eth_call" ?
+      new Response(JSON.stringify({ jsonrpc: "2.0", id: call.id, result: invalid }), { headers: { "content-type": "application/json" } }) : undefined)
+    await expect(readGraphBalance(t.fetch, { now: () => observedAt })).rejects.toThrow("graph_cogs_balance_unavailable")
+    expect(t.calls).toHaveLength(3)
+  }
+  for (const altered of [{ ...block(), hash: "0x" + "b".repeat(64) }, { ...block(), number: "0x124" }]) {
+    const t = balanceTransport(call => call.id === 4 ?
+      new Response(JSON.stringify({ jsonrpc: "2.0", id: call.id, result: altered }), { headers: { "content-type": "application/json" } }) : undefined)
+    await expect(readGraphBalance(t.fetch, { now: () => observedAt })).rejects.toThrow("graph_cogs_balance_unavailable")
+    expect(t.calls).toHaveLength(4)
+  }
+  const stale = balanceTransport(call => call.id === 2 ?
+    new Response(JSON.stringify({ jsonrpc: "2.0", id: 2, result: { ...block(), timestamp: "0x1" } }), { headers: { "content-type": "application/json" } }) : undefined)
+  await expect(readGraphBalance(stale.fetch, { now: () => observedAt })).rejects.toThrow("graph_cogs_balance_unavailable")
+  expect(stale.calls).toHaveLength(2)
+})
+test("HTTP status, content encoding, URL and length do not bypass balance validation", async () => {
+  const good = JSON.stringify({ jsonrpc: "2.0", id: 1, result: "0x2105" })
+  const options: Response[] = [
+    new Response(good, { status: 500, headers: { "content-type": "application/json" } }),
+    new Response(good, { headers: { "content-type": "application/json", "content-encoding": "gzip" } }),
+    new Response(good, { headers: { "content-type": "text/html" } }),
+    new Response(good, { headers: { "content-type": "application/json", "content-length": "99999" } }),
+    new Response("x".repeat(131073), { headers: { "content-type": "application/json" } }),
+  ]
+  const mismatched = new Response(good, { headers: { "content-type": "application/json" } })
+  Object.defineProperty(mismatched, "url", { value: "https://unexpected.invalid/" }); options.push(mismatched)
+  for (const response of options) {
+    let calls = 0
+    await expect(readGraphBalance(async () => { calls++; return response }, { now: () => observedAt })).rejects.toThrow("graph_cogs_balance_unavailable")
+    expect(calls).toBe(1)
+  }
+})
+test("pre-abort makes zero requests and abort during a response prevents the next request", async () => {
+  const controller = new AbortController(); controller.abort()
+  const t = balanceTransport()
+  await expect(readGraphBalance(t.fetch, { signal: controller.signal, now: () => observedAt })).rejects.toThrow("graph_cogs_balance_unavailable")
+  expect(t.calls).toHaveLength(0)
+  const during = new AbortController()
+  const slow = balanceTransport(() => { during.abort(); return undefined })
+  await expect(readGraphBalance(slow.fetch, { signal: during.signal, now: () => observedAt })).rejects.toThrow("graph_cogs_balance_unavailable")
+  expect(slow.calls).toHaveLength(1)
+})
+test("a deadline cancels a late response body and never issues a second request", async () => {
+  let release: ((response: Response) => void) | undefined, calls = 0, cancelled = false
+  const transport: GraphBalanceTransport = () => { calls++; return new Promise(resolve => { release = resolve }) }
+  await expect(readGraphBalance(transport, { timeoutMs: 20 })).rejects.toThrow("graph_cogs_balance_unavailable")
+  expect(calls).toBe(1)
+  const response = new Response(new ReadableStream({ cancel() { cancelled = true } }), { headers: { "content-type": "application/json" } })
+  release!(response)
+  await new Promise(resolve => setTimeout(resolve, 10))
+  expect(cancelled).toBe(true); expect(calls).toBe(1)
+})
+test("the final observation timestamp must still satisfy the acquisition deadline", async () => {
+  let clockReads = 0
+  await readGraphBalance(balanceTransport().fetch, { now: () => { clockReads++; return observedAt } })
+  let secondReads = 0
+  await expect(readGraphBalance(balanceTransport().fetch, { now: () => {
+    secondReads++; return secondReads === clockReads ? observedAt + 6000 : observedAt
+  } })).rejects.toThrow("graph_cogs_balance_unavailable")
+})
+test("bounded empty response chunks cannot starve the deadline or trigger another request", async () => {
+  let calls = 0, cancelled = false
+  const body = new ReadableStream<Uint8Array>({ pull(controller) { controller.enqueue(new Uint8Array(0)) }, cancel() { cancelled = true } })
+  await expect(readGraphBalance(async () => {
+    calls++; return new Response(body, { headers: { "content-type": "application/json" } })
+  }, { now: () => observedAt })).rejects.toThrow("graph_cogs_balance_unavailable")
+  expect(calls).toBe(1); expect(cancelled).toBe(true)
+})

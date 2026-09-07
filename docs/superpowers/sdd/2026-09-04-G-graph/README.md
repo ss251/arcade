@@ -1,5 +1,15 @@
 # Plan G — execution records
 
+## September 8 — G15 offline balance-reader checkpoint
+
+The [balance brief](task-15-balance-brief.md) and
+[balance report](task-15-balance-report.md) add four bounded, pinned read-only
+RPC observations using an explicit transport.35 focused tests/219 assertions
+and exact strict passed, entirely against injected responses; no actual RPC
+or payer balance is claimed. Sole full gate passed5327Vitest/1457Bun,
+root/webstrict and client/SSR builds. Operational binding, response journal/
+cache/reconciliation and live authority remain pending; local commit follows.
+
 ## September 8 — G15 offline durability checkpoint
 
 The [writer brief](task-15-writer-brief.md) and
