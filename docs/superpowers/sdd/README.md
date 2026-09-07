@@ -1,5 +1,23 @@
 # Spec-driven development records
 
+## Dated execution update — September8,2026
+
+[Plan I records](2026-09-04-I-packaging/README.md) now cover inherited CLI
+prerequisites, the Git-derived continuity generator and README packaging.
+The [README](../../../README.md#ethonline-2026) distinguishes current code
+checkpoints from live proof; the original publication table below remains
+historical, not the latest completion status.
+
+[F](2026-09-04-F-gateway-sessions/README.md) includes session code and offline
+twenty-call evidence, not F12 live. [G](2026-09-04-G-graph/README.md) includes
+deployment/indexing and hub/skill code, not paid G15 evidence.
+[H](2026-09-04-H-web/README.md) includes marketplace/dashboard/wizard and
+browser checks; durable session recovery and owner acceptance remain open.
+[J](2026-09-06-J-arc-native/README.md) includes the offline funding/escrow
+runtime and public index/web projections; paused live steps stay paused.
+
+## Original publication and later links
+
 September 6 follow-up: [vendor-neutrality briefs and evidence](2026-09-06-vendor-neutrality/README.md)
 track the separately approved format-wording, openai-api and plugin-ingestion work.
 This link does not mark those later tasks complete.

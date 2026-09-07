@@ -23,6 +23,162 @@ a full specification validator. [Format and execution details](docs/seller-guide
 
 <sub>Editable source: [`docs/architecture.excalidraw`](docs/architecture.excalidraw) — open it at [excalidraw.com](https://excalidraw.com). Regenerate with `python3 scripts/diagram.py`.</sub>
 
+## ETHOnline 2026
+
+### Continuity declaration
+
+ARCADE entered the Continuity track with an existing Arc application. The prior
+Encode × Circle Programmable Money build ran July25–August7,2026; the
+September4 planning commit is the execution baseline, not the start of ARCADE.
+The generated snapshot below is reproducible with
+`bun --no-env-file scripts/continuity.ts --check`.
+[Generator semantics](docs/continuity-generator.md) and
+[dated evidence/attribution](docs/CONTINUITY.md) explain the boundaries.
+
+<!-- continuity:start -->
+<!-- continuity:revision be98d15579f8e79ca0b64c0c1bd0232b83ffdc53 -->
+
+**Snapshot:** [`be98d15`](https://github.com/ss251/arcade/commit/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53). Later commits are not included; this is history, not a completion or live-deployment claim.
+
+**Pre-existing:** 112 reachable commits through [`57183db`](https://github.com/ss251/arcade/commit/57183dbab5769d18af8c7077a9b6fd6d4dee78da) (2026-08-07T15:07:30+05:30), the prior Arc hackathon build.
+
+**Planning baseline:** [`6f38178`](https://github.com/ss251/arcade/commit/6f38178567d89a522a2d67e9ea947273bbc91d58) (2026-09-04T22:01:18+05:30), 1 commit(s) after the inherited build.
+
+**ETHOnline history:** 217 reachable commits after the prior build, including planning; 216 after the execution baseline. [Full comparison](https://github.com/ss251/arcade/compare/57183dbab5769d18af8c7077a9b6fd6d4dee78da...be98d15579f8e79ca0b64c0c1bd0232b83ffdc53).
+
+| Plan | Declared path patterns | Matching non-merge commits | First → last matching commit |
+|---|---:|---:|---|
+| [A](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-A-settlement-core.md) | 27 | 62 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`1705d30`](https://github.com/ss251/arcade/commit/1705d308fca55fc1d1820ed0c7641f879f548ce0) |
+| [B](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-B-publish-adapters.md) | 33 | 27 | [`24be298`](https://github.com/ss251/arcade/commit/24be2982e3759769e90ad5e05fb17f2c6c46b156) → [`44bfca3`](https://github.com/ss251/arcade/commit/44bfca32f21727973fc35fe97a1a7be91564c101) |
+| [C](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-C-canary.md) | 14 | 86 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`115e0f8`](https://github.com/ss251/arcade/commit/115e0f8320325f7b3bb434a6285a869f36e0e54d) |
+| [D](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-D-erc8004.md) | 16 | 70 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`baefbc7`](https://github.com/ss251/arcade/commit/baefbc775c1a29780f97be3f1451a83ea6bb33d0) |
+| [E](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-E-ens.md) | 20 | 93 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`115e0f8`](https://github.com/ss251/arcade/commit/115e0f8320325f7b3bb434a6285a869f36e0e54d) |
+| [F](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-F-gateway-sessions.md) | 24 | 73 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`baefbc7`](https://github.com/ss251/arcade/commit/baefbc775c1a29780f97be3f1451a83ea6bb33d0) |
+| [G](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-G-graph.md) | 32 | 64 | [`d03f0d1`](https://github.com/ss251/arcade/commit/d03f0d1fe1800bc2bc11514a8ebf90791dae5668) → [`49008c8`](https://github.com/ss251/arcade/commit/49008c8d9e49bb4d8c720810fd314c72332f72f0) |
+| [H](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-H-web.md) | 26 | 53 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`64ef613`](https://github.com/ss251/arcade/commit/64ef61306b147cbe0d05636c896fb1469b075ec6) |
+| [I](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-I-packaging.md) | 31 | 10 | [`bd5bd2e`](https://github.com/ss251/arcade/commit/bd5bd2e2c3b20f77837d475c1b34aead11a501f8) → [`be98d15`](https://github.com/ss251/arcade/commit/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53) |
+| [J](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-06-J-arc-native.md) | 26 | 138 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`115e0f8`](https://github.com/ss251/arcade/commit/115e0f8320325f7b3bb434a6285a869f36e0e54d) |
+
+Counts measure commits touching the plans' declared paths, not exclusive plan ownership, authorship, added lines or completion. They overlap and cannot be summed. Shared files, broad directories and later edits can count in several rows; unlisted implementation paths are not counted. The endpoint links do not define contiguous plan ranges.
+Paths come from every first-column entry in the committed File structure tables at this snapshot; sibling paths, braces, numeric ranges, wildcards and directory ellipses are expanded. No current worktree edits enter the result.
+
+<!-- continuity:end -->
+
+The nine original product moves and the later J extension have different
+implementation and live-evidence states at this checkpoint:
+
+| Move / plan | What landed | Evidence limit |
+|---|---|---|
+| Publish adapters · M1/B | Agent Skill, MCP and OpenAPI ingestion; full three-adapter local execution | Separate paid FX proof; local model execution is not a settled purchase |
+| Settlement core · M2/A | Input gate, authenticated lineage, root tree budget, FeeSplitterV2 tree commitment | Recorded three-settlement testnet proof and cycle refusal; not trustless execution |
+| Pay-testing · M3/C | Durable canary history, automatic delisting and paid recovery | Approved bounded testnet proof; not continuous production monitoring |
+| Agent identity · M4/D | ERC-8004 identity, validation and receipt-backed feedback | Recorded testnet proof; evidence, not a reputation score or payment gate |
+| Naming · M5/E | ENSv2 payee/chain lock, renewal, expiry and scoped price permission | Live isolated proof passed; demo URLs stopped, name expired, production re-point pending |
+| Sessions · M6/F | Durable hub session and SDK/CLI/MCP lifecycle | F1 live acceptance/debit; F12 twenty-call offline proof, **no live twenty-call/mined-batch proof** |
+| Graph · M7/G | Ledger mappings, Studio deployment, hub index reads and cost-of-goods skill | Recorded selected A9 indexing; paid Base Graph workflow **not run** |
+| Web · M8/H | Marketplace, receipt trees, ordinary buyer recovery, seller dashboard and publish wizard | Browser/fixture checks; durable session recovery and owner real-wallet/visual acceptance remain open |
+| Network/packaging · M9/A+I | Chain configuration, boot checks, mainnet runbook and this continuity generator | Circle CLI live capture/pay paused; video, submission and mainnet flip incomplete |
+| Arc-native extension · J | Ordered accepts, discovery metadata, delegate funding and root escrow SDK/hub/runner; index/web evidence projections | Funding/escrow tested offline; live CLI paused; escrow oversized and not deployed |
+
+The [public execution records](docs/superpowers/sdd/README.md) link the measured
+proofs and remaining gates. Later vendor-neutrality work adds an
+[OpenAI-compatible engine](docs/evidence/B13-openai-api.md) and
+[Agent Plugins ingestion](docs/evidence/B13-agent-plugins.md). The recorded
+Messages/Chat Completions runs used the same GLM model: two wire formats, not
+two underlying model vendors.
+
+### Reused unchanged
+
+At `be98d15`, Git blob comparisons against `57183db` confirm the original
+[FeeSplitter](contracts/FeeSplitter.sol), [demo assembler](scripts/demo/assemble.py)
+and [old narration script](scripts/narrate.sh) are unchanged. The last is retained
+only to reproduce the prior video; **it must not voice this submission**.
+The architecture image above is also still the inherited diagram; I6 must
+replace it with a validated current render.
+
+The hub, runner, secrecy boundary, ordinary rail and first buyer interfaces
+were inherited foundations, but their shared files have since been extended.
+They are **not** claimed byte-for-byte unchanged or wholly new.
+
+### AI assistance
+
+Codex implemented and tested the continuation; Claude acted as conductor and
+planner; GPT/Grok participated in the design debate. The owner set direction,
+approved financial scope and owns acceptance, narration and submission.
+Per-commit co-author credits are preserved, including earlier Claude-attributed
+work; this is not a claim that one model authored the inherited repository.
+
+Specs, prompts, plans, task briefs and progress records are published under
+[docs/superpowers](docs/superpowers/sdd/README.md), including the
+[original execution order](docs/superpowers/sdd/2026-09-04-A-settlement-core/README.md).
+Private credentials, bearer material, runtime journals and owner handoffs are
+excluded. AI assistance and planned features are not presented as independent
+human review or completed live proof.
+
+### Tests
+
+The I4 checkpoint's sole sequential four-worker gate passed **5,327 Vitest**
+tests and **1,394 Bun** tests (**6,721 total**), root/web strict typechecks and
+client/SSR builds. These are executed results, not counted test declarations.
+[Exact gate record](docs/superpowers/sdd/2026-09-04-I-packaging/task-4-report.md).
+Contract and native subgraph tests have separately dated records; they are not
+included in that total.
+
+```bash
+bun --no-env-file x --no-install vitest run --maxWorkers=4 --minWorkers=1 --maxConcurrency=4
+bun --no-env-file test --max-concurrency=4 .bun.test
+bun --no-env-file run typecheck
+```
+
+Run gates sequentially on the shared machine. Tests include explicit synthetic
+identities and owned loopback services; a green gate does not imply that a live
+wallet, external provider or production deployment was exercised.
+
+### Partner prizes
+
+The intended selections are **Arc/Circle, The Graph and ENS**—three partners,
+not a claim of eligibility or a submitted entry. The
+[official rules](https://ethglobal.com/events/ethonline2026/info/details) allow
+up to three partners and require transparent reuse/AI attribution and a
+2–4 minute, at-least-720p demo with human narration.
+
+Arc evidence is recorded testnet settlement plus configuration/runtime work.
+The Graph has a [recorded selected indexed match](docs/superpowers/sdd/2026-09-04-G-graph/task-6-indexed-match-review.md),
+not current global marketplace completeness or a paid Base query.
+ENS has a [stopped isolated demonstration](docs/runbook.md#ens-namespaces-sepolia),
+not a production name deployment. The owner must reconcile partner eligibility
+and live form fields before submitting.
+
+### Guarantees, and what is not guaranteed
+
+The public manifest projection excludes engine/entry/secret configuration.
+It is not a guarantee against a skill deliberately leaking data in its output
+or through permitted tools. Outputs are untrusted and schema-valid does not
+mean correct.
+
+For ordinary exact settlement, execution/output refusal **before settlement**
+prevents that root settlement attempt. A hub-committed receipt tree can be
+compared with the on-chain root commitment; the chain does not prove that the
+off-chain computation was honest. Child calls spend the hiring seller's
+working capital and settle independently; a failing parent does not unwind
+already settled children or external model/data costs.
+
+A timeout or lost acknowledgement after signing/dispatch can leave payment
+uncertain; it is not proof of no charge, revocation or a refund. Gateway
+transfer UUIDs are not mined batches. The optional escrow path first locks
+principal, and a proven rejection can return principal—not gas. That path
+is offline-tested and not yet deployed here. See the
+[rail-specific custody and fee limits](docs/runbook.md#plan-j--rails-circle-dialect-and-evidence).
+
+### Mainnet
+
+`config/chains/arc-mainnet.json` is **pending** and boot refuses it.
+No Arc-mainnet deployment or settlement has occurred in this continuation.
+The [owner-only runbook](docs/mainnet-runbook.md) requires published parameters,
+reviewed identities and separately confirmed operations. September16 is the
+plan's future checkpoint, not an executed or guaranteed launch.
+Testnet and mainnet credentials are never interchangeable.
+
 ---
 
 ## Proven on Arc testnet
