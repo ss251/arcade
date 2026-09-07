@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "kind": "read-only-delegation-preflight",
+  "at": "2026-09-07T02:14:28.768Z",
+  "plan": {
+    "owner": "0xdaaca688ce93d6ea0bdf4cda9925c5526f3ca5e1",
+    "recipient": "0x67be3fd6f4d5ea3b4928e636def9c2c87bc3e51b",
+    "sourceChain": "Arc_Testnet",
+    "amount": "0.250000",
+    "destinationChain": "Arc_Testnet",
+    "token": "USDC"
+  },
+  "status": "none",
+  "keyAcquisitions": 0,
+  "monetaryActions": 0,
+  "trace": [
+    {
+      "method": "eth_chainId",
+      "status": 200,
+      "contentType": "application/json",
+      "encoding": null,
+      "bytes": "44",
+      "ms": 929
+    },
+    {
+      "method": "eth_call",
+      "status": 200,
+      "contentType": "application/json",
+      "encoding": null,
+      "bytes": "102",
+      "ms": 348
+    }
+  ],
+  "notes": [
+    "No owner grant, deposit, spend or payment was attempted.",
+    "Status none is a delegation prerequisite, not a failed funding proof.",
+    "Current compiled deployment identity and independent effects remain unverified."
+  ]
+}

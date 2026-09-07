@@ -22,6 +22,32 @@ const setup = async () => {
 }
 afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }) })
 
+describe("bounded funding response URL equality", () => {
+  const responseFetch = (response: Response): typeof fetch => Object.assign(
+    async (_input: Parameters<typeof fetch>[0], _init?: Parameters<typeof fetch>[1]) => response,
+    { preconnect: () => {} })
+  it("accepts fetch's canonical trailing slash for the same root RPC URL", async () => {
+    const response = new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: "0x4cef52" }), { headers: { "content-type": "application/json" } })
+    Object.defineProperty(response, "url", { value: "https://rpc.testnet.arc.io/" })
+    const result = await FundingRuntime.boundedFundingJson(responseFetch(response),
+      "https://rpc.testnet.arc.io", "POST", "{}", new AbortController().signal, performance.now() + 1000)
+    expect(result).toEqual({ jsonrpc: "2.0", id: 1, result: "0x4cef52" })
+  })
+  it("still refuses redirected responses, changed paths, schemes and hosts", async () => {
+    for (const url of ["https://rpc.testnet.arc.io/other", "http://rpc.testnet.arc.io/", "https://example.invalid/"]) {
+      const response = new Response("{}", { headers: { "content-type": "application/json" } })
+      Object.defineProperty(response, "url", { value: url })
+      await expect(FundingRuntime.boundedFundingJson(responseFetch(response),
+        "https://rpc.testnet.arc.io", "POST", "{}", new AbortController().signal, performance.now() + 1000)).rejects.toThrow()
+    }
+    const response = new Response("{}", { headers: { "content-type": "application/json" } })
+    Object.defineProperty(response, "url", { value: "https://rpc.testnet.arc.io/" })
+    Object.defineProperty(response, "redirected", { value: true })
+    await expect(FundingRuntime.boundedFundingJson(responseFetch(response),
+      "https://rpc.testnet.arc.io", "POST", "{}", new AbortController().signal, performance.now() + 1000)).rejects.toThrow()
+  })
+})
+
 describe("F11 account-wide funding journal", () => {
   it("exclusively claims one account even when competing operations select different journal paths", async () => {
     const f = await setup()

@@ -135,7 +135,9 @@ async function wire(fetchFn: typeof fetch, url: string, method: "GET" | "POST", 
         try { if (result.body) void result.body.cancel().catch(() => {}) } catch { /* late body owns no authority */ }
         fail("read_unavailable")
       }
-      insist(!finished && !activeSignal.aborted && result.ok && !result.redirected && (!result.url || result.url === url))
+      // Fetch canonicalizes an origin-only request URL to a trailing slash.
+      // Compare the exact canonical destination, still refusing every redirect.
+      insist(!finished && !activeSignal.aborted && result.ok && !result.redirected && (!result.url || result.url === new URL(url).href))
       insist(result.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() === "application/json")
       const length = result.headers.get("content-length")
       insist(length === null || /^(0|[1-9][0-9]{0,6})$/.test(length) && Number(length) <= 262_144)

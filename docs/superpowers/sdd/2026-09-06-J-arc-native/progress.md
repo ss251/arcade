@@ -1,5 +1,20 @@
 # Plan J progress
 
+2026-09-07 07:53 IST — J5C URL correction sole37717PASS:4,825Vitest214/
+67.42s,902Bun60/6,526assert/174.27s,root/webstrict,client395ms/SSR195ms.
+Two code/test pins unchanged;7paths/27links/privacy0 before finalaudit and
+atomiccommit/exactFFmain. Fresh unsigned deployment read confirms unchanged
+Wallet/Minter identities; Minter compiled-source match remains unresolved.
+No keys/grant/deposit/spend/payment, existing policy change, agent or push.
+
+2026-09-07 07:45 IST — J5B3 mergede08d2d5/exactoneFFcleanmain. J5C keyless
+read exposed canonical root RPC URL mismatch in existing bounded wire. Exact
+HTTP200/chainID0x4cef52 proof, genuine URL regressionRed then53Bun/2/254assert/
+3.21s and2-rootstrict0. Corrected read at02:14:28.768UTC returns delegationnone;
+zero keys/monetary actions. Two code/test pins to freeze; one full gate next.
+Current Minter source identity and owned live harness remain pending. No existing
+validity/cap/replay/redirect relaxation, J4 retry, agent, mainnet or push.
+
 2026-09-07 07:35 IST — Task5B3 sole31182PASS:4,825Vitest214/65.64s,
 900Bun60/6,521assert/170.50s,root/webstrict,client361ms/SSR191ms.17code/testpins
 unchanged;22paths/24links/privacy0 before finalaudit/atomiccommit/exactFFmain.
