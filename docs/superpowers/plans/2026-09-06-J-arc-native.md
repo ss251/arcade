@@ -200,6 +200,14 @@ populated with dummy escrow values or silently widened for sessions.
 
 ### Task 8: Hub escrow route, runner signing, pipeline branch (J5)
 
+Execution is split into atomic checkpoints in the
+[Task8 brief](../sdd/2026-09-06-J-arc-native/task-8-brief.md).
+[8A contracts](../sdd/2026-09-06-J-arc-native/task-8a-report.md) implement closed
+capability-free messages and lossless public context conversion only; handlers,
+signing, durable hub admission and pipeline activation remain pending. Public
+jobId alone is not caller authority, and a claimed output hash is not runner
+authorization; the brief explicitly corrects those abbreviated sketches below.
+
 - [ ] Socket messages `EscrowBudgetRequest{jobId, token, amount, escrow, chainId}` → runner replies `EscrowBudgetSigned{jobId, signature, nonce, deadline}`; `EscrowSubmitRequest{jobId, deliverable}` → `EscrowSubmitSigned{…}`. Runner signs with the seller key only; refuses if `amount` ≠ its listing price or `escrow` ≠ chain config. Runner never broadcasts.
 - [ ] `POST /x/:seller/:skill/escrow {jobId}`: validations from spec §7.3 step 3, relay `setBudgetWithAuthorization`, respond `{jobId, budget, token, escrow, fundBy}`; 409 when the job is not Open/ours; rate-limited per payer.
 - [ ] `pipeline.ts`: when `args.verified.rail === "erc8183"`: before `rail.settle`, request `EscrowSubmitSigned` and relay `submitWithAuthorization` (deliverable = keccak256 of canonical output); on decline / runner lost / timeout call `reject(jobId, reason)` and record `refundTx` in the receipt; on settle success record `settleTx` = complete tx. `putReceipt` and attestation unchanged (attester uses `settleTx`).

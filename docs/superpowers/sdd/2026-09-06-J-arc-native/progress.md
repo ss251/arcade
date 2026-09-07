@@ -1,5 +1,20 @@
 # Plan J progress
 
+2026-09-07 13:59 IST — J8A sole18650 fullgatePASS:4,998Vitest226/70.00s,
+973Bun72/7,643assert/174.09s,root/webstrict/clientSSRbuild. Seven-rootstrict0;
+sevenpins unchanged;13paths80links/privacy0. Atomiccommit/exactFF next;8B
+sign-only runner policy/socket ownership then8C/8D and9 remain. No gate replay,
+keys/liveRPC/send/spend/push or existing validity/cap/replay changes.
+
+2026-09-07 13:53 IST — J8A closed escrow socket schemas and lossless public
+action-context conversion implemented.36focusedVitest3PASS (15newcases),
+seven-rootstrict0 before final byte/encode cases; final strict/scopefreeze and
+sole fullgate next. Missing modules were the initial Reds; Schema composition
+typing corrected without weakening runtime excess-property checks. Existing
+Hello v2/legacy decode unchanged. No handlers/signing/hub admission/activation
+yet;8B runner/socket ownership,8C admission,8D pipeline then9 remain. No keys,
+liveRPC/send/spend/push or existing window/cap/replay changes.
+
 2026-09-07 13:45 IST — J7B4b sole56222 fullgatePASS:4,983Vitest224/68.76s,
 973Bun72/7,643assert/175.03s,root/webstrict,client566ms/SSR192ms. Sevenpins
 unchanged;13paths80links/privacy0. Task7 guarded runtime complete offline;

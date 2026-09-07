@@ -146,3 +146,10 @@ job/output/tree context and retains full monetary proof. Hub activation,
 atomic inference admission and buyer lifecycle remain pending; no live claim.
 See [J7B4a wire decisions](superpowers/sdd/2026-09-06-J-arc-native/task-7b4a-report.md)
 and [J7B4b rail verification](superpowers/sdd/2026-09-06-J-arc-native/task-7b4b-report.md).
+
+Task8 begins with closed socket contracts for budget/submit requests, signed
+replies and fixed refusals, plus lossless decimal-string context conversion.
+No capability is sent to the runner. Messages are data, not authorization:
+runner-side checks, socket-bound correlation and hub admission are still
+required before these contracts can trigger work. See the
+[J8A record](superpowers/sdd/2026-09-06-J-arc-native/task-8a-report.md).

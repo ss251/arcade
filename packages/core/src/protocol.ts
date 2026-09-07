@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { PublicListing, SkillId } from "./manifest.ts"
 import { JobOutcome } from "./job.ts"
+import { EscrowProviderRequest, EscrowProviderReply } from "./escrow-protocol.ts"
 
 /**
  * Hub ↔ runner wire protocol.
@@ -116,7 +117,7 @@ export class Heartbeat extends Schema.TaggedClass<Heartbeat>()("Heartbeat", {
   activeJobs: Schema.Int
 }) {}
 
-export const RunnerMessage = Schema.Union(Hello, JobLog, JobResult, Heartbeat)
+export const RunnerMessage = Schema.Union(Hello, JobLog, JobResult, Heartbeat, EscrowProviderReply)
 export type RunnerMessage = typeof RunnerMessage.Type
 
 // ── hub → runner ────────────────────────────────────────────────────────────
@@ -147,7 +148,7 @@ export class Ping extends Schema.TaggedClass<Ping>()("Ping", {
   atMs: Schema.Number
 }) {}
 
-export const HubMessage = Schema.Union(JobAssignment, Ack, Cancel, Ping)
+export const HubMessage = Schema.Union(JobAssignment, Ack, Cancel, Ping, EscrowProviderRequest)
 export type HubMessage = typeof HubMessage.Type
 
 export const decodeRunnerMessage = Schema.decodeUnknown(RunnerMessage)
