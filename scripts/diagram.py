@@ -216,10 +216,9 @@ def mermaid_source() -> str:
     return "\n".join(lines) + "\n"
 
 
-def main() -> None:
-    if sys.argv[1:] not in ([], ["--dark"]):
-        raise SystemExit("usage: python3 scripts/diagram.py [--dark]")
-    scene = {
+def scene() -> dict:
+    """Generate the same document in memory for read-only packaging checks."""
+    return {
         "type": "excalidraw",
         "version": 2,
         "source": "https://github.com/ss251/arcade",
@@ -227,11 +226,17 @@ def main() -> None:
         "appState": {"gridSize": None, "viewBackgroundColor": PAPER},
         "files": {},
     }
+
+
+def main() -> None:
+    if sys.argv[1:] not in ([], ["--dark"]):
+        raise SystemExit("usage: python3 scripts/diagram.py [--dark]")
+    document = scene()
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(scene, indent=2) + "\n")
+    OUT.write_text(json.dumps(document, indent=2) + "\n")
     if not DARK:
         (ROOT / "docs" / "architecture.mmd").write_text(mermaid_source())
-    print(f"docs/{OUT.name} ({len(scene['elements'])} elements)")
+    print(f"docs/{OUT.name} ({len(document['elements'])} elements)")
 
 
 if __name__ == "__main__":

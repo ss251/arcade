@@ -17,6 +17,8 @@ are merged; unresolved live gates are not prerequisites we can invent.
   [capture plan](../../../video/ethonline-2026-shotlist.md).
 - [Task13 brief](task-13-brief.md), [source-backed draft record](task-13-report.md),
   [owner submission checklist](../../../submission-checklist.md).
+- [Task14 brief](task-14-brief.md), [local checker record](task-14-report.md),
+  [checker contract](../../../packaging-evidence.md).
 - [CLI interop status](../../../interop/circle-cli.md).
 
 Single-threaded; four-worker limits; one sequential full gate per atomic commit,
@@ -40,7 +42,7 @@ research. Secrets/bearer material/private journals never enter these records.
 | I11 Sept8 check-in | Corrected owner draft prepared privately; posting unconfirmed, so no public check-in commit |
 | I12 Sept11 check-in | Future integration record; no premature live evidence reruns |
 | I13 submission | Source-backed checklist/three feedback drafts and mechanical/sole full gate passed; actual dashboard/media/submission remain owner checkpoints |
-| I14 packaging evidence | After constituent artifacts; missing proof must fail honestly |
+| I14 packaging evidence | Local checker9focused/strict/sole full gate passed; eight local rows pass, media absent and CLI/manual verification unchecked; deliberately incomplete |
 | I15 mainnet | Owner-only, no execution or configuration flip now |
 
 The source plan contains stale weekday labels and forward-looking templates.
