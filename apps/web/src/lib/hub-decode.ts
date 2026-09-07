@@ -7,6 +7,7 @@ import { NON_SETTLING } from "../../../../packages/core/src/job.ts"
 import { checkedGraphEvidence, type GraphEvidence } from "../../../../packages/buyer/src/graph-evidence.ts"
 import { settlementReferenceKind, type SettlementReferenceKind } from "./format.ts"
 import { declaredRailsOf, type ListingRail } from "./listing-rails.ts"
+import { checkedPublicEscrow, publicEscrowReason, type PublicEscrow } from "./public-escrow.ts"
 
 export interface PayTest { readonly atMs: number; readonly jobId: string; readonly ok: boolean; readonly settleTx?: string }
 export interface ListingStats {
@@ -46,7 +47,8 @@ export interface PublicReceiptRow extends ReceiptRow {
   readonly hop: number; readonly treeHash?: string
   /** Flat recorded descendants, not direct tree edges. */
   readonly children: ReadonlyArray<PublicReceiptChild>
-  readonly skillVersion: string; readonly seller: string; readonly rail: "eip3009" | "gateway" | "test"; readonly network: string
+  readonly skillVersion: string; readonly seller: string; readonly rail: "eip3009" | "gateway" | "test" | "erc8183"; readonly network: string
+  readonly escrow?: PublicEscrow
   readonly sellerCostUsd?: number; readonly feeSweepTx?: string; readonly treeCeilingAtomic?: string
   readonly treeCommittedAtomic?: string; readonly canary?: boolean
   /** Older hubs omit these fields; an absent session marker is not inferred false. */
@@ -270,7 +272,7 @@ export const decodeStats = (v: unknown): MarketStats => {
   return { listings, sellers, calls, settled, trees, volume: volume.display, volumeAtomic: volume.atomic, fees: fees.display, feesAtomic: fees.atomic, source }
 }
 const receiptChild = (v: unknown, rail: string, network: string, kind: SettlementReferenceKind | undefined): PublicReceiptChild => {
-  const r = object(v), priceAtomic = atomic(own(r, "priceAtomic")), settled = bool(own(r, "settled")), tx = settled ? reference(own(r, "settleTx"), rail) : undefined
+  const r = object(v), priceAtomic = atomic(own(r, "priceAtomic")), settled = bool(own(r, "settled")), tx = settled && rail !== "erc8183" ? reference(own(r, "settleTx"), rail) : undefined
   if (own(r, "price") !== money(priceAtomic)) return invalid()
   const skillId = own(r, "skillId")
   return { skillId: skillIdOk(skillId) ? skillId : "unknown-skill", priceAtomic, price: money(priceAtomic), settled,
@@ -279,17 +281,21 @@ const receiptChild = (v: unknown, rail: string, network: string, kind: Settlemen
 export const decodeReceipts = (v: unknown, requested?: string, max = 10_000): ReadonlyArray<PublicReceiptRow> => {
   const rows = array(v, max).map((value): PublicReceiptRow => {
     const r = object(value), skillId = skill(own(r, "skillId")), priceAtomic = atomic(own(r, "priceAtomic")), sellerAtomic = atomic(own(r, "sellerAtomic")),
-      feeAtomic = atomic(own(r, "feeAtomic")), settled = bool(own(r, "settled")), rail = own(r, "rail"), network = text(own(r, "network"), 128), feeBps = integer(own(r, "feeBps"), 10_000)
-    if (requested !== undefined && skillId !== requested || rail !== "eip3009" && rail !== "gateway" && rail !== "test" ||
+      feeAtomic = atomic(own(r, "feeAtomic")), rawSettled = bool(own(r, "settled")), rail = own(r, "rail"), network = text(own(r, "network"), 128), feeBps = integer(own(r, "feeBps"), 10_000)
+    if (requested !== undefined && skillId !== requested || rail !== "eip3009" && rail !== "gateway" && rail !== "test" && rail !== "erc8183" ||
       BigInt(sellerAtomic) + BigInt(feeAtomic) !== BigInt(priceAtomic) || own(r, "price") !== money(priceAtomic) ||
       own(r, "sellerShare") !== money(sellerAtomic) || own(r, "fee") !== money(feeAtomic)) return invalid()
-    const tx = settled ? reference(own(r, "settleTx"), rail) : undefined, kind = settlementReferenceKind(r)
+    const escrowView = rail === "erc8183" ? checkedPublicEscrow(r) : null
+    const settled = rail === "erc8183" ? escrowView?.escrow.state === "settled" : rawSettled
+    const tx = rail === "erc8183" ? escrowView?.settleTx : settled ? reference(own(r, "settleTx"), rail) : undefined
+    const kind = rail === "erc8183" ? settled ? "onchain" : undefined : settlementReferenceKind(r)
     return { skillId, skillVersion: text(own(r, "skillVersion"), 128, true), seller: address(own(r, "seller")), rail, network,
       priceAtomic, sellerAtomic, feeAtomic, feeBps, price: money(priceAtomic), sellerShare: money(sellerAtomic), fee: money(feeAtomic),
-      settled, reason: reason(own(r, "reason"), settled), latencyMs: integer(own(r, "latencyMs")), createdAtMs: integer(own(r, "createdAtMs")),
-      ...copyOptional("settleTx", tx), explorer: explorer(own(r, "explorer"), tx, settled, network, rail, kind), hop: integer(own(r, "hop"), 64),
+      settled, reason: rail === "erc8183" ? publicEscrowReason(escrowView) : reason(own(r, "reason"), settled), latencyMs: integer(own(r, "latencyMs")), createdAtMs: integer(own(r, "createdAtMs")),
+      ...copyOptional("escrow", escrowView?.escrow), ...copyOptional("settleTx", tx),
+      explorer: rail === "erc8183" ? escrowView?.explorer ?? null : explorer(own(r, "explorer"), tx, settled, network, rail, kind), hop: integer(own(r, "hop"), 64),
       ...copyOptional("treeHash", hashOk(own(r, "treeHash")) ? own(r, "treeHash") as string : undefined),
-      ...copyOptional("feeSweepTx", hashOk(own(r, "feeSweepTx")) ? own(r, "feeSweepTx") as string : undefined),
+      ...copyOptional("feeSweepTx", rail !== "erc8183" && hashOk(own(r, "feeSweepTx")) ? own(r, "feeSweepTx") as string : undefined),
       ...copyOptional("treeCeilingAtomic", optional(r, "treeCeilingAtomic", atomic)), ...copyOptional("treeCommittedAtomic", optional(r, "treeCommittedAtomic", atomic)),
       ...copyOptional("sellerCostUsd", optional(r, "sellerCostUsd", finite)), ...copyOptional("canary", optional(r, "canary", bool)),
       ...copyOptional("session", sessionMarker(r)), ...copyOptional("settleRefKind", kind),

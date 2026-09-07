@@ -2,6 +2,8 @@
 import { createServer as createHttpServer, type ServerResponse } from "node:http"
 import { createServer, type ViteDevServer } from "vite"
 import chain from "../../../../config/chains/arc-testnet.json"
+import { scrubReceipt } from "../../../hub/src/receipts-feed.ts"
+import { row as escrowRow } from "../../../hub/test/fixtures/escrow-receipt.ts"
 
 const seller = `0x${"1".repeat(40)}`, otherSeller = `0x${"2".repeat(40)}`
 const tx = `0x${"a".repeat(64)}`, payTx = `0x${"b".repeat(64)}`, registrationTx = `0x${"c".repeat(64)}`
@@ -9,7 +11,7 @@ const privateJob = "job_PRIVATECANARY0000000000000001", privateHistory = "job_PR
 const modes = new Set(["ok", "detail-down", "receipts-down", "both-down", "empty-receipts", "absent-history",
   "empty-history", "unknown-evidence", "zero-evidence", "stale-evidence", "unverified-evidence", "ens-ok",
   "ens-expired", "ens-down", "ens-seller-mismatch", "ens-skill-mismatch", "redirect", "long",
-  "graph-ready", "graph-zero", "graph-invalid", "graph-long", "rails"])
+  "graph-ready", "graph-zero", "graph-invalid", "graph-long", "rails", "escrow", "escrow-malformed"])
 let mode = "ok", reads = { detail: 0, receipts: 0, names: 0, other: 0 }
 let closing = false, web: ViteDevServer | undefined, startup: Promise<void> | undefined, closeWork: Promise<void> | undefined
 let hubOrigin = ""
@@ -51,6 +53,10 @@ function detail() {
   }
 }
 function receipts() {
+  if (mode.startsWith("escrow")) return (["settled", "refunded", "uncertain"] as const).map(state => {
+    const actual = scrubReceipt({ ...escrowRow(state), skillId: "diff-triage" })
+    return mode === "escrow-malformed" ? { ...actual, escrow: { ...actual.escrow, amountAtomic: "1" } } : actual
+  })
   const root = {
     skillId: "diff-triage", skillVersion: "0.1.0", seller, rail: "eip3009", network: chain.caip2,
     priceAtomic: "120000", sellerAtomic: "114000", feeAtomic: "6000", feeBps: 500,

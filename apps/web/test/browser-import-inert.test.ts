@@ -19,6 +19,12 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.resetModules() }
 const noIO = () => { expect(io).not.toHaveBeenCalled(); expect(storage).not.toHaveBeenCalled() }
 
 describe("passive browser modules do not select a server environment on fresh import", () => {
+  it("imports the public escrow reader without ambient network, wallet or storage access", async () => {
+    try {
+      const { checkedPublicEscrow } = await import("../src/lib/public-escrow.ts")
+      expect(checkedPublicEscrow({ rail: "erc8183" })).toBeNull()
+    } finally { noIO() }
+  })
   it("imports and filters declared rails with no environment, wallet or storage reads", async () => {
     try {
       const { declaredRailsOf, filterCatalogue } = await import("../src/lib/listing-rails.ts")

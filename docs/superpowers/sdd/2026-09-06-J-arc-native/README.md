@@ -67,6 +67,7 @@ evidence remain separate open work; this index does not mark them accepted.
   [Inactive observation brief](task-11b1-brief.md), [event/lifecycle mapping record](task-11b1-report.md).
   [Terminal correlation brief](task-11b2-brief.md), [full-receipt projection record](task-11b2-report.md).
   [Declared-rail web brief](task-11c1-brief.md), [labels/filter record](task-11c1-report.md).
+  [Public escrow web brief](task-11c2-brief.md), [receipt display record](task-11c2-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

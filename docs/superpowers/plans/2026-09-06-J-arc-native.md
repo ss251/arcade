@@ -324,10 +324,15 @@ independent RPC, current admin-state or receipt-tree verification is claimed.
 Web [J11C1](../sdd/2026-09-06-J-arc-native/task-11c1-report.md) adds bounded
 declared-rail labels and a local catalogue filter, with actual browser checks.
 This does not add a browser escrow signer or assert live availability.
-Receipt evidence J11C2 and live activation remain separate.
+Read-only [J11C2](../sdd/2026-09-06-J-arc-native/task-11c2-report.md) adds
+coherent public escrow outcomes, numeric job/contract references and matching
+complete/refund links, with quoted amounts separate from reported movement.
+Browser signer/recovery remain unchanged. Its sole full gate passed; live activation
+and Task10 chain proof remain separate.
 
 - [ ] Subgraph: data sources for the escrow proxy and hook; `EscrowJob` entity; `Settlement.rail`; mapping tests (matchstick); redeploy `v0.0.2` to Studio (deploy key inline).
-- [ ] Web: receipt page rail badge and job links; listing page "accepts: gateway · exact · escrow"; marketplace filter. `bun run web:build` + snapshot.
+- [x] Web public slice: qualified escrow terminal state, numeric job/contract and complete/refund links; declared listing rails; local marketplace filter. Client/SSR builds and synthetic native browser inspection passed. Not a browser escrow signer or live proof.
+- [ ] Spec §8 create/fund references: absent from the public receipt projection, not invented by the web. Full buyer lifecycle history remains separate.
 - [ ] Commit: `feat(subgraph,web): escrow jobs indexed and shown`.
 
 ### Task 12: Circle plugin fixture (J4) and docs/claims

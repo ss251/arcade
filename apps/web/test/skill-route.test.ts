@@ -148,6 +148,22 @@ describe("actual H8 Start route through the bounded H4 client", () => {
     expect(html).toContain("not current payment availability")
   })
 
+  it("preserves actual hub escrow projections through Start without private material or inferred movement", async () => {
+    const html = await page("escrow")
+    for (const state of ["settled", "refunded", "uncertain"]) expect(html.replace(/<!-- -->/g, "")).toContain(`Hub reports escrow ${state}`)
+    expect(html.replace(/<!-- -->/g, "")).toContain("Reported principal refund $0.12")
+    expect(html).toContain("No terminal movement established")
+    expect(html).toContain("A quote is not a transfer")
+    expect(html).not.toMatch(/job_[ab]{32}|requestHash|0x5555555555555555555555555555555555555555/)
+    const links = [...html.matchAll(/\bhref="([^"]+)"/g)].map(match => match[1]!)
+    expect(links.filter(url => url.includes("/tx/"))).toEqual([`https://testnet.arcscan.app/tx/0x${"7".repeat(64)}`, `https://testnet.arcscan.app/tx/0x${"8".repeat(64)}`])
+    expect(links.filter(url => url.includes("/address/"))).toEqual(Array(3).fill(`https://testnet.arcscan.app/address/0x${"6".repeat(40)}`))
+    const malformed = await page("escrow-malformed")
+    expect(malformed).toContain("Escrow evidence unavailable")
+    expect(malformed).not.toMatch(/href="[^\"]+\/(tx|address)\/|Hub reports escrow settled|Reported principal refund/)
+    expect(malformed).not.toContain("Recent records unavailable.")
+  })
+
   it("distinguishes empty receipts and absent versus empty pay-test history", async () => {
     const empty = await page("empty-receipts")
     expect(empty).not.toContain("recorded-grandchild"); expect(scripts(empty)).not.toContain("receipts_unavailable")

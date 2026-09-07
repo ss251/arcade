@@ -1,5 +1,21 @@
 # Plan J progress
 
+2026-09-08 00:50 IST — J11C2 sole20753fullgatePASS5327Vitest242/69.89s;
+1362Bun92/11711assert191.65s;root/webstrict/clientSSR317/184ms.15paths146
+links/privacy0;9source/testpins recheck before atomiccommit/exact-one mainFF.
+No browser signer/recovery/CSS/payment safeguard changes. Public terminal
+references only; spec create/fund history unavailable, not fabricated. Task12
+offline next. J4/J5/J6/Task10live paused; no keys/RPC/spend/deploy/push.
+
+2026-09-08 00:45 IST — J11C1 main64ef613; J11C2 read-only escrow receipt
+projection/UI implemented. Final242focusedVitest7PASS5.10s;9rootstrict0.
+Actual Start synthetic settled/refunded/uncertain plus malformed mode passed,
+native390mobile/1280desktop and keyboard disclosure inspected. Both modes
+detail1/receipts1/names0/other0; tabs closed/viewport reset; fixtureexit0,
+PIDgone/both ports refused independently. No CSS/signing/recovery changes.
+Scoped freeze/sole4workerfullgate then atomiccommit/exact-one mainFF next.
+Task12offline follows. J4/J5/J6/Task10live paused; no keys/RPC/spend/push.
+
 2026-09-08 00:26 IST — J11C1 sole94612 fullgatePASS5281Vitest241/69.17s;
 1362Bun92/11711assert190.66s;root/webstrict/clientSSR361ms/190ms.
 Final213focusedVitest8PASS6.41s and11-rootstrict0 usingactualwebconfigparser.

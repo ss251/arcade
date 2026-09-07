@@ -2,6 +2,7 @@ import { Evidence, SchemaBlock } from "./evidence.tsx"
 import { IndexedEvidence } from "./graph-evidence.tsx"
 import { Nav } from "./nav.tsx"
 import { RailDeclaration } from "./rail-declaration.tsx"
+import { EscrowRecord } from "./escrow-record.tsx"
 import { ago, txLink } from "../lib/format.ts"
 import type { PublicReceiptChild, PublicReceiptRow } from "../lib/hub-decode.ts"
 import type { SkillPageData } from "../lib/skill-page-data.ts"
@@ -32,22 +33,22 @@ function Records({ data }: { readonly data: SkillPageData }) {
         : <ol className="skill-records">{data.receipts.map((r, i) => <li key={i}>
           <article>
             <div className="skill-record-heading"><h3 className="skill-code">{r.skillId}</h3>
-              <span className="skill-money">{r.price} authorized</span></div>
-            <p><span className={`skill-state${r.settled ? " is-settled" : " is-unresolved"}`}>{status(r.settled)}</span>
+              <span className="skill-money">{r.price} {r.rail === "erc8183" ? "quoted" : "authorized"}</span></div>
+            {r.rail === "erc8183" ? <EscrowRecord receipt={r} /> : <p><span className={`skill-state${r.settled ? " is-settled" : " is-unresolved"}`}>{status(r.settled)}</span>
               {r.session === true ? <span className="skill-marker">session</span> : null}
-              {r.canary === true ? <span className="skill-marker">canary</span> : null}</p>
+              {r.canary === true ? <span className="skill-marker">canary</span> : null}</p>}
             <p className="skill-note">{ago(r.createdAtMs, data.observedAtMs)} · {r.latencyMs} ms · {r.rail} · <span className="skill-code">{r.network}</span></p>
-            <p>{r.reason}</p>
-            <Reference receipt={r} root={r} />
+            {r.rail === "erc8183" ? null : <><p>{r.reason}</p><Reference receipt={r} root={r} /></>}
             <details className="skill-disclosure"><summary>Recorded amounts and descendants</summary>
-              <p>Authorized amount <span className="skill-money">{r.price}</span>; recorded seller share {r.sellerShare}; recorded fee {r.fee}.</p>
+              {r.rail === "erc8183" ? <p>Quoted amount <span className="skill-money">{r.price}</span>; quoted seller share {r.sellerShare}; quoted fee {r.fee}. A quote is not a transfer.</p>
+                : <p>Authorized amount <span className="skill-money">{r.price}</span>; recorded seller share {r.sellerShare}; recorded fee {r.fee}.</p>}
               <p>Settlement status is a receipt observation, not a balance proof. An uncertain paid outcome is not a confirmed refund.</p>
               <h4>Flat recorded descendants</h4>
               <p>These are a flat list, not direct parent-child edges. Ancestry is not available in this public record.</p>
               {r.children.length === 0 ? <p>No descendants returned in this record.</p>
                 : <ul className="skill-descendants">{r.children.map((child, childIndex) => <li key={childIndex}>
                   <span className="skill-code">{child.skillId}</span> · <span className="skill-money">{child.price}</span> · {status(child.settled)}
-                  <Reference receipt={child} root={r} />
+                  {r.rail === "erc8183" ? <p>Child payment rail and transaction evidence unavailable in this compact root record.</p> : <Reference receipt={child} root={r} />}
                 </li>)}</ul>}
             </details>
           </article>

@@ -122,7 +122,7 @@ const listingProjection = (value: unknown, id: string, resolvedSeller?: string):
 }
 const receiptKeys = ["skillId", "skillVersion", "seller", "priceAtomic", "sellerAtomic", "feeAtomic", "feeBps", "price", "sellerShare", "fee",
   "settled", "reason", "latencyMs", "createdAtMs", "settleTx", "explorer", "hop", "treeHash", "rail", "network", "sellerCostUsd", "feeSweepTx",
-  "treeCeilingAtomic", "treeCommittedAtomic", "canary", "session", "settleRefKind"] as const
+  "treeCeilingAtomic", "treeCommittedAtomic", "canary", "session", "settleRefKind", "escrow"] as const
 const receiptProjection = (value: unknown, id: string): readonly PublicReceiptRow[] => decodeReceipts(array(value, 20).map(raw => {
   const out = pick(raw, receiptKeys)
   // Whitelisting must not convert inherited/invalid presence into legacy absence.
