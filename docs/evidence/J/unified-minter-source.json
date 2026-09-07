@@ -1,0 +1,315 @@
+{
+  "recordedAt": "2026-09-07T02:36:11Z",
+  "kind": "read-only-source-reproduction",
+  "rpc": {
+    "at": "2026-09-07T02:18:42.463Z",
+    "chainId": 5042002,
+    "blockNumber": "60842464",
+    "blockHash": "0x37dc6fb7c3a601ed0ad34361d35b3b9ebd03d4869e29a8d545804b724f8e7c1d",
+    "blockTimestamp": "2026-09-07T02:18:39.000Z",
+    "roles": [
+      {
+        "role": "wallet",
+        "proxy": "0x0077777d7eba4688bdef3e311b846f25870a19b9",
+        "proxyBytes": 163,
+        "proxyHash": "0x874a21508289bf01ee9802032607ae53ba0a4f47f28143a8493921b8db102187",
+        "implementation": "0xa33d52b46964495ea6e2bb09ce85faed05776e28",
+        "implementationBytes": 22818,
+        "implementationHash": "0x69ed7283bbdb751a492d5e4320bd99db7ff6b9ef911afb2032521a59526706b4",
+        "metadataHex": "a26469706673582212202a0ecdc1ddae8aefe4f82d8466f43955b2be249dd9cda56fb8564255aab8446564736f6c634300081d",
+        "metadataCid": "QmRApvd7kbwWyDDa7BSX66vuPRMy2gBRoG1NQdneLL4Rjz"
+      },
+      {
+        "role": "minter",
+        "proxy": "0x0022222abe238cc2c7bb1f21003f0a260052475b",
+        "proxyBytes": 163,
+        "proxyHash": "0x874a21508289bf01ee9802032607ae53ba0a4f47f28143a8493921b8db102187",
+        "implementation": "0x9ef4c7ad4f577be713972310e655337bfd0b84bf",
+        "implementationBytes": 12101,
+        "implementationHash": "0x0c479785c0c0f5a450bcf3200c854db9da6e4b585a5b694ca4eac85396cc28f5",
+        "metadataHex": "a2646970667358221220a22698663fbb412bbcf08bb97bcb8db175587b4f060769e51329b77da758a0b364736f6c634300081d",
+        "metadataCid": "QmZFctbmh6YRsscND55aHSMJchdDFw5XHcByuewaqtXaJN"
+      }
+    ],
+    "requests": 9,
+    "keys": 0,
+    "sends": 0
+  },
+  "reproduction": {
+    "compiler": "0.8.29+commit.ab55807c.Emscripten.clang",
+    "sourceBundleSha256": "a96005ae9f46468a9490e70a7bea54699790ad80486cb96ee14bc634a9e36b62",
+    "artifactSha256": "2c80edc746fdb941ac6c7214b0d6619eedf3c76fdddc0e76c6cffe65a85f76c8",
+    "standardInputSha256": "ce61ef52b2699309ddb638a06d8eef1e4ac789e92cfff0bad9756c0242d661bd",
+    "sourceHashes": [
+      {
+        "path": "src/GatewayMinter.sol",
+        "hash": "0x07045b1b2d7f953e46d128852b61e931f81e8ccc0a12ccda9ea4eddeb27d699c",
+        "accepted": "0x48011135f706c1c766bb4dddfb29556d4b0b2f16db5621aa7fb9c59f255e70fa",
+        "unchanged": false
+      },
+      {
+        "path": "src/modules/common/Denylist.sol",
+        "hash": "0xb636afd742222237c6613ab3384a55917a2dd7fe52b8d6e5467709294438dd53",
+        "accepted": "0xb636afd742222237c6613ab3384a55917a2dd7fe52b8d6e5467709294438dd53",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/interfaces/draft-IERC1822.sol",
+        "hash": "0xc42facb5094f2f35f066a7155bda23545e39a3156faef3ddc00185544443ba7d",
+        "accepted": "0xc42facb5094f2f35f066a7155bda23545e39a3156faef3ddc00185544443ba7d",
+        "unchanged": true
+      },
+      {
+        "path": "src/modules/common/TokenSupport.sol",
+        "hash": "0xac4cd843163cee36c26c17ddc668314d39a6c2943d2abef83c3e52f8bf2a254c",
+        "accepted": "0xac4cd843163cee36c26c17ddc668314d39a6c2943d2abef83c3e52f8bf2a254c",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/utils/math/Math.sol",
+        "hash": "0xa00be322d7db5786750ce0ac7e2f5b633ac30a5ed5fa1ced1e74acfc19acecea",
+        "accepted": "0xa00be322d7db5786750ce0ac7e2f5b633ac30a5ed5fa1ced1e74acfc19acecea",
+        "unchanged": true
+      },
+      {
+        "path": "src/modules/common/Pausing.sol",
+        "hash": "0x9e7807e80e9972f4eee04685c6592c46c323c139648dd659d04300efbd42e570",
+        "accepted": "0x9e7807e80e9972f4eee04685c6592c46c323c139648dd659d04300efbd42e570",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol",
+        "hash": "0x69f54c02b7d81d505910ec198c11ed4c6a728418a868b906b4a0cf29946fda84",
+        "accepted": "0x69f54c02b7d81d505910ec198c11ed4c6a728418a868b906b4a0cf29946fda84",
+        "unchanged": true
+      },
+      {
+        "path": "src/modules/common/TransferSpecHashes.sol",
+        "hash": "0x98dbc1aaad9dbcf54c551a0d50fd6773c96819a7974f19176992798b6d298089",
+        "accepted": "0x98dbc1aaad9dbcf54c551a0d50fd6773c96819a7974f19176992798b6d298089",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/utils/Panic.sol",
+        "hash": "0xf7fe324703a64fc51702311dc51562d5cb1497734f074e4f483bfb6717572d7a",
+        "accepted": "0xf7fe324703a64fc51702311dc51562d5cb1497734f074e4f483bfb6717572d7a",
+        "unchanged": true
+      },
+      {
+        "path": "src/lib/Cursor.sol",
+        "hash": "0x47165eb5f639313c441c97a64ea660549421b70e23fd0ee23c47bdcfa16e589a",
+        "accepted": "0x47165eb5f639313c441c97a64ea660549421b70e23fd0ee23c47bdcfa16e589a",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Utils.sol",
+        "hash": "0x8decfa54cec979c824b044b8128cd91d713f72c71fd7dfa54974624d8c949898",
+        "accepted": "0x8decfa54cec979c824b044b8128cd91d713f72c71fd7dfa54974624d8c949898",
+        "unchanged": true
+      },
+      {
+        "path": "src/GatewayCommon.sol",
+        "hash": "0x2253953090c0e794479cbfec0dfb1bf1564b62e311fd969d843feb6cab03535f",
+        "accepted": "0xacfa9eeeb5dd5a6a174b19eb81a0e4bd25a298fb98d50b6e34d6b0bd17d9c3e1",
+        "unchanged": false
+      },
+      {
+        "path": "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol",
+        "hash": "0xd861907d1168dcaec2a7846edbaed12feb8bad2d6781dba987be01374f90b495",
+        "accepted": "0xd861907d1168dcaec2a7846edbaed12feb8bad2d6781dba987be01374f90b495",
+        "unchanged": true
+      },
+      {
+        "path": "src/lib/AttestationLib.sol",
+        "hash": "0x9ac7e53a7055d561e4ec30ab4be803f400b100d7e36dae3c234a3327af4f390b",
+        "accepted": "0x9ac7e53a7055d561e4ec30ab4be803f400b100d7e36dae3c234a3327af4f390b",
+        "unchanged": true
+      },
+      {
+        "path": "src/lib/AddressLib.sol",
+        "hash": "0x122160c82f2766e75b0b35fe0d07d90f195e8e706f1acf7b5da5711800f3bdae",
+        "accepted": "0x122160c82f2766e75b0b35fe0d07d90f195e8e706f1acf7b5da5711800f3bdae",
+        "unchanged": true
+      },
+      {
+        "path": "src/modules/common/Domain.sol",
+        "hash": "0x1190af14b7fdeedff05d271d3111d1655e5d628c5a4bb5457706bdc5bb341026",
+        "accepted": "0x1190af14b7fdeedff05d271d3111d1655e5d628c5a4bb5457706bdc5bb341026",
+        "unchanged": true
+      },
+      {
+        "path": "src/modules/minter/Mints.sol",
+        "hash": "0x5c0f43f8610ccb50cf3b249c39d31d72f9c812583ee579725919175cae8833fa",
+        "accepted": "0x5c0f43f8610ccb50cf3b249c39d31d72f9c812583ee579725919175cae8833fa",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts-upgradeable/contracts/access/Ownable2StepUpgradeable.sol",
+        "hash": "0xe9570c90b688339474e80090b0cdf0b2c85c25aa28cc6044d489dda9efc2c716",
+        "accepted": "0xe9570c90b688339474e80090b0cdf0b2c85c25aa28cc6044d489dda9efc2c716",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol",
+        "hash": "0xc163fcf9bb10138631a9ba5564df1fa25db9adff73bd9ee868a8ae1858fe093a",
+        "accepted": "0xc163fcf9bb10138631a9ba5564df1fa25db9adff73bd9ee868a8ae1858fe093a",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol",
+        "hash": "0xdbef5f0c787055227243a7318ef74c8a5a1108ca3a07f2b3a00ef67769e1e397",
+        "accepted": "0xdbef5f0c787055227243a7318ef74c8a5a1108ca3a07f2b3a00ef67769e1e397",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/interfaces/IERC1967.sol",
+        "hash": "0xb25a4f11fa80c702bf5cd85adec90e6f6f507f32f4a8e6f5dbc31e8c10029486",
+        "accepted": "0xb25a4f11fa80c702bf5cd85adec90e6f6f507f32f4a8e6f5dbc31e8c10029486",
+        "unchanged": true
+      },
+      {
+        "path": "src/lib/Attestations.sol",
+        "hash": "0x61f1cc243a8a993f041c7cf4b7cd579a0eac65d63b031d1f74b96248dd30ad2f",
+        "accepted": "0x61f1cc243a8a993f041c7cf4b7cd579a0eac65d63b031d1f74b96248dd30ad2f",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/utils/Strings.sol",
+        "hash": "0x44f87e91783e88415bde66f1a63f6c7f0076f2d511548820407d5c95643ac56c",
+        "accepted": "0x44f87e91783e88415bde66f1a63f6c7f0076f2d511548820407d5c95643ac56c",
+        "unchanged": true
+      },
+      {
+        "path": "lib/memview-sol/contracts/TypedMemView.sol",
+        "hash": "0x1977ca8399a17687be72b22bc25cd8e097a7214b3624478a07622fd937f5bffd",
+        "accepted": "0x1977ca8399a17687be72b22bc25cd8e097a7214b3624478a07622fd937f5bffd",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/utils/math/SignedMath.sol",
+        "hash": "0xb1970fac7b64e6c09611e6691791e848d5e3fe410fa5899e7df2e0afd77a99e3",
+        "accepted": "0xb1970fac7b64e6c09611e6691791e848d5e3fe410fa5899e7df2e0afd77a99e3",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol",
+        "hash": "0x195533c86d0ef72bcc06456a4f66a9b941f38eb403739b00f21fd7c1abd1ae54",
+        "accepted": "0x195533c86d0ef72bcc06456a4f66a9b941f38eb403739b00f21fd7c1abd1ae54",
+        "unchanged": true
+      },
+      {
+        "path": "src/lib/TransferSpec.sol",
+        "hash": "0x887d3eb1096df885131e1c2d43dd7b82db3a7ecae1b9083eee07844d5e28a2bf",
+        "accepted": "0x887d3eb1096df885131e1c2d43dd7b82db3a7ecae1b9083eee07844d5e28a2bf",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/utils/Errors.sol",
+        "hash": "0x6afa713bfd42cf0f7656efa91201007ac465e42049d7de1d50753a373648c123",
+        "accepted": "0x6afa713bfd42cf0f7656efa91201007ac465e42049d7de1d50753a373648c123",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/proxy/beacon/IBeacon.sol",
+        "hash": "0xc59a78b07b44b2cf2e8ab4175fca91e8eca1eee2df7357b8d2a8833e5ea1f64c",
+        "accepted": "0xc59a78b07b44b2cf2e8ab4175fca91e8eca1eee2df7357b8d2a8833e5ea1f64c",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol",
+        "hash": "0x92915b7f7f642c6be3f65bfd1522feb5d5b6ef25f755f4dbb51df32c868f2f97",
+        "accepted": "0x92915b7f7f642c6be3f65bfd1522feb5d5b6ef25f755f4dbb51df32c868f2f97",
+        "unchanged": true
+      },
+      {
+        "path": "src/lib/TransferSpecLib.sol",
+        "hash": "0xf97ca8698591031967a37b86c4fd80ed9e39415d9da48c5a5ec28736af991ad6",
+        "accepted": "0xf97ca8698591031967a37b86c4fd80ed9e39415d9da48c5a5ec28736af991ad6",
+        "unchanged": true
+      },
+      {
+        "path": "src/interfaces/IMintableToken.sol",
+        "hash": "0x05e90cdc333cfcc678bd5dad4c8782ddd553e4f4cd433b289a6e7c67d10c7f37",
+        "accepted": "0x05e90cdc333cfcc678bd5dad4c8782ddd553e4f4cd433b289a6e7c67d10c7f37",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/utils/StorageSlot.sol",
+        "hash": "0xcf74f855663ce2ae00ed8352666b7935f6cddea2932fdf2c3ecd30a9b1cd0e97",
+        "accepted": "0xcf74f855663ce2ae00ed8352666b7935f6cddea2932fdf2c3ecd30a9b1cd0e97",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol",
+        "hash": "0x631188737069917d2f909d29ce62c4d48611d326686ba6683e26b72a23bfac0b",
+        "accepted": "0x631188737069917d2f909d29ce62c4d48611d326686ba6683e26b72a23bfac0b",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/utils/Address.sol",
+        "hash": "0xaaa1d17c1129b127a4a401db2fbd72960e2671474be3d08cae71ccdc42f7624c",
+        "accepted": "0xaaa1d17c1129b127a4a401db2fbd72960e2671474be3d08cae71ccdc42f7624c",
+        "unchanged": true
+      },
+      {
+        "path": "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol",
+        "hash": "0x4515543bc4c78561f6bea83ecfdfc3dead55bd59858287d682045b11de1ae575",
+        "accepted": "0x4515543bc4c78561f6bea83ecfdfc3dead55bd59858287d682045b11de1ae575",
+        "unchanged": true
+      }
+    ],
+    "sourceCount": 36,
+    "matchingAcceptedSources": 34,
+    "settings": {
+      "evmVersion": "cancun",
+      "libraries": {},
+      "metadata": {
+        "bytecodeHash": "ipfs"
+      },
+      "optimizer": {
+        "enabled": true,
+        "runs": 150
+      },
+      "outputSelection": {
+        "*": {
+          "*": [
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.immutableReferences",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": [
+        "@memview-sol/=lib/memview-sol/contracts/",
+        "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+        "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+        "forge-std/=lib/forge-std/src/"
+      ]
+    },
+    "immutableReferences": {
+      "2025": [
+        {
+          "length": 32,
+          "start": 3634
+        },
+        {
+          "length": 32,
+          "start": 3675
+        },
+        {
+          "length": 32,
+          "start": 3968
+        }
+      ]
+    },
+    "normalizedRuntimeHash": "0xdbe0b31fd3677a8d7d5f6e729e8247115b7a041e1e5d8d958dd8b18e06747aca",
+    "boundRuntimeHash": "0x0c479785c0c0f5a450bcf3200c854db9da6e4b585a5b694ca4eac85396cc28f5",
+    "runtimeBytes": 12101,
+    "fullRuntimeMatch": true,
+    "metadataTailMatch": true,
+    "metadataJsonSha256": "63f31c1d7c8d395f80850eed605f7e17c1a484b31fb21f8467b45e383b4ed59c"
+  },
+  "moneyMovingActions": 0,
+  "realKeyAcquisitions": 0,
+  "scope": "J5C identity prerequisite only; no delegate grant/deposit/spend/payment, no F11 policy change"
+}

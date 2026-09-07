@@ -1,5 +1,20 @@
 # Plan J progress
 
+2026-09-07 08:13 IST — J5C1 sole59809PASS:4,825Vitest214/66.56s,
+915Bun61/6,555assert/172.65s,root/webstrict,client358ms/SSR174ms. Two code/test
+pins unchanged;6paths/27links/privacy0 after documentation-only heuristic false
+positive correction. Reproduced current Minter source identity, no runtime
+acceptance change. Finalaudit/atomiccommit/exactoneFFmain next; J5C2 guarded
+owned proof then approved live actions remain. J4 live PAUSED, no keys/money/push.
+
+2026-09-07 08:07 IST — J5C URL fix mergede2f6e78/exactoneFFcleanmain.
+Minter source identity reproduced: solc0.8.29/legacy pipeline,12101bytes,
+three declared zero self words bound; entire runtime/metadata matches independent
+finalized RPC read.34/36sources match accepted release; two reviewed admin/event
+deltas documented. Read-only reproduction tool/native13tests pass; strict fix,
+scope/freeze and solefullgate next. No existing F11 acceptance/policy change;
+J5C grant/deposit/spend/payment/harness NOT_RUN, J4 live PAUSED. No keys/agents/push.
+
 2026-09-07 07:53 IST — J5C URL correction sole37717PASS:4,825Vitest214/
 67.42s,902Bun60/6,526assert/174.27s,root/webstrict,client395ms/SSR195ms.
 Two code/test pins unchanged;7paths/27links/privacy0 before finalaudit and
