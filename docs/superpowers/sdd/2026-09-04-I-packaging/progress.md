@@ -1,5 +1,21 @@
 # Plan I progress
 
+2026-09-08 03:03 IST — I8 sole62914gatePASS5327Vitest242/69.36s;
+1413Bun96/11898assert195.33s;root/webstrict/clientSSR381/189ms.5paths,
+15links/privacy0; eight exact content blocks exit0 and all timeline boundaries
+match225s narration. Shotlist/brief frozen; three result records annotated.
+Atomiccommit/mainFF next, then I13 sourced submission/feedback preparation.
+Exact safe-region recorder/owner voice/takes/I10cut and I11posting remain open;
+no live replay, keys, chain call/spend, changed authorization bounds or push.
+
+2026-09-08 02:56 IST — Main7d7aa68. I8 eight source views/225s timeline
+prepared. Native public preview verified; initial empty-home assertion failed
+on22Bun cache files only, corrected observation recorded. Actual mainnet pending
+refusal observed before key/RPC branch. Legacy display0 recorder not run; exact
+safe-region command, owner voice/takes/cut remain pending. Fenced command and
+scope/timeline/link audit, sole4workerfullgate then atomiccommit/mainFF next.
+No wallet/modelkeys, live chain call/spend/approval replay/policy change/push.
+
 2026-09-08 02:44 IST — I7 sole54073gatePASS5327Vitest242/70.10s;
 1413Bun96/11898assert195.21s;root/webstrict/clientSSR335/167ms.15paths,
 17newlinks/privacy0;11frozen beat/checker/test/brief pins unchanged. Postgate
