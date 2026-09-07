@@ -62,8 +62,10 @@ provider liveness. The pending mainnet configuration still fails closed.
 ### Escrow and delegated funding delta (offline implementation)
 
 These Mermaid sources describe implemented paths, not a live transaction trace.
-Plan I will render the updated architecture; the existing README raster is not
-evidence of this delta. Configuration/approval prerequisites remain in the
+Plan I has rendered and inspected the updated [README overview](architecture.png)
+and DOM-validated these two Mermaid flows; [reproduction details](diagram-rendering.md)
+distinguish reference layouts from video frames. This is not live transaction
+evidence. Configuration/approval prerequisites remain in the
 [escrow guide](erc8183-escrow.md) and [funding guide](unified-balance-funding.md).
 
 ```mermaid

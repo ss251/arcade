@@ -1,0 +1,93 @@
+{
+  "task": "I6",
+  "observedCompleteAtUTC": "2026-09-07T20:49:52Z",
+  "mode": "owned-loopback-offline-DOM-export",
+  "fundsMoved": false,
+  "liveEvidence": false,
+  "bundleSha256": "da9c363071afbe79e06807bd1e67dbacc1123187db7b99e2608dd4a1a9567e94",
+  "inputs": [
+    {
+      "name": "architecture",
+      "sha256": "618b2925e96d1f5942321dd197b61473077461dfcabc0a1f3e5de8a03f027bde"
+    },
+    {
+      "name": "architecture-dark",
+      "sha256": "4120febbab8ea2ebfce40dc863fcae984a6cd9797b6b587f378d59c0a298fb8e"
+    },
+    {
+      "name": "architecture-flow",
+      "sha256": "76b06cf4b6bdb0bc339b7d35432fa0eb414342a885268059cbeaa81803bccc49"
+    },
+    {
+      "name": "escrow-flow",
+      "sha256": "9de3f7c15fca1aa381257f5652a555a8bdc1222e1823a6b989c6481977401ba6"
+    },
+    {
+      "name": "delegate-flow",
+      "sha256": "cee9bc99d5b0766b47eb590a7dd89fc0d511bc41e0a4c8429080b77af1f97914"
+    }
+  ],
+  "results": {
+    "architecture": {
+      "svgSha256": "dbc9a009618a6edab9c6c05da7b48414bf3b6e44d65032d4707f7c9978cf55a1",
+      "pngSha256": "fb3318917c317c6c16710e13d077affc113d5ca63f3f73d22962ebd4ca9ac7a7",
+      "width": 2000,
+      "height": 1503
+    },
+    "architecture-dark": {
+      "svgSha256": "cb198456e152d18c2ee0394f425947dd0b116129a4eb9ebe445705ea0b07b31f",
+      "pngSha256": "b47f6963f0d0e90dd8691a071c0d9f2b8eb3595756ca6910e8f1ece65f15c895",
+      "width": 2000,
+      "height": 1503
+    },
+    "architecture-flow": {
+      "svgSha256": "188e0ec62d3aaf3ddbacceecfd2411d0ef158588ae8372ff574206b19203a0e0",
+      "pngSha256": "8b49c8e713dc19ffaf9b783399a3b811aff8729db4053d3eb6624ef242d5e831",
+      "width": 2000,
+      "height": 2419
+    },
+    "escrow-flow": {
+      "svgSha256": "e63db9edfa74125389d3de4c8a337785a14380ca3a3261aa2a5ab2b092d62d16",
+      "pngSha256": "871dc28f5005ba6b69b2291c9c39485d8f16059b7388ee9315686b4882acfbad",
+      "width": 2000,
+      "height": 213
+    },
+    "delegate-flow": {
+      "svgSha256": "8ca348557b62ae62af50e8516184d6d22081f7d8282df14849a073a4d1ee56dc",
+      "pngSha256": "ff86ba0843da643ac3d5108b32924ef06068722efbb2b11ed9a1c0ecdca0c4c3",
+      "width": 2000,
+      "height": 120
+    }
+  },
+  "complete": true,
+  "publicArtifacts": [
+    "docs/architecture.png",
+    "docs/architecture-dark.png"
+  ],
+  "intermediateArtifacts": "SVG exports and three Mermaid reference PNGs retained locally, not committed",
+  "visualReview": {
+    "overview": "Light/dark inspected: full text visible, both palettes legible, no container clipping; same 2000x1503 geometry.",
+    "references": "Three Mermaid sources parse and rasterize in a real DOM; reference layouts require zoom and are not video-ready fit-to-window shots.",
+    "rasterDeterminism": "Not claimed across browser/font versions; generator scenes are tested deterministic."
+  },
+  "failuresResolved": [
+    {
+      "stage": "generator regression",
+      "detail": "Different Python hash seeds changed output; negative arrow labels centered on positive displacement. Both reproduced and fixed."
+    },
+    {
+      "stage": "first owned page",
+      "detail": "Wrapper inserted controls inside bundled DOMPurify's literal closing-body string. No export; stopped. Final document-boundary insertion regression added; installed bundle unchanged."
+    },
+    {
+      "stage": "second owned page",
+      "detail": "Light/dark exported, generated Mermaid node named graph refused by the real parser. Partial manifest incomplete; stopped. Node IDs now prefixed n_."
+    }
+  ],
+  "cleanup": {
+    "allThreePidsAbsent": true,
+    "allThreePortsRefused": true,
+    "allOwnedTabsClosed": true
+  },
+  "scope": "No wallet/key/model/RPC/payment/deployment/production operations. CSP restricts external connections; not a packet-capture assertion."
+}

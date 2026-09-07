@@ -21,7 +21,7 @@ a full specification validator. [Format and execution details](docs/seller-guide
   <img src="docs/architecture.png" alt="ARCADE architecture: the seller's machine, the hub, the buyer, and settlement on Arc">
 </picture>
 
-<sub>Editable source: [`docs/architecture.excalidraw`](docs/architecture.excalidraw) — open it at [excalidraw.com](https://excalidraw.com). Regenerate with `python3 scripts/diagram.py`.</sub>
+<sub>Editable [scene](docs/architecture.excalidraw), [Mermaid companion](docs/architecture.mmd) and [offline render workflow](docs/diagram-rendering.md). The picture describes implemented paths and states the live-proof limits.</sub>
 
 ## ETHOnline 2026
 
@@ -93,8 +93,9 @@ At `be98d15`, Git blob comparisons against `57183db` confirm the original
 [FeeSplitter](contracts/FeeSplitter.sol), [demo assembler](scripts/demo/assemble.py)
 and [old narration script](scripts/narrate.sh) are unchanged. The last is retained
 only to reproduce the prior video; **it must not voice this submission**.
-The architecture image above is also still the inherited diagram; I6 must
-replace it with a validated current render.
+The architecture image above is now an ETHOnline-generated and visually checked
+replacement, not reused unchanged; its [render record](docs/evidence/I/diagram-render.json)
+separates current implementation from paused or incomplete live proof.
 
 The hub, runner, secrecy boundary, ordinary rail and first buyer interfaces
 were inherited foundations, but their shared files have since been extended.

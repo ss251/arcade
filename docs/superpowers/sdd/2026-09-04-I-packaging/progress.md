@@ -1,5 +1,21 @@
 # Plan I progress
 
+2026-09-08 02:31 IST — I6 sole94610gatePASS5327Vitest242/69.17s;
+1405Bun95/11880assert194.42s;root/webstrict/clientSSR350/169ms.17paths,
+22newlinks/privacy0;14 immutable source/artifact pins rechecked after the3
+result-record annotations. Atomiccommit/exact-one mainFF next, then I7
+evidence-qualified human narration. No active renderer/gate, keys/RPC/spend/
+deployment/approval replay/validity-cap change/push. All live pauses unchanged.
+
+2026-09-08 02:24 IST — I5 main d9dfae2. I6 current59-element light/dark
+overview inspected; two generator regressions reproduced/fixed, owned wrapper
+and reserved Mermaid ID browser failures fixed without bundle/sanitizer change.
+Final native five-pair export complete; all3PIDs absent/3ports refused/tabs
+closed. Generated Mermaid companion plus J12 flows DOM-rendered; reference
+layouts require zoom, not video frames. Final focused/strict/audit, one4worker
+fullgate then atomiccommit/mainFF next. Corrected check-in owner draft private,
+not posted. No wallet/modelkeys, chainRPC/spend/approval replay/policychange/push.
+
 2026-09-08 01:55 IST — I5 sole89841fullgatePASS5327Vitest242/69.39s;
 1394Bun93/11774assert192.69s;root/webstrict/clientSSR360/173ms.6paths,
 24newlinks/privacy0. Exact seven headings/snapshot PASS;16,993 old README

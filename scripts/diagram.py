@@ -23,6 +23,7 @@ is the other half of that look: it turns off the sketchy stroke simulation, so l
 drawn straight. Both are needed; changing only the font leaves wobbling boxes.
 """
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -38,20 +39,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DARK = "--dark" in sys.argv
 OUT = ROOT / "docs" / ("architecture-dark.excalidraw" if DARK else "architecture.excalidraw")
 
-# Real rendered widths, measured once in a browser with canvas measureText against the same
-# font stacks Excalidraw uses, and baked in here.
-#
-# They are baked rather than estimated because an estimate CLIPS. A text element stores its
-# own width, and Excalidraw draws to that box: the first version guessed
-# `len × fontSize × 0.55`, which is about right for lowercase Helvetica and far too narrow
-# for capitals and for mono. The title rendered as "ARCAD", the hub as "ARCADE HU", and the
-# USDC line lost its last two words — three silent truncations in a diagram whose whole job
-# is to be read.
-#
-# Regenerate with scripts/measure_text.js if a string changes; an id missing here falls back
-# to a deliberately generous estimate, which over-runs rather than cuts.
-MEASURED: dict[str, int] = json.loads((ROOT / "docs" / ".text-widths.json").read_text())
-
+# Widths are conservative estimates, not measurements. Do not reuse historical
+# ID-only cached widths after changing a label; inspect the real DOM export.
 SANS, MONO = 2, 3
 
 if DARK:
@@ -59,7 +48,7 @@ if DARK:
     # "dark" text colours (#15803d, #6d28d9) are unreadable, so they invert rather than
     # being reused.
     PAPER = "#161513"
-    INK, MUTED = "#e8e6e1", "#9b968b"
+    INK, MUTED = "#e8e6e1", "#b3aea4"
     GREEN, GREEN_D, FILL_G, ZONE_G = "#2ca96c", "#4ade80", "#1a4d2e", "#12281c"
     PURPLE, PURPLE_D, FILL_P, ZONE_P = "#a78bfa", "#c4b5fd", "#2d1b69", "#1d1435"
     BLUE, BLUE_D, FILL_B, ZONE_B = "#4e94dc", "#93c5fd", "#1e3a5f", "#152838"
@@ -67,7 +56,7 @@ if DARK:
     AMBER, FILL_LAW = "#f59e0b", "#3a2c10"
 else:
     PAPER = "#ffffff"
-    INK, MUTED = "#1e1e1e", "#757575"
+    INK, MUTED = "#1e1e1e", "#595959"
     GREEN, GREEN_D, FILL_G, ZONE_G = "#22c55e", "#15803d", "#b2f2bb", "#d3f9d8"
     PURPLE, PURPLE_D, FILL_P, ZONE_P = "#8b5cf6", "#6d28d9", "#d0bfff", "#e5dbff"
     BLUE, BLUE_D, FILL_B, ZONE_B = "#4a9eed", "#2563eb", "#a5d8ff", "#dbe4ff"
@@ -76,87 +65,48 @@ else:
 
 # type, id, x, y, w, h, and per-type extras. Labels are expanded below.
 SPEC: list[dict] = [
-    {"t": "text", "id": "ti", "x": 494, "y": 10, "text": "ARCADE", "size": 30, "color": INK},
-    {"t": "text", "id": "sub", "x": 268, "y": 52, "size": 16, "color": MUTED,
-     "text": "Publish a skill as a paid endpoint on Arc. Agents hire agents, per call, in USDC."},
-
-    # ── seller ────────────────────────────────────────────────────────────
-    {"t": "rect", "id": "zs", "x": 20, "y": 110, "w": 270, "h": 300, "bg": ZONE_G,
-     "stroke": GREEN, "sw": 1, "opacity": 30},
-    {"t": "text", "id": "zsl", "x": 40, "y": 122, "text": "SELLER  ·  own machine",
-     "size": 15, "color": GREEN_D},
-    {"t": "rect", "id": "sk", "x": 45, "y": 155, "w": 220, "h": 78, "bg": FILL_G,
-     "stroke": GREEN, "label": "skill/\nprompts · code · secrets", "size": 16},
-    {"t": "text", "id": "nl", "x": 52, "y": 246, "text": "never leaves this machine",
-     "size": 16, "color": GREEN_D},
-    {"t": "rect", "id": "rn", "x": 45, "y": 285, "w": 220, "h": 72, "bg": FILL_G,
-     "stroke": GREEN, "label": "runner (daemon)", "size": 16},
-    {"t": "text", "id": "rnl", "x": 52, "y": 368, "text": "dials out · no open ports",
-     "size": 15, "color": MUTED},
-
-    # ── hub ───────────────────────────────────────────────────────────────
-    {"t": "rect", "id": "zh", "x": 410, "y": 110, "w": 280, "h": 300, "bg": ZONE_P,
-     "stroke": PURPLE, "sw": 1, "opacity": 30},
-    {"t": "text", "id": "zhl", "x": 430, "y": 122, "text": "ARCADE HUB", "size": 15,
-     "color": PURPLE_D},
-    {"t": "rect", "id": "h1", "x": 432, "y": 152, "w": 236, "h": 52, "bg": FILL_P,
-     "stroke": PURPLE, "label": "registry — listings, prices", "size": 15},
-    {"t": "rect", "id": "h2", "x": 432, "y": 216, "w": 236, "h": 52, "bg": FILL_P,
-     "stroke": PURPLE, "label": "paywall — x402", "size": 15},
-    {"t": "rect", "id": "h3", "x": 432, "y": 280, "w": 236, "h": 52, "bg": FILL_P,
-     "stroke": PURPLE, "label": "broker — dispatch, bounded", "size": 15},
-    {"t": "rect", "id": "h4", "x": 432, "y": 344, "w": 236, "h": 52, "bg": FILL_P,
-     "stroke": PURPLE, "label": "settle — on success only", "size": 15},
-
-    # ── buyer ─────────────────────────────────────────────────────────────
-    {"t": "rect", "id": "zb", "x": 810, "y": 110, "w": 270, "h": 300, "bg": ZONE_B,
-     "stroke": BLUE, "sw": 1, "opacity": 30},
-    {"t": "text", "id": "zbl", "x": 830, "y": 122, "text": "BUYER  ·  any agent",
-     "size": 15, "color": BLUE_D},
-    {"t": "rect", "id": "b1", "x": 835, "y": 155, "w": 220, "h": 78, "bg": FILL_B,
-     "stroke": BLUE, "label": "wallet\nin the browser", "size": 16},
-    {"t": "text", "id": "b1l", "x": 842, "y": 246, "text": "signs EIP-3009 · no gas",
-     "size": 16, "color": BLUE_D},
-    {"t": "rect", "id": "b2", "x": 835, "y": 285, "w": 220, "h": 72, "bg": FILL_B,
-     "stroke": BLUE, "label": "x402 client", "size": 16},
-    {"t": "text", "id": "b2l", "x": 842, "y": 368, "text": "probe · sign · retry",
-     "size": 15, "color": MUTED},
-
-    # ── the flow ──────────────────────────────────────────────────────────
-    {"t": "arrow", "id": "f1", "x": 808, "y": 178, "dx": -116, "dy": 0, "stroke": BLUE_D,
-     "label": "1 probe", "size": 14},
-    {"t": "arrow", "id": "f2", "x": 692, "y": 242, "dx": 116, "dy": 0, "stroke": PURPLE,
-     "label": "2  402", "size": 14},
-    {"t": "arrow", "id": "f3", "x": 808, "y": 306, "dx": -116, "dy": 0, "stroke": BLUE_D,
-     "label": "3 signed", "size": 14},
-    {"t": "arrow", "id": "f4", "x": 408, "y": 210, "dx": -116, "dy": 0, "stroke": PURPLE,
-     "label": "4 job", "size": 14},
-    {"t": "arrow", "id": "f5", "x": 292, "y": 306, "dx": 116, "dy": 0, "stroke": GREEN,
-     "label": "5 result", "size": 14},
-    # A "socket opened by the runner" note used to sit here. It was ~200px of text in a
-    # 116px gap, so it ran under the settle box — and the seller zone already says "dials
-    # out · no open ports", which is the same fact where it belongs.
-    {"t": "arrow", "id": "f6", "x": 550, "y": 410, "dx": 0, "dy": 62, "stroke": USDC,
-     "label": "6 settle", "size": 14},
-
-    # ── chain ─────────────────────────────────────────────────────────────
-    {"t": "rect", "id": "arc", "x": 390, "y": 474, "w": 320, "h": 76, "bg": FILL_ARC,
-     "stroke": USDC, "label": "Arc testnet  ·  eip155:5042002", "size": 16},
-    {"t": "text", "id": "arcl", "x": 330, "y": 562, "size": 14, "color": MUTED, "mono": True,
-     "text": "USDC 0x3600...0000  —  native gas token AND the ERC-20 prices use"},
-
-    # ── the law ───────────────────────────────────────────────────────────
-    {"t": "rect", "id": "law", "x": 170, "y": 606, "w": 760, "h": 46, "bg": FILL_LAW,
-     "stroke": AMBER, "sw": 1, "opacity": 45, "size": 16,
-     "label": "verify payment  →  execute in sandbox  →  validate output  →  settle"},
-    {"t": "text", "id": "lawl", "x": 236, "y": 664, "size": 15, "color": MUTED,
-     "text": "A job that refuses, times out or returns the wrong shape settles nothing. That is the refund."},
+    {"t": "text", "id": "title", "x": 20, "y": 14, "text": "ARCADE", "size": 32, "color": INK},
+    {"t": "text", "id": "subtitle", "x": 20, "y": 60, "text": "Agent capabilities → paid endpoints on Arc · implemented architecture, not a claim of live readiness", "size": 20, "color": MUTED},
+    {"t": "rect", "id": "canary", "x": 550, "y": 103, "w": 340, "h": 40, "bg": FILL_P, "stroke": PURPLE, "label": "canary · paid healthcheck", "size": 18},
+    {"t": "arrow", "id": "canary_flow", "x": 720, "y": 144, "dx": 0, "dy": 16, "stroke": PURPLE},
+    {"t": "rect", "id": "seller", "x": 20, "y": 165, "w": 400, "h": 360, "bg": ZONE_G, "stroke": GREEN},
+    {"t": "text", "id": "seller_title", "x": 42, "y": 180, "text": "SELLER · own machine", "size": 20, "color": GREEN_D},
+    {"t": "rect", "id": "capability", "x": 42, "y": 220, "w": 356, "h": 78, "bg": FILL_G, "stroke": GREEN, "label": "Agent Skill · MCP · OpenAPI\nlocal code + scoped secrets", "size": 18},
+    {"t": "rect", "id": "runner", "x": 42, "y": 365, "w": 356, "h": 65, "bg": FILL_G, "stroke": GREEN, "label": "runner · outbound socket\nbounded work + child hires", "size": 17},
+    {"t": "text", "id": "seller_limit", "x": 42, "y": 459, "text": "Public metadata omits secrets.\nOutputs need exfiltration care.", "size": 17, "color": MUTED},
+    {"t": "rect", "id": "hub", "x": 520, "y": 165, "w": 400, "h": 360, "bg": ZONE_P, "stroke": PURPLE},
+    {"t": "text", "id": "hub_title", "x": 542, "y": 180, "text": "HUB · admission + dispatch", "size": 20, "color": PURPLE_D},
+    {"t": "rect", "id": "registry", "x": 542, "y": 220, "w": 356, "h": 40, "bg": FILL_P, "stroke": PURPLE, "label": "registry · prices + rails", "size": 17},
+    {"t": "rect", "id": "input_gate", "x": 542, "y": 270, "w": 356, "h": 40, "bg": FILL_P, "stroke": PURPLE, "label": "input gate → verify payment", "size": 17},
+    {"t": "rect", "id": "lineage", "x": 542, "y": 320, "w": 356, "h": 40, "bg": FILL_P, "stroke": PURPLE, "label": "lineage · hops + tree ledger", "size": 17},
+    {"t": "rect", "id": "broker", "x": 542, "y": 370, "w": 356, "h": 40, "bg": FILL_P, "stroke": PURPLE, "label": "dispatch → output validation", "size": 17},
+    {"t": "rect", "id": "terminal", "x": 542, "y": 470, "w": 356, "h": 40, "bg": FILL_P, "stroke": PURPLE, "label": "terminal outcome + receipt", "size": 17},
+    {"t": "rect", "id": "buyer", "x": 1020, "y": 165, "w": 400, "h": 360, "bg": ZONE_B, "stroke": BLUE},
+    {"t": "text", "id": "buyer_title", "x": 1042, "y": 180, "text": "BUYER · agent or browser", "size": 20, "color": BLUE_D},
+    {"t": "rect", "id": "selection", "x": 1042, "y": 220, "w": 356, "h": 78, "bg": FILL_B, "stroke": BLUE, "label": "probe → select a rail\nsign → submit → reconcile", "size": 18},
+    {"t": "rect", "id": "sessions", "x": 1042, "y": 325, "w": 356, "h": 65, "bg": FILL_B, "stroke": BLUE, "label": "Gateway · bounded session\n20-call proof: offline only", "size": 18},
+    {"t": "rect", "id": "delegate", "x": 1032, "y": 418, "w": 376, "h": 82, "bg": FILL_B, "stroke": BLUE, "label": "Owner custody → delegate → Arc\nUnified Balance funding\nlive signing / CLI buy paused", "size": 17},
+    {"t": "arrow", "id": "f1", "x": 1018, "y": 238, "dx": -96, "dy": 0, "stroke": BLUE_D, "label": "1 probe", "size": 14},
+    {"t": "arrow", "id": "f2", "x": 922, "y": 291, "dx": 96, "dy": 0, "stroke": PURPLE, "label": "2 402", "size": 14},
+    {"t": "arrow", "id": "f3", "x": 1018, "y": 345, "dx": -96, "dy": 0, "stroke": BLUE_D, "label": "3 submit", "size": 14},
+    {"t": "arrow", "id": "f4", "x": 518, "y": 387, "dx": -96, "dy": 0, "stroke": PURPLE, "label": "4 job", "size": 14},
+    {"t": "arrow", "id": "f5", "x": 422, "y": 442, "dx": 96, "dy": 0, "stroke": GREEN_D, "label": "5 result", "size": 14},
+    {"t": "arrow", "id": "rail_flow", "x": 720, "y": 577, "dx": 0, "dy": 18, "stroke": PURPLE},
+    {"t": "text", "id": "rails_heading", "x": 20, "y": 550, "text": "SETTLEMENT · Arc testnet 5042002 · advertised preference: Gateway → exact → escrow", "size": 20, "color": INK},
+    {"t": "rect", "id": "gateway", "x": 20, "y": 600, "w": 440, "h": 148, "bg": FILL_B, "stroke": BLUE, "label": "1 · CIRCLE GATEWAY\nSpend from funded balance\nAcceptance ≠ mined batch\nRetained: deposit + acceptance", "size": 18},
+    {"t": "rect", "id": "exact", "x": 500, "y": 600, "w": 440, "h": 148, "bg": FILL_P, "stroke": PURPLE, "label": "2 · EXACT / EIP-3009\nRelay after validated success\nFeeSplitterV2 · tree commitment\nRetained: mined lineage proof", "size": 18},
+    {"t": "rect", "id": "escrow", "x": 980, "y": 600, "w": 440, "h": 148, "bg": FILL_LAW, "stroke": AMBER, "label": "3 · ERC-8183 ESCROW\nPrincipal locked before work\nHub evaluates · receipt-tree hook\nComplete pays / reject refunds\nOffline · deployment blocked", "size": 17},
+    {"t": "text", "id": "evidence_heading", "x": 20, "y": 786, "text": "DISCOVERY + EVIDENCE · separate from the settlement decision", "size": 20, "color": INK},
+    {"t": "rect", "id": "ens", "x": 20, "y": 833, "w": 440, "h": 115, "bg": FILL_G, "stroke": GREEN, "label": "ENSv2 · Sepolia → discovery\nNames · payTo lock · expiry\nExpiry is not service health\nDemo stopped; re-point pending", "size": 17},
+    {"t": "rect", "id": "erc8004", "x": 500, "y": 833, "w": 440, "h": 115, "bg": FILL_B, "stroke": BLUE, "label": "ERC-8004 on Arc\nIdentity · validation · feedback\nBest-effort settlement evidence\nRetained: six-role live proof", "size": 17},
+    {"t": "rect", "id": "graph", "x": 980, "y": 833, "w": 440, "h": 115, "bg": FILL_P, "stroke": PURPLE, "label": "Arc events → The Graph → web\nSelected lineage, not all totals\nBase paid-query hop NOT RUN\nEscrow sources inactive", "size": 17},
+    {"t": "rect", "id": "limits", "x": 20, "y": 986, "w": 1400, "h": 72, "bg": FILL_LAW, "stroke": AMBER, "label": "Before-settlement failure can avoid a charge. Unknown settlement is not a refund.\nA failed parent does not reverse paid children, external API costs or gas. Escrow has custody and admin risks.", "size": 18},
 ]
 
 
 def base(el_id: str, x: float, y: float, w: float, h: float) -> dict:
     """Fields every Excalidraw element carries. Deterministic — no randomness, so reruns diff clean."""
-    seed = abs(hash(el_id)) % 2_000_000_000
+    seed = int.from_bytes(hashlib.sha256(el_id.encode()).digest()[:8], "big") % 2_000_000_000
     return {
         "id": el_id, "x": x, "y": y, "width": w, "height": h,
         "angle": 0, "strokeColor": INK, "backgroundColor": "transparent",
@@ -169,9 +119,7 @@ def base(el_id: str, x: float, y: float, w: float, h: float) -> dict:
 
 
 def width_of(el_id: str, text: str, size: int, mono: bool) -> int:
-    """Measured width when we have one; a generous estimate when we do not."""
-    if el_id in MEASURED:
-        return MEASURED[el_id]
+    """Conservative estimate. Real browser rendering remains the visual gate."""
     longest = max(len(ln) for ln in text.split("\n"))
     # 0.68 rather than 0.55: erring wide leaves harmless empty space, erring narrow cuts
     # glyphs off the end and looks like a typo.
@@ -231,15 +179,46 @@ def build() -> list[dict]:
             lines = s["label"].split("\n")
             tw = width_of(tid, s["label"], size, False)
             th = len(lines) * size * 1.25
-            t = text_el(tid, s["x"] + (s["w"] if kind == "rect" else abs(s["dx"])) / 2 - tw / 2,
-                        s["y"] + (s["h"] if kind == "rect" else abs(s["dy"])) / 2 - th / 2,
+            t = text_el(tid, s["x"] + (s["w"] if kind == "rect" else s["dx"]) / 2 - tw / 2,
+                        s["y"] + (s["h"] if kind == "rect" else s["dy"]) / 2 - th / 2,
                         s["label"], size, INK, container=s["id"])
+            if kind == "rect" and (tw > s["w"] - 16 or th > s["h"] - 12):
+                raise ValueError(f"diagram label exceeds container: {s['id']}")
             e["boundElements"] = [{"id": tid, "type": "text"}]
             out.append(t)
     return out
 
 
+def mermaid_source() -> str:
+    """Semantic companion from the same labels; geometry remains in SPEC."""
+    flows = [
+        ("canary", "registry", "paid probe"), ("capability", "registry", "publish metadata"),
+        ("selection", "registry", "probe"), ("registry", "selection", "ordered 402"),
+        ("selection", "input_gate", "selected payment"), ("input_gate", "lineage", "admit"),
+        ("lineage", "broker", "bounded dispatch"), ("broker", "runner", "job"),
+        ("runner", "broker", "result"), ("broker", "terminal", "validated outcome"),
+        ("terminal", "gateway", "Gateway rail"), ("terminal", "exact", "exact rail"),
+        ("terminal", "escrow", "escrow rail"), ("delegate", "selection", "funding path"),
+        ("sessions", "input_gate", "session bounds"), ("ens", "registry", "discovery"),
+        ("terminal", "erc8004", "best effort evidence"), ("exact", "graph", "on-chain events"),
+        ("escrow", "graph", "inactive data sources"),
+    ]
+    nodes = {s["id"]: s for s in SPEC if s["t"] == "rect" and "label" in s}
+    lines = ["%% Generated by scripts/diagram.py; implemented paths, not live readiness.", "flowchart TB"]
+    for key, node in nodes.items():
+        label = node["label"].replace('"', "&quot;").replace("\n", " — ")
+        # Prefix avoids Mermaid keywords such as the evidence node named graph.
+        lines.append(f'  n_{key}["{label}"]')
+    for source, target, label in flows:
+        if source not in nodes or target not in nodes:
+            raise ValueError("unknown diagram flow node")
+        lines.append(f"  n_{source} -->|{label}| n_{target}")
+    return "\n".join(lines) + "\n"
+
+
 def main() -> None:
+    if sys.argv[1:] not in ([], ["--dark"]):
+        raise SystemExit("usage: python3 scripts/diagram.py [--dark]")
     scene = {
         "type": "excalidraw",
         "version": 2,
@@ -250,7 +229,9 @@ def main() -> None:
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(scene, indent=2) + "\n")
-    print(f"{OUT}  ({len(scene['elements'])} elements)")
+    if not DARK:
+        (ROOT / "docs" / "architecture.mmd").write_text(mermaid_source())
+    print(f"docs/{OUT.name} ({len(scene['elements'])} elements)")
 
 
 if __name__ == "__main__":

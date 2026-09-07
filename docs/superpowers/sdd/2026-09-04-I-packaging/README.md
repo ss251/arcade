@@ -11,6 +11,7 @@ are merged; unresolved live gates are not prerequisites we can invent.
 - [Task4 brief](task-4-brief.md), [generator checkpoint](task-4-report.md),
   [operator contract](../../../continuity-generator.md).
 - [Task5 brief](task-5-brief.md), [README checkpoint](task-5-report.md).
+- [Task6 brief](task-6-brief.md), [diagram checkpoint](task-6-report.md).
 - [CLI interop status](../../../interop/circle-cli.md).
 
 Single-threaded; four-worker limits; one sequential full gate per atomic commit,
@@ -24,14 +25,14 @@ research. Secrets/bearer material/private journals never enter these records.
 | I1 CLI prerequisites | Historical record reused; no provisioning replay or current readiness claim |
 | I2 capture/decoder | Live capture paused with J4; safe offline tooling may be prepared, no counterfeit capture |
 | I3 CLI paid evidence | Paused with J4; no authorization or live purchase |
-| I4 continuity generator | Implemented; pinned snapshot, all A–J declared-path activity,32 focused tests and sole full gate passed; I5 marker integration next |
+| I4 continuity generator | Implemented; pinned snapshot, all A–J declared-path activity,32 focused tests/full gate passed; I5 markers integrated |
 | I5 README | Seven sections and pinned snapshot implemented; product bytes preserved, sole full gate passed; I6 current diagram next |
-| I6 architecture | Generator + DOM-backed render/visual verification; J12 Mermaid sources are not yet rendered |
+| I6 architecture | Both overview palettes inspected, five actual DOM exports complete;11 focused tests/strict and sole full gate passed |
 | I7 narration | Human-voice text and bounded word-budget checks; no TTS |
 | I8 shot list | Evidence-qualified shots; no replay of consumed live approvals |
 | I9 capture/voice | Owner voice and appropriate live/demo readiness required |
 | I10 cut | Requires actual takes, measured in-points and owner voice; no invented footage |
-| I11 Sept8 check-in | Prepare draft; owner posts, then recorded confirmation permits check-in commit |
+| I11 Sept8 check-in | Corrected owner draft prepared privately; posting unconfirmed, so no public check-in commit |
 | I12 Sept11 check-in | Future integration record; no premature live evidence reruns |
 | I13 submission | Prepare sourced fields/feedback; owner submits |
 | I14 packaging evidence | After constituent artifacts; missing proof must fail honestly |
