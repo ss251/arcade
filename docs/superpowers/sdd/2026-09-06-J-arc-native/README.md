@@ -28,6 +28,8 @@ evidence remain separate open work; this index does not mark them accepted.
 - [Task6 pinned source and hook brief](task-6a-brief.md),
   [hook verification and size blocker](task-6a-report.md),
   [escrow build guide](../../../erc8183-escrow.md).
+- [Task6B read-only deploy preflight brief](task-6b-brief.md),
+  [preflight/unsigned plan record](task-6b-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

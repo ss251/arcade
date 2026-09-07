@@ -1,0 +1,77 @@
+{
+  "format": "arcade-erc8183-build-preflight-v1",
+  "observedDate": "2026-09-07",
+  "status": "build_blocked",
+  "sourcePin": "142e669c1fd318486a4628395b629f033654dd06",
+  "compiler": "0.8.28+commit.7893614a",
+  "settings": {
+    "viaIR": true,
+    "optimizerRuns": 200,
+    "evmVersion": "cancun",
+    "bytecodeHash": "ipfs"
+  },
+  "reports": [
+    {
+      "role": "implementation",
+      "status": "blocked",
+      "reason": "artifact_oversized",
+      "runtimeBytes": 26167,
+      "creationBytes": 26398
+    },
+    {
+      "role": "proxy",
+      "status": "passed",
+      "runtimeBytes": 130,
+      "creationBytes": 674
+    },
+    {
+      "role": "hook",
+      "status": "passed",
+      "runtimeBytes": 1632,
+      "creationBytes": 1872
+    }
+  ],
+  "limits": {
+    "runtimeBytes": 24576,
+    "creationBytesIncludingArguments": 49152
+  },
+  "experiments": [
+    {
+      "compiler": "0.8.28+commit.7893614a",
+      "viaIR": false,
+      "optimizerRuns": 200,
+      "runtimeBytes": 27574
+    },
+    {
+      "compiler": "0.8.28+commit.7893614a",
+      "viaIR": true,
+      "optimizerRuns": 200,
+      "runtimeBytes": 26167
+    },
+    {
+      "compiler": "0.8.28+commit.7893614a",
+      "viaIR": true,
+      "optimizerRuns": 1,
+      "runtimeBytes": 25776,
+      "savedSetting": false
+    },
+    {
+      "compiler": "0.8.36+commit.8a079791",
+      "viaIR": true,
+      "optimizerRuns": 200,
+      "runtimeBytes": 26363,
+      "sourceFilesVerified": 43,
+      "savedSetting": false
+    }
+  ],
+  "keyReads": 0,
+  "networkRequests": 0,
+  "signatures": 0,
+  "broadcasts": 0,
+  "deploymentTransactions": 0,
+  "notes": [
+    "Read-only artifact compatibility checks, not an independent compiler/bytecode audit or on-chain proof.",
+    "No source re-pin, pruning, code-size cap increase or payment-validity/replay change.",
+    "Current CLI has no live executor; explicit owner treasury confirmation remains pending."
+  ]
+}

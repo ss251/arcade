@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 10:36 IST — J6B1 sole35853 fullgatePASS:4,825Vitest214/67.17s;
+964Bun69/7,317assert/172.25s;root/webstrict;client576ms/SSR186ms.
+Fourcode/testpins unchanged throughgate;11paths51links/privacy0. Finalaudit/
+atomiccommit/exactFFnext. Treasuryquestionqueued; SIZEgate stillFAIL, no live
+executor/key/RPC/send. Next7A typedbindings/provider auth;7B runtime then8/9offline.
+
+2026-09-07 10:31 IST — J6A merged1e169c4/exactoneFFcleanmain.6B1 readonly
+deploy CLI/artifact checks/unsigned seven-call plan implemented;9focusedBun/
+47assert126ms,4-rootstrict0PASS. Actualcheck exits2 artifact_oversized26167;
+hook/proxychecks pass. Extra43-source0.8.36probe26363alsooversized, not promoted.
+Freeze/solefullgate next;6B2liveexecutor/journal/config NOT_IMPLEMENTED, deployment
+and treasury checkpoint pending. Continue7–9 offline; J4/J5 paused, no keys/spend.
+
 2026-09-07 10:20 IST — J6A sole36921 fullTESTgatePASS:31Foundry3/25.62ms;
 4,825Vitest214/67.00s;955Bun67/7,272assert/172.70s;root/webstrict;
 client373ms/SSR196ms. Separate deploymentSIZEgate FAIL remains explicit.

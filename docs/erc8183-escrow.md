@@ -26,11 +26,30 @@ the first command's hook tests pass but the second **fails EIP-170**:
 | Default legacy, optimizer 200 | 27,574 | 24,576 |
 | Candidate via-IR, optimizer 200 | 26,167 | 24,576 |
 | Command-only via-IR, optimizer 1 | 25,776 | 24,576 |
+| Command-only Solidity0.8.36, via-IR, optimizer 200 | 26,363 | 24,576 |
 
 The optimizer-1 experiment is not the saved profile. No code-size limit was
 raised, no upstream code was removed, and no alternate source pin was chosen.
 Local Foundry test deployment is not evidence that a normal chain deployment
 will accept oversized runtime code. The deployer must refuse this before keys.
+
+The read-only deployment entrypoint now makes that refusal concrete:
+
+```sh
+bun --no-env-file scripts/deploy-erc8183.ts --dry-run
+bun --no-env-file scripts/deploy-erc8183.ts --check-build
+```
+
+Check-build exits2 with `artifact_oversized` for the current implementation.
+It reads the already-built candidate artifacts and verifies source metadata;
+it does not build, access RPC/Keychain, write a journal/config or broadcast.
+An unsigned seven-step plan additionally requires explicit treasury and public
+deployer-nonce arguments; that mode also refuses the current oversized artifact.
+There is deliberately no live executor in this checkpoint. The later executor
+must enforce bounded gas, durable hash-before-send journaling and independent
+receipt/code/getter verification before writing deployment evidence/config.
+Do not treat a command-line treasury argument as a substitute for owner approval.
+See [Task6B status](superpowers/sdd/2026-09-06-J-arc-native/task-6b-report.md).
 
 ## Hook and refund semantics
 
