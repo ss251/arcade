@@ -4,3 +4,7 @@ export * from "./eip3009.ts"
 export * from "./gateway.ts"
 export * from "./gateway-sign.ts"
 export * from "./test-rail.ts"
+// Offline escrow bindings only; these exports do not install or advertise a rail.
+export * from "./erc8183-abi.ts"
+export * from "./erc8183-codec.ts"
+export * from "./erc8183-auth.ts"

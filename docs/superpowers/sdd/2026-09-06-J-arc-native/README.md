@@ -30,6 +30,8 @@ evidence remain separate open work; this index does not mark them accepted.
   [escrow build guide](../../../erc8183-escrow.md).
 - [Task6B read-only deploy preflight brief](task-6b-brief.md),
   [preflight/unsigned plan record](task-6b-report.md).
+- [Task7 escrow runtime brief](task-7-brief.md),
+  [offline ABI/facts/provider-signature checkpoint](task-7a-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

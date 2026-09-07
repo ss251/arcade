@@ -166,6 +166,13 @@ See the [preflight record](../sdd/2026-09-06-J-arc-native/task-6b-report.md).
 
 ### Task 7: Escrow rail in `packages/payments` (J5)
 
+Execution7A adds offline ABI/job/receipt and provider-signature helpers only;
+7B adds the guarded rail/relay. Neither may be advertised live without a verified
+deployment. The [brief](../sdd/2026-09-06-J-arc-native/task-7-brief.md) records
+request-ownership/durable-admission, pre-settlement receipt-hash and upstream
+claim/payout/fee obligations omitted by the shorthand. Public jobId alone is not
+caller authority. See [7A verification](../sdd/2026-09-06-J-arc-native/task-7a-report.md).
+
 - [ ] `erc8183.ts`: `Erc8183Live({escrow, hook, evaluatorKey, rpc})` implementing `Rail` with `name: "erc8183"`. `challenge` → requirements `{scheme: "erc8183", network, asset: USDC, amount, payTo: seller, maxTimeoutSeconds, extra: {escrow, hook, evaluator, expiresInSeconds, providerAgentId, description}}`. `verify(payload, requirements)` → `getJob(payload.jobId)` must be Funded with `budget == amount`, `paymentToken == USDC`, `provider == payTo`, `evaluator == ours`, `hook == ours`, `expiredAt - now ≥ timeout + 600`; returns `VerifiedPayment{payer: job.client, …}`. `settle(verified, tree)` → `complete(jobId, "arcade-settled", abi.encode(treeHash|0, childCount|0, childTotal|0, receiptHash))` with the existing receipt backoff; returns `{txHash}`. New `reject(jobId, reason)` (not on `Rail`; exported for the pipeline).
 - [ ] `erc8183-auth.ts`: typed-data builders for `SetBudgetAuthorization(signer, jobId, token, amount, optParamsHash, nonce, deadline)` and `SubmitAuthorization(signer, jobId, deliverable, optParamsHash, nonce, deadline)` matching `ERC8183WithAuthorization.sol` lines 20-26; nonce = `uint72` random; deadline = now + 10 min. `relaySetBudget`/`relaySubmit` send the `*WithAuthorization` calls from the facilitator key.
 - [ ] Tests with a mocked `readContract`/`writeContract`: every verify refusal; settle encodes optParams exactly; reject path.

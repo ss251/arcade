@@ -1,0 +1,24 @@
+{
+  "observedAt": "2026-09-07T05:26:59.362Z",
+  "endpoint": "https://rpc.testnet.arc.network",
+  "chainId": 5042002,
+  "method": "eth_estimateGas",
+  "sourcePin": "142e669c1fd318486a4628395b629f033654dd06",
+  "creationHash": "0x23156ccaa0c47e18928d1a711f4e78c9d9e63f238607ed65f16aa2f0396b2ac7",
+  "runtimeBytes": 26167,
+  "response": {
+    "errorCode": -32003,
+    "errorMessage": "revert: CreateContractSizeLimit"
+  },
+  "rpcRequests": 2,
+  "keys": 0,
+  "signatures": 0,
+  "broadcasts": 0,
+  "paidCalls": 0,
+  "simulationFrom": "0xcf821769ed3c0e55e152745377bb833d7155a78a",
+  "notes": [
+    "Unsigned read-only simulation only, not a deployment attempt or mined transaction.",
+    "No state override, code-size limit change, key lookup, signing or broadcast.",
+    "This is J6 deployment-size evidence, not a J4 Circle services-pay refusal."
+  ]
+}

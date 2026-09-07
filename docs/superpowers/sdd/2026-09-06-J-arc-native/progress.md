@@ -1,5 +1,19 @@
 # Plan J progress
 
+2026-09-07 10:58 IST — J7A sole99429PASS:4,851Vitest216/66.77s;
+964Bun69/7,319assert/173.45s;root/webstrict;client343ms/SSR177ms.
+Sixfrozencode/testpins unchanged; final12pathsaudit next. J6 unsigned2RPC
+simulation05:26:59UTC confirms Arc error-32003 CreateContractSizeLimit, no
+key/signature/send/spend. Public evidence added; no deployment attempt.
+Atomiccommit/exactFF then7B runtime; J4/J5 live andJ6 treasury remain paused.
+
+2026-09-07 10:51 IST — J7A offline ABI/job/tree/provider authorization helpers
+implemented;28ABIentries match pinned compiler output,26focusedVitest2/394ms,
+6-rootstrict0PASS. Sixcode/testpins to freeze; solefullgate/audit/commit/FFnext.
+No installed/advertised escrow rail;7B runtime then8request admission/pipeline
+and9buyer remain. J6 deploymentSIZE/treasury paused; J4/J5 live paused. No keys,
+RPC/send, existing validity/cap/replay change, agent or push.
+
 2026-09-07 10:36 IST — J6B1 sole35853 fullgatePASS:4,825Vitest214/67.17s;
 964Bun69/7,317assert/172.25s;root/webstrict;client576ms/SSR186ms.
 Fourcode/testpins unchanged throughgate;11paths51links/privacy0. Finalaudit/
