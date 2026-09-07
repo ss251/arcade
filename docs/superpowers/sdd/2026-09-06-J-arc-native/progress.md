@@ -1,5 +1,20 @@
 # Plan J progress
 
+2026-09-07 14:57 IST — J8B3a sole74406 fullgatePASS:5,030Vitest229/71.16s,
+981Bun73/7,681assert/174.63s;root/webstrict/clientSSRbuild. Five-rootstrict0,
+fivepins unchanged,10paths80links/privacy0. Atomiccommit/exactFF next, no replay.
+Remaining8B sign-only runtime/original-socket completion authority, then8C/8D/9.
+No keys/liveRPC/send/spend/deploy/push or existing window/cap/replay changes.
+
+2026-09-07 14:52 IST — J8B3a separate provider signature journal implemented
+offline. Missing-module Red→8actualSQLiteBun/40assert PASS;10focusedVitest2
+(5new)PASS;5-rootstrict0. Captured fixed600-second issuance/full public context,
+canonical storage, one-shot job/stage/request/provider-nonce reservations,
+actual EIP-712 signature validation before CAS; late signature cannot overwrite
+uncertainty. No signer/send/replay API or runtime authority. Freeze/fullgate next;
+remaining8B runtime/socket,8C/8D admission/pipeline,9 buyer. No keys/liveRPC/spend,
+activation/push or changes to existing windows/caps/replay rules.
+
 2026-09-07 14:44 IST — J8B2 sole73692 fullgatePASS:5,025Vitest228/69.54s,
 973Bun72/7,641assert/173.20s,root/webstrict/clientSSRbuild. Four-rootstrict0;
 fourpins unchanged;9paths77links/privacy0. Atomiccommit/exactFF next, no replay.

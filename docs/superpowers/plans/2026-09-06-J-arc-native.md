@@ -213,8 +213,10 @@ output/input/listing. Durable signing claims and socket/chain authority remain
 unimplemented; a completion data object alone is not permission to sign.
 [8B2 preflight](../sdd/2026-09-06-J-arc-native/task-8b2-report.md) adds the
 concrete read-only canonical provider/job/nonce checks before signing. It exposes
-no signer or broadcast method. Signing journal/runtime and socket handlers remain
-pending; no live activation is implied by a read-only module.
+no signer or broadcast method. The [8B3a private signing journal](../sdd/2026-09-06-J-arc-native/task-8b3a-report.md)
+now reserves complete public intents and retains signature/uncertainty state.
+The sign-only runtime and original-socket authority remain pending; neither
+the data helpers nor a journal claim grant permission to sign or activate a rail.
 
 - [ ] Socket messages `EscrowBudgetRequest{jobId, token, amount, escrow, chainId}` → runner replies `EscrowBudgetSigned{jobId, signature, nonce, deadline}`; `EscrowSubmitRequest{jobId, deliverable}` → `EscrowSubmitSigned{…}`. Runner signs with the seller key only; refuses if `amount` ≠ its listing price or `escrow` ≠ chain config. Runner never broadcasts.
 - [ ] `POST /x/:seller/:skill/escrow {jobId}`: validations from spec §7.3 step 3, relay `setBudgetWithAuthorization`, respond `{jobId, budget, token, escrow, fundBy}`; 409 when the job is not Open/ours; rate-limited per payer.
