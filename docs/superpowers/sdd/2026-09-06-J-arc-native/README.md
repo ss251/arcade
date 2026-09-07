@@ -33,6 +33,7 @@ evidence remain separate open work; this index does not mark them accepted.
 - [Task7 escrow runtime brief](task-7-brief.md),
   [offline ABI/facts/provider-signature checkpoint](task-7a-report.md).
   [Request ownership and finalized reader](task-7b1-report.md).
+  [Action contracts and receipt proofs](task-7b2-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

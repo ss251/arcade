@@ -24,7 +24,10 @@ getter evidence, not an RPC-returned hash alone, establishes settlement/refund.
 7B1 implements the request capability commitment and finalized identity/state
 reader; see the [wire decision and verification record](task-7b1-report.md).
 It does not activate a rail or replace durable budget/execution reservations.
-7B2 must compose the bounded transport and guarded actions before Task8 wiring.
+7B2 adds offline action contracts, pre-settlement receipt projection and
+signed-intent/log/poststate proofs; see [verification](task-7b2-report.md).
+7B3 must compose the bounded transport and durable guarded action lifecycle
+before the active Effect rail and Task8 wiring. No journal or send exists yet.
 
 7C/Task8 integration: typed wire dispatch, durable one-job/one-request reservation,
 provider socket authorization, pipeline submit then complete or reject, and

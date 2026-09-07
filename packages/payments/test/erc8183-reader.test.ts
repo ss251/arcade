@@ -38,6 +38,20 @@ function fixture() {
     options: { signal: controller.signal, nowSeconds: () => now } }
 }
 describe("identity-bound escrow finalized reader (fake RPC, no sends)", () => {
+  it("reconciles an older canonical receipt block under a fresh finalized head, never an unfinalized or mismatched block", async () => {
+    const f = fixture()
+    f.client.getBlock = async args => "blockTag" in args ? f.block : { number: args.blockNumber, hash: hash(40), timestamp: 100n }
+    const reader = createEscrowReader(f.client, identity, f.options)
+    await expect(reader.readJobAt(7n, { blockNumber: 40n, blockHash: hash(40) }))
+      .resolves.toMatchObject({ blockNumber: 40n, blockHash: hash(40), timestamp: 100 })
+    await expect(reader.readJobAt(7n, { blockNumber: 51n, blockHash: hash(40) })).rejects.toThrow("escrow_facts_refused")
+    await expect(reader.readJobAt(7n, { blockNumber: 40n, blockHash: hash(41) })).rejects.toThrow("escrow_facts_refused")
+    expect(f.calls.filter(c => !["getChainId", "getBlock"].includes(c.method))
+      .every(c => (c.args as { blockNumber: bigint }).blockNumber === 40n)).toBe(true)
+    const target = { blockNumber: 40n, blockHash: hash(40) }
+    f.client.getChainId = async () => { target.blockNumber = 49n; return 5042002 }
+    await expect(reader.readJobAt(7n, target)).resolves.toMatchObject({ blockNumber: 40n })
+  })
   it("reads every state fact at the same finalized height and rechecks canonical hash", async () => {
     const f = fixture(), reader = createEscrowReader(f.client, identity, f.options)
     const result = await reader.readJob(7n)

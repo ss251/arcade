@@ -176,6 +176,9 @@ The [7B1 wire decision](../sdd/2026-09-06-J-arc-native/task-7b1-report.md)
 adds a buyer-held capability committed to the exact request in the description;
 budget and funded payloads require both jobId and capability. Pure verification
 and the finalized reader are implemented; guarded sends/admission remain pending.
+The [7B2 checkpoint](../sdd/2026-09-06-J-arc-native/task-7b2-report.md)
+adds offline action/receipt proof contracts and historical finalized read-back.
+7B3 still owns the actual bounded transport, durable action lifecycle and rail.
 
 - [ ] `erc8183.ts`: `Erc8183Live({escrow, hook, evaluatorKey, rpc})` implementing `Rail` with `name: "erc8183"`. `challenge` → requirements `{scheme: "erc8183", network, asset: USDC, amount, payTo: seller, maxTimeoutSeconds, extra: {escrow, hook, evaluator, expiresInSeconds, providerAgentId, description}}`. `verify(payload, requirements)` → `getJob(payload.jobId)` must be Funded with `budget == amount`, `paymentToken == USDC`, `provider == payTo`, `evaluator == ours`, `hook == ours`, `expiredAt - now ≥ timeout + 600`; returns `VerifiedPayment{payer: job.client, …}`. `settle(verified, tree)` → `complete(jobId, "arcade-settled", abi.encode(treeHash|0, childCount|0, childTotal|0, receiptHash))` with the existing receipt backoff; returns `{txHash}`. New `reject(jobId, reason)` (not on `Rail`; exported for the pipeline).
 - [ ] `erc8183-auth.ts`: typed-data builders for `SetBudgetAuthorization(signer, jobId, token, amount, optParamsHash, nonce, deadline)` and `SubmitAuthorization(signer, jobId, deliverable, optParamsHash, nonce, deadline)` matching `ERC8183WithAuthorization.sol` lines 20-26; nonce = `uint72` random; deadline = now + 10 min. `relaySetBudget`/`relaySubmit` send the `*WithAuthorization` calls from the facilitator key.

@@ -107,3 +107,24 @@ does not yet exist. A fresh snapshot or correct capability does not replace
 durable once-only admission or guarded hash-before-send journaling. No escrow
 rail is advertised until those pieces and deployment prerequisites are ready.
 See the [J7B1 record](superpowers/sdd/2026-09-06-J-arc-native/task-7b1-report.md).
+
+## Settlement commitment and proof (offline contracts)
+
+The hook receiptHash commits the versioned pre-settlement projection produced
+by escrowCompletionProjection. Persist its exact bytes before complete. It
+includes the request identity, output hash, price, floor-rounded fee and tree,
+but excludes settleTx and later terminal/attestation fields to avoid a circular
+hash. It is not the hash of the final Receipt document. Confirmed Submit output
+must match this projection before completion is allowed.
+
+The action evidence checks require a recovered exact transaction intent,
+separately fetched mined transaction, successful receipt, exact token/escrow/
+hook logs and an identity-checked job snapshot at that canonical finalized
+receipt block. readJobAt can obtain historical facts, but cannot replace
+fresh readJob authority before a send. The full-job source keeps settledAmount
+zero on complete/reject; it is partial-claim accounting, not a terminal flag.
+Fee flooring can legitimately produce no PlatformFeePaid event at tiny prices.
+
+The broadcast runtime and durable action/admission journals remain unimplemented.
+No hash-only settlement, automatic uncertain-send retry, or live rail activation
+is supplied by these helpers. See the [J7B2 record](superpowers/sdd/2026-09-06-J-arc-native/task-7b2-report.md).

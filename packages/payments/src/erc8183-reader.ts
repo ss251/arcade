@@ -38,23 +38,36 @@ export interface EscrowReadClient {
 export function createEscrowReader(client: EscrowReadClient, input: unknown,
   options: { readonly signal: AbortSignal; readonly nowSeconds: () => number }) {
   const id = captureEscrowIdentity(input)
-  return Object.freeze({ identity: id, async readJob(rawJobId: bigint): Promise<EscrowSnapshot> {
+  async function readJob(rawJobId: bigint, target?: { readonly blockNumber: bigint; readonly blockHash: Hex }): Promise<EscrowSnapshot> {
     try {
       const jobId = escrowUint(rawJobId); escrowCheck(jobId > 0n)
-      let previous = escrowSeconds(options.nowSeconds()), timestamp: number | undefined
+      const selected = target === undefined ? undefined : escrowRecord(target, ["blockNumber", "blockHash"])
+      const targetNumber = selected === undefined ? undefined : escrowUint(selected.blockNumber)
+      const targetHash = selected === undefined ? undefined : escrowBytes32(selected.blockHash, false)
+      let previous = escrowSeconds(options.nowSeconds()), finalizedTimestamp: number | undefined
       const active = () => {
         const now = escrowSeconds(options.nowSeconds())
         escrowCheck(!options.signal.aborted && now >= previous); previous = now
-        if (timestamp !== undefined) assertEscrowSnapshotFresh(timestamp, now)
+        if (finalizedTimestamp !== undefined) assertEscrowSnapshotFresh(finalizedTimestamp, now)
       }
       const checked = async <T>(read: () => Promise<T>): Promise<T> => {
         active(); const value = await read(); active(); return value
       }
       escrowCheck(await checked(() => client.getChainId()) === id.chainId)
-      const block = await checked(() => client.getBlock({ blockTag: "finalized" }))
+      const head = await checked(() => client.getBlock({ blockTag: "finalized" }))
+      const finalizedNumber = escrowUint(head.number); escrowCheck(finalizedNumber > 0n)
+      escrowBytes32(head.hash, false)
+      finalizedTimestamp = Number(escrowUint(head.timestamp, 48)); active()
+      let block = head
+      if (targetNumber !== undefined) {
+        escrowCheck(targetNumber > 0n && targetNumber <= finalizedNumber)
+        block = await checked(() => client.getBlock({ blockNumber: targetNumber }))
+        escrowCheck(block.number === targetNumber && escrowBytes32(block.hash, false) === targetHash &&
+          block.timestamp <= head.timestamp)
+      }
       const blockNumber = escrowUint(block.number), blockHash = escrowBytes32(block.hash, false)
       escrowCheck(blockNumber > 0n)
-      timestamp = Number(escrowUint(block.timestamp, 48)); active()
+      const timestamp = Number(escrowUint(block.timestamp, 48)); active()
       const at = { blockNumber }
       for (const [address, expected] of [[id.escrow, id.proxyCodeHash],
         [id.implementation, id.implementationCodeHash], [id.hook, id.hookCodeHash]] as const) {
@@ -84,5 +97,10 @@ export function createEscrowReader(client: EscrowReadClient, input: unknown,
         canonical.timestamp === BigInt(timestamp) && await checked(() => client.getChainId()) === id.chainId)
       return Object.freeze({ chainId: id.chainId, escrow: id.escrow, blockNumber, blockHash, timestamp, jobId, pendingClaimHash, job })
     } catch { throw new EscrowFactsRefused() }
-  } })
+  }
+  return Object.freeze({ identity: id, readJob: (jobId: bigint) => readJob(jobId),
+    /** Historical canonical receipt-block facts, fenced by a fresh finalized head.
+     * Not current admission/sending authority; those paths still require readJob. */
+    readJobAt: (jobId: bigint, block: { readonly blockNumber: bigint; readonly blockHash: Hex }) => readJob(jobId, block)
+  })
 }

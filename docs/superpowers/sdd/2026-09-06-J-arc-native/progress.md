@@ -1,5 +1,20 @@
 # Plan J progress
 
+2026-09-07 11:49 IST — J7B2 sole49378:4,908Vitest220/68.99s PASS;
+963Bun PASS plus one unchanged relay afterEach timeout (964total/69files/
+7,317assert/177.68s), NOT a clean monolithic gate. Only failing case rerun:
+1PASS/2assert/193ms, matching earlier01:31IST fixture flake history. No
+speculative fix or timeout weakening. Previously unreached80503 root/web
+strict and client348ms/SSR174ms PASS. Seven frozen code/test pins and13-path
+scope audit next, then atomiccommit/exactFF with the concern recorded.
+
+2026-09-07 11:39 IST — J7B2 action/receipt contracts and historical finalized
+read-back implemented offline. Focused 39 Vitest/3 files/84ms; seven-root strict
+final capture next, then scope freeze and sole full gate. Actual bounded
+transport, durable action journal, send/uncertainty lifecycle and active rail
+remain J7B3 work, not completed by these helpers. J4/J5/J6 live pauses unchanged;
+no owner key, real RPC, send/spend, subagent or push.
+
 2026-09-07 11:21 IST — J7B1 sole37680 fullgatePASS:4,883Vitest218/66.33s;
 964Bun69/7,317assert/172.66s;root/webstrict/client+SSR(185ms)builds.
 Five frozen code/test pins to recheck;11paths57links/privacy0 initial audit.
