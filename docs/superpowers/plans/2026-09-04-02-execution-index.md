@@ -1,5 +1,11 @@
 # Execution index — ARCADE at ETHOnline 2026
 
+> Current execution rule (owner, Sept8): single-threaded, no subagent fan-out;
+> one sequential four-worker full gate per commit and prompt no-squash main
+> fast-forwards. Historical parallel-wave/gate templates below are superseded
+> by that rule. [Plan I execution ledger](../sdd/2026-09-04-I-packaging/README.md)
+> follows the merged J offline checkpoints without implying live acceptance.
+
 Spec: `../specs/2026-09-04-ethonline-continuity-design.md`. Nine plans, one per workstream, in this directory. Execution is subagent-driven (`superpowers:subagent-driven-development`): one fresh executor per task, conductor reviews between tasks, gates run before every commit. Owner-performed steps are collected in `2026-09-04-01-owner-actions.md`.
 
 ## Order and parallelism

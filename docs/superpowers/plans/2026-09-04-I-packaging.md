@@ -1,5 +1,12 @@
 # Plan I — Circle CLI interop (M9 part 2) + packaging
 
+> Execution update2026-09-08: [Plan I ledger](../sdd/2026-09-04-I-packaging/README.md)
+> starts after the merged J offline checkpoints. Existing CLI prerequisites are
+> [recorded, not replayed](../../interop/circle-cli.md); I2/I3 live remain paused
+> with J4. Template output/acceptance statements below are not evidence of a run.
+> Current owner rules: single-threaded, four-worker limits, one full gate per
+> commit, exact-one main fast-forward, no push or consumed approval replay.
+
 > September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
