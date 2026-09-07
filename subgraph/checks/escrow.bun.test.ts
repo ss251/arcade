@@ -30,7 +30,7 @@ function declarations(name: Name) {
 }
 
 describe("J11 inactive escrow schema and ABI contracts", () => {
-  test("mapping sources cannot instantiate templates or manufacture terminal settlements", () => {
+  test("observation modules never instantiate templates or directly manufacture settlements", () => {
     for (const path of ["../src/escrow-events.ts", "../src/escrow.ts", "../src/escrow-hook.ts"]) {
       expect(text(path)).not.toMatch(/\.create(?:WithContext)?\(|new (?:Settlement|Tree|Listing)\b/)
     }
@@ -39,7 +39,8 @@ describe("J11 inactive escrow schema and ABI contracts", () => {
     ["address activation", "      abi: ERC8183\n", "      abi: ERC8183\n      address: '0x1111111111111111111111111111111111111111'\n"],
     ["invented start block", "      abi: ArcadeJobHook\n", "      abi: ArcadeJobHook\n      startBlock: 1\n"],
     ["wrong escrow handler", "handler: handleJobFunded", "handler: handleSettled"],
-    ["foreign hook mapping", "file: ./src/escrow-hook.ts", "file: ./src/fee-splitter.ts"]
+    ["foreign hook mapping", "file: ./src/escrow-hook.ts", "file: ./src/fee-splitter.ts"],
+    ["disabled full receipt", "          receipt: true\n", "          receipt: false\n"]
   ] as const) test(`refuses ${label} in staged templates`, () => {
     const template = text("../subgraph.template.yaml"), changed = template.replace(from, to)
     expect(changed).not.toBe(template)
@@ -71,10 +72,10 @@ describe("J11 inactive escrow schema and ABI contracts", () => {
         kind: "ethereum", name, network: "arc-testnet", source: { abi: name },
         mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
           file: name === "ERC8183" ? "./src/escrow.ts" : "./src/escrow-hook.ts",
-          entities: ["EscrowJob", "EscrowEvent"], abis: [{ name, file: `./abis/${name}.json` }],
+          entities: name === "ArcadeJobHook" ? ["EscrowJob", "EscrowEvent", "Settlement"] : ["EscrowJob", "EscrowEvent"], abis: [{ name, file: `./abis/${name}.json` }],
           eventHandlers: declarations(name).map(event => ({
             event: `${event.name}(${event.inputs.map(input => `${input.indexed ? "indexed " : ""}${input.type}`).join(",")})`,
-            handler: `handle${event.name}` })) }
+            handler: `handle${event.name}`, ...(event.name === "ArcadeSettled" ? { receipt: true } : {}) })) }
       })
     }
   })

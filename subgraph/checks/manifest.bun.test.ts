@@ -20,7 +20,7 @@ const requiredAssets = [
   "schema.graphql", "src/fee-splitter.ts", "src/ids.ts", "abis/FeeSplitter.json", "abis/FeeSplitterV2.json",
   "src/identity.ts", "src/reputation.ts", "src/validation.ts", "src/registry.ts",
   "abis/IdentityRegistry.json", "abis/ReputationRegistry.json", "abis/ValidationRegistry.json",
-  "abis/ERC8183.json", "abis/ArcadeJobHook.json", "src/escrow.ts", "src/escrow-hook.ts", "src/escrow-events.ts"
+  "abis/ERC8183.json", "abis/ArcadeJobHook.json", "src/escrow.ts", "src/escrow-hook.ts", "src/escrow-events.ts", "src/escrow-closure.ts"
 ]
 
 const registryTemplates = [

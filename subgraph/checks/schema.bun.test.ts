@@ -30,7 +30,8 @@ const expected: Readonly<Record<string, { readonly immutable: boolean; readonly 
   EscrowJob: { immutable: false, fields: {
     id: "ID!", chainId: "BigInt!", escrow: "Bytes!", jobId: "BigInt!", client: "Bytes!",
     provider: "Bytes!", evaluator: "Bytes!", hook: "Bytes!", expiredAt: "BigInt!", status: "String!",
-    paymentToken: "Bytes", budgetAtomic: "BigInt", fundedAtomic: "BigInt", deliverable: "Bytes",
+    paymentToken: "Bytes", budgetAtomic: "BigInt", fundedAtomic: "BigInt", fundedAt: "BigInt", fundTx: "Bytes",
+    closureEligible: "Boolean!", completedAt: "BigInt", completeTx: "Bytes", treeHash: "Bytes", receiptHash: "Bytes", deliverable: "Bytes",
     createdBlock: "BigInt!", createdAt: "BigInt!", createdTxHash: "Bytes!",
     updatedBlock: "BigInt!", updatedAt: "BigInt!", updatedLogIndex: "BigInt!", events: "[EscrowEvent!]!"
   } },

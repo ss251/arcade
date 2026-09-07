@@ -174,7 +174,8 @@ const ESCROW_TEMPLATES = [
       "file": "./src/escrow-hook.ts",
       "entities": [
         "EscrowJob",
-        "EscrowEvent"
+        "EscrowEvent",
+        "Settlement"
       ],
       "abis": [
         {
@@ -185,7 +186,8 @@ const ESCROW_TEMPLATES = [
       "eventHandlers": [
         {
           "event": "ArcadeSettled(indexed uint256,bytes32,uint32,uint256,bytes32)",
-          "handler": "handleArcadeSettled"
+          "handler": "handleArcadeSettled",
+          "receipt": true
         },
         {
           "event": "ArcadeRefused(indexed uint256,bytes32)",
@@ -323,7 +325,7 @@ export async function buildManifest(paths: ManifestPaths): Promise<void> {
       "./schema.graphql", "./src/fee-splitter.ts", "./src/ids.ts", "./abis/FeeSplitter.json", "./abis/FeeSplitterV2.json",
       "./src/identity.ts", "./src/reputation.ts", "./src/validation.ts", "./src/registry.ts",
       "./abis/IdentityRegistry.json", "./abis/ReputationRegistry.json", "./abis/ValidationRegistry.json",
-      "./abis/ERC8183.json", "./abis/ArcadeJobHook.json", "./src/escrow.ts", "./src/escrow-hook.ts", "./src/escrow-events.ts"
+      "./abis/ERC8183.json", "./abis/ArcadeJobHook.json", "./src/escrow.ts", "./src/escrow-hook.ts", "./src/escrow-events.ts", "./src/escrow-closure.ts"
     ]) {
       if (!(await stat(new URL(relative, output))).isFile()) return fail()
     }

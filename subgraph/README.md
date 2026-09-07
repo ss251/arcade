@@ -1,9 +1,25 @@
 # ARCADE ledger
 
 Latest status: [G6 indexed A9 match](#september-6-2026--g6-indexed-a9-match).
-Local J11 escrow mappings remain inactive; see [J11B1](#j11b1-inactive-escrow-observations).
+Local J11 escrow mappings remain inactive; see [J11B2](#j11b2-inactive-paid-projection).
 The dated local/G1 sections below are historical checkpoints. Neither a successful
 build nor an acknowledgment proves the later indexed-event acceptance gate.
+
+## J11B2 inactive paid projection
+
+September7: a bounded complete successful transaction receipt can now qualify
+an indexed escrow Settlement. It needs an explicit local treasury, eligible
+observed USDC funding/submission and matching actual fee/payout/completion/hook
+events with two outgoing USDC transfers. Conflicting logs anywhere, missing
+fees/receipt/context and unsupported payout paths remain unclassified. Raw
+observations are preserved; missing evidence is not zero or an inferred refund.
+
+This is an event-footprint projection, not independent RPC, current admin-state,
+execution or receipt-tree verification. No fake splitter/nonce/Tree/Listing is
+created. Supplied hook hashes are metadata. Both templates remain inactive and
+active sources unchanged. The [J11B2 report](../docs/superpowers/sdd/2026-09-06-J-arc-native/task-11b2-report.md)
+records125 distinct actual mapping tests and the separate local gates. No new
+deployment, CID, query, live escrow payment or refund proof exists.
 
 ## J11B1 inactive escrow observations
 

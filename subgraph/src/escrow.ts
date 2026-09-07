@@ -1,4 +1,4 @@
-import { BigInt } from "@graphprotocol/graph-ts"
+import { BigInt, Bytes } from "@graphprotocol/graph-ts"
 import { EscrowEvent, EscrowJob } from "../generated/schema"
 import { ARC_CHAIN_ID } from "./ids"
 import { begin, binding, bytes, jobKey, known, nonzero, unsigned } from "./escrow-events"
@@ -8,7 +8,10 @@ import { JobCreated, ProviderSet, PayoutReceiverSet, BudgetSet, JobFunded, JobSu
 
 function save(record: EscrowEvent): void {
   const job = known(record)
-  if (job != null) job.save()
+  if (job != null) {
+    if (record.kind == "partial_settled" || record.kind == "refunded" || record.kind == "evaluator_fee_paid") job.closureEligible = false
+    job.save()
+  }
   record.save()
 }
 
@@ -60,7 +63,10 @@ export function handleSettled(event: Settled): void {
 }
 function status(record: EscrowEvent, value: string): void {
   const job = known(record)
-  if (job != null) { job.status = value; job.save() }
+  if (job != null) {
+    if (value != "COMPLETED" || job.status != "SUBMITTED") job.closureEligible = false
+    job.status = value; job.save()
+  }
   record.save()
 }
 export function handleJobCreated(event: JobCreated): void {
@@ -78,6 +84,7 @@ export function handleJobCreated(event: JobCreated): void {
     job.chainId = ARC_CHAIN_ID; job.escrow = pins.proxy; job.jobId = p.jobId
     job.client = p.client; job.provider = p.provider; job.evaluator = p.evaluator; job.hook = p.hook
     job.expiredAt = p.expiredAt; job.status = "OPEN"
+    job.closureEligible = false
     job.createdBlock = record.blockNumber; job.createdAt = record.timestamp; job.createdTxHash = record.txHash
     job.updatedBlock = record.blockNumber; job.updatedAt = record.timestamp; job.updatedLogIndex = record.logIndex
     job.save(); record.job = key
@@ -89,7 +96,10 @@ export function handleProviderSet(event: ProviderSet): void {
   const record = begin(event, "provider_set", p.jobId); if (record == null) return
   record.actor = p.provider; record.agentId = p.agentId
   const job = known(record)
-  if (job != null) { job.provider = p.provider; job.save() }
+  if (job != null) {
+    if (job.status != "OPEN") job.closureEligible = false
+    job.provider = p.provider; job.save()
+  }
   record.save()
 }
 export function handlePayoutReceiverSet(event: PayoutReceiverSet): void {
@@ -102,7 +112,10 @@ export function handleBudgetSet(event: BudgetSet): void {
   const record = begin(event, "budget_set", p.jobId); if (record == null) return
   record.token = p.token; record.amountAtomic = p.amount
   const job = known(record)
-  if (job != null) { job.paymentToken = p.token; job.budgetAtomic = p.amount; job.save() }
+  if (job != null) {
+    job.closureEligible = false
+    job.paymentToken = p.token; job.budgetAtomic = p.amount; job.save()
+  }
   record.save()
 }
 export function handleJobFunded(event: JobFunded): void {
@@ -110,7 +123,14 @@ export function handleJobFunded(event: JobFunded): void {
   const record = begin(event, "job_funded", p.jobId); if (record == null) return
   record.actor = p.client; record.amountAtomic = p.amount
   const job = known(record)
-  if (job != null) { job.fundedAtomic = p.amount; job.status = "FUNDED"; job.save() }
+  if (job != null) {
+    const token = job.paymentToken, budget = job.budgetAtomic
+    job.closureEligible = job.status == "OPEN" && job.fundedAtomic === null && token !== null && budget !== null &&
+      token.equals(Bytes.fromHexString("0x3600000000000000000000000000000000000000")) && budget.equals(p.amount) &&
+      p.amount.gt(BigInt.zero()) && p.client.equals(job.client)
+    job.fundedAtomic = p.amount; job.fundedAt = record.timestamp; job.fundTx = record.txHash
+    job.status = "FUNDED"; job.save()
+  }
   record.save()
 }
 export function handleJobSubmitted(event: JobSubmitted): void {
@@ -118,6 +138,9 @@ export function handleJobSubmitted(event: JobSubmitted): void {
   const record = begin(event, "job_submitted", p.jobId); if (record == null) return
   record.actor = p.provider; record.hash = p.deliverable
   const job = known(record)
-  if (job != null) { job.deliverable = p.deliverable; job.status = "SUBMITTED"; job.save() }
+  if (job != null) {
+    job.closureEligible = job.closureEligible && job.status == "FUNDED" && p.provider.equals(job.provider)
+    job.deliverable = p.deliverable; job.status = "SUBMITTED"; job.save()
+  }
   record.save()
 }

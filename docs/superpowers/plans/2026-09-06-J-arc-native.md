@@ -316,7 +316,12 @@ source activation yet. Live Task10 and Studio redeploy remain deployment-blocked
 [J11B1](../sdd/2026-09-06-J-arc-native/task-11b1-report.md) adds two real inactive
 event/lifecycle mapping templates and actual runtime tests. No source is
 instantiated or assigned an invented deployment pin. Terminal settlement
-correlation remains J11B2; web J11C and live activation remain separate.
+correlation is added offline by [J11B2](../sdd/2026-09-06-J-arc-native/task-11b2-report.md):
+only a bounded full successful receipt with matching actual USDC transfers,
+fee, payout, completion and hook may create an escrow Settlement. Explicit
+local treasury and eligible observed funding/submission are required; no
+independent RPC, current admin-state or receipt-tree verification is claimed.
+Web J11C and live activation remain separate.
 
 - [ ] Subgraph: data sources for the escrow proxy and hook; `EscrowJob` entity; `Settlement.rail`; mapping tests (matchstick); redeploy `v0.0.2` to Studio (deploy key inline).
 - [ ] Web: receipt page rail badge and job links; listing page "accepts: gateway · exact · escrow"; marketplace filter. `bun run web:build` + snapshot.

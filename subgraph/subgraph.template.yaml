@@ -157,11 +157,13 @@ templates:
       entities:
         - EscrowJob
         - EscrowEvent
+        - Settlement
       abis:
         - name: ArcadeJobHook
           file: ./abis/ArcadeJobHook.json
       eventHandlers:
         - event: "ArcadeSettled(indexed uint256,bytes32,uint32,uint256,bytes32)"
           handler: handleArcadeSettled
+          receipt: true
         - event: "ArcadeRefused(indexed uint256,bytes32)"
           handler: handleArcadeRefused

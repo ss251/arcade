@@ -1,5 +1,22 @@
 # Plan J progress
 
+2026-09-07 23:59 IST — J11B2 sole87306 fullgatePASS5258Vitest240/70.52s;
+1362Bun92/11713assert192.57s;root/webstrict/clientSSR342ms/175ms.
+Final188focusedBun5/436assert731ms;5-rootstrict0;Graphcodegen/WASM;
+125distinct actualMatchstickPASS.17paths150links/privacy0;11code/testpins
+rechecked before atomiccommit/exact-one mainFF. Inactive event correlation
+only, not independent RPC/admin/execution/tree proof. J11C web next.
+No ownerkeys/RPC/spend/policychange/deploy/push; live pauses unchanged.
+
+2026-09-07 23:53 IST — J11B2 offline full-receipt paid projection implemented.
+37new Matchstick PASS2.347s; final prefix-selected escrow suite64/4.464s plus
+27splitter1.632s,16identity1.812s,11reputation1.759s,7validation1.643s:
+125distinct tests PASS sequentially. Missing/conflicting receipt evidence,
+repeat funding and unsupported payout paths remain unclassified; explicit local
+treasury, exact USDC transfers and observed funding/submission required. No
+source activation or independent RPC/tree/admin proof. Final focused checks,
+strict/build, freeze/solegate next. J4/J5/J6/Task10 live pauses unchanged.
+
 2026-09-07 23:23 IST — J11B1 sole73911 fullgatePASS5258Vitest240/71.88s;
 1360Bun92/11706assert193.13s;root/webstrict/clientSSR. Final5-rootstrict0,
 Graphcodegen/WASM and88actualMatchstickPASS.17paths147links/privacy0;

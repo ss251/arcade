@@ -1,6 +1,7 @@
 import { BigInt } from "@graphprotocol/graph-ts"
 import { ArcadeSettled, ArcadeRefused } from "../generated/templates/ArcadeJobHook/ArcadeJobHook"
 import { begin, binding, bytes, known, unsigned } from "./escrow-events"
+import { correlatePaid } from "./escrow-closure"
 
 export function handleArcadeSettled(event: ArcadeSettled): void {
   const p = event.params; bytes(p.treeHash, 32); bytes(p.receiptHash, 32)
@@ -13,8 +14,8 @@ export function handleArcadeSettled(event: ArcadeSettled): void {
     assert(job.hook.equals(pins.hook) && job.evaluator.equals(pins.evaluator), "Unexpected hook job binding")
     job.save()
   }
-  // Supplied metadata only: never manufacture a Settlement or verified receipt Tree.
   record.save()
+  if (job != null) correlatePaid(event, record, job)
 }
 export function handleArcadeRefused(event: ArcadeRefused): void {
   const p = event.params; bytes(p.reason, 32)

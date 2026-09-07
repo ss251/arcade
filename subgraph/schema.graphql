@@ -89,6 +89,15 @@ type EscrowJob @entity(immutable: false) {
   "Unknown until the corresponding event is observed; never default zero."
   budgetAtomic: BigInt
   fundedAtomic: BigInt
+  fundedAt: BigInt
+  fundTx: Bytes
+  "Local observed-sequence eligibility, not execution or administrative-state proof."
+  closureEligible: Boolean!
+  completedAt: BigInt
+  completeTx: Bytes
+  "Supplied hook metadata on a correlated paid footprint, never verified tree contents."
+  treeHash: Bytes
+  receiptHash: Bytes
   deliverable: Bytes
   createdBlock: BigInt!
   createdAt: BigInt!

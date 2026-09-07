@@ -30,6 +30,8 @@ export function binding(): EscrowBinding | null {
   if (proxy.equals(hook) || proxy.equals(evaluator) || hook.equals(evaluator)) return null
   return new EscrowBinding(proxy, hook, evaluator)
 }
+/** Optional additional LOCAL deployment binding, never a default or metadata claim. */
+export function closureTreasury(): Bytes | null { return contextAddress(dataSource.context(), "treasury") }
 export function jobKey(proxy: Bytes, jobId: BigInt): string {
   unsigned(jobId); assert(jobId.gt(BigInt.zero()), "Invalid escrow job ID")
   return ARC_CHAIN_ID.toString() + ":" + proxy.toHexString() + ":" + jobId.toString()
