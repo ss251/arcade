@@ -18,7 +18,7 @@ const abi = parseAbi(["function domain() view returns(uint32)", "function paused
   "function isAuthorizedForBalance(address token,address depositor,address addr) view returns(bool)",
   "function gatewayMint(bytes attestation,bytes signature)"])
 const word = (n: bigint) => encodeAbiParameters([{ type: "uint256" }], [n])
-const fixture = async (mode: "ready" | "none" | "pending" | "fee" | "transfer-lost" | "send-lost" | "gas" | "no-gas" | "wrong-chain" | "receipt-pending" | "receipt-lost" = "ready") => {
+const fixture = async (mode: "ready" | "none" | "pending" | "fee" | "transfer-lost" | "send-lost" | "gas" | "no-gas" | "wrong-chain" | "receipt-pending" | "receipt-lost" | "pending-batch" | "pending-only" | "malformed-pending" | "unknown-balance-field" = "ready") => {
   const dir = await realpath(await mkdtemp(join(tmpdir(), "arcade-unified-runtime-"))); await chmod(dir, 0o700); roots.push(dir)
   const account = privateKeyToAccount(generatePrivateKey()), owner = `0x${"11".repeat(20)}` as const
   const plan = captureUnifiedFundingPlan({ owner, recipient: account.address, sourceChain: "Arc_Testnet", amount: "0.25" })
@@ -73,7 +73,11 @@ const fixture = async (mode: "ready" | "none" | "pending" | "fee" | "transfer-lo
     if (path === "/v1/info") return response({ version: 1, domains: [{ chain: "Arc", network: "testnet", domain: 26,
       processedHeight: "1000", burnIntentExpirationHeight: "1200" }] })
     const body = JSON.parse(init!.body as string)
-    if (path === "/v1/balances") return response({ token: "USDC", balances: [{ domain: 26, depositor: owner, balance: "0.500000" }] })
+    if (path === "/v1/balances") return response({ token: "USDC", balances: [{ domain: 26, depositor: owner,
+      balance: mode === "pending-only" ? "0" : "0.500000",
+      ...(mode === "pending-batch" || mode === "pending-only" ? { pendingBatch: "0.500000" } : {}),
+      ...(mode === "malformed-pending" ? { pendingBatch: "not-an-amount" } : {}),
+      ...(mode === "unknown-balance-field" ? { unexpectedCredit: "0.500000" } : {}) }] })
     if (path === "/v1/estimate") return response([{ burnIntentSet: { intents: body[0].intents.map((row: { spec: unknown }) => ({
       spec: row.spec, maxBlockHeight: "1150", maxFee: mode === "fee" ? "50001" : "1000"
     })) } }])
@@ -95,6 +99,18 @@ const fixture = async (mode: "ready" | "none" | "pending" | "fee" | "transfer-lo
   return { plan, command, runtime, journalPath, observed, counts: () => ({ keys, transfers, broadcasts, receipts }) }
 }
 describe("actual Kit1.6.0 and Viem1.17.1 owned runtime", () => {
+  test("accepts observed pendingBatch metadata without treating it as available credit", async () => {
+    const f = await fixture("pending-batch")
+    expect(await f.runtime.execute(f.plan, f.command)).toMatchObject({ status: "sdk_returned" })
+    expect(f.counts()).toEqual({ keys: 1, transfers: 1, broadcasts: 1, receipts: 1 })
+  })
+  test("pending-only, malformed metadata and unknown balance fields refuse before keys", async () => {
+    for (const mode of ["pending-only", "malformed-pending", "unknown-balance-field"] as const) {
+      const f = await fixture(mode)
+      await expect(f.runtime.execute(f.plan, f.command)).rejects.toThrow()
+      expect(f.counts()).toEqual({ keys: 0, transfers: 0, broadcasts: 0, receipts: 0 })
+    }
+  })
   test("a wrong chain or absent destination gas refuses before key acquisition", async () => {
     for (const mode of ["wrong-chain", "no-gas"] as const) {
       const f = await fixture(mode)

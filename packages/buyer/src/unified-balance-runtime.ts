@@ -190,7 +190,10 @@ export const createUnifiedRuntime = (options: UnifiedRuntimeOptions): UnifiedCli
           method: "POST", body: JSON.stringify({ token: "USDC", sources: [{ domain: c.domain, depositor: plan.owner }] })
         })).json() as { token?: unknown; balances?: unknown }
         if (balances.token !== "USDC" || !Array.isArray(balances.balances) || balances.balances.length !== 1) return fail()
-        const balance = fundingRecord(balances.balances[0], ["domain", "depositor", "balance"])
+        const balance = fundingRecord(balances.balances[0], ["domain", "depositor", "balance"], ["pendingBatch"])
+        // The live API reports pending batch metadata separately. Validate its
+        // shape but never count it as available owner credit for this spend.
+        if (Object.hasOwn(balance, "pendingBatch")) parseFundingAmount(balance.pendingBatch)
         if (balance.domain !== c.domain || typeof balance.depositor !== "string" || balance.depositor.toLowerCase() !== plan.owner ||
           parseFundingAmount(balance.balance) < amount + feeCap) return fail()
         const sourceBlock = await sourceClient.getBlockNumber({ cacheTime: 0 })

@@ -21,6 +21,7 @@ evidence remain separate open work; this index does not mark them accepted.
   [Guarded runtime and CLI](task-5b3-report.md), [funding guide](../../../unified-balance-funding.md).
 - [Task5C brief](task-5c-brief.md), [canonical URL correction/preflight](task-5c-url-report.md).
   [Reproduced Minter source identity](task-5c1-report.md).
+  [Pending-batch response compatibility](task-5c2-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

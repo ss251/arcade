@@ -1,5 +1,19 @@
 # Plan J progress
 
+2026-09-07 08:23 IST — J5C2 sole59093PASS:4,825Vitest214/68.09s,
+917Bun61/6,579assert/171.96s,root/webstrict,client494ms/SSR203ms. Focused11/
+108assert/1.76s and2-rootstrict0;6paths/27links/privacy0,two code/test pins
+unchanged. Finalaudit/atomiccommit/exactoneFFmain next. One unsigned0.25USDC
+quote returned maxFee3850atomic and finite height62228535; no signature, transfer
+or chosen/changed signing cap. J5C owned live harness next; J4 remains PAUSED.
+
+2026-09-07 08:17 IST — J5C1 merged29e8f1e/exactoneFFcleanmain. Fresh
+unsigned role/balance/permission preflight exposed API pendingBatch metadata
+rejection. ActualSDK regression Red reproduced; parser now validates this known
+field without counting it as available credit. Negative pending-only/malformed/
+unknown-field cases stay pre-key refusals. Focused/strict then freeze/solegate
+next. No existing validity/cap/replay/F11 identity change, real key or live action.
+
 2026-09-07 08:13 IST — J5C1 sole59809PASS:4,825Vitest214/66.56s,
 915Bun61/6,555assert/172.65s,root/webstrict,client358ms/SSR174ms. Two code/test
 pins unchanged;6paths/27links/privacy0 after documentation-only heuristic false

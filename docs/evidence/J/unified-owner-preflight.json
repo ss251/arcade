@@ -1,0 +1,34 @@
+{
+  "kind": "read-only-pre-grant-prerequisite",
+  "at": "2026-09-07T02:45:21.023Z",
+  "blockNumber": "60845570",
+  "blockHash": "0x6c2141abadb868de4b9c6653ef0f2930656003baecd4651e17010249d5a2d3e3",
+  "owner": "0xdaaca688ce93d6ea0bdf4cda9925c5526f3ca5e1",
+  "delegate": "0x67be3fd6f4d5ea3b4928e636def9c2c87bc3e51b",
+  "ownerTokenAtomic": "19610000",
+  "ownerNativeWei": "19610000000000000000",
+  "delegateTokenAtomic": "19496425",
+  "delegateNativeWei": "19496425875000000000",
+  "allowanceAtomic": "0",
+  "ownerGatewayTotalAtomic": "0",
+  "authorized": false,
+  "withdrawalDelay": "1209600",
+  "mintAuthority": "0x0000000000000000000000000000000000000000",
+  "minterAllowed": true,
+  "minterOwner": "0x884eF91aea52d9Cdf67CD71b052E2c36B2C4B844",
+  "api": {
+    "token": "USDC",
+    "balances": [
+      {
+        "domain": 26,
+        "depositor": "0xdaACA688cE93d6EA0BDf4cdA9925C5526f3cA5e1",
+        "balance": "0",
+        "pendingBatch": "0"
+      }
+    ]
+  },
+  "calls": 14,
+  "keys": 0,
+  "sends": 0,
+  "liveProof": false
+}
