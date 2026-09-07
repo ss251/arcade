@@ -1,5 +1,16 @@
 # Plan J progress
 
+2026-09-07 21:10 IST — J9B3 sole9678 fullgatePASS5,226Vitest238/72.15s;
+1,282Bun86/10,282assert192.40s;root/webstrict/clientSSR.10paths133links/privacy0;
+fourfrozen code/test pins checked before atomiccommit/exact-one mainFF. Next
+J9B4 concrete buyer Arc ports, thenJ9C SDK/MCP/CLI. No live/policy/ownerkey/push.
+
+2026-09-07 21:04 IST — J9B3 durable buyer coordinator and bounded HTTP
+implemented with synthetic ports and actual private SQLite. Full gate pending
+after focused checks/freeze. Concrete buyer Arc ports split into J9B4, then
+J9C actualSDK/MCP/CLI and local-pinned health. No live activation/ownerkey/
+RPC/spend/send/deploy/replay/policychange/push; J4/J5/J6 pauses unchanged.
+
 2026-09-07 20:40 IST — J9B2 sole62279 fullgatePASS5,204Vitest237/72.24s;
 1,250Bun85/10,048assert190.62s;root/webstrict/clientSSR.8paths129links/privacy0;
 2frozen code/test pins checked before atomic commit/exact-one mainFF. Next

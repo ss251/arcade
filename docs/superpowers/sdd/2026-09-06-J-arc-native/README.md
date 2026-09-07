@@ -58,6 +58,7 @@ evidence remain separate open work; this index does not mark them accepted.
 - [Task9 buyer brief](task-9-brief.md), [offline intent and pre-create facts](task-9a-report.md).
   [Transaction proof brief](task-9b1-brief.md), [exact buyer and budget-relay proofs](task-9b1-report.md).
   [Private journal brief](task-9b2-brief.md), [durable single-purchase storage](task-9b2-report.md).
+  [Driver brief](task-9b3-brief.md), [bounded coordinator and HTTP checkpoint](task-9b3-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

@@ -224,5 +224,10 @@ now records one purchase per owned file, with durable ordered action claims,
 cumulative buyer gas and private accepted-token recovery. Reopening cannot
 resume a payment or claim a new purchase. This concrete path requires distinct
 buyer/evaluator accounts and all three buyer transactions, with zero initial
-allowance; it does not lock the wallet across separate files/programs. The
-network/signing driver and actual SDK integration are still pending.
+allowance; it does not lock the wallet across separate files/programs.
+The [J9B3 coordinator](superpowers/sdd/2026-09-06-J-arc-native/task-9b3-report.md)
+now composes these phases with bounded, once-only HTTP and synthetic chain
+ports in offline tests. It rechecks authority, balance, allowance, nonce and
+current facts after signing, and persists the private result token before
+returning funding/queued evidence. Concrete buyer Arc ports and actual
+SDK/MCP/CLI integration remain next; this is not live execution or settlement.
