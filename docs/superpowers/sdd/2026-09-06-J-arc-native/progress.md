@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 22:44 IST — J9C2B sole gate8030 PASS exit0: sequential bounded
+Vitest/Bun, root/web TypeScript and client/SSR build. Final output truncated;
+no invented aggregate counts or gate replay. Eight paths/148 links/privacy0,
+three frozen source/test hashes checked before atomic commit/exact-one mainFF.
+Task9 offline complete; Task10 live remains deployment-blocked. J4/J5 paused.
+No owner keys, real RPC, spending, validity/cap/replay changes or push.
+
+2026-09-07 22:34 IST — J9C2B explicit MCP escrow/config/ownedjournal and
+gas-inclusive per-call/cumulative accounting implemented. Focused101Vitest4
+PASS1.59s;42Bun3/156assertPASS3.00s. Strict/freeze/solefullgate next. Local
+funding counts principal+actual gas despite remote refund claims; uncertainty
+retains full exposure. Task9 offline integration awaits gate; no live/push.
+
 2026-09-07 22:23 IST — J9C2A sole42275 fullgatePASS5,258Vitest240/75.44s;
 1,324Bun90/11,584assert194.08s;root/webstrict/clientSSR. Focused61Bun4/
 1386assert6.19s;8-rootstrict0.14paths144links/privacy0;8frozen code/test

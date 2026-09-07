@@ -290,10 +290,16 @@ cleanup. CLI JSON evidence is independently reconstructed from the private
 journal, not trusted from remote fields; principal and configured gas ceilings
 are separate and explicit. Actual MCP gas-inclusive accounting remains J9C2B.
 
+[J9C2B](../sdd/2026-09-06-J-arc-native/task-9c2b-report.md) completes offline
+MCP integration: explicit rail plus owner config, gas-inclusive serialized
+ceilings, owned journal before key, and local funding accounting independent
+of remote terminal claims. Its sole full gate passed before the atomic commit;
+Task10 live proof is still blocked on deployment and existing owner checkpoints.
+
 - [x] `fetch-with-payment.ts` opt-in `erc8183` branch uses the durable create/budget/approve/fund/root driver, closed input+capability envelopes and exact local principal/gas limits. Independently verify all four transaction proofs, save the private202 before returning and expose local funding/queued evidence. Backoff is read-only, never a repeated write.
-- [ ] MCP and CLI expose `rail: "erc8183"`; hire-by-name unchanged (payTo lock still applies).
+- [x] MCP and CLI expose explicit `rail: "erc8183"` with independent owner config/private journal; hire-by-name payTo lock still applies. MCP ceilings include gas; CLI declares separate principal/gas caps.
 - [x] Actual SDK/Arc-port/owned-loopback/private-SQLite composition against synthetic RPC; pre-gas ENS/current-listing refusals and full local-versus-health identity mismatch. Armed `/healthz` exposes full public pins, not just evaluator.
-- [ ] Commit: `feat(buyer): pay a listing through ERC-8183 escrow`.
+- [x] Atomic buyer path checkpoints J9A..J9C2B, each with one full gate and exact-one main fast-forward; no squash or push. This is offline integration, not live payment proof.
 
 ### Task 10: Live escrow proof (J5)
 

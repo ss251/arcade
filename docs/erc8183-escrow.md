@@ -285,4 +285,28 @@ and fenced seller data. `settlementVerified` and `refundVerified` remain false.
 No terminal claim or refund is inferred from hub prose. Signals join SDK cleanup
 before close; the owning process retains a330second hard fuse. A used file refuses
 before a key read. Never rename/remove/rotate it merely to retry uncertainty.
-Private MCP opt-in and gas-inclusive session accounting remain J9C2B.
+
+## Explicit MCP escrow and spending limits
+
+[J9C2B](superpowers/sdd/2026-09-06-J-arc-native/task-9c2b-report.md) adds
+`arcade_call_skill` with explicit `rail: "erc8183"` and the same owner config/
+one-purchase journal. Config alone does not change default Gateway/exact
+selection. Keys, pins and private paths are not tool arguments. Existing ENS
+authority checks and fixed session rails remain unchanged.
+
+For escrow, `ARCADE_MAX_CALL_USD`, `ARCADE_SESSION_BUDGET_USD` and the narrowing
+tool `maxAmountUsd` include principal **plus configured gas**. This differs from
+the CLI's explicitly separate principal and gas caps. MCP reserves the actual
+eligible principal quote plus the gas ceiling before SDK entry. The SDK's own
+principal cap stays at that quote, not the combined reserve. Native gas rounds
+up to USDC micro-units; no additional balance is invented.
+
+An unsigned refusal releases exposure only while the owned journal is empty.
+Unknown outcomes retain the full reservation. When the journal verifies all
+four transaction proofs and the accepted job, principal plus actual buyer gas
+is counted as spent; only unused exposure is released. A hub claim of failure
+or refund cannot release that principal. Output says `fundedUsdc`,
+`buyerGasUsdc`, `accountedSpendUsdc`, explicit `hubReportedStatus` and closed
+`escrowEvidence`; it does not claim independently verified terminal settlement
+or refund. The purchase lease joins cancellation cleanup before closing SQLite.
+Do not reset budgets or rotate a used journal to bypass reconciliation.
