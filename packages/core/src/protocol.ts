@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { PublicListing, SkillId } from "./manifest.ts"
 import { JobOutcome } from "./job.ts"
-import { EscrowProviderRequest, EscrowProviderReply } from "./escrow-protocol.ts"
+import { EscrowProviderRequest, EscrowProviderReply, EscrowContextWire } from "./escrow-protocol.ts"
 
 /**
  * Hub ↔ runner wire protocol.
@@ -131,7 +131,9 @@ export class JobAssignment extends Schema.TaggedClass<JobAssignment>()("JobAssig
   timeoutSec: Schema.Int,
   parentJobId: Schema.optional(Schema.String),
   /** Present only when the listing declares `hire-skills`; the runner forwards it on child purchases. */
-  hireCapability: Schema.optional(Schema.String)
+  hireCapability: Schema.optional(Schema.String),
+  /** Root escrow only. A runner must refuse this assignment when escrow is disabled. */
+  escrow: Schema.optional(EscrowContextWire)
 }) {}
 
 export class Ack extends Schema.TaggedClass<Ack>()("Ack", {

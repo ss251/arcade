@@ -50,8 +50,10 @@ The [8B3a private journal](task-8b3a-report.md) reserves captured provider inten
 before signing and prevents a late signature from crossing uncertainty.
 The [8B3b session runtime](task-8b3b-report.md) composes these concrete checks
 with local execution completion closures and bounded sign-only acquisition.
-Actual daemon/socket transport and broker ownership integration remain required;
-a pure completion object or journal claim is not socket authority.
+The [8B3c1 daemon integration](task-8b3c1-report.md) adds explicit local CLI
+configuration, real per-socket message handlers and actual execution completion.
+Hub-side broker ownership/response correlation remains8B3c2; atomic admission
+and pipeline remain8C/8D. No actual deployment or hub settlement is yet enabled.
 
 ## Verification
 

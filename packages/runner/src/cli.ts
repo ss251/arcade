@@ -79,6 +79,7 @@ const usage = () => {
   arcade status [--skills DIR]                     identity, hub, skills, earnings
   arcade fund --help                               fund a buyer from owner Unified Balance
   arcade start [--skills DIR]                      connect to the hub and serve jobs
+       [--escrow-config FILE --escrow-journal FILE] explicit pinned Arc escrow opt-in
 
   arcade publish <skillDir>                        preview the PUBLIC projection
   arcade publish <pluginDir> [--yes]               Agent Plugin skills + supported MCP tools
@@ -692,7 +693,15 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
     const idx = args.indexOf("--skills")
     const skillsDir = idx > -1 && args[idx + 1] !== undefined ? args[idx + 1]! : skillsDirDefault
     const config = yield* readConfig
-    yield* startDaemon({ config, skillsDir })
+    if (args.some(a => a.startsWith("--escrow"))) {
+      // Bun-only SQLite module is loaded only for explicit opt-in. Public config
+      // validation precedes journal creation and the existing seller-key lookup.
+      const { parseEscrowRunnerArgs, openEscrowRunnerConfig } = yield* Effect.promise(() => import("./escrow-config.ts"))
+      yield* Effect.acquireUseRelease(
+        Effect.try({ try: () => openEscrowRunnerConfig(parseEscrowRunnerArgs(args)!), catch: () => Error("escrow_runner_configuration_refused") }),
+        owned => startDaemon({ config, skillsDir, escrow: owned.options }),
+        owned => Effect.sync(owned.close))
+    } else yield* startDaemon({ config, skillsDir })
     return
   }
 

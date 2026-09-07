@@ -22,6 +22,8 @@ import { startHireBroker } from "./hire-broker.ts"
 import type { RunnerConfig } from "./config.ts"
 import { makeEnsLiveness, viemEnsWriter, type EnsWriter } from "./ens.ts"
 import { ensJournalPath } from "./ens-journal.ts"
+import { captureEscrowIdentity, escrowAddress, escrowCheck, escrowContextFromWire } from "@arcade/payments"
+import { createEscrowProviderSession, type EscrowProviderSessionOptions } from "./escrow-provider.ts"
 
 /**
  * Seller daemon.
@@ -37,6 +39,11 @@ export interface DaemonArgs {
   readonly skillsDir: string
   /** Public IO seam for offline lifecycle tests; ordinary callers use ensTickerFor. */
   readonly ensTickerFactory?: typeof ensTickerFor
+  /** Explicit opt-in only; keys/current listings/socket authority are derived locally. */
+  readonly escrow?: Pick<EscrowProviderSessionOptions, "identity" | "journal" | "operationTimeoutMs" | "fetch"> & {
+    /** Clock seam for encoded offline chain fixtures; CLI never accepts a clock function. */
+    readonly nowSeconds?: () => number
+  }
 }
 
 export interface EnsTicker { readonly tick: () => Promise<void>; readonly stop: () => void }
@@ -87,6 +94,12 @@ export const agentAnnouncementsFor = (agents: RunnerConfig["agents"] | undefined
 
 export const startDaemon = (args: DaemonArgs) =>
   Effect.gen(function* () {
+    const escrowConfig = args.escrow === undefined ? undefined : yield* Effect.try({ try: () => {
+      const identity = captureEscrowIdentity(args.escrow!.identity), provider = escrowAddress(args.config.sellerAddress)
+      escrowCheck(provider !== identity.evaluator && args.escrow!.journal.durability === "durable" &&
+        Number.isSafeInteger(args.escrow!.operationTimeoutMs) && args.escrow!.operationTimeoutMs > 0 && args.escrow!.operationTimeoutMs <= 300000)
+      return Object.freeze({ ...args.escrow!, identity, provider })
+    }, catch: () => Error("escrow_runner_configuration_refused") })
     const skills = yield* loadSkills(args.skillsDir)
     if (skills.length === 0) {
       return yield* Effect.fail(new Error(`no skills found in ${args.skillsDir}`))
@@ -177,6 +190,7 @@ export const startDaemon = (args: DaemonArgs) =>
       let reconnect: ReturnType<typeof setTimeout> | undefined
       let ensTimer: ReturnType<typeof setInterval> | undefined
       let ensTicker: EnsTicker | undefined
+      let escrowSocket: ReturnType<typeof createEscrowProviderSession> | undefined
       const active = () => connected && !closed
       const runEns = () => { if (active()) void Promise.resolve().then(() => ensTicker?.tick()).catch(() => {}) }
       const startEns = () => {
@@ -195,6 +209,22 @@ export const startDaemon = (args: DaemonArgs) =>
         reconnect = undefined
         const ws = new WebSocket(args.config.hubWsUrl)
         socket = ws
+        escrowSocket?.close()
+        let acknowledged = false
+        const escrow = escrowConfig === undefined ? undefined : createEscrowProviderSession({ ...escrowConfig,
+          nowSeconds: escrowConfig.nowSeconds ?? (() => Math.floor(Date.now() / 1000)),
+          isCurrent: () => !closed && connected && socket === ws && acknowledged && ws.readyState === WebSocket.OPEN,
+          resourceFor: skillId => `${args.config.hubUrl.replace(/\/$/, "")}/x/${escrowConfig.provider}/${encodeURIComponent(skillId)}`,
+          currentListing: skillId => {
+            const skill = byId.get(skillId), agent = args.config.agents[skillId]
+            return skill && agent ? { listing: toPublicListing(skill.manifest), providerAgentId: BigInt(agent.agentId) } : undefined
+          },
+          // Hello already acquired the seller account. This port only permits the new
+          // escrow signing operation after local/chain/journal guards; it cannot send.
+          acquireSigner: async () => ({ address: sellerAccount.address,
+            signTypedData: async typed => sellerAccount.signTypedData(typed) })
+        })
+        escrowSocket = escrow
 
         ws.addEventListener("open", () => {
           if (closed || socket !== ws) { ws.close(); return }
@@ -258,6 +288,15 @@ export const startDaemon = (args: DaemonArgs) =>
           void Effect.runPromise(
             Effect.gen(function* () {
               const msg = yield* decodeHubMessage(JSON.parse(String(ev.data)))
+              if (msg._tag === "Ack") { acknowledged = msg.ok; return }
+              if (msg._tag === "EscrowBudgetRequest" || msg._tag === "EscrowSubmitRequest") {
+                const reply = escrow === undefined ? { _tag: "EscrowAuthorizationRefused", requestId: msg.requestId,
+                  operation: msg._tag === "EscrowBudgetRequest" ? "budget" : "submit", reason: "authorization_refused" } :
+                  yield* Effect.promise(() => escrow.authorize(msg))
+                if (!closed && socket === ws && ws.readyState === WebSocket.OPEN &&
+                  (reply._tag === "EscrowAuthorizationRefused" || acknowledged)) ws.send(JSON.stringify(reply))
+                return
+              }
               if (msg._tag !== "JobAssignment") return
 
               const skill = byId.get(msg.skillId)
@@ -293,6 +332,20 @@ export const startDaemon = (args: DaemonArgs) =>
                 return
               }
 
+              let escrowJob: ReturnType<NonNullable<typeof escrow>["assign"]> | undefined
+              if (msg.escrow !== undefined) {
+                try {
+                  escrowCheck(escrow !== undefined && msg.parentJobId === undefined)
+                  const context = escrowContextFromWire(msg.escrow)
+                  escrowCheck(context.call.skillId === msg.skillId && context.call.skillVersion === msg.skillVersion &&
+                    context.call.timeoutSeconds === msg.timeoutSec)
+                  escrowJob = escrow.assign({ hubJobId: msg.jobId, context, input: msg.input })
+                } catch {
+                  if (!closed && socket === ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ _tag: "JobResult", jobId: msg.jobId,
+                    outcome: { status: "failed", startedAtMs: Date.now(), finishedAtMs: Date.now(), error: "escrow assignment refused" } }))
+                  return
+                }
+              }
               activeJobs++
               console.log(`[runner] job ${msg.jobId} -> ${msg.skillId}`)
               // The job's ceiling is fixed before it starts and revoked when it ends, so a
@@ -312,11 +365,11 @@ export const startDaemon = (args: DaemonArgs) =>
                   }
                 : undefined
 
-              const outcome = yield* execSkill({
+              let outcome = yield* execSkill({
                 manifest: skill.manifest,
                 skillDir: skill.dir,
                 jobId: msg.jobId,
-                input: msg.input,
+                input: escrowJob === undefined ? msg.input : escrowJob.input,
                 ...(hireGrant === undefined ? {} : { hire: hireGrant }),
                 onLog: (line) =>
                   ws.send(JSON.stringify({ _tag: "JobLog", jobId: msg.jobId, line, atMs: Date.now() }))
@@ -333,6 +386,13 @@ export const startDaemon = (args: DaemonArgs) =>
                   )
                 )
               )
+              if (escrowJob !== undefined) {
+                try { escrowJob.complete(outcome) } catch {
+                  outcome = JobOutcome.make({ status: "failed", startedAtMs: outcome.startedAtMs,
+                    finishedAtMs: outcome.finishedAtMs, error: "escrow completion refused",
+                    ...(outcome.costUsd === undefined ? {} : { costUsd: outcome.costUsd }) })
+                }
+              }
               activeJobs--
               console.log(`[runner] job ${msg.jobId} ${outcome.status}`)
 
@@ -348,6 +408,8 @@ export const startDaemon = (args: DaemonArgs) =>
         })
 
         ws.addEventListener("close", () => {
+          acknowledged = false
+          escrow?.close()
           if (socket !== ws) return
           connected = false
           if (heartbeat !== undefined) clearInterval(heartbeat)
@@ -374,6 +436,7 @@ export const startDaemon = (args: DaemonArgs) =>
         if (ensTimer !== undefined) clearInterval(ensTimer)
         if (reconnect !== undefined) clearTimeout(reconnect)
         ensTicker?.stop()
+        escrowSocket?.close()
         socket?.close()
         broker?.stop()
         resume(Effect.void as never)

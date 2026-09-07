@@ -1,12 +1,11 @@
 /** One original socket's provider signing authority. Never broadcasts or auto-retries. */
 import { Schema } from "effect"
 import { EscrowProviderRequest, EscrowProviderReply, type PublicListing } from "@arcade/core"
-import { assertEscrowProviderSignature, assertEscrowProviderJob, captureEscrowIdentity, captureEscrowProviderIntent,
+import { assertEscrowProviderSignature, assertEscrowProviderJob, boundEscrowIO, captureEscrowIdentity, captureEscrowProviderIntent,
   createEscrowProviderReader, escrowActionContext, escrowAddress, escrowCheck, escrowContextFromWire,
   escrowProviderContextHash, escrowProviderTypedData, escrowRecord, escrowSeconds,
   providerAuthorizationDeadline, randomProviderNonce, type EscrowActionContext,
   type EscrowProviderClaim, type EscrowProviderJournal, type EscrowSnapshot } from "@arcade/payments"
-import { boundEscrowIO } from "@arcade/payments/erc8183-rpc"
 import type { Hex } from "viem"
 import { captureLocalEscrowAssignment, captureLocalEscrowCompletion, captureLocalEscrowListing } from "./escrow-local.ts"
 export interface EscrowProviderSessionOptions {

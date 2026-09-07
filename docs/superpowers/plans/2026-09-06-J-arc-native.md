@@ -217,8 +217,10 @@ no signer or broadcast method. The [8B3a private signing journal](../sdd/2026-09
 now reserves complete public intents and retains signature/uncertainty state.
 The [8B3b sign-only session runtime](../sdd/2026-09-06-J-arc-native/task-8b3b-report.md)
 now composes local completion closures, canonical preflight and durable claims.
-Actual daemon/socket transport and broker ownership integration remain pending;
-the data helpers and journal alone still grant no signing or activation authority.
+The [8B3c1 daemon integration](../sdd/2026-09-06-J-arc-native/task-8b3c1-report.md)
+connects this to explicit CLI configuration, actual socket messages and local
+execution. Hub broker ownership/correlation and admission/pipeline remain pending;
+no deployed escrow or end-to-end hub settlement is claimed by the loopback tests.
 
 - [ ] Socket messages `EscrowBudgetRequest{jobId, token, amount, escrow, chainId}` → runner replies `EscrowBudgetSigned{jobId, signature, nonce, deadline}`; `EscrowSubmitRequest{jobId, deliverable}` → `EscrowSubmitSigned{…}`. Runner signs with the seller key only; refuses if `amount` ≠ its listing price or `escrow` ≠ chain config. Runner never broadcasts.
 - [ ] `POST /x/:seller/:skill/escrow {jobId}`: validations from spec §7.3 step 3, relay `setBudgetWithAuthorization`, respond `{jobId, budget, token, escrow, fundBy}`; 409 when the job is not Open/ours; rate-limited per payer.

@@ -1,5 +1,22 @@
 # Plan J progress
 
+2026-09-07 15:52 IST — J8B3c1 sole62068 full gate PASS:5,032Vitest/230files/
+70.84s;1,015Bun/76files/7,831assertions/179.02s; root/web strict and client/SSR
+builds. Ten-root focused strict0;14-path/86-local-link scope/privacy audit clean.
+Nine code pins frozen before gate; final comparison and atomic commit/FF next.
+Hub broker8B3c2 then8C/8D/9 remain; no live activation or existing policy change.
+
+2026-09-07 15:38 IST — J8B3c1 explicit CLI/daemon/socket integration implemented
+offline. Two wire Reds (dropped/ignored escrow context) and actual loopback
+disabled-escrow execution Red fixed. Six actualWebSocket/execBun26assert PASS;
+three config/actualCLI-refusalBun28assert PASS;21focusedVitest3PASS including
+unchanged ENS daemon/local completion. Fixture syntax/input-envelope assumptions
+corrected before final proofs. No owner keys/liveRPC/send/payment; ephemeral
+seller key is absent from actual skill child's environment. Newconfig requires
+full pinned identity, explicit IO bound and owned private journal; no fallback.
+Final strict/scopefreeze/fullgate next. Hub broker8B3c2 then8C/8D/9 remain;
+no existing validity/cap/replay changes, deployment/activation/approval replay/push.
+
 2026-09-07 15:16 IST — J8B3b sole28750 fullgatePASS:5,030Vitest229/68.87s,
 1,006Bun74/7,777assert/174.16s;root/webstrict/clientSSRbuild. Four-rootstrict0,
 threepins unchanged,8paths84links/privacy0. Atomiccommit/exactFF next, no replay.
