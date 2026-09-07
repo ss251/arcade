@@ -111,8 +111,11 @@ superseded by current documentation; they were not copied as factual feedback.
 - [ ] Review the final narrative against actual proof, including each live,
   retained, offline, unavailable and paused label. No inflated test-count,
   production-readiness, completion or partner-eligibility claims.
-- [ ] Verify a clean fresh-clone setup separately; passing gates in the current
-  installed worktree do not establish fresh installation reproducibility.
+- [ ] Review the [isolated local-clone check](superpowers/sdd/2026-09-04-I-packaging/task-14-install-report.md).
+  Root-only installation exposed separate subgraph/source prerequisites;
+  targeted recovery and the remaining strict/build stages passed. Public GitHub
+  access and a new-host setup are separate checks. Do not call the initial
+  full-gate attempt all-green.
 - [ ] Deliberately refresh/review the continuity snapshot at the submission
   revision; verify specs, plans, briefs, prompts and ledgers are public without
   private handoffs/research, credentials, authorization headers or wallet material.

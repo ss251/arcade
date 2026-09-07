@@ -1,5 +1,20 @@
 # Plan I progress
 
+2026-09-08 04:01 IST — Isolated install checkpoint: sole41596 full attempt
+passed5327Vitest but had3 missing-import Bun failures; no full repeat. Separate
+subgraph frozen/no-scripts install447packages/22.84s and clean pinned ERC8183
+source restored prerequisites. Targeted recovery85tests/4files/225assert1.400s
+passed; previously unrun root/webstrict and clientSSR335/166ms passed. Both
+locks unchanged, application code unchanged, README bootstrap documented.
+Six documentation paths only; no paid/live proof or all-green initial gate claim.
+
+2026-09-08 03:40 IST — Isolated localclone at326d6e4 installed1269 packages
+in62.00s via frozenlock/no-scripts/concurrency4, own HOME/cache, no copied
+node_modules. Postinstall clean and lockSHAunchanged. SamehostPython3.12.4/
+Bun1.3.14; no submodule/subgraph/Forge/mainnet claims. Five documentation paths
+mirrored before the sole fullgate in freshclone; warmtreegate not repeated.
+No source workaround, keys, live API/payment, approval replay, xcodebuild or push.
+
 2026-09-08 03:33 IST — I14sole76879gatePASS5327Vitest242/69.08s;
 1422Bun97/11964assert196.45s;root/webstrict/clientSSR355/184ms.9paths,
 8links/privacy0; six code/test/contract/brief pins unchanged after3resultrecords.

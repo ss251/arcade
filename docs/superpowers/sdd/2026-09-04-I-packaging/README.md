@@ -19,6 +19,8 @@ are merged; unresolved live gates are not prerequisites we can invent.
   [owner submission checklist](../../../submission-checklist.md).
 - [Task14 brief](task-14-brief.md), [local checker record](task-14-report.md),
   [checker contract](../../../packaging-evidence.md).
+- [Isolated install brief](task-14-install-brief.md),
+  [same-host reproduction record](task-14-install-report.md).
 - [CLI interop status](../../../interop/circle-cli.md).
 
 Single-threaded; four-worker limits; one sequential full gate per atomic commit,

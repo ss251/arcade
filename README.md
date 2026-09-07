@@ -125,6 +125,23 @@ client/SSR builds. These are executed results, not counted test declarations.
 Contract and native subgraph tests have separately dated records; they are not
 included in that total.
 
+For a **fresh checkout**, the complete development gate also needs the separate
+subgraph workspace and the recorded ERC8183 source gitlink. Root installation
+alone leaves three schema/ABI test modules unable to load. No deployment or
+wallet setup is needed for these prerequisites:
+
+```bash
+bun --no-env-file install --frozen-lockfile --ignore-scripts --concurrent-scripts=4 --network-concurrency=4
+(cd subgraph && bun --no-env-file install --frozen-lockfile --ignore-scripts --concurrent-scripts=4 --network-concurrency=4)
+git submodule update --init --checkout --jobs 1 --depth 1 -- lib/erc8183
+```
+
+Do not force-update a dirty submodule. This initializes the recorded revision,
+not the upstream branch tip. Lifecycle scripts stay disabled. The
+[isolated installation record](docs/superpowers/sdd/2026-09-04-I-packaging/task-14-install-report.md)
+separates the initial root-only failure from targeted recovery and does not
+claim a new-host, Forge, Matchstick, public-repository or deployment proof.
+
 ```bash
 bun --no-env-file x --no-install vitest run --maxWorkers=4 --minWorkers=1 --maxConcurrency=4
 bun --no-env-file test --max-concurrency=4 .bun.test
