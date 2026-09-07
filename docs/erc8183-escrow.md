@@ -125,6 +125,12 @@ fresh readJob authority before a send. The full-job source keeps settledAmount
 zero on complete/reject; it is partial-claim accounting, not a terminal flag.
 Fee flooring can legitimately produce no PlatformFeePaid event at tiny prices.
 
-The broadcast runtime and durable action/admission journals remain unimplemented.
-No hash-only settlement, automatic uncertain-send retry, or live rail activation
-is supplied by these helpers. See the [J7B2 record](superpowers/sdd/2026-09-06-J-arc-native/task-7b2-report.md).
+The guarded action coordinator and private SQLite journal are implemented and
+tested offline; concrete bounded RPC/signing transport, active rail and hub
+execution admission remain unimplemented. The journal retains uncertain action
+and evaluator ownership across restarts and does not automatically replay sends
+or reverse them with reject. All cooperating workers must share one private
+journal; this does not control other programs using the evaluator key.
+No hash-only settlement or live rail activation is supplied by these helpers.
+See the [J7B2 proof record](superpowers/sdd/2026-09-06-J-arc-native/task-7b2-report.md)
+and [J7B3a coordinator/storage record](superpowers/sdd/2026-09-06-J-arc-native/task-7b3a-report.md).

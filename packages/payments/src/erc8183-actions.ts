@@ -38,7 +38,7 @@ export function escrowCompletionProjection(context: unknown, input: unknown) {
   } catch { throw new EscrowFactsRefused() }
 }
 export const ESCROW_COMPLETE_REASON = toHex("arcade-settled", { size: 32 })
-const REJECTIONS = ["declined", "runner_lost", "timeout", "output_invalid", "execution_failed"] as const
+export const ESCROW_REJECTIONS = Object.freeze(["declined", "runner_lost", "timeout", "output_invalid", "execution_failed"] as const)
 export interface PreparedEscrowAction {
   readonly kind: "budget" | "submit" | "complete" | "reject"
   readonly context: EscrowActionContext
@@ -104,7 +104,7 @@ export async function prepareEscrowAction(
       data = encodeFunctionData({ abi: ERC8183_ABI, functionName: "complete", args: [c.jobId, reason,
         encodeEscrowCommitment({ ...receipt.tree, receiptHash: receipt.hash })] })
     } else {
-      escrowCheck(typeof action.reason === "string" && (REJECTIONS as readonly string[]).includes(action.reason))
+      escrowCheck(typeof action.reason === "string" && (ESCROW_REJECTIONS as readonly string[]).includes(action.reason))
       reason = toHex("arcade-" + action.reason, { size: 32 })
       data = encodeFunctionData({ abi: ERC8183_ABI, functionName: "reject", args: [c.jobId, reason, "0x"] })
     }

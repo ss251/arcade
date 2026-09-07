@@ -2,15 +2,26 @@
 import { encodeAbiParameters, keccak256, parseAbiParameters, parseTransaction, recoverTransactionAddress, toHex,
   type Hex, type TransactionReceipt } from "viem"
 import { type PreparedEscrowAction } from "./erc8183-actions.ts"
-import { captureEscrowJob, escrowAddress, escrowBytes32, escrowCheck, escrowFeeQuote, escrowSeconds, escrowUint,
+import { captureEscrowJob, escrowAddress, escrowBytes32, escrowCheck, escrowFeeQuote, escrowRecord, escrowSeconds, escrowUint,
   EscrowFactsRefused, ERC8183_ZERO, ERC8183_ZERO_HASH } from "./erc8183-codec.ts"
 import type { EscrowSnapshot } from "./erc8183-request.ts"
 export interface EscrowTransactionTerms {
   readonly nonce: number; readonly gas: bigint; readonly maxFeePerGas: bigint
   readonly maxPriorityFeePerGas: bigint; readonly gasCapWei: bigint
 }
+export function captureEscrowTransactionTerms(input: unknown): EscrowTransactionTerms {
+  try {
+    const t = escrowRecord(input, ["nonce", "gas", "maxFeePerGas", "maxPriorityFeePerGas", "gasCapWei"])
+    escrowCheck(typeof t.nonce === "number" && Number.isSafeInteger(t.nonce) && t.nonce >= 0)
+    const gas = escrowUint(t.gas), maxFeePerGas = escrowUint(t.maxFeePerGas),
+      maxPriorityFeePerGas = escrowUint(t.maxPriorityFeePerGas), gasCapWei = escrowUint(t.gasCapWei)
+    escrowCheck(gas > 0n && maxFeePerGas > 0n && maxPriorityFeePerGas <= maxFeePerGas && gas * maxFeePerGas <= gasCapWei)
+    return Object.freeze({ nonce: t.nonce, gas, maxFeePerGas, maxPriorityFeePerGas, gasCapWei })
+  } catch { throw new EscrowFactsRefused() }
+}
 export async function assertEscrowSignedAction(action: PreparedEscrowAction, raw: unknown, terms: EscrowTransactionTerms) {
   try {
+    terms = captureEscrowTransactionTerms(terms)
     escrowCheck(typeof raw === "string" && /^0x02(?:[0-9a-fA-F]{2}){1,65535}$/.test(raw) &&
       Number.isSafeInteger(terms.nonce) && terms.nonce >= 0)
     const gas = escrowUint(terms.gas), maxFee = escrowUint(terms.maxFeePerGas), priority = escrowUint(terms.maxPriorityFeePerGas)
@@ -111,6 +122,7 @@ export function assertEscrowActionReceipt(action: PreparedEscrowAction, signed: 
         action.kind === "complete" ? job.submittedAt > 0 && job.submittedAt <= after.timestamp : job.submittedAt <= after.timestamp))
     const fee = escrowFeeQuote(c.call.amount)
     return Object.freeze({ kind: action.kind, txHash: hash, blockHash, blockNumber: receipt.blockNumber,
+      blockTimestamp: after.timestamp, submittedAt: job.submittedAt,
       gasWei: gasUsed * gasPrice, feeAtomic: action.kind === "complete" ? fee.feeAtomic : 0n,
       sellerAtomic: action.kind === "complete" ? fee.sellerAtomic : 0n, refundAtomic: action.kind === "reject" ? c.call.amount : 0n })
   } catch { throw new EscrowFactsRefused() }
