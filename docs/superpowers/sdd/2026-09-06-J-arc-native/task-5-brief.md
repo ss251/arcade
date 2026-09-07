@@ -15,7 +15,8 @@ of this task. No J4 approval has been consumed.
 3. 5C: separate owned live harness, gates, approved testnet proof and independent
    readbacks. No replay of consumed proof actions, raw logs or keys in the repo.
 
-5A is merged.5B1 adds the durable journal;5B2 guarded adapters/CLI follow.
+5A is merged.5B1 adds the durable journal;5B2 adds final signing/mint guards
+and strict command policy.5B3 guarded transport/adapters and CLI routing follow.
 No runnable funding CLI, owner grant, deposit, delegate spend or payment is
 claimed by those preparation checkpoints.
 

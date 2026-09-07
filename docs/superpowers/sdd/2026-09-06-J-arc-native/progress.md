@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 07:03 IST — Task5B2 sole84370 fullPASS:4,792Vitest212/66.58s,
+887Bun58/6,411assert/167.89s,root/webstrict,client412ms/SSR202ms. Fivecode/test
+pins frozen;9paths/21links/privacy0 before finalaudit/atomiccommit/exactFFmain.
+J5B3 SDK transport/adapters and actual CLI wiring next,5C live NOT_RUN; no
+existing validity/cap/replay change, keys, funding/payment, agents or push.
+
+2026-09-07 06:58 IST — Task5B1 merged232b778/exactoneFFcleanmain.5B2 final
+burn/mint guards and strict command policy:64focused/2/603ms,4-rootstrict0.
+Corrected malformed-array test table before freezing; no claimed behavior Red
+for that harness error. Actual transport/adapters/CLI routing remain5B3;5C live
+NOT_RUN. Freeze/audit/sole sequential gate next. No existing validity/cap/replay
+change, key read, funding/payment, agent, mainnet or push; J4 live PAUSED.
+
 2026-09-07 06:37 IST — Task5B1 sole43628PASS:4,728Vitest210/65.78s,
 887Bun58/6,413assert/169.86s,root/webstrict,client393ms/SSR208ms. Corrected
 focused55Bun/2/202assert/1.82s and4-rootstrict0. Three source/test pins frozen;
@@ -125,7 +138,8 @@ notrun; later escrow-state/Circlepayer/queued202 assumptions explicitly flagged.
   No live-payment claim.
 - Task4 PAUSED:4A MERGED9305ff2.4B runtime unimplemented; live NOT_RUN. No
   policy change; existing deposit/payment approvals remain unused.
-- Task5 IN_PROGRESS:5A policy/binding;5B runtime/journal/CLI and5C live NOT_RUN.
+- Task5 IN_PROGRESS:5A policy/binding and5B1 journal merged;5B2 signing/command
+  policy checkpoint;5B3 runtime/CLI routing and5C live NOT_RUN.
 - Task6 NOT_STARTED: pinned escrow contracts/hook; one approved deployment unused.
 - Task7 NOT_STARTED: escrow rail/relayed authorizations.
 - Task8 NOT_STARTED: hub/runner/pipeline escrow coordination.

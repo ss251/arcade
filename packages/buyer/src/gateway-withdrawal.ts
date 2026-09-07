@@ -53,7 +53,7 @@ export const encodeBurnIntent = (input: BurnIntent): Hex => {
 }
 export const hashBurnIntent = (intent: BurnIntent): Hex => keccak256(encodeBurnIntent(intent))
 const field = <N extends string, T extends string>(name: N, type: T) => Object.freeze({ name, type })
-const burnTypes = Object.freeze({
+export const GATEWAY_BURN_TYPES = Object.freeze({
   EIP712Domain: Object.freeze([field("name", "string"), field("version", "string")]),
   TransferSpec: Object.freeze([field("version", "uint32"), field("sourceDomain", "uint32"), field("destinationDomain", "uint32"),
     field("sourceContract", "bytes32"), field("destinationContract", "bytes32"), field("sourceToken", "bytes32"), field("destinationToken", "bytes32"),
@@ -66,7 +66,7 @@ const burnTypes = Object.freeze({
 export const burnIntentTypedData = (input: BurnIntent, authority: FundingAuthority) => {
   const intent = captureBurnIntent(input, authority), s = intent.spec
   const word = (a: Hex): Hex => `0x${addressWord(a)}`
-  return Object.freeze({ domain: Object.freeze({ name: "GatewayWallet", version: "1" } as const), types: burnTypes, primaryType: "BurnIntent" as const,
+  return Object.freeze({ domain: Object.freeze({ name: "GatewayWallet", version: "1" } as const), types: GATEWAY_BURN_TYPES, primaryType: "BurnIntent" as const,
     message: Object.freeze({ maxBlockHeight: intent.maxBlockHeight, maxFee: intent.maxFee, spec: Object.freeze({ ...s,
       sourceContract: word(s.sourceContract), destinationContract: word(s.destinationContract), sourceToken: word(s.sourceToken), destinationToken: word(s.destinationToken),
       sourceDepositor: word(s.sourceDepositor), destinationRecipient: word(s.destinationRecipient), sourceSigner: word(s.sourceSigner), destinationCaller: word(s.destinationCaller) }) }) })
