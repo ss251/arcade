@@ -23,6 +23,11 @@ export function captureEscrowIdentity(input: unknown) {
   } catch { throw new EscrowFactsRefused() }
 }
 export type EscrowIdentity = ReturnType<typeof captureEscrowIdentity>
+export interface EscrowDeploymentSnapshot {
+  readonly identity: EscrowIdentity
+  readonly chainId: 5042002; readonly escrow: Hex; readonly blockNumber: bigint
+  readonly blockHash: Hex; readonly timestamp: number
+}
 /** Narrow read port, structurally compatible with a viem public client. Production transport
  * must own request cancellation/deadlines and disable retries; signal checks here cannot
  * forcibly cancel a client that ignores its transport's AbortSignal. */
@@ -38,9 +43,9 @@ export interface EscrowReadClient {
 export function createEscrowReader(client: EscrowReadClient, input: unknown,
   options: { readonly signal: AbortSignal; readonly nowSeconds: () => number }) {
   const id = captureEscrowIdentity(input)
-  async function readJob(rawJobId: bigint, target?: { readonly blockNumber: bigint; readonly blockHash: Hex }): Promise<EscrowSnapshot> {
+  async function readAt<T>(target: { readonly blockNumber: bigint; readonly blockHash: Hex } | undefined,
+    capture: (read: (name: string, args?: readonly unknown[]) => Promise<unknown>) => Promise<T>) {
     try {
-      const jobId = escrowUint(rawJobId); escrowCheck(jobId > 0n)
       const selected = target === undefined ? undefined : escrowRecord(target, ["blockNumber", "blockHash"])
       const targetNumber = selected === undefined ? undefined : escrowUint(selected.blockNumber)
       const targetHash = selected === undefined ? undefined : escrowBytes32(selected.blockHash, false)
@@ -90,15 +95,27 @@ export function createEscrowReader(client: EscrowReadClient, input: unknown,
         types: { EIP712Domain: [{ name: "name", type: "string" }, { name: "version", type: "string" },
           { name: "chainId", type: "uint256" }, { name: "verifyingContract", type: "address" }] },
         domain: { name: "ERC8183", version: "1", chainId: BigInt(id.chainId), verifyingContract: id.escrow } }))
-      const job = captureEscrowJob(await read("getJob", [jobId]))
-      const pendingClaimHash = escrowBytes32(await read("pendingClaimHash", [jobId]))
+      const facts = await capture(read)
       const canonical = await checked(() => client.getBlock({ blockNumber }))
       escrowCheck(canonical.number === blockNumber && escrowBytes32(canonical.hash, false) === blockHash &&
         canonical.timestamp === BigInt(timestamp) && await checked(() => client.getChainId()) === id.chainId)
-      return Object.freeze({ chainId: id.chainId, escrow: id.escrow, blockNumber, blockHash, timestamp, jobId, pendingClaimHash, job })
+      return Object.freeze({ chainId: id.chainId, escrow: id.escrow, blockNumber, blockHash, timestamp, ...facts })
+    } catch { throw new EscrowFactsRefused() }
+  }
+  async function readJob(rawJobId: bigint, target?: { readonly blockNumber: bigint; readonly blockHash: Hex }): Promise<EscrowSnapshot> {
+    try {
+      const jobId = escrowUint(rawJobId); escrowCheck(jobId > 0n)
+      return await readAt(target, async read => {
+        const job = captureEscrowJob(await read("getJob", [jobId])),
+          pendingClaimHash = escrowBytes32(await read("pendingClaimHash", [jobId]))
+        return { jobId, pendingClaimHash, job }
+      })
     } catch { throw new EscrowFactsRefused() }
   }
   return Object.freeze({ identity: id, readJob: (jobId: bigint) => readJob(jobId),
+    /** Full identity/fees/domain at a fresh canonical finalized block BEFORE createJob.
+     * No job lookup and no jobCounter guess; the receipt must later identify the real job. */
+    readDeployment: (): Promise<EscrowDeploymentSnapshot> => readAt(undefined, async () => ({ identity: id })),
     /** Historical canonical receipt-block facts, fenced by a fresh finalized head.
      * Not current admission/sending authority; those paths still require readJob. */
     readJobAt: (jobId: bigint, block: { readonly blockNumber: bigint; readonly blockHash: Hex }) => readJob(jobId, block)

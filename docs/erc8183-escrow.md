@@ -203,3 +203,11 @@ retain the issued result token for terminal retrieval. See the
 [HTTP contract and limits](superpowers/sdd/2026-09-06-J-arc-native/task-8c2-report.md).
 Generic discovery exposes listing opt-in but cannot invent a signable input
 commitment. Task9 buyer lifecycle and Task10 live proof remain pending.
+
+The [J9A buyer checkpoint](superpowers/sdd/2026-09-06-J-arc-native/task-9a-report.md)
+adds offline pre-create identity reads and locally pinned request/price/expiry/
+gas intent. It prepares exact create/approve/fund calldata but cannot sign/send.
+Arc's native gas and ERC-20 USDC share one balance: reserve six-decimal principal
+converted to18decimals plus the remaining total gas budget together. Exact-price
+approval from zero allowance is required; no implicit unlimited grant or reset.
+The private durable executor and actual SDK integration are still pending.

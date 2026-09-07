@@ -259,6 +259,13 @@ completes Task8's offline code composition; Task9 buyer lifecycle follows.
 
 ### Task 9: Buyer escrow path (J5)
 
+Offline checkpoints and safety-specific implementation are tracked in the
+[J9 brief](../sdd/2026-09-06-J-arc-native/task-9-brief.md). J9A adds pre-create
+deployment facts, locally pinned bounded intent and exact calldata, not an
+executable buyer. Transaction proofs/private journal/runtime and SDK/MCP/CLI
+remain. Use J8's closed input+capability budget/root envelopes, not bare jobId;
+backoff is read-only, never an ambiguous write retry. No validity-policy changes.
+
 - [ ] `fetch-with-payment.ts` `erc8183` branch: `createJob(payTo, evaluator, now+expiresInSeconds, description, hook, providerAgentId)` with the buyer key → `jobId` from `JobCreated`; `POST …/escrow {jobId}`; `approve(escrow, amount)`; `fund(jobId, USDC, amount, "0x")`; retry the call with `PAYMENT-SIGNATURE = {accepted, payload:{jobId}}`. Each on-chain step uses the existing backoff; `--max-amount` still gates. Journal the three tx hashes into the SDK result.
 - [ ] MCP and CLI expose `rail: "erc8183"`; hire-by-name unchanged (payTo lock still applies).
 - [ ] Tests with a fake chain client; refusal when `extra.evaluator` ≠ the hub's advertised evaluator (`/healthz` gains `erc8183.evaluator`).

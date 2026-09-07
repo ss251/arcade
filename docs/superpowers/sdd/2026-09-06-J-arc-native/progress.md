@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 19:54 IST — J9A sole91701 fullgatePASS5,158Vitest236/71.73s;
+1,237Bun84/9,952assert191.19s;root/webstrict/clientSSR.10paths120links/privacy0;
+four frozen code/test pins checked before atomic commit/exact-one main FF.
+No executable buyer/live proof yet;9B transaction proofs/privatejournal/driver
+and9C actualSDK/MCP/CLI remain. No ownerkeys/RPC/send/spend/policychange/push.
+
+2026-09-07 19:49 IST — J9A offline buyer intent, shared pre-create full deployment
+reader and exact create/approve/fund preparation implemented. Focused123Vitest5
+PASS1.57s;4-rootstrict0. One native-USDC balance reserves principal+remaining gas;
+no capability retained publicly. Freshness and existing timeout+600 unchanged.
+Freeze/sole gate next; actual transaction proofs/private journal/executor and
+SDK/MCP/CLI remain9B/C. No ownerkeys/RPC/send/spend/policy change/deploy/push.
+
 2026-09-07 19:31 IST — J8D5 sole13892 fullgatePASS5,106Vitest235/71.29s;
 1,237Bun84/9,954assert190.11s;root/webstrict/clientSSR.12paths134links/privacy0;
 five frozen code/test pins checked before atomic commit/FF. Task8 offline code

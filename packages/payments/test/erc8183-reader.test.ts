@@ -38,6 +38,38 @@ function fixture() {
     options: { signal: controller.signal, nowSeconds: () => now } }
 }
 describe("identity-bound escrow finalized reader (fake RPC, no sends)", () => {
+  it("checks the full deployment before a job exists, without getJob or jobCounter", async () => {
+    const f = fixture(), reader = createEscrowReader(f.client, identity, f.options)
+    delete f.getters.getJob; delete f.getters.pendingClaimHash
+    const result = await reader.readDeployment()
+    expect(result).toEqual({ identity: reader.identity, chainId: 5042002, escrow: addr(10),
+      blockNumber: 50n, blockHash: hash(50), timestamp: 1000 })
+    expect(Object.isFrozen(result)).toBe(true); expect(Object.isFrozen(result.identity)).toBe(true)
+    expect(f.calls.filter(c => c.method === "getBlock").map(c => c.args))
+      .toEqual([{ blockTag: "finalized" }, { blockNumber: 50n }])
+    expect(f.calls.some(c => ["getJob", "pendingClaimHash", "jobCounter"].includes(c.method))).toBe(false)
+    expect(f.calls.filter(c => !["getChainId", "getBlock"].includes(c.method)).map(c => c.method)).toEqual([
+      "getCode", "getCode", "getCode", "getStorageAt", "paused", "platformFeeBP", "evaluatorFeeBP", "platformTreasury",
+      "allowedPaymentTokens", "whitelistedHooks", "escrow", "evaluator", "DOMAIN_SEPARATOR"
+    ])
+    expect(f.calls.filter(c => !["getChainId", "getBlock"].includes(c.method))
+      .every(c => (c.args as { blockNumber: bigint }).blockNumber === 50n)).toBe(true)
+    const count = f.calls.length
+    await expect(reader.readJob(0n)).rejects.toThrow("escrow_facts_refused")
+    expect(f.calls).toHaveLength(count)
+  })
+  it.each(["fee", "chain", "code", "slot", "stale", "reorg", "abort"])("deployment-only read preserves %s refusal", async problem => {
+    const f = fixture()
+    if (problem === "fee") f.getters.platformFeeBP = 499n
+    if (problem === "chain") f.client.getChainId = async () => 1
+    if (problem === "code") f.client.getCode = async () => "0x04"
+    if (problem === "slot") f.client.getStorageAt = async () => hash(99)
+    if (problem === "stale") f.block.timestamp = 969n
+    if (problem === "reorg") { let n = 0; f.client.getBlock = async () => ({ ...f.block, hash: hash(++n) }) }
+    if (problem === "abort") f.controller.abort()
+    await expect(createEscrowReader(f.client, identity, f.options).readDeployment()).rejects.toThrow(/^escrow_facts_refused$/)
+    expect(f.calls.some(c => ["getJob", "pendingClaimHash", "jobCounter"].includes(c.method))).toBe(false)
+  })
   it("reconciles an older canonical receipt block under a fresh finalized head, never an unfinalized or mismatched block", async () => {
     const f = fixture()
     f.client.getBlock = async args => "blockTag" in args ? f.block : { number: args.blockNumber, hash: hash(40), timestamp: 100n }
