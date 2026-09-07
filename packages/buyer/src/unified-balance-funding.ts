@@ -38,7 +38,7 @@ export const captureUnifiedFundingPlan = (input: unknown): UnifiedFundingPlan =>
       destinationChain: "Arc_Testnet", token: "USDC" })
   } catch { return fail() }
 }
-const capturePlan = (value: UnifiedFundingPlan): UnifiedFundingPlan => {
+export const captureCanonicalUnifiedPlan = (value: unknown): UnifiedFundingPlan => {
   const raw = fundingRecord(value, ["owner", "recipient", "sourceChain", "amount", "destinationChain", "token"])
   if (raw.destinationChain !== "Arc_Testnet" || raw.token !== "USDC") return fail()
   return captureUnifiedFundingPlan({ owner: raw.owner, recipient: raw.recipient, sourceChain: raw.sourceChain, amount: raw.amount })
@@ -47,7 +47,7 @@ const capturePlan = (value: UnifiedFundingPlan): UnifiedFundingPlan => {
  * Adapter is a trusted caller capability; runtime must bind its signer to recipient
  * and enforce fees/gas before signing. No forwarder, retry or custom fee is enabled. */
 export const unifiedSpendParams = <A>(input: UnifiedFundingPlan, adapter: A) => {
-  const plan = capturePlan(input)
+  const plan = captureCanonicalUnifiedPlan(input)
   return Object.freeze({ token: plan.token, amount: plan.amount,
     from: Object.freeze({ adapter, sourceAccount: plan.owner,
       allocations: Object.freeze({ chain: plan.sourceChain, amount: plan.amount }) }),
@@ -71,6 +71,17 @@ export const delegateStatus = (owner: unknown, delegate: unknown, sourceChain: u
 export type UnifiedFundingEvent = Readonly<{ stage: "planned" | "delegate_none" | "delegate_pending" | "spend_intent" | "uncertain";
   plan: UnifiedFundingPlan }> | Readonly<{ stage: "sdk_returned"; plan: UnifiedFundingPlan; txHash: `0x${string}` }>
 export interface UnifiedFundingJournal { append(event: UnifiedFundingEvent): Promise<void> }
+export const captureUnifiedFundingEvent = (input: unknown, expectedPlan: UnifiedFundingPlan): UnifiedFundingEvent => {
+  const raw = fundingRecord(input, ["stage", "plan"], ["txHash"])
+  const plan = captureCanonicalUnifiedPlan(raw.plan), expected = captureCanonicalUnifiedPlan(expectedPlan)
+  if (JSON.stringify(plan) !== JSON.stringify(expected)) return fail()
+  if (raw.stage === "sdk_returned") {
+    if (typeof raw.txHash !== "string" || raw.txHash.length !== 66 || !/^0x[0-9a-f]{64}$/.test(raw.txHash) || /^0x0{64}$/.test(raw.txHash)) return fail()
+    return Object.freeze({ stage: raw.stage, plan, txHash: raw.txHash as `0x${string}` })
+  }
+  if (raw.txHash !== undefined || typeof raw.stage !== "string" || !["planned", "delegate_none", "delegate_pending", "spend_intent", "uncertain"].includes(raw.stage)) return fail()
+  return Object.freeze({ stage: raw.stage as "planned" | "delegate_none" | "delegate_pending" | "spend_intent" | "uncertain", plan })
+}
 export interface UnifiedFundingDependencies {
   /** Reads for the owner, not the delegate's own account. Never signs. */
   readonly delegateStatus: DelegateReader

@@ -1,5 +1,19 @@
 # Plan J progress
 
+2026-09-07 06:37 IST — Task5B1 sole43628PASS:4,728Vitest210/65.78s,
+887Bun58/6,413assert/169.86s,root/webstrict,client393ms/SSR208ms. Corrected
+focused55Bun/2/202assert/1.82s and4-rootstrict0. Three source/test pins frozen;
+7-path/20-link/privacy audit and atomic commit/exactFF next.5B2 guarded adapters
+and fund CLI then5C live proof remain. J4 live stays PAUSED; no keys/sends,
+validity/cap/replay changes, agents, push or mainnet action.
+
+2026-09-07 06:32 IST — Task5A merged d0d9969/exactoneFFcleanmain.5B1
+durable Unified Balance journal reuses Gateway private-file IO with a separate
+closed format;13native tests/37assertions pass. Corrected an initially nonexistent
+regression-suite path; actual F11 runtime/journal regression and strict checks
+follow. No live runtime/CLI or money movement is claimed.5B2 adapters/CLI then5C
+proof next; J4 live PAUSED, no validity/cap/replay changes or push.
+
 2026-09-07 06:22 IST — Task5A sole8824PASS:4,728Vitest210/66.59s,
 874Bun57/6,374assert/167.68s,root/webstrict,client365ms/SSR186ms.47focused
 tests/2files/652ms and4-rootstrict0; six frozen code/package/lock pins. Final

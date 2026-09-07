@@ -15,8 +15,9 @@ of this task. No J4 approval has been consumed.
 3. 5C: separate owned live harness, gates, approved testnet proof and independent
    readbacks. No replay of consumed proof actions, raw logs or keys in the repo.
 
-Only the first checkpoint is implemented so far. No runnable funding CLI,
-durable journal, owner grant, deposit, delegate spend or payment is claimed.
+5A is merged.5B1 adds the durable journal;5B2 guarded adapters/CLI follow.
+No runnable funding CLI, owner grant, deposit, delegate spend or payment is
+claimed by those preparation checkpoints.
 
 ## Source-backed corrections to the shorthand plan
 

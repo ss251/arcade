@@ -8,6 +8,8 @@ import { captureFundingAuthority, captureFundingPublicEvent, decodeFundingReques
   encodeFundingPublic, encodeFundingRequest, operationDigest as digestOperation,
   type FundingAuthority, type FundingPublicEvent, type FundingRequest } from "./gateway-funding.ts"
 import { captureTransferSpec, hashTransferSpec } from "./gateway-withdrawal.ts"
+import { captureCanonicalUnifiedPlan, captureUnifiedFundingEvent,
+  type UnifiedFundingEvent, type UnifiedFundingJournal, type UnifiedFundingPlan } from "./unified-balance-funding.ts"
 
 const FORMAT = "arcade-gateway-funding-v1"
 const ZERO = `0x${"00".repeat(32)}` as Hex
@@ -461,6 +463,114 @@ export async function finalizeFundingJournal(input: FundingJournalRead,
   } catch {
     if (file) await file.close().catch(() => {})
     if (ownedLocation) await poison(ownedLocation.directory, ownedLocation.digest)
+    return fail()
+  }
+}
+
+// A distinct format reuses the reviewed private-file IO above. It deliberately
+// does not pretend a delegated SDK spend is an F11 self-withdrawal. Fresh-file
+// ownership prevents reopening this operation; it is not a global account lock.
+const UNIFIED_FORMAT = "arcade-unified-funding-v1"
+export interface UnifiedJournalSnapshot {
+  readonly plan: UnifiedFundingPlan
+  readonly head: FundingJournalHead
+  readonly events: readonly UnifiedFundingEvent[]
+}
+export interface OwnedUnifiedFundingJournal extends UnifiedFundingJournal {
+  snapshot(): UnifiedJournalSnapshot
+  close(): Promise<void>
+}
+const unifiedLocation = async (path: unknown) => {
+  insist(typeof path === "string" && path.length <= 2048 && isAbsolute(path) && normalize(path) === path &&
+    path.endsWith(".jsonl") && !/[\u0000-\u001f\u007f]/.test(path))
+  const parent = dirname(path); await privateDir(parent)
+  return { path, parent }
+}
+const unifiedTransition = (previous: UnifiedFundingEvent["stage"] | undefined, next: UnifiedFundingEvent["stage"]) => {
+  const allowed = previous === undefined ? ["planned"] : previous === "planned" ? ["delegate_none", "delegate_pending", "spend_intent"] :
+    previous === "spend_intent" ? ["sdk_returned", "uncertain"] : []
+  insist(allowed.includes(next))
+}
+function decodeUnifiedEvidence(bytes: string, expectedPlan: UnifiedFundingPlan): UnifiedJournalSnapshot {
+  insist(bytes.endsWith("\n") && Buffer.byteLength(bytes) <= MAX_FILE)
+  const lines = bytes.slice(0, -1).split("\n")
+  insist(lines.length >= 1 && lines.length <= 5 && lines.every(line => Buffer.byteLength(line) <= MAX_LINE))
+  const header = own(JSON.parse(lines[0]!)); exact(header, ["format", "plan"])
+  insist(header.format === UNIFIED_FORMAT)
+  const plan = captureCanonicalUnifiedPlan(header.plan), expected = captureCanonicalUnifiedPlan(expectedPlan)
+  insist(JSON.stringify(plan) === JSON.stringify(expected))
+  let head: FundingJournalHead = Object.freeze({ sequence: 0, hash: hash(lines[0]!) })
+  const events: UnifiedFundingEvent[] = []
+  for (const line of lines.slice(1)) {
+    const row = own(JSON.parse(line)); exact(row, ["sequence", "previousHash", "event", "hash"])
+    insist(row.sequence === head.sequence + 1 && row.previousHash === head.hash)
+    const event = captureUnifiedFundingEvent(row.event, plan)
+    unifiedTransition(events.at(-1)?.stage, event.stage)
+    const payload = JSON.stringify({ sequence: row.sequence, previousHash: row.previousHash, event })
+    insist(row.hash === hash(payload)); events.push(event)
+    head = Object.freeze({ sequence: row.sequence as number, hash: canonicalDigest(row.hash) })
+  }
+  return Object.freeze({ plan, head, events: Object.freeze(events) })
+}
+/** Integrity/readback only. SDK return is not independent settlement evidence;
+ * supply an externally retained head to also detect complete history rewrites. */
+export async function readUnifiedFundingJournal(path: string, plan: UnifiedFundingPlan, expectedHead?: FundingJournalHead): Promise<UnifiedJournalSnapshot> {
+  try {
+    const expected = captureCanonicalUnifiedPlan(plan), location = await unifiedLocation(path)
+    const result = decodeUnifiedEvidence(await readOwned(location.path), expected)
+    if (expectedHead !== undefined) {
+      const h = own(expectedHead); exact(h, ["sequence", "hash"])
+      insist(h.sequence === result.head.sequence && h.hash === result.head.hash)
+    }
+    return result
+  } catch { return fail() }
+}
+/** No append/resume mode: an existing evidence path is always refused, even if
+ * empty or a previous SDK outcome was uncertain. Never erase it to retry. */
+export async function openUnifiedFundingJournal(path: string, inputPlan: UnifiedFundingPlan): Promise<OwnedUnifiedFundingJournal> {
+  let file: FileHandle | undefined
+  try {
+    const plan = captureCanonicalUnifiedPlan(inputPlan), location = await unifiedLocation(path)
+    file = await open(location.path, constants.O_RDWR | constants.O_APPEND | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
+    const owned = file
+    await privateFile(owned)
+    let bytes = JSON.stringify({ format: UNIFIED_FORMAT, plan }) + "\n"
+    await owned.writeFile(bytes); await owned.sync(); await syncDir(location.parent, {})
+    let snapshot = decodeUnifiedEvidence(bytes, plan)
+    let closing = false, closed = false, poisoned = false, closePromise: Promise<void> | undefined
+    let tail: Promise<void> = Promise.resolve()
+    return Object.freeze({
+      snapshot: () => snapshot,
+      append(input: UnifiedFundingEvent) {
+        let event: UnifiedFundingEvent
+        try { insist(!closing && !closed && !poisoned); event = captureUnifiedFundingEvent(input, plan) }
+        catch { poisoned = true; return Promise.reject(new FundingJournalError()) }
+        const operation = tail.then(async () => {
+          insist(!closed && !poisoned)
+          unifiedTransition(snapshot.events.at(-1)?.stage, event.stage)
+          insist(await boundRead(owned) === bytes)
+          const payload = JSON.stringify({ sequence: snapshot.head.sequence + 1, previousHash: snapshot.head.hash, event })
+          const row = payload.slice(0, -1) + `,"hash":"${hash(payload)}"}\n`
+          const nextBytes = bytes + row, next = decodeUnifiedEvidence(nextBytes, plan)
+          await owned.writeFile(row); await owned.sync(); await syncDir(location.parent, {})
+          bytes = nextBytes; snapshot = next
+        }).catch(() => { poisoned = true; throw new FundingJournalError() })
+        tail = operation.then(() => {}, () => {})
+        return operation
+      },
+      close() {
+        if (closePromise) return closePromise
+        closing = true
+        closePromise = (async () => {
+          await tail
+          try { insist(!poisoned && await boundRead(owned) === bytes) }
+          finally { closed = true; await owned.close() }
+        })().catch(() => { throw new FundingJournalError() })
+        return closePromise
+      }
+    })
+  } catch {
+    if (file) await file.close().catch(() => {})
     return fail()
   }
 }
