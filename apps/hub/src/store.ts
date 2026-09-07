@@ -174,6 +174,8 @@ export const validateErc8004DocBytes = (bytes: string): void => {
 }
 
 export interface Store extends SessionStore {
+  /** Available only through the concrete SQLite adapter; activation requires durable. */
+  readonly escrow?: import("./escrow-store.ts").EscrowStore
   /** Identical retries succeed; conflicting bytes fail before any registry write. */
   readonly putErc8004Doc: (jobId: string, kind: Erc8004DocKind, bytes: string) => Effect.Effect<void>
   readonly getErc8004Doc: (jobId: string, kind: Erc8004DocKind) => Effect.Effect<string | undefined>

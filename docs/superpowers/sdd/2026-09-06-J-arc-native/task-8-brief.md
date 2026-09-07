@@ -56,6 +56,9 @@ The [8B3c2 hub correlator](task-8b3c2-report.md) now preserves original socket
 ownership after result cleanup, independently verifies replies and fences
 replacement/disconnect/duplicate attempts. Its volatile retention is not durable
 admission: that and pipeline remain8C/8D. No deployment or settlement is enabled.
+The [8C brief](task-8c-brief.md) now routes to the concrete
+[8C1 Store implementation](task-8c1-report.md). Budget HTTP, atomic terminal
+evidence and pipeline activation still remain; no live completion is implied.
 
 ## Verification
 

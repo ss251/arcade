@@ -1,5 +1,21 @@
 # Plan J progress
 
+2026-09-07 16:34 IST — J8C1 sole93114 full gate PASS:5,057Vitest232/70.64s;
+1,036Bun77/7,949assertions/180.52s;root/webstrict/clientSSRbuild.21newSQLite
+118assert/1.71s, four-rootstrict0;10paths96links/privacy0. Four frozen code pins
+to be compared before atomic commit/exact main FF. C2/D terminal and budget/
+pipeline composition then9 buyer next. No activation/live/policy change/push.
+
+2026-09-07 16:27 IST — J8C1 actual SQLite Store integration implemented offline.
+Reciprocal jobs marker/admission row before reaping; atomic queued insertion,
+one-shot execution CAS, current-disk reads/stale writer refusal, exact input
+order and scoped bigint decoding. No terminal/HTTP activation.20new+50legacy
+store/session tests PASS331assert/9.37s. New ignored-write Red then fixed by
+transactional readback; final21case proof and strict check completed separately.
+Final21escrowBun118assert/1.71s andfour-rootstrict0. Scope/privacy freeze and
+sole full gate next, thenC2/D/9. No key/RPC/send/
+spend/deployment/approval replay/policy change/push; J4/J5/J6 pauses unchanged.
+
 2026-09-07 16:12 IST — J8B3c2 sole19114 full gate PASS:5,057Vitest232/71.42s;
 1,015Bun76/7,833assertions/178.69s;root/webstrict/clientSSRbuild. Six-rootstrict0,
 43focused/4files;11paths89links/privacy0. Six frozen code pins will be checked

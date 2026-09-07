@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite"
+import { openEscrowStore, EscrowStoreRefused, EscrowStorageUnavailable } from "./escrow-store.ts"
 import { Effect, Layer, Ref, Schema } from "effect"
 import { Job, Rating, Receipt, Session, SessionId, SessionInvalid, SessionCapacity, SessionStorageUnavailable, SessionConflict } from "@arcade/core"
 import { sessionJson, sessionParse, sessionAuthorizationKey, transitionSession, validateSessionLedger, SESSION_EVIDENCE_BYTES,
@@ -172,6 +173,10 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
   db.exec("PRAGMA busy_timeout = 1000")
   db.exec("PRAGMA foreign_keys = ON")
   db.exec(SCHEMA)
+  // Reciprocal escrow ownership is validated BEFORE legacy reaping or cache reads.
+  let escrow: ReturnType<typeof openEscrowStore>
+  try { escrow = openEscrowStore(db, bootId, path === ":memory:" || path === "" ? "volatile" : "durable") }
+  catch { db.close(); throw new EscrowStorageUnavailable() }
 
   const countCalls = db.query<{ n: number }, [string]>("SELECT COUNT(*) AS n FROM session_calls WHERE session_id = ?")
   const headerCountValid = (row: SessionHeaderRow) => {
@@ -193,7 +198,7 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
   // log can name which boot abandoned the work.
   const stale = db
     .query<{ id: string; json: string; boot_id: string }, []>(
-      `SELECT id, json, boot_id FROM jobs WHERE status IN ('queued','running')
+      `SELECT id, json, boot_id FROM jobs WHERE status IN ('queued','running') AND escrow_key IS NULL
        AND NOT EXISTS (SELECT 1 FROM session_calls WHERE session_calls.job_id = jobs.id)`
     )
     .all()
@@ -212,13 +217,13 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
   }
 
   const jobs = new Map<string, Job>()
-  for (const row of db.query<{ json: string }, []>(`SELECT json FROM jobs WHERE NOT EXISTS (SELECT 1 FROM session_calls WHERE session_calls.job_id = jobs.id)`).all()) {
+  for (const row of db.query<{ json: string }, []>(`SELECT json FROM jobs WHERE escrow_key IS NULL AND NOT EXISTS (SELECT 1 FROM session_calls WHERE session_calls.job_id = jobs.id)`).all()) {
     const j = decodeJob(fromJson(row.json)) as Job
     jobs.set(j.id, j)
   }
 
   const receipts = db
-    .query<{ json: string }, []>(`SELECT json FROM receipts WHERE NOT EXISTS (SELECT 1 FROM session_calls WHERE session_calls.job_id = receipts.job_id) ORDER BY created_at_ms ASC`)
+    .query<{ json: string }, []>(`SELECT json FROM receipts WHERE NOT EXISTS (SELECT 1 FROM jobs WHERE jobs.id = receipts.job_id AND jobs.escrow_key IS NOT NULL) AND NOT EXISTS (SELECT 1 FROM session_calls WHERE session_calls.job_id = receipts.job_id) ORDER BY created_at_ms ASC`)
     .all()
     .map((r) => decodeReceiptRow(fromJson(r.json)) as Receipt)
 
@@ -369,6 +374,7 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     if (command.kind === "open" && !old.sessions.has(sessionId) && db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM sessions").get()!.n >= 10000) throw new SessionCapacity()
     // Global claims use exact UNIQUE indexes; unrelated evidence is never loaded.
     if (command.kind === "reserve") {
+      if (escrow.owned(command.binding.jobId)) throw new SessionConflict()
       if (!old.sessionCalls.has(command.binding.jobId) && (db.query("SELECT 1 FROM jobs WHERE id = ?").get(command.binding.jobId) ||
         db.query("SELECT 1 FROM receipts WHERE job_id = ?").get(command.binding.jobId) || ownedSessionJob(command.binding.jobId))) throw new SessionConflict()
     }
@@ -396,6 +402,7 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
   // Existing inherently-global APIs intentionally enumerate terminal receipts.
   // They validate each bounded row once, without loading its job or all siblings.
   const currentReceipts = db.transaction(() => {
+    escrow.assertHealthy()
     try {
       const headers = new Map(listSessionHeaders().map(header => [header.session.id, header.session]))
       const result = [...Effect.runSync(inner.allReceipts)]
@@ -418,12 +425,15 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
   const store: Store = {
     ...inner,
     ...sessionOps,
+    escrow: escrow.store,
     getJob: id => Effect.sync(() => {
+      if (escrow.owned(id)) return escrow.getJob(id)
       try { const sessionId = sessionForJob(id); return sessionId !== undefined ? readSessions.deferred(sessionId).jobs.get(id) : Effect.runSync(inner.getJob(id)) }
       catch { throw new SessionStorageUnavailable() }
     }),
-    allReceipts: Effect.sync(() => currentReceipts.deferred()),
+    allReceipts: Effect.sync(() => { escrow.assertHealthy(); return currentReceipts.deferred() }),
     statsFor: skillId => Effect.sync(() => {
+      escrow.assertHealthy()
       const state = Effect.runSync(Ref.get(ref)), receipts = currentReceipts.deferred()
       return Effect.runSync(makeStore(Effect.runSync(Ref.make({ ...state, receipts }))).statsFor(skillId))
     }),
@@ -435,11 +445,13 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
       Effect.runSync(inner.putErc8004Doc(jobId, kind, bytes))
     })),
     putJob: job => Effect.uninterruptible(Effect.sync(() => db.transaction(() => {
+      if (escrow.owned(job.id)) throw new EscrowStoreRefused()
       if (ownedSessionJob(job.id)) throw new SessionConflict()
       Effect.runSync(inner.putJob(job))
       putJobStmt.run(job.id, job.status, bootId, job.createdAtMs, toJson(job))
     }).immediate())),
     putReceipt: r => Effect.uninterruptible(Effect.sync(() => db.transaction(() => {
+      if (escrow.owned(r.jobId)) throw new EscrowStoreRefused()
       if (r.sessionId !== undefined || ownedSessionJob(r.jobId)) throw new SessionConflict()
       Effect.runSync(inner.putReceipt(r))
       putReceiptStmt.run(r.jobId, r.feeAccrualId ?? null, r.createdAtMs, toJson(r))
@@ -475,7 +487,7 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
           const all = yield* inner.allReceipts
           yield* Effect.sync(() => {
             for (const r of all) {
-              if (r.sessionId !== undefined || ownedSessionJob(r.jobId)) continue
+              if (r.sessionId !== undefined || ownedSessionJob(r.jobId) || escrow.owned(r.jobId)) continue
               putReceiptStmt.run(
                 r.jobId,
                 r.feeAccrualId ?? null,

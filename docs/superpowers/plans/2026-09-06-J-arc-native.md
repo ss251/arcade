@@ -222,6 +222,11 @@ execution. The [8B3c2 hub correlator](../sdd/2026-09-06-J-arc-native/task-8b3c2-
 binds authenticated original socket ownership and independently checks replies
 after result cleanup. Durable admission/pipeline remain8C/8D; no deployed escrow
 or end-to-end hub settlement is claimed by the loopback tests.
+The [8C1 Store checkpoint](../sdd/2026-09-06-J-arc-native/task-8c1-report.md)
+adds actual atomic admission and one-shot inference ownership, reciprocal
+restart/stale-writer guards and exact input preservation. Budget HTTP and
+atomic terminal/pipeline activation remain C2/D; see the
+[8C brief](../sdd/2026-09-06-J-arc-native/task-8c-brief.md).
 
 - [ ] Socket messages `EscrowBudgetRequest{jobId, token, amount, escrow, chainId}` → runner replies `EscrowBudgetSigned{jobId, signature, nonce, deadline}`; `EscrowSubmitRequest{jobId, deliverable}` → `EscrowSubmitSigned{…}`. Runner signs with the seller key only; refuses if `amount` ≠ its listing price or `escrow` ≠ chain config. Runner never broadcasts.
 - [ ] `POST /x/:seller/:skill/escrow {jobId}`: validations from spec §7.3 step 3, relay `setBudgetWithAuthorization`, respond `{jobId, budget, token, escrow, fundBy}`; 409 when the job is not Open/ours; rate-limited per payer.
