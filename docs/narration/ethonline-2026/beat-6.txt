@@ -1,0 +1,1 @@
+The Gateway probe includes a deposit and one accepted payment. Separately, twenty session calls passed through the real application with offline payment fixtures. That is not one mined batch. Bounded sessions are implemented; full live batching and recipient-credit evidence remain open.

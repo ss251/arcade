@@ -12,6 +12,7 @@ are merged; unresolved live gates are not prerequisites we can invent.
   [operator contract](../../../continuity-generator.md).
 - [Task5 brief](task-5-brief.md), [README checkpoint](task-5-report.md).
 - [Task6 brief](task-6-brief.md), [diagram checkpoint](task-6-report.md).
+- [Task7 brief](task-7-brief.md), [human narration checkpoint](task-7-report.md).
 - [CLI interop status](../../../interop/circle-cli.md).
 
 Single-threaded; four-worker limits; one sequential full gate per atomic commit,
@@ -28,7 +29,7 @@ research. Secrets/bearer material/private journals never enter these records.
 | I4 continuity generator | Implemented; pinned snapshot, all A–J declared-path activity,32 focused tests/full gate passed; I5 markers integrated |
 | I5 README | Seven sections and pinned snapshot implemented; product bytes preserved, sole full gate passed; I6 current diagram next |
 | I6 architecture | Both overview palettes inspected, five actual DOM exports complete;11 focused tests/strict and sole full gate passed |
-| I7 narration | Human-voice text and bounded word-budget checks; no TTS |
+| I7 narration | Eight drafts/444 words fit225 planned seconds;8 native-shell tests/strict and sole full gate passed; no recorded voice |
 | I8 shot list | Evidence-qualified shots; no replay of consumed live approvals |
 | I9 capture/voice | Owner voice and appropriate live/demo readiness required |
 | I10 cut | Requires actual takes, measured in-points and owner voice; no invented footage |

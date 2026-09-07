@@ -1,0 +1,1 @@
+The web connects listings, receipt trees and dashboards. It distinguishes unavailable data from zero, and Gateway transfer references from mined transactions. Cost displays depend on recorded evidence, not a guarantee of complete billing. The escrow path is implemented offline; deployment and its live proof remain blocked.

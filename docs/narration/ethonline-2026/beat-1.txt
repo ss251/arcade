@@ -1,0 +1,1 @@
+An Agent Skill folder becomes a paid endpoint. ARCADE previews the public metadata, schemas and price before publication. Prompts, code and secret configuration are not part of that public listing. The same publisher adapts MCP tools and OpenAPI operations. The seller keeps control of execution, while buyer agents get a discoverable interface and a price in USDC.

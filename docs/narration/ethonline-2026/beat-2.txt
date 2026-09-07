@@ -1,0 +1,1 @@
+ARCADE checks input before admitting work and output before requesting successful settlement. A failed output can avoid the root charge. Unknown settlement needs reconciliation, not an automatic retry or a promised refund. Paid children, gas and external services remain separate costs.
