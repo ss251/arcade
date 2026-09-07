@@ -20,7 +20,18 @@ export function captureEscrowTransactionTerms(input: unknown): EscrowTransaction
   } catch { throw new EscrowFactsRefused() }
 }
 export async function assertEscrowSignedAction(action: PreparedEscrowAction, raw: unknown, terms: EscrowTransactionTerms) {
+  return assertEscrowSignedTransaction(action, raw, terms)
+}
+/** Shared exact wire proof for separately prepared evaluator or buyer transactions.
+ * No signing authority is inferred from this narrow intent; caller owns preparation. */
+export async function assertEscrowSignedTransaction(action: Pick<PreparedEscrowAction, "sender" | "to" | "data">,
+  raw: unknown, terms: EscrowTransactionTerms) {
   try {
+    const own = (key: "sender" | "to" | "data") => {
+      const d = Object.getOwnPropertyDescriptor(action, key); escrowCheck(d && "value" in d); return d.value as unknown
+    }
+    const sender = escrowAddress(own("sender")), to = escrowAddress(own("to")), data = own("data")
+    escrowCheck(typeof data === "string" && /^0x(?:[0-9a-f]{2}){1,65535}$/.test(data))
     terms = captureEscrowTransactionTerms(terms)
     escrowCheck(typeof raw === "string" && /^0x02(?:[0-9a-fA-F]{2}){1,65535}$/.test(raw) &&
       Number.isSafeInteger(terms.nonce) && terms.nonce >= 0)
@@ -29,9 +40,9 @@ export async function assertEscrowSignedAction(action: PreparedEscrowAction, raw
     const serialized = raw.toLowerCase() as `0x02${string}`, tx = parseTransaction(serialized)
     escrowCheck(tx.type === "eip1559" && tx.chainId === 5042002 && tx.nonce === terms.nonce &&
       tx.gas === gas && tx.maxFeePerGas === maxFee && (tx.maxPriorityFeePerGas ?? 0n) === priority &&
-      (tx.value ?? 0n) === 0n && escrowAddress(tx.to) === action.to && tx.data === action.data &&
+      (tx.value ?? 0n) === 0n && escrowAddress(tx.to) === to && tx.data === data &&
       (tx.accessList === undefined || tx.accessList.length === 0) &&
-      escrowAddress(await recoverTransactionAddress({ serializedTransaction: serialized })) === action.sender)
+      escrowAddress(await recoverTransactionAddress({ serializedTransaction: serialized })) === sender)
     return Object.freeze({ hash: keccak256(serialized), serialized, nonce: terms.nonce,
       gas, maxFeePerGas: maxFee, maxPriorityFeePerGas: priority, gasCapWei: terms.gasCapWei })
   } catch { throw new EscrowFactsRefused() }

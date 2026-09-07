@@ -1,5 +1,17 @@
 # Plan J progress
 
+2026-09-07 20:13 IST — J9B1 sole2336 fullgatePASS5,204Vitest237/72.30s;
+1,237Bun84/9,952assert189.90s;root/webstrict/clientSSR.11paths126links/privacy0;
+5frozen code/test pins checked before atomic commit/exact-one mainFF. Actual
+private journal/runtime andSDK remain next; no live/policychange/ownerkey/push.
+
+2026-09-07 20:07 IST — J9B1 exact buyer signed/mined/receipt/fulljob proofs and
+independent provider-authorized budget-relay proof implemented offline. Focused
+166Vitest6PASS1.88s;5-rootstrict0. Captured pre-await inputs, correct-emitter
+events and exact allowance required; no funding-as-settlement claim. Freeze/
+solegate next, then private durable journal/driver and actualSDK/MCP/CLI9B2/C.
+No ownerkeys/RPC/send/spend/validitychange/deploy/replay/push; live pauses remain.
+
 2026-09-07 19:54 IST — J9A sole91701 fullgatePASS5,158Vitest236/71.73s;
 1,237Bun84/9,952assert191.19s;root/webstrict/clientSSR.10paths120links/privacy0;
 four frozen code/test pins checked before atomic commit/exact-one main FF.

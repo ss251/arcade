@@ -211,3 +211,10 @@ Arc's native gas and ERC-20 USDC share one balance: reserve six-decimal principa
 converted to18decimals plus the remaining total gas budget together. Exact-price
 approval from zero allowance is required; no implicit unlimited grant or reset.
 The private durable executor and actual SDK integration are still pending.
+
+[J9B1 proofs](superpowers/sdd/2026-09-06-J-arc-native/task-9b1-report.md) now bind
+buyer create/approve/fund signatures to exact mined transactions, canonical
+receipt logs and full job readback. JobCreated ID alone is only a lookup hint.
+The hub's budget relay requires independent mined/provider-signature proof;
+its HTTP hash is not authority. These offline proofs label funding, not settlement,
+and do not expose private capability or signed bytes as public SDK evidence.

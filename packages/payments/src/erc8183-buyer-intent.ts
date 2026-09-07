@@ -9,6 +9,7 @@ import { captureEscrowIdentity } from "./erc8183-reader.ts"
 import { assertEscrowSnapshotFresh, captureEscrowCall, escrowRequestDescription } from "./erc8183-request.ts"
 import { captureEscrowRequirements } from "./erc8183-wire.ts"
 const originals = new WeakSet<object>()
+const actions = new WeakSet<object>()
 const PREFIX = "arcade:erc8183:request:v1:"
 /** Arc native USDC has 18 decimals; ERC-20 has 6, backed by the SAME balance.
  * Principal plus remaining gas must fit together, not pass two independent checks.
@@ -43,7 +44,7 @@ export function createEscrowBuyerIntent(input: unknown) {
   } catch { throw new EscrowFactsRefused() }
 }
 export type EscrowBuyerIntent = ReturnType<typeof createEscrowBuyerIntent>
-function original(input: EscrowBuyerIntent) {
+export function captureOriginalEscrowBuyerIntent(input: EscrowBuyerIntent) {
   escrowCheck(originals.has(input)); return input
 }
 /** Supplied balance must be the independently read native view, not an HTTP claim.
@@ -51,7 +52,7 @@ function original(input: EscrowBuyerIntent) {
  * Use only BEFORE funding; the principal is still reserved throughout this sequence. */
 export function assertEscrowBuyerReserve(input: EscrowBuyerIntent, nativeBalanceWei: bigint, spentGasWei: bigint) {
   try {
-    const i = original(input), spent = escrowUint(spentGasWei)
+    const i = captureOriginalEscrowBuyerIntent(input), spent = escrowUint(spentGasWei)
     escrowCheck(spent <= i.gasBudgetWei)
     const principalWei = escrowUint(i.call.amount * 10n ** 12n), remainingGasWei = i.gasBudgetWei - spent,
       requiredWei = reserve(i.call.amount, remainingGasWei)
@@ -63,13 +64,16 @@ export interface PreparedEscrowBuyerAction {
   readonly kind: "create" | "approve" | "fund"; readonly intent: EscrowBuyerIntent; readonly jobId: bigint | null
   readonly chainId: 5042002; readonly sender: Hex; readonly to: Hex; readonly value: 0n; readonly data: Hex
 }
+export function captureOriginalEscrowBuyerAction(input: PreparedEscrowBuyerAction) {
+  escrowCheck(actions.has(input)); return input
+}
 /** Facts must originate from the full-pinned reader, with allowance read independently at
  * the SAME block and a closing canonical check. This function checks facts, not their origin.
  * A later executor must own durable intent/nonce/hash claims before any signature or send. */
 export function prepareEscrowBuyerAction(input: EscrowBuyerIntent, snapshot: unknown, operation: unknown,
   nowSeconds: number): PreparedEscrowBuyerAction {
   try {
-    const i = original(input), now = escrowSeconds(nowSeconds), kind: unknown = operation && typeof operation === "object"
+    const i = captureOriginalEscrowBuyerIntent(input), now = escrowSeconds(nowSeconds), kind: unknown = operation && typeof operation === "object"
       ? Object.getOwnPropertyDescriptor(operation, "kind")?.value : undefined
     escrowCheck(kind === "create" || kind === "approve" || kind === "fund")
     const op = escrowRecord(operation, kind === "create" ? ["kind"] : ["kind", "jobId", "allowanceAtomic"])
@@ -100,6 +104,7 @@ export function prepareEscrowBuyerAction(input: EscrowBuyerIntent, snapshot: unk
         data = encodeFunctionData({ abi: ERC8183_ABI, functionName: "fund", args: [jobId, c.token, c.amount, "0x"] })
       }
     }
-    return Object.freeze({ kind, intent: i, jobId, chainId: 5042002 as const, sender: i.client, to, value: 0n as const, data })
+    const result = Object.freeze({ kind, intent: i, jobId, chainId: 5042002 as const, sender: i.client, to, value: 0n as const, data })
+    actions.add(result); return result
   } catch { throw new EscrowFactsRefused() }
 }
