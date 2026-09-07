@@ -63,6 +63,9 @@ The [8C brief](task-8c-brief.md) now routes to the concrete
 [8D2 reader/result checkpoint](task-8d2-report.md) adds explicit recorded evidence,
 mixed-rail child provenance and actual token-gated result withholding. Budget HTTP,
 attestation and pipeline/boot activation remain; no live completion is implied.
+The [8D3 closure checkpoint](task-8d3-report.md) closes escrow child admission
+on current SQLite before a stable receipt tree can be committed. Existing
+capability expiry and legacy root behavior remain unchanged.
 
 ## Verification
 

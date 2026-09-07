@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 18:02 IST — J8D3 sole35455 fullgatePASS:5,097Vitest234/71.00s;
+1,100Bun80/8,340assert183.54s;root/webstrict/clientSSR.5-rootstrict0;
+10paths75links/privacy0; compare five frozen pins then atomic commit/exact main
+FF. Next actual pipeline/attestation, budget/root HTTP/durable boot, then9.
+No activation, existing policy change, ownerkey/RPC/spend/deploy/replay/push.
+
+2026-09-07 17:57 IST — J8D3 durable escrow tree closure implemented offline.
+Current-disk immutable ceiling/close latch, monotone child resolution, reciprocal
+header/row digest and terminal tree accounting.82SQLite3/444assertPASS3.22s;
+5-root strict/freeze then sole full gate next. No HTTP/pipeline activation yet;
+actual orchestration/budget/root/boot/attestation and9 remain. No existing
+authorization expiry/cap/replay changes, ownerkeys, realRPC, spending or push.
+
 2026-09-07 17:45 IST — J8D2 sole71381 fullgatePASS:5,097Vitest234/75.89s;
 1,075Bun79/8,209assert182.66s;root/webstrict/clientSSR.17paths107links/privacy0
 freeze; compare11code/test pins, commit and exact-one main FF next. Then C2/D

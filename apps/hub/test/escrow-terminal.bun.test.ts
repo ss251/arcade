@@ -45,6 +45,31 @@ async function rejects<A, E>(effect: Effect.Effect<A, E>, tag = "EscrowStoreRefu
   if (exit._tag === "Failure") expect(Cause.pretty(exit.cause)).toContain(tag)
 }
 describe("durable escrow terminal evidence", () => {
+  test.each(["complete", "reject"] as const)("%s requires a closed prepared tree and exact actual accounting", async kind => {
+    const h = await setup(kind), s = h.open().store, id = h.queued.id
+    await run(s.escrow!.admit(h.context, h.queued)); await run(s.escrow!.begin(h.context, id))
+    await run(s.escrow!.prepareTree(h.context, id, 0n))
+    const terminal = { ...h.terminal, receipt: Receipt.make({ ...h.terminal.receipt, treeCeilingAtomic: 0n, treeCommittedAtomic: 0n }) }
+    await rejects(s.escrow!.finish(h.context, terminal))
+    await run(s.escrow!.closeTree(h.context, id))
+    await rejects(s.escrow!.finish(h.context, { ...terminal, receipt: Receipt.make({ ...terminal.receipt, treeCeilingAtomic: 1n }) }))
+    expect(await run(s.escrow!.finish(h.context, terminal))).toEqual({ created: true })
+    expect(await run(s.reserveTree(id, "job_" + "z".repeat(32), 1n, 1n))).toBe(false)
+  })
+  test("pending closed-tree holds prevent confirmed terminal evidence but are not erased by uncertainty", async () => {
+    const h = await setup("reject"), s = h.open().store, id = h.queued.id, child = "job_" + "z".repeat(32)
+    await run(s.escrow!.admit(h.context, h.queued)); await run(s.escrow!.begin(h.context, id))
+    await run(s.escrow!.prepareTree(h.context, id, 10n)); await run(s.reserveTree(id, child, 4n, 10n))
+    await run(s.escrow!.closeTree(h.context, id))
+    await rejects(s.escrow!.finish(h.context, h.terminal))
+    const terminal = { ...h.terminal, proof: null, receipt: Receipt.make({ ...h.terminal.receipt,
+      escrow: escrowTerminalEvidence(h.context, null), reason: "escrow outcome uncertain; reconciliation required" }) }
+    await run(s.escrow!.finish(h.context, terminal))
+    expect((await run(s.treeState(id))).reservedAtomic).toBe(4n)
+    await run(s.commitTree(child))
+    expect((await run(s.treeState(id))).committedAtomic).toBe(4n)
+    expect((await run(s.allReceipts))[0]!.escrow?.state).toBe("uncertain")
+  })
   test.each(["complete", "reject", "uncertain"] as const)("atomically records %s across two handles and restart", async kind => {
     const h = await setup(kind), a = h.open(), b = h.open()
     await run(a.store.escrow!.admit(h.context, h.queued)); await run(a.store.escrow!.begin(h.context, h.queued.id))

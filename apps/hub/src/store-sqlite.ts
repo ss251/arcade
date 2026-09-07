@@ -475,11 +475,26 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
         Effect.runSync(inner.recordPayTest(owned))
       })),
     reserveTree: (root, child, amount, ceiling) =>
-      Effect.tap(inner.reserveTree(root, child, amount, ceiling), (ok) =>
-        Effect.sync(() => { if (ok) upsertTree.run(child, root, amount.toString(), "reserved") })
-      ),
-    commitTree: (child) => Effect.tap(inner.commitTree(child), () => Effect.sync(() => setTreeStateStmt.run("committed", child))),
-    releaseTree: (child) => Effect.tap(inner.releaseTree(child), () => Effect.sync(() => setTreeStateStmt.run("released", child))),
+      Effect.uninterruptible(Effect.sync(() => {
+        const escrowResult = escrow.tree.reserve(root, child, amount, ceiling)
+        if (escrowResult !== undefined) return escrowResult
+        const ok = Effect.runSync(inner.reserveTree(root, child, amount, ceiling))
+        if (ok) upsertTree.run(child, root, amount.toString(), "reserved")
+        return ok
+      })),
+    commitTree: child => Effect.uninterruptible(Effect.sync(() => {
+      if (escrow.tree.transition(child, "committed")) return
+      Effect.runSync(inner.commitTree(child)); setTreeStateStmt.run("committed", child)
+    })),
+    releaseTree: child => Effect.uninterruptible(Effect.sync(() => {
+      if (escrow.tree.transition(child, "released")) return
+      Effect.runSync(inner.releaseTree(child)); setTreeStateStmt.run("released", child)
+    })),
+    treeState: root => Effect.sync(() => {
+      const state = escrow.tree.snapshot(root)
+      if (state) return { children: state.children, reservedAtomic: state.reservedAtomic, committedAtomic: state.committedAtomic }
+      return Effect.runSync(inner.treeState(root))
+    }),
     // The sweep rewrites many receipts at once; re-persisting the whole set afterwards is
     // simpler than tracking which rows the in-memory update touched, and a sweep is rare.
     backfillFeeSweep: (accrualId, txHash) =>

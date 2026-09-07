@@ -1,5 +1,6 @@
 /** Durable inference ownership on the hub's existing SQLite connection. No RPC/signing. */
 import type { Database } from "bun:sqlite"
+import { openEscrowTree, type EscrowRootTreeState } from "./escrow-tree.ts"
 import { Data, Effect } from "effect"
 import { hashJson, Job } from "@arcade/core"
 import { escrowActionContext, escrowCheck, escrowContextFromWire, escrowContextToWire,
@@ -19,6 +20,8 @@ export interface EscrowStore {
   readonly uncertain: (context: unknown, jobId: string) => Effect.Effect<void, EscrowStoreRefused | EscrowStorageUnavailable>
   readonly finish: (context: unknown, terminal: unknown) => Effect.Effect<{ created: boolean }, EscrowStoreRefused | EscrowStorageUnavailable>
   readonly get: (jobId: string) => Effect.Effect<EscrowAdmission | undefined, EscrowStoreRefused | EscrowStorageUnavailable>
+  readonly prepareTree: (context: unknown, jobId: string, ceilingAtomic: bigint) => Effect.Effect<void, EscrowStoreRefused | EscrowStorageUnavailable>
+  readonly closeTree: (context: unknown, jobId: string) => Effect.Effect<EscrowRootTreeState, EscrowStoreRefused | EscrowStorageUnavailable>
 }
 const keyOf = (c: EscrowActionContext) => `${c.call.chainId}:${c.call.escrow}:${c.jobId}`
 const jobIdOf = (id: unknown): string => { escrowCheck(typeof id === "string" && /^job_[A-Za-z0-9]{16,128}$/.test(id)); return id }
@@ -36,6 +39,7 @@ const SELECT = `SELECT escrow_admissions.*, jobs.id, jobs.escrow_key, jobs.statu
   FROM escrow_admissions JOIN jobs ON jobs.id = escrow_admissions.job_id`
 /** Called before the legacy reaper or cache load. Migration never rewrites existing jobs. */
 export function openEscrowStore(db: Database, bootId: string, durability: EscrowStore["durability"]) {
+  let assertTreeBinding = (_id: string): void => {}
   if (!db.query<{ name: string }, []>("PRAGMA table_info(jobs)").all().some(c => c.name === "escrow_key")) db.exec("ALTER TABLE jobs ADD COLUMN escrow_key TEXT")
   db.exec(`CREATE TABLE IF NOT EXISTS escrow_admissions (
     key TEXT PRIMARY KEY, job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id), context_json TEXT NOT NULL,
@@ -69,6 +73,7 @@ export function openEscrowStore(db: Database, bootId: string, durability: Escrow
         row.created_at_ms === job.createdAtMs && row.context_hash === escrowProviderContextHash(context) &&
         row.job_digest === hashJson(JSON.parse(row.json)) && ["admitted", "executing", "uncertain", "settled", "refunded"].includes(row.state))
       matches(context, job)
+      assertTreeBinding(job.id)
       if (row.terminal_json === null) escrowCheck(job.outcome === undefined &&
         (row.state === "admitted" ? job.status === "queued" : row.state === "executing" ? job.status === "running" : row.state === "uncertain" && ["queued", "running"].includes(job.status)))
       else {
@@ -141,6 +146,17 @@ export function openEscrowStore(db: Database, bootId: string, durability: Escrow
     escrowCheck(previous !== undefined && escrowProviderContextHash(previous.context) === escrowProviderContextHash(context))
     const existing = db.query<Row, [string]>(SELECT + " WHERE escrow_admissions.job_id = ?").get(id)!
     if (existing.terminal_json !== null) { escrowCheck(existing.terminal_json === json); return { created: false } }
+    const rootTree = tree.snapshot(id)
+    if (rootTree) {
+      escrowCheck(rootTree.closed)
+      if (terminal.receipt.escrow!.state !== "uncertain") {
+        escrowCheck(rootTree.reservedAtomic === 0n)
+        const children = terminal.receipt.children ?? [], committed = rootTree.children.filter(row => row.state === "committed")
+        escrowCheck(children.length === committed.length && committed.every(row => children.some(child => child.jobId === row.childJobId &&
+          child.priceAtomic === row.amountAtomic && child.settled)) && terminal.receipt.treeCeilingAtomic === rootTree.ceilingAtomic &&
+          terminal.receipt.treeCommittedAtomic === rootTree.committedAtomic)
+      }
+    }
     escrowCheck(["admitted", "executing", "uncertain"].includes(previous.state) &&
       (terminal.receipt.escrow!.state !== "settled" || previous.state === "executing") &&
       (previous.state !== "uncertain" || terminal.receipt.escrow!.state === "uncertain") &&
@@ -171,8 +187,12 @@ export function openEscrowStore(db: Database, bootId: string, durability: Escrow
     begin: (context, id) => effect(() => transition.immediate(context, id, "begin")),
     uncertain: (context, id) => effect(() => { transition.immediate(context, id, "uncertain") }),
     finish: (context, terminal) => effect(() => finish.immediate(context, terminal)),
-    get: id => effect(() => db.transaction(read).deferred(id)) })
-  return Object.freeze({ store, owned,
+    get: id => effect(() => db.transaction(read).deferred(id)),
+    prepareTree: (context, id, ceiling) => effect(() => { escrowCheck(durability === "durable"); tree.prepare(context, id, ceiling) }),
+    closeTree: (context, id) => effect(() => { escrowCheck(durability === "durable"); return tree.close(context, id) }) })
+  const tree = openEscrowTree(db, read)
+  assertTreeBinding = tree.assertBinding
+  return Object.freeze({ store, owned, tree,
     getReceipts: () => {
       try {
         topology()
