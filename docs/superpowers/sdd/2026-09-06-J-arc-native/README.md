@@ -18,6 +18,7 @@ evidence remain separate open work; this index does not mark them accepted.
 - [Task5 brief](task-5-brief.md), [policy/binding checkpoint](task-5a-report.md).
   [Durable journal checkpoint](task-5b1-report.md).
   [Signing guards and command policy](task-5b2-report.md).
+  [Guarded runtime and CLI](task-5b3-report.md), [funding guide](../../../unified-balance-funding.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

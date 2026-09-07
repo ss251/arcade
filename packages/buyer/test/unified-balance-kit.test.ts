@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
-import { unifiedKitBindings } from "../src/unified-balance-kit.ts"
+import { unifiedKitBindings, createUnifiedFundingKit, oneAttemptUnifiedProvider } from "../src/unified-balance-kit.ts"
+import { createUnifiedBalanceKitContext } from "@circle-fin/unified-balance-kit"
 import { captureUnifiedFundingPlan } from "../src/unified-balance-funding.ts"
 
 const owner = `0x${"11".repeat(20)}` as const, recipient = `0x${"22".repeat(20)}` as const
@@ -15,6 +16,18 @@ const setup = () => {
   return { kit, read, signer, bindings }
 }
 describe("Unified Balance Kit1.6.0 binding", () => {
+  it("overrides the actual provider's spend request config without losing kit callbacks", async () => {
+    const provider = createUnifiedBalanceKitContext({ disableAnalytics: true, disableErrorReporting: true }).providers[0]
+    const spend = vi.spyOn(provider, "spend").mockRejectedValue(Error("OFFLINE_STOP"))
+    const wrapped = oneAttemptUnifiedProvider(provider), onBroadcast = vi.fn()
+    await expect(wrapped.spend({} as never, { requestConfig: { maxRetries: 10, timeout: 99999 }, onBroadcast })).rejects.toThrow("OFFLINE_STOP")
+    expect(spend).toHaveBeenCalledExactlyOnceWith({}, { onBroadcast, requestConfig: { maxRetries: 1, timeout: 5000, retryDelay: 0 } })
+  })
+  it("constructs a usable bounded-provider kit without a live request", () => {
+    const kit = createUnifiedFundingKit()
+    expect(kit.getSupportedChains().some(chain => chain.chain === "Arc_Testnet")).toBe(true)
+    expect(kit.getSupportedChains().some(chain => chain.chain === "Base_Sepolia")).toBe(true)
+  })
   it("reads readiness using the owner adapter, without touching the delegate adapter", async () => {
     const { kit, read, signer, bindings } = setup()
     expect(await bindings.delegateStatus({ owner, delegate: recipient, sourceChain: "Base_Sepolia" })).toBe("pending")

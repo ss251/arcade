@@ -16,9 +16,9 @@ of this task. No J4 approval has been consumed.
    readbacks. No replay of consumed proof actions, raw logs or keys in the repo.
 
 5A is merged.5B1 adds the durable journal;5B2 adds final signing/mint guards
-and strict command policy.5B3 guarded transport/adapters and CLI routing follow.
-No runnable funding CLI, owner grant, deposit, delegate spend or payment is
-claimed by those preparation checkpoints.
+and strict command policy.5B3 adds guarded transport/adapters and actual CLI
+routing, tested with the real pinned SDK and fake IO. Live owner grant, deposit,
+delegate spend and payment remain5C/NOT_RUN.
 
 ## Source-backed corrections to the shorthand plan
 
@@ -41,6 +41,9 @@ recipient is the distinct delegate. The owner retains source-account custody.
 A ready delegation permits future source spending: it is not a per-call cap.
 
 ## Runtime work still required
+
+The5B3 checkpoint implements the following runtime boundaries. Independent live
+deployment/state/effects verification remains5C; SDK return alone is not proof.
 
 - Default Viem adapter1.17.1 invokes `waitForTransactionReceipt` internally.
   Supply a guarded receipt implementation using the project's bounded

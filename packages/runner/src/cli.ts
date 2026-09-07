@@ -77,6 +77,7 @@ const usage = () => {
        [--seller 0x..]                             …reuse an address you already control
        [--import 0x<key>]                          …adopt an existing key
   arcade status [--skills DIR]                     identity, hub, skills, earnings
+  arcade fund --help                               fund a buyer from owner Unified Balance
   arcade start [--skills DIR]                      connect to the hub and serve jobs
 
   arcade publish <skillDir>                        preview the PUBLIC projection
@@ -844,7 +845,11 @@ credential stays in your keychain — ARCADE only ever sees a job result.`)
 
 // Importing the helpers must never execute a seller command.
 if (import.meta.main) {
-  Effect.runPromise(main).catch((e) => {
+  if (rawArgs[0] === "fund") {
+    const { runOwnedFundingCli } = await import("../../buyer/src/gateway-funding-cli.ts")
+    const { runUnifiedFundingCommand } = await import("../../buyer/src/unified-balance-cli.ts")
+    await runOwnedFundingCli(() => runUnifiedFundingCommand(rawArgs, process.env))
+  } else Effect.runPromise(main).catch((e) => {
     console.error(String((e as Error)?.message ?? e))
     process.exit(1)
   })

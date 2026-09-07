@@ -17,6 +17,29 @@ const path = async () => {
   return join(root, "run.jsonl")
 }
 describe("owned Unified Balance journal", () => {
+  test("prepared mint hash survives an uncertain outcome within the same five-line bound", async () => {
+    const journalPath = await path(), journal = await openUnifiedFundingJournal(journalPath, plan)
+    await journal.append({ stage: "planned", plan })
+    await journal.append({ stage: "spend_intent", plan })
+    await journal.append({ stage: "mint_prepared", plan, txHash })
+    await journal.append({ stage: "uncertain", plan })
+    await journal.close()
+    const saved = await readUnifiedFundingJournal(journalPath, plan)
+    expect(saved.events[2]).toEqual({ stage: "mint_prepared", plan, txHash })
+    expect((await readFile(journalPath, "utf8")).trim().split("\n")).toHaveLength(5)
+  })
+  test("SDK return must match the prepared transaction hash", async () => {
+    for (const same of [true, false]) {
+      const journalPath = await path(), journal = await openUnifiedFundingJournal(journalPath, plan)
+      await journal.append({ stage: "planned", plan })
+      await journal.append({ stage: "spend_intent", plan })
+      await journal.append({ stage: "mint_prepared", plan, txHash })
+      const append = journal.append({ stage: "sdk_returned", plan, txHash: same ? txHash : `0x${"44".repeat(32)}` })
+      if (same) { await append; await journal.close() }
+      else { await expect(append).rejects.toThrow(); await journal.close().catch(() => {}) }
+      expect((await readUnifiedFundingJournal(journalPath, plan)).events[2]).toEqual({ stage: "mint_prepared", plan, txHash })
+    }
+  })
   test("fresh mode0600 evidence, immutable plan and bounded hash chain survive close", async () => {
     const journalPath = await path(), journal = await openUnifiedFundingJournal(journalPath, plan)
     await journal.append({ stage: "planned", plan })

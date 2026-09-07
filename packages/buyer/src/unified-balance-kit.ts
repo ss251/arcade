@@ -1,11 +1,25 @@
 /** SDK-only binding. No keys, transports, observers or signing clients are
  * created on import. The CLI runtime supplies separately guarded adapters. */
-import { UnifiedBalanceKit, resolveChainIdentifier } from "@circle-fin/unified-balance-kit"
+import { UnifiedBalanceKit, createUnifiedBalanceKitContext, resolveChainIdentifier } from "@circle-fin/unified-balance-kit"
 import { captureUnifiedFundingPlan, unifiedSpendParams, UnifiedFundingFailure, type UnifiedFundingDependencies } from "./unified-balance-funding.ts"
 
 type KitAdapter = Parameters<UnifiedBalanceKit["getDelegateStatus"]>[0]["from"]["adapter"]
 type FundingKit = Pick<UnifiedBalanceKit, "getDelegateStatus" | "spend">
-export const createUnifiedFundingKit = () => new UnifiedBalanceKit({ disableAnalytics: true, disableErrorReporting: true })
+type GatewayProvider = ReturnType<typeof createUnifiedBalanceKitContext>["providers"][0]
+/** Pinned1.6.0 provider seam: requestConfig is an internal, published type.
+ * Do not configure provider headers: that SDK factory replaces requestConfig
+ * with headers-only when headers exist. The owned fetch boundary independently
+ * refuses a second transfer dispatch, redirects and unbounded response bodies. */
+export const oneAttemptUnifiedProvider = (provider: GatewayProvider): GatewayProvider => ({
+  ...provider,
+  spend: (params, options) => provider.spend(params, { ...options,
+    requestConfig: { maxRetries: 1, timeout: 5000, retryDelay: 0 } })
+})
+export const createUnifiedFundingKit = () => {
+  const context = createUnifiedBalanceKitContext({ disableAnalytics: true, disableErrorReporting: true })
+  return new UnifiedBalanceKit({ excludeDefaultProviders: true, providers: [oneAttemptUnifiedProvider(context.providers[0])],
+    disableAnalytics: true, disableErrorReporting: true })
+}
 
 /** Owner adapter must be read-only. Delegate adapter must guard signing, gas and
  * receipt polling; this binding is not authority to use unbounded SDK defaults. */

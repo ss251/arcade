@@ -97,6 +97,10 @@ export const buyerMain = async (raw: readonly string[], env: Readonly<Record<str
   const { fundingMain, captureCliArgv } = await import("./gateway-funding-cli.ts")
   let args: readonly string[]
   try { args = captureCliArgv(raw) } catch { return fundingMain([], { env, role: "buyer" }) }
+  if (args[0] === "fund") {
+    const { runUnifiedFundingCommand } = await import("./unified-balance-cli.ts")
+    return runUnifiedFundingCommand(args, env)
+  }
   if (args[0] === "session" || args[0] === "--help" || args[0]?.startsWith("gateway-")) {
     return fundingMain(args, { env, role: "buyer" })
   }
@@ -104,7 +108,7 @@ export const buyerMain = async (raw: readonly string[], env: Readonly<Record<str
 }
 
 if (import.meta.main) {
-  if (process.argv[2] === "session" || process.argv[2] === "--help" || process.argv[2]?.startsWith("gateway-")) {
+  if (process.argv[2] === "fund" || process.argv[2] === "session" || process.argv[2] === "--help" || process.argv[2]?.startsWith("gateway-")) {
     const { runOwnedFundingCli } = await import("./gateway-funding-cli.ts")
     await runOwnedFundingCli(() => buyerMain(process.argv.slice(2), process.env))
   } else process.exitCode = await buyerMain(process.argv.slice(2), process.env)

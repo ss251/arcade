@@ -69,13 +69,13 @@ export const delegateStatus = (owner: unknown, delegate: unknown, sourceChain: u
   })
 
 export type UnifiedFundingEvent = Readonly<{ stage: "planned" | "delegate_none" | "delegate_pending" | "spend_intent" | "uncertain";
-  plan: UnifiedFundingPlan }> | Readonly<{ stage: "sdk_returned"; plan: UnifiedFundingPlan; txHash: `0x${string}` }>
+  plan: UnifiedFundingPlan }> | Readonly<{ stage: "mint_prepared" | "sdk_returned"; plan: UnifiedFundingPlan; txHash: `0x${string}` }>
 export interface UnifiedFundingJournal { append(event: UnifiedFundingEvent): Promise<void> }
 export const captureUnifiedFundingEvent = (input: unknown, expectedPlan: UnifiedFundingPlan): UnifiedFundingEvent => {
   const raw = fundingRecord(input, ["stage", "plan"], ["txHash"])
   const plan = captureCanonicalUnifiedPlan(raw.plan), expected = captureCanonicalUnifiedPlan(expectedPlan)
   if (JSON.stringify(plan) !== JSON.stringify(expected)) return fail()
-  if (raw.stage === "sdk_returned") {
+  if (raw.stage === "mint_prepared" || raw.stage === "sdk_returned") {
     if (typeof raw.txHash !== "string" || raw.txHash.length !== 66 || !/^0x[0-9a-f]{64}$/.test(raw.txHash) || /^0x0{64}$/.test(raw.txHash)) return fail()
     return Object.freeze({ stage: raw.stage, plan, txHash: raw.txHash as `0x${string}` })
   }

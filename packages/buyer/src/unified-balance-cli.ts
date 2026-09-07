@@ -13,6 +13,7 @@ const HELP = "arcade fund --from-unified-balance --owner ADDRESS --source Arc_Te
   "Destination: Arc_Testnet, recipient: the delegate. Default fee cap 0.05 USDC; destination gas cap 0.10 native USDC (100000000000000000 wei).\n" +
   "Dry-run is offline and never reads a key; supply --delegate to resolve the complete plan. Ready live spends require a fresh private journal and an explicit finite --max-burn-block-delta.\n" +
   "No mainnet, auto-allocation, forwarder, automatic deposit, grant or retry. Owner delegation is source-specific and is not a per-call cap.\n"
+  + "Self-signed Arc mint requires the delegate to already hold its destination gas cap in native USDC.\n"
 export interface UnifiedFundingCommand {
   readonly kind: "fund"
   readonly owner: `0x${string}`
@@ -121,4 +122,19 @@ export const unifiedFundingMain = async (input: readonly string[], context: Unif
       "unified_funding_unavailable: retain evidence; do not retry an uncertain spend", true)
     return error instanceof UnifiedFundingCliError ? 2 : 1
   }
+}
+
+/** Called by the owning buyer/arcade command, under runOwnedFundingCli's hard
+ * process fuse. The SDK module is not even loaded for help/invalid/dry-run. */
+export const runUnifiedFundingCommand = async (args: readonly string[], env: Readonly<Record<string, string | undefined>>): Promise<number> => {
+  const controller = new AbortController(), deadlineMs = performance.now() + 300000
+  try {
+    return await unifiedFundingMain(args, { env,
+      runtime: async () => {
+        const { createUnifiedRuntime } = await import("./unified-balance-runtime.ts")
+        return createUnifiedRuntime({ env, signal: controller.signal, deadlineMs })
+      },
+      write: async (line, error) => { await Bun.write(error ? Bun.stderr : Bun.stdout, line + "\n") }
+    })
+  } finally { controller.abort() }
 }

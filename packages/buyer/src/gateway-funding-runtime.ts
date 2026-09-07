@@ -165,6 +165,9 @@ async function wire(fetchFn: typeof fetch, url: string, method: "GET" | "POST", 
     try { if (reader) void reader.cancel().catch(() => {}); else if (response?.body) void response.body.cancel().catch(() => {}) } catch { /* fixed errors only */ }
   }
 }
+/** Shared bounded anonymous JSON IO for the separate delegated funding runtime.
+ * Caller must supply pinned destinations; existing F11 callers are unchanged. */
+export const boundedFundingJson = wire
 const readMethods = new Set(["eth_chainId", "eth_getBlockByNumber", "eth_getCode", "eth_getStorageAt", "eth_call", "eth_getBalance",
   "eth_getTransactionCount", "eth_estimateGas", "eth_gasPrice", "eth_maxPriorityFeePerGas", "eth_getTransactionReceipt", "eth_getTransactionByHash", "eth_getLogs"])
 export function createFundingDependencies(input: FundingDependencyOptions): FundingDependencies {

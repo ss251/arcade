@@ -486,10 +486,11 @@ const unifiedLocation = async (path: unknown) => {
   const parent = dirname(path); await privateDir(parent)
   return { path, parent }
 }
-const unifiedTransition = (previous: UnifiedFundingEvent["stage"] | undefined, next: UnifiedFundingEvent["stage"]) => {
-  const allowed = previous === undefined ? ["planned"] : previous === "planned" ? ["delegate_none", "delegate_pending", "spend_intent"] :
-    previous === "spend_intent" ? ["sdk_returned", "uncertain"] : []
-  insist(allowed.includes(next))
+const unifiedTransition = (previous: UnifiedFundingEvent | undefined, next: UnifiedFundingEvent) => {
+  const allowed = previous === undefined ? ["planned"] : previous.stage === "planned" ? ["delegate_none", "delegate_pending", "spend_intent"] :
+    previous.stage === "spend_intent" ? ["mint_prepared", "sdk_returned", "uncertain"] : previous.stage === "mint_prepared" ? ["sdk_returned", "uncertain"] : []
+  insist(allowed.includes(next.stage))
+  if (previous?.stage === "mint_prepared" && next.stage === "sdk_returned") insist(previous.txHash === next.txHash)
 }
 function decodeUnifiedEvidence(bytes: string, expectedPlan: UnifiedFundingPlan): UnifiedJournalSnapshot {
   insist(bytes.endsWith("\n") && Buffer.byteLength(bytes) <= MAX_FILE)
@@ -505,7 +506,7 @@ function decodeUnifiedEvidence(bytes: string, expectedPlan: UnifiedFundingPlan):
     const row = own(JSON.parse(line)); exact(row, ["sequence", "previousHash", "event", "hash"])
     insist(row.sequence === head.sequence + 1 && row.previousHash === head.hash)
     const event = captureUnifiedFundingEvent(row.event, plan)
-    unifiedTransition(events.at(-1)?.stage, event.stage)
+    unifiedTransition(events.at(-1), event)
     const payload = JSON.stringify({ sequence: row.sequence, previousHash: row.previousHash, event })
     insist(row.hash === hash(payload)); events.push(event)
     head = Object.freeze({ sequence: row.sequence as number, hash: canonicalDigest(row.hash) })
@@ -547,7 +548,7 @@ export async function openUnifiedFundingJournal(path: string, inputPlan: Unified
         catch { poisoned = true; return Promise.reject(new FundingJournalError()) }
         const operation = tail.then(async () => {
           insist(!closed && !poisoned)
-          unifiedTransition(snapshot.events.at(-1)?.stage, event.stage)
+          unifiedTransition(snapshot.events.at(-1), event)
           insist(await boundRead(owned) === bytes)
           const payload = JSON.stringify({ sequence: snapshot.head.sequence + 1, previousHash: snapshot.head.hash, event })
           const row = payload.slice(0, -1) + `,"hash":"${hash(payload)}"}\n`
