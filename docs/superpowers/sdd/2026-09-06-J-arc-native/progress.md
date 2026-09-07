@@ -1,5 +1,20 @@
 # Plan J progress
 
+2026-09-07 09:58 IST — J5C3C sole22011PASS:4,825Vitest214/67.16s,
+955Bun67/7,272assert/173.13s,root/webstrict,client354ms/SSR186ms. Thirteen
+code/script/test pins unchanged,18paths/32links/privacy0. Finalaudit/atomiccommit/
+exactFFnext. J5 live is PAUSED on reproduced keyless timing prerequisite;
+all real keys/grants/deposits/spends/payments still unused. No cap widened.
+Next J6 offline pinned contracts/hook/deploy script; treasury OWNER checkpoint.
+
+2026-09-07 09:52 IST — J5C3B mergedadc07ff/exactoneFFcleanmain. J5C3C
+owned delivery/source/paid-call/CLI composition implemented;28focusedBun414assert/
+723msPASS, strict finalcapture next. Actual keyless read-cost probes hit unchanged
+5-second boundary (fullinventory6410ms; integratedhelper5272ms, no dispatch).
+J5 LIVE PAUSED before keys/grants/deposits; approvals unused. Scope/freeze/sole
+fullgate/commit/FF next, then J6 offline and explicit treasury checkpoint/J7-J9.
+No existing timeout/validity/cap/replay/F11 acceptance changes, push or agent.
+
 2026-09-07 09:11 IST — J5C3B sole15793PASS:4,825Vitest214/67.05s,
 938Bun63/6,951assert/172.66s,root/webstrict,client369ms/SSR171ms. Four code/test
 pins unchanged. Eight-path/29links/privacy0; finalaudit/atomiccommit/exactFFnext.

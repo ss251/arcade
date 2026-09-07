@@ -4,6 +4,26 @@ Code/offline integration is implemented; the approved J5 live proof is **not
 run**. This is normal Gateway funding, not a change to batched x402 payment
 validity. J4 Circle services-pay remains paused.
 
+The owned J5 harness is implemented offline, but live execution is paused on an
+observed pre-transfer read-cost prerequisite: the existing five-second request
+boundary ended before the full6410ms limits-read sequence finished. The
+[timing record](evidence/J/unified-signing-preflight-timing.json) contains only
+keyless reads and a non-network transfer stub, not a live spend/refusal. All J5
+live approvals remain unused. The harness checks this prerequisite before keys
+or owner transactions; no timeout, validity or cap was widened.
+
+```sh
+bash scripts/e2e-delegate-funding.sh --help
+bash scripts/e2e-delegate-funding.sh --dry-run
+```
+
+Do not start the one-shot live run until that prerequisite is resolved. Its
+future explicit live command also requires --max-burn-block-delta INTEGER;
+there is no silent default. The [owned-proof record](superpowers/sdd/2026-09-06-J-arc-native/task-5c3c-report.md)
+details grant/deposit/delivery, one real0.01USDC eip3009 call, process cleanup,
+persistent grant and pending source-batch handling. Fees accrue in the splitter;
+the harness never withdraws them. Loopback URLs cease serving after cleanup.
+
 The pinned Unified Balance Kit1.6.0 and Viem adapter1.17.1 move an explicit
 amount from an owner's Gateway custody to its distinct delegate on Arc testnet.
 Sources are exactly Arc_Testnet or Base_Sepolia. No mainnet, automatic deposit,

@@ -159,12 +159,12 @@ export const proofStages = ["planned", "grant_prepared", "grant_confirmed", "app
   "source_checked", "purchase_intent", "purchase_confirmed", "complete", "uncertain"] as const
 export type ProofStage = typeof proofStages[number]
 export type ProofFacts = Readonly<{ txHash?: Hex; blockHash?: Hex; blockNumber?: bigint; amount?: bigint; gasWei?: bigint;
-  specHash?: Hex; maxFee?: bigint; maxBlockHeight?: bigint; available?: bigint; pendingBatch?: bigint; sourceTxHash?: Hex;
+  specHash?: Hex; maxFee?: bigint; actualFee?: bigint; maxBlockHeight?: bigint; available?: bigint; pendingBatch?: bigint; sourceTxHash?: Hex;
   sourceDebit?: "pending" | "confirmed"; jobId?: string }>
 export function captureProofEvent(stage: ProofStage, facts: ProofFacts) {
   proofCheck(proofStages.includes(stage))
   const r = fundingRecord(facts, [], ["txHash", "blockHash", "blockNumber", "amount", "gasWei", "specHash", "maxFee",
-    "maxBlockHeight", "available", "pendingBatch", "sourceTxHash", "sourceDebit", "jobId"])
+    "actualFee", "maxBlockHeight", "available", "pendingBatch", "sourceTxHash", "sourceDebit", "jobId"])
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(r)) {
     if (["txHash", "blockHash", "specHash", "sourceTxHash"].includes(key)) out[key] = proofHash(value)

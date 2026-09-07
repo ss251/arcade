@@ -1,0 +1,54 @@
+{
+  "kind": "read-only-signing-preflight-timing",
+  "network": "Arc testnet",
+  "transferTransport": "non-network throwing stub; no transfer HTTP request",
+  "observations": [
+    {
+      "at": "2026-09-07T04:11:09.248Z",
+      "kind": "full_limits_IO_inventory",
+      "boundaryElapsedMs": 5003,
+      "callbackElapsedMs": 6410,
+      "completed": true,
+      "readFailed": false,
+      "dispatchReached": false,
+      "rpcReads": 16,
+      "balanceQueries": 1
+    },
+    {
+      "at": "2026-09-07T04:18:21.508Z",
+      "kind": "actual_pre_key_helper",
+      "boundaryElapsedMs": 5002,
+      "callbackElapsedMs": 5272,
+      "complete": false,
+      "readFailed": false,
+      "interrupted": true,
+      "dispatchReached": false,
+      "rpcReads": 14,
+      "balanceQueries": 0
+    }
+  ],
+  "keys": 0,
+  "signatures": 0,
+  "ownerBroadcasts": 0,
+  "actualTransferRequests": 0,
+  "liveCliInvoked": false,
+  "existingSource": {
+    "network": {
+      "path": "packages/buyer/src/unified-balance-network.ts",
+      "sha256": "ad72af47b6f8a36438e4ead41f08351f8810070a4cc01375ae92a16ee22d2de5",
+      "requestTimerLine": 62,
+      "beforeTransferLine": 67,
+      "dispatchLine": 68,
+      "sourceDefinedError": "unified_network_refused",
+      "rawErrorCaptured": false
+    },
+    "runtime": {
+      "path": "packages/buyer/src/unified-balance-runtime.ts",
+      "sha256": "6cf592be4dcd0b8a0b0b9530bafe06b81c0918ac40072d440098ebd7aec7c907",
+      "limitsStartLine": 179,
+      "limitsEndLine": 202
+    }
+  },
+  "conclusion": "J5 live paused on observed read-cost prerequisite. Existing five-second boundary encloses the final limits reads. No timeout, payment validity, fee/gas cap or replay rule changed.",
+  "limitations": "Cost probe only: readiness values were not asserted and no actual SDK spend/signature/payment was attempted. A fast future cost probe is not a network guarantee."
+}
