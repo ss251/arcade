@@ -1,5 +1,22 @@
 # Plan J progress
 
+2026-09-07 16:12 IST — J8B3c2 sole19114 full gate PASS:5,057Vitest232/71.42s;
+1,015Bun76/7,833assertions/178.69s;root/webstrict/clientSSRbuild. Six-rootstrict0,
+43focused/4files;11paths89links/privacy0. Six frozen code pins will be checked
+before atomic commit/exact main FF. J8C durable admission then8D/9 next, no replay.
+
+2026-09-07 16:06 IST — J8B3c2 actual hub broker/socket correlation implemented
+offline. Original stable connection retained through JobResult cleanup and Hello
+refresh; replacement/disconnect/cancellation and duplicate attempts fenced.
+Actual typed signature recovery plus post-await checks;64pending/1000retained
+capacity, no auto eviction. First two genuine broker Reds fixed. Focused31tests
+including9existing broker plus2actualhub WebSocket cases passed; a final separate
+clock/socket case is added. Six-rootstrict0 before that test-only split. Final
+freeze/gate next, then8C/8D/9. No live activation, keys, RPC, sends, spending,
+deployment, existing policy changes or push; J4/J5/J6 live pauses unchanged.
+Final focused43Vitest/4files PASS4.84s:23new broker,2actualhub,9existingbroker,
+9existing signed-Hello cases. No full gate run yet.
+
 2026-09-07 15:52 IST — J8B3c1 sole62068 full gate PASS:5,032Vitest/230files/
 70.84s;1,015Bun/76files/7,831assertions/179.02s; root/web strict and client/SSR
 builds. Ten-root focused strict0;14-path/86-local-link scope/privacy audit clean.

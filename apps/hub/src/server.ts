@@ -680,6 +680,8 @@ const main = Effect.gen(function* () {
             const conn: RunnerConn = {
               runnerId: msg.runnerId,
               seller: msg.seller,
+              connectionId: ws.data,
+              isCurrent: () => currentSockets.get(msg.runnerId) === ws.data && sockets.has(ws.data) && ws.readyState === 1,
               send: (m: HubMessage) => ws.send(JSON.stringify(m)),
               close: () => ws.close()
             }
@@ -755,6 +757,16 @@ const main = Effect.gen(function* () {
                 return
               }
               yield* broker.complete(msg.jobId, msg.outcome)
+            })))
+            break
+          }
+          case "EscrowBudgetSigned":
+          case "EscrowSubmitSigned":
+          case "EscrowAuthorizationRefused": {
+            await run(registrationLock.withPermits(1)(Effect.gen(function* () {
+              const rid = ws.data.runnerId
+              if (rid === undefined || currentSockets.get(rid) !== ws.data || !sockets.has(ws.data)) return
+              if (broker.escrow) yield* Effect.promise(() => broker.escrow!.accept(ws.data, msg))
             })))
             break
           }

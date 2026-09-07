@@ -3,8 +3,10 @@ import {
   type JobOutcome,
   NoRunnerAvailable,
   RunnerDisconnected,
-  type HubMessage
+  type HubMessage,
+  type EscrowContextWire
 } from "@arcade/core"
+import { makeEscrowBroker, type EscrowBroker } from "./escrow-broker.ts"
 
 /**
  * Job broker.
@@ -20,6 +22,9 @@ export interface RunnerConn {
   readonly seller: string
   readonly send: (msg: HubMessage) => void
   readonly close: () => void
+  /** Stable authenticated socket identity across same-socket Hello refreshes. */
+  readonly connectionId?: object
+  readonly isCurrent?: () => boolean
 }
 
 interface BrokerState {
@@ -33,6 +38,7 @@ interface BrokerState {
 }
 
 export interface Broker {
+  readonly escrow?: EscrowBroker
   readonly register: (conn: RunnerConn, skillIds: ReadonlyArray<string>) => Effect.Effect<void>
   readonly unregister: (runnerId: string) => Effect.Effect<void>
   readonly dispatch: (args: {
@@ -43,6 +49,7 @@ export interface Broker {
     readonly timeoutSec: number
     readonly parentJobId?: string
     readonly hireCapability?: string
+    readonly escrow?: EscrowContextWire
   }) => Effect.Effect<JobOutcome, NoRunnerAvailable | RunnerDisconnected>
   readonly complete: (jobId: string, outcome: JobOutcome) => Effect.Effect<void>
   /** Routing: which connected runner can serve this SKILL. */
@@ -53,9 +60,15 @@ export interface Broker {
 
 export class BrokerTag extends Context.Tag("@arcade/hub/Broker")<BrokerTag, Broker>() {}
 
-export const makeBroker = (ref: Ref.Ref<BrokerState>): Broker => {
+export const makeBroker = (ref: Ref.Ref<BrokerState>, options: { readonly nowSeconds?: () => number } = {}): Broker => {
+  const escrow = makeEscrowBroker({ nowSeconds: options.nowSeconds ?? (() => Math.floor(Date.now() / 1000)),
+    current: rid => Effect.runSync(Ref.get(ref)).conns.get(rid),
+    routes: skill => { const s = Effect.runSync(Ref.get(ref)); return [...(s.routes.get(skill) ?? [])]
+      .flatMap(rid => { const conn = s.conns.get(rid); return conn ? [conn] : [] }) } })
   const register: Broker["register"] = (conn, skillIds) =>
     Ref.update(ref, (s) => {
+      const previous = s.conns.get(conn.runnerId)
+      if (previous && (previous.connectionId !== conn.connectionId || previous.seller.toLowerCase() !== conn.seller.toLowerCase())) escrow.disconnected(conn.runnerId)
       const conns = new Map(s.conns)
       conns.set(conn.runnerId, conn)
       const routes = new Map(s.routes)
@@ -77,6 +90,7 @@ export const makeBroker = (ref: Ref.Ref<BrokerState>): Broker => {
 
   const unregister: Broker["unregister"] = (runnerId) =>
     Effect.gen(function* () {
+      escrow.disconnected(runnerId)
       const s = yield* Ref.get(ref)
       // Fail every job this runner was holding — never leave a buyer's request hanging.
       const orphaned = [...s.assigned.entries()].filter(([, rid]) => rid === runnerId)
@@ -128,6 +142,25 @@ export const makeBroker = (ref: Ref.Ref<BrokerState>): Broker => {
 
   const dispatch: Broker["dispatch"] = (args) =>
     Effect.gen(function* () {
+      if (args.escrow !== undefined) {
+        const waiter = yield* Deferred.make<JobOutcome, RunnerDisconnected>()
+        const cleanup = Ref.update(ref, st => {
+          const waiters = new Map(st.waiters), assigned = new Map(st.assigned)
+          if (waiters.get(args.jobId) === waiter) { waiters.delete(args.jobId); assigned.delete(args.jobId) }
+          return { ...st, waiters, assigned }
+        })
+        yield* Effect.try({ try: () => {
+          const s = Effect.runSync(Ref.get(ref))
+          if (s.waiters.has(args.jobId) || s.assigned.has(args.jobId)) throw Error("escrow_assignment_refused")
+          const { conn, message } = escrow.bind({ ...args, escrow: args.escrow! })
+          // No await between exact-socket binding, waiter installation and one send.
+          Effect.runSync(Ref.update(ref, st => ({ ...st,
+            waiters: new Map(st.waiters).set(args.jobId, waiter), assigned: new Map(st.assigned).set(args.jobId, conn.runnerId) })))
+          try { conn.send(message) } catch { escrow.failed(args.jobId); Effect.runSync(cleanup); throw Error("escrow_assignment_refused") }
+        }, catch: () => new NoRunnerAvailable({ skillId: args.skillId }) })
+        return yield* Deferred.await(waiter).pipe(
+          Effect.onInterrupt(() => Effect.sync(() => escrow.failed(args.jobId))), Effect.ensuring(cleanup))
+      }
       const rid = yield* runnerFor(args.skillId)
       if (rid === undefined) {
         return yield* new NoRunnerAvailable({ skillId: args.skillId })
@@ -166,6 +199,7 @@ export const makeBroker = (ref: Ref.Ref<BrokerState>): Broker => {
       const s = yield* Ref.get(ref)
       const waiter = s.waiters.get(jobId)
       if (waiter !== undefined) {
+        escrow.complete(jobId, outcome)
         yield* Deferred.succeed(waiter, outcome)
       }
       yield* Ref.update(ref, (st) => {
@@ -177,7 +211,7 @@ export const makeBroker = (ref: Ref.Ref<BrokerState>): Broker => {
       })
     })
 
-  return { register, unregister, dispatch, complete, runnerFor, runnerForJob }
+  return { register, unregister, dispatch, complete, runnerFor, runnerForJob, escrow: escrow.facade }
 }
 
 export const BrokerLive = Layer.effect(

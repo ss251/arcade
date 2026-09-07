@@ -52,8 +52,10 @@ The [8B3b session runtime](task-8b3b-report.md) composes these concrete checks
 with local execution completion closures and bounded sign-only acquisition.
 The [8B3c1 daemon integration](task-8b3c1-report.md) adds explicit local CLI
 configuration, real per-socket message handlers and actual execution completion.
-Hub-side broker ownership/response correlation remains8B3c2; atomic admission
-and pipeline remain8C/8D. No actual deployment or hub settlement is yet enabled.
+The [8B3c2 hub correlator](task-8b3c2-report.md) now preserves original socket
+ownership after result cleanup, independently verifies replies and fences
+replacement/disconnect/duplicate attempts. Its volatile retention is not durable
+admission: that and pipeline remain8C/8D. No deployment or settlement is enabled.
 
 ## Verification
 

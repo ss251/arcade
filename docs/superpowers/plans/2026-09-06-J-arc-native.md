@@ -203,14 +203,13 @@ populated with dummy escrow values or silently widened for sessions.
 Execution is split into atomic checkpoints in the
 [Task8 brief](../sdd/2026-09-06-J-arc-native/task-8-brief.md).
 [8A contracts](../sdd/2026-09-06-J-arc-native/task-8a-report.md) implement closed
-capability-free messages and lossless public context conversion only; handlers,
-signing, durable hub admission and pipeline activation remain pending. Public
+capability-free messages and lossless public context conversion only. Public
 jobId alone is not caller authority, and a claimed output hash is not runner
 authorization; the brief explicitly corrects those abbreviated sketches below.
 [8B1 local completion data](../sdd/2026-09-06-J-arc-native/task-8b1-report.md)
 shares the unchanged hub validator with the runner and binds actual validated
-output/input/listing. Durable signing claims and socket/chain authority remain
-unimplemented; a completion data object alone is not permission to sign.
+output/input/listing. A completion data object alone is not permission to sign;
+the subsequent checkpoints below add durable claims and socket/chain authority.
 [8B2 preflight](../sdd/2026-09-06-J-arc-native/task-8b2-report.md) adds the
 concrete read-only canonical provider/job/nonce checks before signing. It exposes
 no signer or broadcast method. The [8B3a private signing journal](../sdd/2026-09-06-J-arc-native/task-8b3a-report.md)
@@ -219,8 +218,10 @@ The [8B3b sign-only session runtime](../sdd/2026-09-06-J-arc-native/task-8b3b-re
 now composes local completion closures, canonical preflight and durable claims.
 The [8B3c1 daemon integration](../sdd/2026-09-06-J-arc-native/task-8b3c1-report.md)
 connects this to explicit CLI configuration, actual socket messages and local
-execution. Hub broker ownership/correlation and admission/pipeline remain pending;
-no deployed escrow or end-to-end hub settlement is claimed by the loopback tests.
+execution. The [8B3c2 hub correlator](../sdd/2026-09-06-J-arc-native/task-8b3c2-report.md)
+binds authenticated original socket ownership and independently checks replies
+after result cleanup. Durable admission/pipeline remain8C/8D; no deployed escrow
+or end-to-end hub settlement is claimed by the loopback tests.
 
 - [ ] Socket messages `EscrowBudgetRequest{jobId, token, amount, escrow, chainId}` → runner replies `EscrowBudgetSigned{jobId, signature, nonce, deadline}`; `EscrowSubmitRequest{jobId, deliverable}` → `EscrowSubmitSigned{…}`. Runner signs with the seller key only; refuses if `amount` ≠ its listing price or `escrow` ≠ chain config. Runner never broadcasts.
 - [ ] `POST /x/:seller/:skill/escrow {jobId}`: validations from spec §7.3 step 3, relay `setBudgetWithAuthorization`, respond `{jobId, budget, token, escrow, fundBy}`; 409 when the job is not Open/ours; rate-limited per payer.
