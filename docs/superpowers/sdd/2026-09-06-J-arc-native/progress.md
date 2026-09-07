@@ -1,5 +1,19 @@
 # Plan J progress
 
+2026-09-07 19:31 IST — J8D5 sole13892 fullgatePASS5,106Vitest235/71.29s;
+1,237Bun84/9,954assert190.11s;root/webstrict/clientSSR.12paths134links/privacy0;
+five frozen code/test pins checked before atomic commit/FF. Task8 offline code
+composition complete, not live activation/proof. Next9 buyer lifecycle with
+private durable capability/transaction ownership and no unsafe exact fallback.
+
+2026-09-07 19:23 IST — J8D5 explicit full-pin/private-journal startup and actual
+process cancellation implemented. Final49Bun2/194assertPASS2.84s;5-rootstrict0;
+earlier68Bun3/477assertPASS9.17s includes unchanged legacy boot. Actual-process
+red tests caught journal release before application cleanup; nested app scope
+inside layer provision fixes the order without timeout changes. Repeated
+SIGINT/SIGTERM now await verification/budget/job cleanup and durable uncertainty.
+No live config/ownerkey/RPC/send/spend/deploy/replay/push. Freeze/gate next, then9.
+
 2026-09-07 19:01 IST — J8C2 sole17833 fullgatePASS5,106Vitest235/70.72s;
 1,188Bun82/9,758assert187.39s;root/webstrict/clientSSR.14paths118links/privacy0;
 eight frozen code/test pins checked before atomic commit/exact-one FF. No gate

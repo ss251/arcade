@@ -245,12 +245,17 @@ wires dedicated registry selection, request-bound budget/root routes and hub-own
 execution scope. Budget takes `{input,payment}` with the J7 capability envelope;
 bare-jobId requests are not ownership proof. Explicit pinned boot/journal remains
 unarmed before Task9, so Task8 is still open. No existing validity change or live run.
+The subsequent [8D5 boot checkpoint](../sdd/2026-09-06-J-arc-native/task-8d5-report.md)
+adds explicit full-pin/private-journal activation and verified real process
+shutdown ordering. No live deployment/configuration exists. Its passing gate
+completes Task8's offline code composition; Task9 buyer lifecycle follows.
 
-- [ ] Socket messages `EscrowBudgetRequest{jobId, token, amount, escrow, chainId}` → runner replies `EscrowBudgetSigned{jobId, signature, nonce, deadline}`; `EscrowSubmitRequest{jobId, deliverable}` → `EscrowSubmitSigned{…}`. Runner signs with the seller key only; refuses if `amount` ≠ its listing price or `escrow` ≠ chain config. Runner never broadcasts.
-- [ ] `POST /x/:seller/:skill/escrow {jobId}`: validations from spec §7.3 step 3, relay `setBudgetWithAuthorization`, respond `{jobId, budget, token, escrow, fundBy}`; 409 when the job is not Open/ours; rate-limited per payer.
-- [ ] `pipeline.ts`: when `args.verified.rail === "erc8183"`: before `rail.settle`, request `EscrowSubmitSigned` and relay `submitWithAuthorization` (deliverable = keccak256 of canonical output); on decline / runner lost / timeout call `reject(jobId, reason)` and record `refundTx` in the receipt; on settle success record `settleTx` = complete tx. `putReceipt` and attestation unchanged (attester uses `settleTx`).
-- [ ] Tests: escrow route refusals; pipeline settle and reject branches with a fake rail; the existing pipelines untouched (assert no escrow call on gateway/eip3009).
-- [ ] Commit: `feat(hub,runner): ERC-8183 escrow route, provider signing over the socket, evaluator complete/reject in the pipeline`.
+- [x] Full-context budget/submit socket requests and fixed signed/refused replies; current listing/output/deployment checks, original socket correlation, durable once-only provider signing, no runner broadcast or capability disclosure.
+- [x] `POST /x/:seller/:skill/escrow {input,payment}` with J7 jobId/capability envelope, independently derived terms, guarded budget relay, budget/token/escrow/hash/fundBy response and verified-payer abuse bounds. Bare jobId is not authority.
+- [x] Dedicated `escrow-pipeline.ts`: durable admission/tree closure, original verified rail object, output-bound submit/complete or proven reject, no opposite action after uncertainty, atomic terminal receipt/proof persistence before attestation. Exact/session pipelines stay separate.
+- [x] Explicit pinned Arc boot with original Store/broker, private action journal and matching evaluator signer; actual process shutdown awaits request/job uncertainty cleanup before journal release.
+- [x] Owned SQLite/loopback, synthetic rail/proof and actual process tests cover refusal, success/refund, uncertainty, duplicate ownership, limits and unchanged legacy rails. No live proof claimed.
+- [x] Implemented as the linked atomic J8 checkpoint commits, each with its recorded gate; no squash or push.
 
 ### Task 9: Buyer escrow path (J5)
 

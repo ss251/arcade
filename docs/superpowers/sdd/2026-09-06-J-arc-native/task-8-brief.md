@@ -72,6 +72,10 @@ budget/root HTTP and explicit pinned boot remain before Task9.
 The [8C2 HTTP checkpoint](task-8c2-report.md) wires the dedicated registry,
 budget/root transport and hub-owned execution lifetime. Pinned boot remains
 unarmed; Task8 is not complete and no live action has been enabled.
+The subsequent [8D5 boot checkpoint](task-8d5-report.md) completes the explicit
+code composition with pinned config, original Store/broker, concrete journal
+and real process cancellation. Live configuration/deployment remains absent;
+Task9 buyer lifecycle follows its gate.
 
 ## Verification
 

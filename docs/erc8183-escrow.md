@@ -1,6 +1,6 @@
 # ERC-8183 escrow build status
 
-**Not deployed. Not yet a built/advertised payment rail.** Task 6A adds the
+**Not deployed or live-enabled. Explicit hub/runner composition is implemented.** Task 6A adds the
 receipt hook and tests against the unchanged approved upstream source. J6
 deployment has two outstanding prerequisites: a deployable artifact and explicit
 owner confirmation of the treasury. No key, transaction or testnet gas has been
@@ -126,8 +126,8 @@ zero on complete/reject; it is partial-claim accounting, not a terminal flag.
 Fee flooring can legitimately produce no PlatformFeePaid event at tiny prices.
 
 The guarded action coordinator, private SQLite journal and concrete bounded
-Arc RPC/signing ports are implemented and tested offline; hub activation and
-execution admission remain unimplemented. The journal retains uncertain action
+Arc RPC/signing ports are implemented and tested offline. The subsequent J8
+admission and explicit boot are described below. The journal retains uncertain action
 and evaluator ownership across restarts and does not automatically replay sends
 or reverse them with reject. All cooperating workers must share one private
 journal; this does not control other programs using the evaluator key.
@@ -142,8 +142,8 @@ altering exact-payment schemas. The explicit Effect factory and dedicated
 Erc8183Tag now compose the guarded executor with the shared durable journal.
 Verification discards capabilities, brands results privately and checks EOA
 provider code at the canonical job snapshot. Settlement requires actual hub
-job/output/tree context and retains full monetary proof. Hub activation,
-atomic inference admission and buyer lifecycle remain pending; no live claim.
+job/output/tree context and retains full monetary proof. J8 adds explicit hub
+activation and atomic admission below; buyer lifecycle/live proof remain pending.
 See [J7B4a wire decisions](superpowers/sdd/2026-09-06-J-arc-native/task-7b4a-report.md)
 and [J7B4b rail verification](superpowers/sdd/2026-09-06-J-arc-native/task-7b4b-report.md).
 
@@ -153,3 +153,53 @@ No capability is sent to the runner. Messages are data, not authorization:
 runner-side checks, socket-bound correlation and hub admission are still
 required before these contracts can trigger work. See the
 [J8A record](superpowers/sdd/2026-09-06-J-arc-native/task-8a-report.md).
+
+## Explicit hub/runner configuration (offline implementation, no deployment yet)
+
+The [J8 boot record](superpowers/sdd/2026-09-06-J-arc-native/task-8d5-report.md)
+composes durable admission/terminal receipts, closed trees, authenticated provider
+messages and the actual escrow pipeline. Do not arm it with Circle's reference
+contract or guessed addresses. J6 must first produce a deployable, owner-approved,
+independently verified ARCADE deployment. No such configuration was installed.
+
+Hub opt-in requires both `ARCADE_ESCROW_CONFIG` and `ARCADE_ESCROW_JOURNAL`,
+with explicit absolute canonical paths. Also supply `ARCADE_DB`, a bare
+`ARCADE_PUBLIC_URL` origin, a stable `ARCADE_HUB_SECRET` of at least32characters
+and at most4096UTF8bytes, and the approved evaluator key as
+`ARCADE_FACILITATOR_KEY` inside the consuming process. Never put keys in the
+public JSON, logs, source or command arguments. There is no ephemeral evaluator
+or escrow RPC/address/treasury fallback. Escrow is Arc-only and cannot arm with
+the offline test default; existing exact/session/provider validity limits remain.
+
+Public JSON has exactly four fields: `identity`, `gasCapWei` (positive canonical
+decimal string, explicitly owner-budgeted per action), `expiresInSeconds` and
+`operationTimeoutMs`. Identity has exactly `chainId`, `escrow`, `implementation`,
+`hook`, `evaluator`, `treasury`, `token`, `proxyCodeHash`, `implementationCodeHash`,
+`hookCodeHash`, all from independently verified deployment evidence. Job expiry
+must cover the listing timeout plus the existing600seconds; operation IO uses
+the existing1–300000ms range and separate bounded per-request cleanup. These
+settings are not permission to widen any payment authorization window.
+
+Config must be an owned single-link regular file, not group/world writable,
+≤32768bytes. DB/journal parents must be owned0700; the action file is owned0600.
+All paths, including SQLite sidecar names, must be distinct and nonsymlinked.
+Retained action sidecars cause refusal: investigate, do not delete/recover them
+as a retry strategy. Journal ownership must be shared by cooperating workers;
+it does not control unrelated software spending from the same evaluator key.
+
+Runner opts in separately with `--escrow-config` and `--escrow-journal`. Its
+public JSON contains exactly the same full `identity` plus `operationTimeoutMs`;
+its private provider signature journal is distinct from the hub action journal.
+Runner signs only for its original hub socket/current listing/completed output,
+using the existing fixed600-second provider authorization deadline. It does not
+broadcast. Hub signal shutdown awaits request/action/job cleanup before journal
+release; ordinary restarts never replay uncertain actions or inference.
+
+The budget endpoint accepts exactly `{input,payment}` with the closed J7
+capability envelope, not a bare jobId. It returns budget/token/escrow/budgetTx
+and `fundBy = expiredAt - timeoutSeconds - 600`; the buyer must independently
+check facts before funding. Root retries require still-funded verification;
+retain the issued result token for terminal retrieval. See the
+[HTTP contract and limits](superpowers/sdd/2026-09-06-J-arc-native/task-8c2-report.md).
+Generic discovery exposes listing opt-in but cannot invent a signable input
+commitment. Task9 buyer lifecycle and Task10 live proof remain pending.

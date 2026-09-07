@@ -1,4 +1,4 @@
-import { Effect, Exit, Layer, Runtime, Schema, Scope } from "effect"
+import { Cause, Effect, Exit, Layer, Runtime, Schema, Scope } from "effect"
 import {
   ARC_CAIP2,
   ARC_RPC_URL,
@@ -67,6 +67,7 @@ import { escrowResultDelivery } from "./escrow-result.ts"
 import { escrowListingChallenge } from "./escrow-listing.ts"
 import { makeEscrowRoutes } from "./escrow-http.ts"
 import { runEscrowJob } from "./escrow-pipeline.ts"
+import { openEscrowHubRail, readEscrowHubBoot } from "./escrow-config.ts"
 import { sellerSummary, SellerSummaryUnavailable } from "./summary.ts"
 import { buildTreeView } from "./tree-view.ts"
 import { chainCheck, chainMetadataCheck, chainStartupRefusal } from "./chain-check.ts"
@@ -284,6 +285,10 @@ const railLayer = (name: string) => {
 // Before the layers: building them emits its own diagnostics, and a refusal to start
 // should be the first thing in the log rather than buried under warnings about the
 // configuration it is refusing.
+const escrowBoot = (() => {
+  try { return readEscrowHubBoot(process.env, { chainId: chainConfig.chainId, rail: RAIL }) }
+  catch { console.error("[hub] refusing to start: escrow_hub_configuration_refused"); process.exit(2) }
+})()
 preflight()
 
 // The test rail moves no funds and stays offline. Static availability refusals above
@@ -310,12 +315,15 @@ if (RAIL !== "test" && process.env["ARCADE_CHAIN_CHECK"] !== "0") {
 
 const Erc8004Layer = Erc8004FromEnv(chainConfig.erc8004)
 const StoreLayer = StoreFromEnv()
-const RailsLayer = Layer.unwrapEffect(Effect.gen(function* () {
+const RailsLayer = Layer.unwrapScoped(Effect.gen(function* () {
+  const store = yield* StoreTag, broker = yield* BrokerTag
   const fallback = yield* RailTag.pipe(Effect.provide(railLayer(RAIL)))
   const others = chainConfig.status === "ready" && chainConfig.gateway !== null && RAIL !== "gateway"
     ? [yield* RailTag.pipe(Effect.provide(railLayer("gateway")))] : []
-  return railsLayerFrom(fallback, others)
-}))
+  const escrow = escrowBoot === undefined ? undefined : yield* Effect.acquireRelease(
+    Effect.sync(() => openEscrowHubRail(escrowBoot, store, broker)), opened => Effect.sync(opened.close))
+  return railsLayerFrom(fallback, others, escrow?.rail)
+})).pipe(Layer.provide(Layer.merge(StoreLayer, BrokerLive)))
 const AppLive = Layer.mergeAll(StoreLayer, BrokerLive, RailsLayer, Erc8004Layer, GraphFromEnv(),
   AttestLive.pipe(Layer.provide(Layer.merge(StoreLayer, Erc8004Layer))))
 
@@ -1517,9 +1525,25 @@ const main = Effect.gen(function* () {
   yield* Effect.never
 })
 
-Effect.runPromise(Effect.scoped(main.pipe(Effect.provide(AppLive)))).catch((e) => {
-  console.error(e)
-  process.exit(1)
-})
+if (escrowBoot === undefined) {
+  Effect.runPromise(Effect.scoped(main.pipe(Effect.provide(AppLive)))).catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })
+} else {
+  // Armed escrow owns actual process shutdown, not only an in-memory Scope.
+  // Journal release follows request/fiber interruption and bounded action cleanup.
+  const shutdown = new AbortController(), stop = () => shutdown.abort()
+  process.on("SIGINT", stop); process.on("SIGTERM", stop)
+  // The application scope is INSIDE layer provision. With an outer application
+  // scope, the inner layer scope closed its journal before the application's
+  // request/job finalizers. Repeated signals keep awaiting the same cleanup.
+  void Effect.runPromiseExit(Effect.scoped(main).pipe(Effect.provide(AppLive)), { signal: shutdown.signal }).then(exit => {
+    process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop)
+    const failed = Exit.isFailure(exit) && !Cause.isInterruptedOnly(exit.cause)
+    if (failed) console.error("[hub] escrow startup or runtime unavailable")
+    process.exit(failed ? 1 : 0)
+  })
+}
 
 export { JobOutcome }
