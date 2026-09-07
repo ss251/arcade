@@ -45,6 +45,7 @@ evidence remain separate open work; this index does not mark them accepted.
   [Runner-local completion binding](task-8b1-report.md).
   [Read-only provider preflight](task-8b2-report.md).
   [Private provider signing journal](task-8b3a-report.md).
+  [Sign-only provider session runtime](task-8b3b-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

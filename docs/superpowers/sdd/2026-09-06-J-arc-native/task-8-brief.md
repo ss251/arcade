@@ -48,8 +48,10 @@ The [8B2 preflight](task-8b2-report.md) supplies a concrete bounded read-only
 Arc provider/job/nonce check and shares state predicates with relay preparation.
 The [8B3a private journal](task-8b3a-report.md) reserves captured provider intents
 before signing and prevents a late signature from crossing uncertainty.
-The sign-only runtime and original-socket ownership/daemon integration remain
-required; this journal does not read chain facts or authorize a local completion.
+The [8B3b session runtime](task-8b3b-report.md) composes these concrete checks
+with local execution completion closures and bounded sign-only acquisition.
+Actual daemon/socket transport and broker ownership integration remain required;
+a pure completion object or journal claim is not socket authority.
 
 ## Verification
 

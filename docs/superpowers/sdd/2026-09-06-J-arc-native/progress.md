@@ -1,5 +1,22 @@
 # Plan J progress
 
+2026-09-07 15:16 IST — J8B3b sole28750 fullgatePASS:5,030Vitest229/68.87s,
+1,006Bun74/7,777assert/174.16s;root/webstrict/clientSSRbuild. Four-rootstrict0,
+threepins unchanged,8paths84links/privacy0. Atomiccommit/exactFF next, no replay.
+8B3c actual daemon/socket/broker ownership remains next, then8C/8D/9.
+No owner keys/liveRPC/send/spend/deploy/push or existing window/cap/replay changes.
+
+2026-09-07 15:10 IST — J8B3b sign-only session runtime implemented offline.
+25actualSQLite/fakeRPCBun96assert PASS;13existing local-completion Vitest PASS;
+4-rootstrict0 after test-helper literal typing correction. Missing-module Red
+and two genuine post-journal stale/lifetime-floor-before-key Reds fixed by
+reapplying unchanged provider predicates after awaits. Actual signatures use
+ephemeral fixtures only; no broadcast port. Original session-local completion
+closure, current listing/schema/resource/deployment, late callback/uncertainty,
+disconnect and competing request cases covered. Scopefreeze/solefullgate next.
+Daemon/socket/broker composition still8B3c; then8C/8D/9. No owner keys/liveRPC,
+payment/deploy/activation/push or existing policy/window/cap/replay changes.
+
 2026-09-07 14:57 IST — J8B3a sole74406 fullgatePASS:5,030Vitest229/71.16s,
 981Bun73/7,681assert/174.63s;root/webstrict/clientSSRbuild. Five-rootstrict0,
 fivepins unchanged,10paths80links/privacy0. Atomiccommit/exactFF next, no replay.
