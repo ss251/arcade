@@ -69,6 +69,9 @@ capability expiry and legacy root behavior remain unchanged.
 The [8D4 pipeline checkpoint](task-8d4-report.md) composes durable execution,
 tree closure, guarded terminal actions and post-durable attestation. Actual
 budget/root HTTP and explicit pinned boot remain before Task9.
+The [8C2 HTTP checkpoint](task-8c2-report.md) wires the dedicated registry,
+budget/root transport and hub-owned execution lifetime. Pinned boot remains
+unarmed; Task8 is not complete and no live action has been enabled.
 
 ## Verification
 

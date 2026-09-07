@@ -149,6 +149,17 @@ async function finished(origin: string, response: Response) {
   throw Error("Owned simulated job did not finish")
 }
 describe("J1 native ordinary-route selection (offline named rails)", () => {
+  it("keeps escrow HTTP disabled without explicit boot wiring and publishes the root resource", async () => {
+    await hub(paidEnv, async origin => {
+      const response = await get(origin, pathFor(), { method: "POST", body: "{}" })
+      expect(response.status).toBe(402)
+      expect((await response.json()).resource).toMatchObject({ url: origin + pathFor(), mimeType: "application/json" })
+      const budget = await get(origin, pathFor() + "/escrow", { method: "POST", body: '{"jobId":"PRIVATE_UNVERIFIED"}' })
+      expect(budget.status).toBe(503); expect(await budget.json()).toEqual({ error: "escrow_unavailable" })
+      expect(budget.headers.get("cache-control")).toBe("private, no-store")
+      expect(await stats(origin)).toMatchObject({ verifies: [], settlements: [], dispatches: 0, jobWrites: 0, networkRequests: 0 })
+    })
+  }, 10000)
   it("booted without Gateway, advertises and settles only exact", async () => {
     await hub({ ...paidEnv, TEST_NO_GATEWAY: "1" }, async origin => {
       const choices = (await probe(origin)).accepts

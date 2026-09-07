@@ -1,4 +1,4 @@
-import { Effect, Layer, Runtime, Schema } from "effect"
+import { Effect, Exit, Layer, Runtime, Schema, Scope } from "effect"
 import {
   ARC_CAIP2,
   ARC_RPC_URL,
@@ -64,6 +64,9 @@ export { scrubReceipt, type PublicReceiptRow, type PublicReceiptChild } from "./
 import { listingReceiptFeed, publicStats, receiptLimit } from "./public-feeds.ts"
 import { receiptChildExplorer, receiptExplorer } from "./receipt-reference.ts"
 import { escrowResultDelivery } from "./escrow-result.ts"
+import { escrowListingChallenge } from "./escrow-listing.ts"
+import { makeEscrowRoutes } from "./escrow-http.ts"
+import { runEscrowJob } from "./escrow-pipeline.ts"
 import { sellerSummary, SellerSummaryUnavailable } from "./summary.ts"
 import { buildTreeView } from "./tree-view.ts"
 import { chainCheck, chainMetadataCheck, chainStartupRefusal } from "./chain-check.ts"
@@ -481,6 +484,22 @@ const main = Effect.gen(function* () {
   const attester = yield* AttestTag
   const handleSessionCall = makeSessionCallRoutes({ store, broker, sessions, rails, chain: chainConfig, hubSecret,
     configuredHubSecret, publicOrigin, canaryAddress, attester, attestationArmed: erc8004.armed })
+  const escrowScope = yield* Scope.make()
+  let escrowClosing = false
+  const escrowRoutes = makeEscrowRoutes({ store, rails, hubSecret, configuredHubSecret, publicOrigin, jobToken,
+    attestation: (agentId, payTo, origin) => !erc8004.armed || chainConfig.erc8004 === undefined ? undefined : {
+      agentId, payTo, origin, chainId: chainConfig.chainId, identityRegistry: chainConfig.erc8004.identity },
+    start: async args => {
+      if (escrowClosing) throw Error("escrow_unavailable")
+      await run(runEscrowJob(args).pipe(
+        Effect.onError(() => store.escrow!.uncertain(args.verified.context, args.jobId).pipe(Effect.catchAllCause(() => Effect.void))),
+        Effect.catchAllCause(() => Effect.sync(() => console.error("[hub] escrow job requires reconciliation"))),
+        Effect.forkIn(escrowScope)))
+    } })
+  // Stop new requests, await request-owned verification/relay cleanup, then interrupt
+  // accepted jobs and await their uncertainty cleanup. Boot journal ownership encloses this.
+  yield* Effect.addFinalizer(() => Effect.sync(() => { escrowClosing = true }).pipe(
+    Effect.zipRight(Effect.promise(escrowRoutes.close)), Effect.zipRight(Scope.close(escrowScope, Exit.void))))
   const tokenFrom = (req: Request, url: URL): string | null =>
     req.headers.get("x-job-token") ?? url.searchParams.get("token")
 
@@ -812,6 +831,8 @@ const main = Effect.gen(function* () {
       const url = new URL(req.url)
       const path = url.pathname
 
+      const escrowBudgetResponse = await escrowRoutes.budget(req)
+      if (escrowBudgetResponse !== undefined) return escrowBudgetResponse
       const sessionResponse = await handleSessionRoute(req)
       if (sessionResponse !== undefined) return sessionResponse
       const sessionCallResponse = await handleSessionCall(req)
@@ -1219,8 +1240,14 @@ const main = Effect.gen(function* () {
         }
         const lineage0 = lineageE.right
 
+        let escrowContext: ReturnType<typeof escrowListingChallenge>["challenge"]["escrow"]
+        if (rails.escrow && lineage0.hop === 0 && !found.right.delisted && !url.search && callMatch[1]!.toLowerCase() === seller.toLowerCase()) {
+          try { escrowContext = escrowListingChallenge(found.right, input, resource).challenge.escrow }
+          catch { /* An unverified/not-opted-in listing cannot advertise escrow. */ }
+        }
         const choices = await run(challengeChoices(rails, listing, {
           priceAtomic, resource, payTo: seller, description: listing.description,
+          ...(escrowContext === undefined ? {} : { escrow: escrowContext }),
           ...(found.right.feeSplitter === undefined ? {} : { feeSplitter: found.right.feeSplitter }),
           ...(found.right.splitterVersion === undefined ? {} : { feeSplitterVersion: found.right.splitterVersion })
         }, { child: lineage0.hop > 0 }))
@@ -1228,6 +1255,7 @@ const main = Effect.gen(function* () {
         if (header === null) {
           return json(
             { x402Version: 2, error: choices.length === 0 ? "unsupported_rail" : "payment required",
+              resource: { url: resource, description: listing.description, mimeType: "application/json" },
               rail: rail.name, accepts: choices.map(choice => choice.requirements) },
             402
           )
@@ -1239,6 +1267,7 @@ const main = Effect.gen(function* () {
         if (name === "malformed") return json({ error: "malformed payment header" }, 400)
         const chosen = choices.find(choice => choice.rail.name === name || name === "eip3009" && choice.rail.name === "test")
         if (chosen === undefined) return json({ error: "unsupported_rail" }, 402)
+        if (chosen.kind === "escrow") return escrowRoutes.root(req, input, raw.right)
         const decoded = await run(Schema.decodeUnknown(PaymentPayload)(raw.right).pipe(Effect.either))
         if (decoded._tag === "Left") return json({ error: "malformed payment header" }, 400)
         const { rail: selectedRail, requirements } = chosen

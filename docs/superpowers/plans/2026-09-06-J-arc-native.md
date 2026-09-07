@@ -240,6 +240,11 @@ The [8D3 tree closure](../sdd/2026-09-06-J-arc-native/task-8d3-report.md) and
 [8D4 typed pipeline](../sdd/2026-09-06-J-arc-native/task-8d4-report.md) now provide
 durable execution/tree accounting, guarded actions and post-durable attestation.
 Budget/root HTTP and explicit pinned boot are still unwired; Task8 remains open.
+The subsequent [8C2 HTTP checkpoint](../sdd/2026-09-06-J-arc-native/task-8c2-report.md)
+wires dedicated registry selection, request-bound budget/root routes and hub-owned
+execution scope. Budget takes `{input,payment}` with the J7 capability envelope;
+bare-jobId requests are not ownership proof. Explicit pinned boot/journal remains
+unarmed before Task9, so Task8 is still open. No existing validity change or live run.
 
 - [ ] Socket messages `EscrowBudgetRequest{jobId, token, amount, escrow, chainId}` → runner replies `EscrowBudgetSigned{jobId, signature, nonce, deadline}`; `EscrowSubmitRequest{jobId, deliverable}` → `EscrowSubmitSigned{…}`. Runner signs with the seller key only; refuses if `amount` ≠ its listing price or `escrow` ≠ chain config. Runner never broadcasts.
 - [ ] `POST /x/:seller/:skill/escrow {jobId}`: validations from spec §7.3 step 3, relay `setBudgetWithAuthorization`, respond `{jobId, budget, token, escrow, fundBy}`; 409 when the job is not Open/ours; rate-limited per payer.

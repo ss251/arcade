@@ -1,5 +1,24 @@
 # Plan J progress
 
+2026-09-07 19:01 IST — J8C2 sole17833 fullgatePASS5,106Vitest235/70.72s;
+1,188Bun82/9,758assert187.39s;root/webstrict/clientSSR.14paths118links/privacy0;
+eight frozen code/test pins checked before atomic commit/exact-one FF. No gate
+replay on main. Actual routes are wired but escrow boot still unarmed; D5 next,
+then9 buyer lifecycle. No live/key/spend/approval replay/policy change/push.
+
+2026-09-07 18:55 IST — J8C2 final focusedPASS45HTTPBun/1158assert1.292s;
+84Vitest4/0.823s;8-rootstrict0. Earlier disabled-boot+HTTP63Bun2/446assert
+PASS7.76s. Freeze14paths(8code/tests+6SDD); sole sequential full gate next.
+No live activation or existing policy change. D5 pinned boot remains, then9.
+
+2026-09-07 18:53 IST — J8C2 budget/root HTTP and dedicated typed registry wired
+offline. Current request input/listing/capability bind quotes; exact/session
+paths retain their payloads. Budget has bounded process abuse controls before
+one guarded action; root durable admission precedes a hub-owned handoff.
+Explicit pinned boot remains unarmed; Task8 incomplete. Focused/gate results
+follow before commit. No owner key, real RPC, spending, send, validity/cap/replay
+change or push. J4/J5/J6 live pauses unchanged.
+
 2026-09-07 18:27 IST — J8D4 sole20833 fullgatePASS:5,097Vitest234/72.20s;
 1,142Bun81/8,592assert184.90s;root/webstrict/clientSSR.42newBun252assert1.78s;
 79existingVitest7/2.32s;4-rootstrict0;10paths114links/privacy0. Compare four

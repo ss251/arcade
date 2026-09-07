@@ -53,6 +53,7 @@ evidence remain separate open work; this index does not mark them accepted.
   [Reader/result brief](task-8d2-brief.md), [explicit compatibility checkpoint](task-8d2-report.md).
   [Tree closure brief](task-8d3-brief.md), [durable closure checkpoint](task-8d3-report.md).
   [Pipeline brief](task-8d4-brief.md), [typed execution checkpoint](task-8d4-report.md).
+  [HTTP brief](task-8c2-brief.md), [request-bound budget/root routes](task-8c2-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

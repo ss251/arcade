@@ -1,12 +1,14 @@
 import { Effect } from "effect"
 import { isDeepStrictEqual } from "node:util"
 import { DEFAULT_LISTING_RAILS, type ListingRail, type PublicListing } from "@arcade/core"
-import type { ChallengeInput, PaymentRequirements, Rail } from "@arcade/payments"
+import type { ChallengeInput, PaymentRequirements, Rail, Erc8183Rail } from "@arcade/payments"
 import type { Rails } from "./rails.ts"
 
 const preference: ReadonlyArray<ListingRail> = ["gateway", "eip3009", "erc8183"]
 type ListingRails = Pick<PublicListing, "rails">
-export interface ChallengeChoice { readonly rail: Rail; readonly requirements: PaymentRequirements }
+export type ChallengeChoice =
+  | { readonly kind: "exact"; readonly rail: Rail; readonly requirements: PaymentRequirements }
+  | { readonly kind: "escrow"; readonly rail: Erc8183Rail; readonly requirements: PaymentRequirements }
 
 /** Only built AND listed rails. Test mode is an explicit offline exact simulation;
  * a built Gateway remains available to the separate session inventory, never to
@@ -15,14 +17,30 @@ export const challengeChoices = (
   rails: Rails, listing: ListingRails, input: ChallengeInput, options: { readonly child?: boolean } = {}
 ): Effect.Effect<ReadonlyArray<ChallengeChoice>> => {
   const declared = listing.rails ?? DEFAULT_LISTING_RAILS
-  const allowed = (rail: Rail) => declared.includes(rail.name === "test" ? "eip3009" : rail.name)
+  const allowed = (rail: Pick<Rail, "name">) => declared.includes(rail.name === "test" ? "eip3009" : rail.name)
   const candidates = options.child || rails.default.name === "test"
     ? (rails.default.name !== "erc8183" && allowed(rails.default) ? [rails.default] : [])
     : preference.flatMap(name => {
       const built = rails.get(name)
       return built !== undefined && allowed(built) ? [built] : []
     })
-  return Effect.forEach(candidates, rail => Effect.map(rail.challenge(input), requirements => ({ rail, requirements })))
+  // Closed legacy rails must never see escrow-only fields. Without actual input
+  // there is no signable escrow quote (notably during generic discovery).
+  const { escrow: _context, ...exactInput } = input
+  return Effect.gen(function* () {
+    const choices: ChallengeChoice[] = yield* Effect.forEach(candidates, rail =>
+      Effect.map(rail.challenge(exactInput), requirements => ({ kind: "exact" as const, rail, requirements })))
+    if (!options.child && rails.default.name !== "test" && rails.escrow && allowed(rails.escrow) && input.escrow !== undefined) {
+      const rail = rails.escrow
+      const choice = yield* rail.challenge(input).pipe(
+        Effect.map(requirements => ({ kind: "escrow" as const, rail, requirements })),
+        Effect.catchAllCause(() => Effect.succeed(undefined)))
+      // For example, a listing timeout may exceed this deployment's explicitly
+      // configured job lifetime. Omit that quote; do not break valid exact choices.
+      if (choice !== undefined) choices.push(choice)
+    }
+    return choices
+  })
 }
 
 export const buildAccepts = (
