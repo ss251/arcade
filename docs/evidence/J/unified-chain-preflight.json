@@ -1,0 +1,31 @@
+{
+  "kind": "keyless-owned-chain-preflight",
+  "observedAt": "2026-09-07T03:32:55.027Z",
+  "rpc": "https://rpc.testnet.arc.io",
+  "balanceApi": "https://gateway-api-testnet.circle.com/v1/balances",
+  "chainId": 5042002,
+  "blockNumber": "60851095",
+  "blockHash": "0xaabcb08b5b6747639f511882ab6580d6ef259b1fc36737a6f3b8a674e9b80ada",
+  "blockTimestamp": "1788751966",
+  "owner": "0xdaaca688ce93d6ea0bdf4cda9925c5526f3ca5e1",
+  "delegate": "0x67be3fd6f4d5ea3b4928e636def9c2c87bc3e51b",
+  "ownerNativeWei": "19610000000000000000",
+  "delegateNativeWei": "19496425875000000000",
+  "allowanceAtomic": "0",
+  "ownerGatewayTotalAtomic": "0",
+  "authorized": false,
+  "withdrawalDelayBlocks": "1209600",
+  "availableAtomic": "0",
+  "pendingBatchAtomic": "0",
+  "identity": {
+    "wallet": "F11 accepted compiled Wallet",
+    "minter": "J5C1 exact reproduced deployed build; F11 acceptance unchanged"
+  },
+  "rpcReads": 24,
+  "balanceQueries": 1,
+  "keyReads": 0,
+  "signatures": 0,
+  "broadcasts": 0,
+  "assertFreshPassed": true,
+  "limitation": "Prerequisite only. Owner grants, deposit, delegated spend and paid-call proof are not run."
+}

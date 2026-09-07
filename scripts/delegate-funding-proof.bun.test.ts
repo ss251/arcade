@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, keccak256, padHex, parseAbi, type Hex, type TransactionSerializableEIP1559 } from "viem"
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
 import { assertDelegateMintLogs, assertDelegateProofIdentity, assertFreshDelegateProof, captureProofEvent,
-  DELEGATE_PROOF as P, nextProofStage, proofStages, readDelegateAvailable, ownerProofCall, assertProofSignedTransaction,
+  DELEGATE_PROOF as P, nextProofStage, proofStages, readDelegateAvailable, ownerProofCall, assertProofSignedTransaction, assertOwnerProofLogs,
   type DelegateProofSnapshot, type ProofLog, type ProofStage } from "./delegate-funding-proof.ts"
 import { openDelegateProofJournal } from "./delegate-funding-journal.ts"
 
@@ -90,6 +90,31 @@ describe("delegated funding proof contracts", () => {
     const wrong = logs(); wrong[1] = { ...wrong[1]!, data: encodeAbiParameters([{ type: "uint32" }, { type: "bytes32" }, { type: "bytes32" }, { type: "uint256" }],
       [26, padHex(P.delegate, { size: 32 }), padHex(P.delegate, { size: 32 }), 250000n]) }
     expect(() => assertDelegateMintLogs(wrong, HASH)).toThrow()
+  })
+  test("owner confirmations require exact grant, approval and both deposit events", () => {
+    const events = parseAbi(["event DelegateAdded(address indexed token,address indexed depositor,address delegate)",
+      "event Approval(address indexed owner,address indexed spender,uint256 value)",
+      "event Deposited(address indexed token,address indexed depositor,address indexed sender,uint256 value)",
+      "event Transfer(address indexed from,address indexed to,uint256 value)"])
+    const grant: ProofLog = { address: P.wallet, topics: encodeEventTopics({ abi: events, eventName: "DelegateAdded",
+      args: { token: P.token, depositor: P.owner } }) as Hex[], data: encodeAbiParameters([{ type: "address" }], [P.delegate]) }
+    const approval: ProofLog = { address: P.token, topics: encodeEventTopics({ abi: events, eventName: "Approval",
+      args: { owner: P.owner, spender: P.wallet } }) as Hex[], data: encodeAbiParameters([{ type: "uint256" }], [500000n]) }
+    const deposit: ProofLog = { address: P.wallet, topics: encodeEventTopics({ abi: events, eventName: "Deposited",
+      args: { token: P.token, depositor: P.owner, sender: P.owner } }) as Hex[], data: approval.data }
+    const transfer: ProofLog = { address: P.token, topics: encodeEventTopics({ abi: events, eventName: "Transfer",
+      args: { from: P.owner, to: P.wallet } }) as Hex[], data: approval.data }
+    for (const [step, logs] of [["grant", [grant]], ["approval", [approval]], ["deposit", [deposit, transfer]]] as const) {
+      expect(() => assertOwnerProofLogs(step, logs)).not.toThrow()
+      expect(() => assertOwnerProofLogs(step, [])).toThrow()
+      expect(() => assertOwnerProofLogs(step, [...logs, ...logs])).toThrow()
+      expect(() => assertOwnerProofLogs(step, logs.map(l => ({ ...l, address: P.seller })))).toThrow()
+    }
+    expect(() => assertOwnerProofLogs("deposit", [deposit])).toThrow()
+    expect(() => assertOwnerProofLogs("deposit", [transfer])).toThrow()
+    expect(() => assertOwnerProofLogs("grant", [{ ...grant, data: encodeAbiParameters([{ type: "address" }], [P.owner]) }])).toThrow()
+    expect(() => assertOwnerProofLogs("approval", [{ ...approval, data: encodeAbiParameters([{ type: "uint256" }], [500001n]) }])).toThrow()
+    expect(() => assertOwnerProofLogs("deposit", [deposit, { ...transfer, data: encodeAbiParameters([{ type: "uint256" }], [499999n]) }])).toThrow()
   })
 })
 describe("fresh owned proof journal", () => {

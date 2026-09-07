@@ -98,9 +98,38 @@ export function readDelegateAvailable(input: unknown) {
 }
 const EVENTS = parseAbi([
   "event Transfer(address indexed from,address indexed to,uint256 value)",
+  "event Approval(address indexed owner,address indexed spender,uint256 value)",
+  "event DelegateAdded(address indexed token,address indexed depositor,address delegate)",
+  "event Deposited(address indexed token,address indexed depositor,address indexed sender,uint256 value)",
   "event AttestationUsed(address indexed token,address indexed recipient,bytes32 indexed transferSpecHash,uint32 sourceDomain,bytes32 sourceDepositor,bytes32 sourceSigner,uint256 value)"
 ])
 export interface ProofLog { address: Hex; topics: readonly Hex[]; data: Hex }
+export function assertOwnerProofLogs(step: OwnerProofStep, logs: readonly ProofLog[]): void {
+  proofCheck(logs.length <= 128 && ["grant", "approval", "deposit"].includes(step))
+  let matched = 0, transfer = 0
+  for (const log of logs) {
+    let event
+    try { event = decodeEventLog({ abi: EVENTS, data: log.data, topics: log.topics as [Hex, ...Hex[]], strict: true }) }
+    catch { continue }
+    if (step === "grant" && log.address.toLowerCase() === DELEGATE_PROOF.wallet && event.eventName === "DelegateAdded") {
+      proofCheck(event.args.token.toLowerCase() === DELEGATE_PROOF.token && event.args.depositor.toLowerCase() === DELEGATE_PROOF.owner &&
+        event.args.delegate.toLowerCase() === DELEGATE_PROOF.delegate); matched++
+    }
+    if (step === "approval" && log.address.toLowerCase() === DELEGATE_PROOF.token && event.eventName === "Approval") {
+      proofCheck(event.args.owner.toLowerCase() === DELEGATE_PROOF.owner && event.args.spender.toLowerCase() === DELEGATE_PROOF.wallet &&
+        event.args.value === DELEGATE_PROOF.depositAtomic); matched++
+    }
+    if (step === "deposit" && log.address.toLowerCase() === DELEGATE_PROOF.wallet && event.eventName === "Deposited") {
+      proofCheck(event.args.token.toLowerCase() === DELEGATE_PROOF.token && event.args.depositor.toLowerCase() === DELEGATE_PROOF.owner &&
+        event.args.sender.toLowerCase() === DELEGATE_PROOF.owner && event.args.value === DELEGATE_PROOF.depositAtomic); matched++
+    }
+    if (step === "deposit" && log.address.toLowerCase() === DELEGATE_PROOF.token && event.eventName === "Transfer" &&
+      event.args.from.toLowerCase() === DELEGATE_PROOF.owner && event.args.to.toLowerCase() === DELEGATE_PROOF.wallet) {
+      proofCheck(event.args.value === DELEGATE_PROOF.depositAtomic); transfer++
+    }
+  }
+  proofCheck(matched === 1 && transfer === (step === "deposit" ? 1 : 0))
+}
 /** Receipt status/canonicality and transaction identity must be established by the caller. */
 export function assertDelegateMintLogs(logs: readonly ProofLog[], specHash: Hex): void {
   proofCheck(logs.length <= 128)

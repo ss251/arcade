@@ -1,5 +1,20 @@
 # Plan J progress
 
+2026-09-07 09:11 IST — J5C3B sole15793PASS:4,825Vitest214/67.05s,
+938Bun63/6,951assert/172.66s,root/webstrict,client369ms/SSR171ms. Four code/test
+pins unchanged. Eight-path/29links/privacy0; finalaudit/atomiccommit/exactFFnext.
+No live key/grant/deposit/spend/payment; owner-chain checkpoint is not the full
+J5C orchestration or live proof. J4 remains PAUSED with existing policy intact.
+
+2026-09-07 09:06 IST — J5C3B owner-side chain driver implemented. Fixed
+grant/approval/deposit order, hash-journal-before-send, identity/nonce refresh,
+at most three owner broadcasts with no retries, finalized receipt/log/state/
+native-balance readback. Focused21Bun/372assert/1.335s,5-rootstrict0PASS;
+actual keyless snapshot24RPC+onebalancequeryPASS. Fresh grant/allowance/custody
+remain0; no real keys/signatures/sends. Scope/freeze/solefullgate next. Funding
+orchestration and owned one-call purchase are still pending, not live proof.
+J4 PAUSED, existing validity/cap/replay/F11 identity acceptance unchanged.
+
 2026-09-07 08:40 IST — J5C3A sole71856PASS:4,825Vitest214/65.76s,
 927Bun62/6,656assert/171.85s,root/webstrict,client356ms/SSR167ms. Three code/test
 pins unchanged,7paths/28links/privacy0. Finalaudit/atomiccommit/exactoneFFmain
