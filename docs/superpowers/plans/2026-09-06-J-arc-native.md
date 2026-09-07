@@ -277,9 +277,16 @@ chain ports. J9B4 concrete buyer Arc/signing ports and J9C SDK/MCP/CLI remain.
 Arc ports and owned-loopback/SQLite composition over synthetic RPC. Only J9C
 actual SDK/MCP/CLI and local-pinned armed health remain in this offline task.
 
-- [ ] `fetch-with-payment.ts` `erc8183` branch: `createJob(payTo, evaluator, now+expiresInSeconds, description, hook, providerAgentId)` with the buyer key → `jobId` from `JobCreated`; `POST …/escrow {jobId}`; `approve(escrow, amount)`; `fund(jobId, USDC, amount, "0x")`; retry the call with `PAYMENT-SIGNATURE = {accepted, payload:{jobId}}`. Each on-chain step uses the existing backoff; `--max-amount` still gates. Journal the three tx hashes into the SDK result.
+[J9C1](../sdd/2026-09-06-J-arc-native/task-9c1-report.md) wires actual SDK
+selection with explicit independent local pins/bounds/private journal, current
+listing/input capture, pre-gas ENS authority and full armed health identity.
+Its local funding/queued evidence contains all four transaction proofs and
+cannot be forged by remote result fields. No live deployment was activated;
+private CLI/MCP configuration and gas-inclusive accounting remain J9C2.
+
+- [x] `fetch-with-payment.ts` opt-in `erc8183` branch uses the durable create/budget/approve/fund/root driver, closed input+capability envelopes and exact local principal/gas limits. Independently verify all four transaction proofs, save the private202 before returning and expose local funding/queued evidence. Backoff is read-only, never a repeated write.
 - [ ] MCP and CLI expose `rail: "erc8183"`; hire-by-name unchanged (payTo lock still applies).
-- [ ] Tests with a fake chain client; refusal when `extra.evaluator` ≠ the hub's advertised evaluator (`/healthz` gains `erc8183.evaluator`).
+- [x] Actual SDK/Arc-port/owned-loopback/private-SQLite composition against synthetic RPC; pre-gas ENS/current-listing refusals and full local-versus-health identity mismatch. Armed `/healthz` exposes full public pins, not just evaluator.
 - [ ] Commit: `feat(buyer): pay a listing through ERC-8183 escrow`.
 
 ### Task 10: Live escrow proof (J5)

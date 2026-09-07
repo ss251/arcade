@@ -1,9 +1,11 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, spyOn, test } from "bun:test"
+import { Effect } from "effect"
 import { chmodSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { decodeFunctionData, encodeFunctionResult, erc20Abi, hashDomain, keccak256, parseTransaction, toHex, type Hex } from "viem"
-import { formatPrice } from "@arcade/core"
+import { formatPrice, loadChainConfig } from "@arcade/core"
+import { callSkill } from "../../buyer/src/index.ts"
 import { createEscrowBuyerChain } from "../src/erc8183-buyer-chain.ts"
 import { createEscrowBuyerDriver } from "../src/erc8183-buyer-driver.ts"
 import { openEscrowBuyerJournal } from "../src/erc8183-buyer-journal.ts"
@@ -13,14 +15,25 @@ import { buyerFixture, buyer, hash } from "./fixtures/erc8183-buyer.ts"
 type Kind = "create" | "budget" | "approve" | "fund"
 const kinds = ["create", "budget", "approve", "fund"] as const
 const abi = [...ERC8183_ABI, ...ARCADE_JOB_HOOK_ABI, ...erc20Abi] as const
-async function scenario(badBudget: boolean) {
+async function scenario(badBudget: boolean, sdk = false) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "arcade-buyer-runtime-test-"))); chmodSync(dir, 0o700)
   const owned = openEscrowBuyerJournal(join(dir, "purchase.sqlite")), controller = new AbortController(),
     jobId = "job_" + "a".repeat(32), token = "b".repeat(32), httpCalls: string[] = [], sends: string[] = []
   let phase = 0, acquisitions = 0, requests = 0
+  let rng: ReturnType<typeof spyOn<typeof crypto, "getRandomValues">> | undefined
   const all = {} as Record<Kind, Awaited<ReturnType<typeof buyerFixture>>>
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request): Promise<Response> {
     const url = new URL(request.url), f = all.create
+    if (sdk && url.pathname === "/listings/skill") {
+      httpCalls.push("listing")
+      return Response.json({ id: "skill", version: "1.0.0", seller: f.intent.call.provider, price: "$0.30", rails: ["erc8183"],
+        bounds: { timeoutSec: 60 }, delisted: false, erc8004: { agentId: "8", verified: true, chain: "eip155:5042002", registry: loadChainConfig().erc8004!.identity } })
+    }
+    if (sdk && url.pathname === `/jobs/${jobId}/result`) {
+      httpCalls.push("poll"); expect(url.searchParams.get("token")).toBe(token)
+      return Response.json({ job_id: jobId, status: "succeeded", result: { fixture: true }, receipt: { settled: true, price: "$0.30" },
+        authorizedRail: "gateway", authorizedAmountAtomic: "1", escrowEvidence: { forged: true } })
+    }
     if (url.pathname === "/healthz") { httpCalls.push("health"); return Response.json({ ok: true, rail: "gateway",
       rails: ["gateway", "erc8183"], network: "eip155:5042002", erc8183: f.intent.identity }) }
     if (url.pathname.endsWith("/escrow")) {
@@ -30,6 +43,10 @@ async function scenario(badBudget: boolean) {
       expect(request.headers.has("payment-signature")).toBe(false); phase = 2
       return Response.json({ status: "budget_set", jobId: "7", budget: badBudget ? "300001" : "300000", token: f.intent.call.token,
         escrow: f.intent.call.escrow, budgetTx: all.budget.tx.hash, fundBy: f.intent.fundBy })
+    }
+    if (sdk && !request.headers.has("payment-signature")) {
+      httpCalls.push("probe"); expect(phase).toBe(0); expect(await request.json()).toEqual({ fixture: true })
+      return Response.json({ x402Version: 2, accepts: [f.input.requirements] }, { status: 402 })
     }
     httpCalls.push("root"); expect(phase).toBe(4)
     expect(await request.json()).toEqual({ fixture: true })
@@ -98,22 +115,39 @@ async function scenario(badBudget: boolean) {
           return globalThis.fetch(url, init) }) as typeof globalThis.fetch,
         chain: (kind, intent) => createEscrowBuyerChain({ kind, intent, signal: controller.signal, deadlineMs, nowSeconds,
           fetch: rpcFetch, acquireSigner: async () => { acquisitions++; return buyer } }) })
+    const execute = async () => {
+      if (!sdk) return driver.execute(f.input, JSON.stringify({ fixture: true }))
+      // Fixture-only deterministic capability. The SDK production path still uses
+      // crypto.getRandomValues; keys above were generated before this scoped spy.
+      rng = spyOn(crypto, "getRandomValues").mockImplementation((array: Uint8Array) => {
+        if (!(array instanceof Uint8Array)) throw Error("unexpected fixture RNG")
+        array.fill(0); array[array.length - 1] = 77; return array
+      })
+      const out = await Effect.runPromise(callSkill({ hubUrl: server.url.origin, seller: f.intent.call.provider, skillId: "skill", input: { fixture: true },
+        account: { ...buyer, signTransaction: async (t: Parameters<typeof buyer.signTransaction>[0]) => { acquisitions++; return buyer.signTransaction(t) } }, maxAmountAtomic: 300000n, preferRail: ["erc8183"],
+        escrow: { identity: id, gasBudgetWei: 6000000n, expiresInSeconds: 1800, operationTimeoutMs: 15000, journal: owned.journal, rpcFetch, nowSeconds },
+        fetch: (async (url, init) => { expect(new URL(String(url)).origin).toBe(server.url.origin); return globalThis.fetch(url, init) }) as typeof globalThis.fetch }))
+      expect(out.authorizedRail).toBe("erc8183"); expect(out.authorizedAmountAtomic).toBe(300000n)
+      expect(out.escrowEvidence).not.toHaveProperty("forged"); expect(out).not.toHaveProperty("job_token")
+      return { response: Response.json({ jobId: out.jobId, authorizedRail: out.authorizedRail }), evidence: out.escrowEvidence! }
+    }
     if (badBudget) {
-      await expect(driver.execute(f.input, JSON.stringify({ fixture: true }))).rejects.toThrow("escrow_buyer_uncertain")
+      await expect(execute()).rejects.toThrow("escrow_buyer_uncertain")
       expect(sends).toEqual(["create"]); expect(acquisitions).toBe(1); expect(httpCalls).toEqual(["health", "budget"])
       expect(await owned.journal.inspect()).toMatchObject({ state: "uncertain" })
     } else {
-      const result = await driver.execute(f.input, JSON.stringify({ fixture: true }))
+      const result = await execute()
       expect(result.evidence).toMatchObject({ state: "funded_and_queued", fundedAtomic: 300000n, buyerGasWei: 600000n })
       expect(result.evidence.proofs.map(p => p.kind)).toEqual([...kinds])
       expect(sends).toEqual(["create", "approve", "fund"]); expect(acquisitions).toBe(3)
-      expect(httpCalls).toEqual(["health", "budget", "root"]); expect(requests).toBeGreaterThan(150)
+      expect(httpCalls).toEqual(sdk ? ["listing", "probe", "health", "budget", "root", "poll"] : ["health", "budget", "root"]); expect(requests).toBeGreaterThan(150)
       expect((await owned.journal.readAccepted())?.token).toBe(token)
-      expect(await result.response.json()).toMatchObject({ job_id: jobId, job_token: token })
+      expect(await result.response.json()).toMatchObject(sdk ? { jobId, authorizedRail: "erc8183" } : { job_id: jobId, job_token: token })
     }
-  } finally { controller.abort(); await server.stop(true); owned.close(); rmSync(dir, { recursive: true, force: true }) }
+  } finally { rng?.mockRestore(); controller.abort(); await server.stop(true); owned.close(); rmSync(dir, { recursive: true, force: true }) }
 }
 describe("buyer driver + real Arc ports + owned loopback + private SQLite (synthetic chain)", () => {
   test("records one create/budget/approve/fund/root sequence and privately retains the actual202", () => scenario(false))
   test("an invalid actual HTTP budget response stops before buyer approval", () => scenario(true))
+  test("actual SDK independently captures listing, probes, buys and polls without trusting remote funding fields", () => scenario(false, true))
 })

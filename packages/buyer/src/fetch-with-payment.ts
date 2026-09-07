@@ -3,6 +3,8 @@ import type { Account } from "viem"
 import { HIRE_CAPABILITY_HEADER, PaymentAlreadyAttempted, RpcFailure, type ListingRail } from "@arcade/core"
 import { captureRailPreference, paymentChoices, selectAccept, type PaymentChoice } from "./accept-selection.ts"
 import { readGatewayBalance } from "./gateway-balance.ts"
+import { assertEscrowSdkRequest, captureEscrowFetchConfig, escrowSdkPurchase, fetchEscrowSdkProbe, readEscrowSdkJson,
+  type EscrowFetchConfig, type EscrowPurchaseEvidence } from "./erc8183-sdk.ts"
 import {
   HEADER_PAYMENT_LEGACY,
   HEADER_PAYMENT_SIGNATURE,
@@ -29,8 +31,9 @@ export interface PayFetchOptions {
   readonly account: Account
   /** Refuse to sign anything above this, in atomic units. The buyer-side spend cap. */
   readonly maxAmountAtomic?: bigint
-  /** Ordered allow-list. Default: funded Gateway, then exact. Escrow is not yet selectable. */
+  /** Ordered allow-list. Escrow additionally requires explicit local configuration below. */
   readonly preferRail?: readonly ListingRail[]
+  readonly escrow?: EscrowFetchConfig
   /** Hub-issued opaque capability proving this purchase is a child of a running job. */
   readonly lineage?: string
   readonly fetch?: typeof globalThis.fetch
@@ -136,6 +139,8 @@ export interface PaidResponse {
   readonly requirements?: PaymentRequirements
   /** Local authorization choice, not a remote receipt or proof of settlement. */
   readonly authorizedRail?: PaymentChoice["rail"]
+  /** Local canonical funding evidence, not the hub's settlement claim. */
+  readonly escrowEvidence?: EscrowPurchaseEvidence
 }
 
 const decode402 = (body: unknown) =>
@@ -155,6 +160,8 @@ export const fetchWithPayment = (
   Effect.gen(function* () {
     const doFetch = options.fetch ?? globalThis.fetch
     const account = options.account, beforeSign = options.beforeSign
+    const escrow = options.escrow === undefined ? undefined : yield* Effect.try({ try: () => captureEscrowFetchConfig(options.escrow!),
+      catch: () => new RpcFailure({ method: "402", reason: "Invalid local escrow configuration. Nothing was signed." }) })
     const payerAddress = account.address
     const preference = yield* Effect.try({ try: () => captureRailPreference(options.preferRail),
       catch: () => new RpcFailure({ method: "402", reason: "Unsupported payment preferences. Nothing was signed." }) })
@@ -169,6 +176,14 @@ export const fetchWithPayment = (
     })
 
     const headers = saved.headers
+    let escrowHeadersInvalid = false
+    headers.forEach((_value, key) => { if (key !== "content-type" && key !== "accept") escrowHeadersInvalid = true })
+    if (escrow !== undefined && (options.lineage !== undefined || saved.stable.method !== "POST" ||
+      escrowHeadersInvalid ||
+      headers.get("content-type")?.toLowerCase() !== "application/json" || typeof saved.stable.body !== "string" ||
+      options.maxAmountAtomic === undefined)) {
+      return yield* new RpcFailure({ method: "402", reason: "Escrow requires a bounded root JSON request and explicit local configuration. Nothing was signed." })
+    }
     if (headers.has(HEADER_PAYMENT_SIGNATURE) || headers.has(HEADER_PAYMENT_LEGACY)) {
       return yield* new PaymentAlreadyAttempted({ resource: saved.url })
     }
@@ -180,13 +195,17 @@ export const fetchWithPayment = (
       try: signal => replayBody(saved.stable.body, [saved.stable.signal, signal]),
       catch: () => new RpcFailure({ method: "fetch", reason: "Unsupported payment request. Nothing was signed." })
     })
+    if (escrow !== undefined) yield* Effect.try({ try: () => assertEscrowSdkRequest(escrow, saved.url, bodyForAttempt()),
+      catch: () => new RpcFailure({ method: "402", reason: "Escrow request differs from the captured target/input. Nothing was signed." }) })
     const requestForAttempt = (requestHeaders: Headers): RequestInit => {
       const body = bodyForAttempt()
       return { ...saved.stable, ...(body === undefined ? {} : { body }), headers: requestHeaders, redirect: "error", credentials: "omit" }
     }
 
     const probe = yield* Effect.tryPromise({
-      try: () => doFetch(saved.url, requestForAttempt(new Headers(headers))),
+      try: signal => escrow === undefined ? doFetch(saved.url, requestForAttempt(new Headers(headers))) :
+        fetchEscrowSdkProbe(saved.url, requestForAttempt(new Headers(headers)), doFetch,
+          saved.stable.signal ? AbortSignal.any([signal, saved.stable.signal]) : signal),
       catch: (e) => new RpcFailure({ method: "fetch", reason: String((e as Error)?.message ?? e) })
     })
 
@@ -195,7 +214,8 @@ export const fetchWithPayment = (
     }
 
     const body = yield* Effect.tryPromise({
-      try: () => probe.json() as Promise<unknown>,
+      try: signal => escrow === undefined ? probe.json() as Promise<unknown> :
+        readEscrowSdkJson(probe, saved.stable.signal ? AbortSignal.any([signal, saved.stable.signal]) : signal, performance.now() + 5000),
       catch: (e) => new RpcFailure({ method: "402 body", reason: String((e as Error)?.message ?? e) })
     })
     // The hub also uses 402 for policy refusals (for example a lineage cycle). These
@@ -209,7 +229,7 @@ export const fetchWithPayment = (
       Effect.mapError((e) => new RpcFailure({ method: "402 decode", reason: String(e) }))
     )
 
-    const choices = yield* Effect.try({ try: () => paymentChoices(challenge.accepts, preference),
+    const choices = yield* Effect.try({ try: () => paymentChoices(challenge.accepts, preference, escrow !== undefined),
       catch: () => new RpcFailure({ method: "402", reason: "Unsupported payment requirements. Nothing was signed." }) })
     const affordable = cap === undefined ? choices : choices.filter(choice => choice.amountAtomic <= cap)
     if (!affordable.length && choices.length && cap !== undefined) {
@@ -222,7 +242,7 @@ export const fetchWithPayment = (
       if (observed !== null) available = observed
     }
     if (saved.stable.signal?.aborted) return yield* new RpcFailure({ method: "402", reason: "Payment request cancelled. Nothing was signed." })
-    const selected = yield* Effect.try({ try: () => selectAccept(affordable.map(c => c.requirements), preference, available),
+    const selected = yield* Effect.try({ try: () => selectAccept(affordable.map(c => c.requirements), preference, available, escrow !== undefined),
       catch: () => new RpcFailure({ method: "402", reason: "Unsupported payment requirements. Nothing was signed." }) })
     if (selected === undefined) {
       return yield* new RpcFailure({ method: "402", reason: "no acceptable payment requirements" })
@@ -242,6 +262,15 @@ export const fetchWithPayment = (
     })
     if (refusal !== null) return yield* new RpcFailure({ method: "beforeSign", reason: refusal })
     if (saved.stable.signal?.aborted) return yield* new RpcFailure({ method: "402", reason: "Payment request cancelled. Nothing was signed." })
+
+    if (selected.rail === "erc8183") {
+      if (escrow === undefined || cap === undefined) return yield* new RpcFailure({ method: "402", reason: "Escrow is not configured. Nothing was signed." })
+      const result = yield* escrowSdkPurchase({ config: escrow, requirements, account, body: bodyForAttempt() as string,
+        maxAmountAtomic: cap, fetch: doFetch, ...(saved.stable.signal === undefined ? {} : { signal: saved.stable.signal }),
+        ...(beforeSign === undefined ? {} : { beforeSign }) })
+      return { response: result.response, paid: true, amountAtomic: amount, requirements, authorizedRail: "erc8183",
+        escrowEvidence: result.evidence } satisfies PaidResponse
+    }
 
     // Preserve the caller's existing ENS authority gate, then independently pin
     // the signing domain. No explicit malformed Gateway metadata can fall back.

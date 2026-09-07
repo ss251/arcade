@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 22:01 IST — J9C1 sole81562 fullgatePASS5,258Vitest240/73.86s;
+1,292Bun88/11,128assert194.14s;root/webstrict/clientSSR. Focused107Vitest4
+PASS1.12s;36Bun4/1216assert10.23s;9-rootstrict0.15paths141links/privacy0;
+nine frozen code/test pins checked before atomiccommit/exact-one mainFF.
+Private CLI/MCP remains J9C2. No live/policy change/ownerkeys/spending/push.
+
+2026-09-07 21:55 IST — J9C1 actual SDK/current listing/ENS binding and armed
+health implemented. Focused36Bun4/1,216assertPASS10.23s;9-rootstrict0.
+Default/ENS/exact regression and sole full gate follow before atomiccommit/FF.
+Only explicit local pins/bounds/privatejournal enable escrow; cancellation
+joins durable uncertainty before journalclose. CLI/MCP remain J9C2. No live,
+ownerkeys, realRPC, policywindow/cap changes, spending, replay or push.
+
 2026-09-07 21:28 IST — J9B4 sole30793 fullgatePASS5,246Vitest239/74.12s;
 1,284Bun87/10,731assert191.83s;root/webstrict/clientSSR.11paths138links/privacy0;
 fivefrozen code/test pins checked before atomiccommit/exact-one mainFF. Actual

@@ -60,9 +60,12 @@ const until = async (predicate: () => boolean) => {
   expect(predicate()).toBe(true)
 }
 test("actual armed boot constructs one journal, Store and guarded rail without external traffic", async () => {
-  await hub("ready", async origin => {
+  await hub("ready", async (origin, _output, _stop, dir) => {
     const health = await (await get(origin, "/healthz")).json()
     expect(health).toMatchObject({ rail: "eip3009", rails: ["eip3009", "gateway", "erc8183"] })
+    const configured = JSON.parse(readFileSync(join(dir, "public.json"), "utf8"))
+    expect(health.erc8183).toEqual(configured.identity)
+    expect(Object.keys(health).sort()).toEqual(["erc8183", "network", "ok", "rail", "rails"])
     const response = await get(origin, path, { method: "POST", body: "{}" }); expect(response.status).toBe(402)
     const body = await response.json()
     expect(body.accepts.map((r: { scheme: string }) => r.scheme)).toEqual(["exact", "exact", "erc8183"])

@@ -1,5 +1,5 @@
 import { Effect, Schedule } from "effect"
-import { ARC_CAIP2, USDC_ADDRESS, fenceResult, type ListingRail } from "@arcade/core"
+import { ARC_CAIP2, USDC_ADDRESS, docBytes, fenceResult, type ListingRail } from "@arcade/core"
 import type { Account } from "viem"
 import { RpcFailure } from "@arcade/core"
 
@@ -9,6 +9,8 @@ import { fetchWithPayment } from "./fetch-with-payment.ts"
 import { captureRailPreference } from "./accept-selection.ts"
 import { resolveEnsListing, ensRefusal, parseArcadeEndpoint, sepoliaEnsReader, type EnsReader, type EnsListing } from "./ens-policy.ts"
 import type { PaymentRequirements } from "@arcade/payments"
+import { captureEscrowPurchaseConfig, readEscrowListingCall, type EscrowPurchaseConfig, type EscrowPurchaseEvidence } from "./erc8183-sdk.ts"
+export type { EscrowPurchaseConfig, EscrowPurchaseEvidence } from "./erc8183-sdk.ts"
 export * from "./ens-policy.ts"
 export * from "./session.ts"
 
@@ -25,6 +27,7 @@ interface CallSkillBase {
   readonly account: Account
   readonly maxAmountAtomic?: bigint
   readonly preferRail?: readonly ListingRail[]
+  readonly escrow?: EscrowPurchaseConfig
   readonly lineage?: string
   readonly pollIntervalMs?: number
   readonly maxWaitMs?: number
@@ -49,7 +52,9 @@ export interface SkillResult {
   /** Local signing provenance, never read from hub JSON; not proof of settlement. */
   readonly authorizedAmountAtomic?: bigint
   /** Local chosen wire authorization rail, not the hub-reported settlement rail. */
-  readonly authorizedRail?: "gateway" | "eip3009"
+  readonly authorizedRail?: "gateway" | "eip3009" | "erc8183"
+  /** Independently read funding/queued proof, never a claim that the job settled. */
+  readonly escrowEvidence?: EscrowPurchaseEvidence
   /**
    * The result, wrapped so it can be handed to a model without becoming an instruction.
    *
@@ -70,6 +75,10 @@ export const callSkill = (args: CallSkillArgs) =>
   Effect.gen(function* () {
     const preference = yield* Effect.try({ try: () => captureRailPreference(args.preferRail),
       catch: () => new RpcFailure({ method: "402", reason: "Unsupported payment preferences. Nothing was signed." }) })
+    const escrow = args.escrow === undefined ? undefined : yield* Effect.try({ try: () => {
+      if (args.maxAmountAtomic === undefined || args.lineage !== undefined) throw Error()
+      return { config: captureEscrowPurchaseConfig(args.escrow!), body: docBytes(args.input) }
+    }, catch: () => new RpcFailure({ method: "402", reason: "Escrow requires explicit local configuration, principal cap and root input. Nothing was signed." }) })
     const pollInterval = args.pollIntervalMs ?? 1000
     const maxWait = args.maxWaitMs ?? 15 * 60_000
     if(!Number.isSafeInteger(pollInterval)||pollInterval<1||!Number.isSafeInteger(maxWait)||maxWait<1||maxWait>15*60_000||
@@ -97,18 +106,23 @@ export const callSkill = (args: CallSkillArgs) =>
       if (origin !== expected) return yield* new RpcFailure({method:"callSkill",reason:"ENS endpoint differs from the capability's issuing hub. Nothing was signed or sent."})
     }
     const doFetch = args.fetch ?? globalThis.fetch
+    const escrowCall = escrow === undefined ? undefined : yield* Effect.tryPromise({
+      try: signal => readEscrowListingCall(url, escrow.body, escrow.config, doFetch, signal),
+      catch: () => new RpcFailure({ method: "402", reason: "Current escrow listing or local identity is unavailable. Nothing was signed." })
+    })
 
     const paid = yield* fetchWithPayment(
       url,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(args.input)
+        body: escrow?.body ?? JSON.stringify(args.input)
       },
       {
         account: args.account,
         ...(args.maxAmountAtomic === undefined ? {} : { maxAmountAtomic: args.maxAmountAtomic }),
         preferRail: preference,
+        ...(escrow === undefined ? {} : { escrow: { ...escrow.config, call: escrowCall! } }),
         ...(args.lineage === undefined ? {} : { lineage: args.lineage }),
         fetch: doFetch,
         ...(ens === undefined ? {} : { beforeSign: (req:PaymentRequirements):string|null => {
@@ -155,9 +169,10 @@ export const callSkill = (args: CallSkillArgs) =>
         typeof wire.receipt!=="object"||wire.receipt===null||Array.isArray(wire.receipt))return yield* new RpcFailure({method:"poll",reason:"Mismatched or invalid terminal job response; reconcile any signed payment."})
       // Fenced here, at the protocol edge, so every caller gets it whether or not they
       // thought about it.
-      const {authorizedAmountAtomic:_untrustedAmount,authorizedRail:_untrustedRail,...publicWire}=wire
+      const {authorizedAmountAtomic:_untrustedAmount,authorizedRail:_untrustedRail,escrowEvidence:_untrustedEscrow,...publicWire}=wire
       return { ...publicWire, jobId:accepted.job_id,status:wire.status,result:wire.result,receipt:wire.receipt as Record<string,unknown>,fencedResult: fenceResult(wire.result, seller),
-        ...(paid.paid?{authorizedAmountAtomic:paid.amountAtomic,authorizedRail:paid.authorizedRail}:{}) } satisfies SkillResult
+        ...(paid.paid?{authorizedAmountAtomic:paid.amountAtomic,authorizedRail:paid.authorizedRail}:{}),
+        ...(paid.escrowEvidence === undefined ? {} : { escrowEvidence: paid.escrowEvidence }) } satisfies SkillResult
     })
 
     return yield* poll.pipe(

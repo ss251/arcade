@@ -853,7 +853,8 @@ const main = Effect.gen(function* () {
         return new Response("expected websocket", { status: 400 })
       }
 
-      if (path === "/healthz") return json({ ok: true, rail: rail.name, rails: rails.names, network: ARC_CAIP2 })
+      if (path === "/healthz") return json({ ok: true, rail: rail.name, rails: rails.names, network: ARC_CAIP2,
+        ...(escrowBoot === undefined || rails.escrow === undefined ? {} : { erc8183: escrowBoot.identity }) })
 
       // ---- the marketplace page ----------------------------------------------
       // Statistics are computed per listing rather than stored, so the page cannot show a

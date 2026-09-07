@@ -236,5 +236,25 @@ SDK/MCP/CLI integration remain next; this is not live execution or settlement.
 now supply the buyer-specific full-pinned reader, same-block observations,
 bounded exact signing, once-only send and independent mined-wire reconstruction.
 The full driver composes with these ports, actual owned-loopback HTTP and private
-SQLite in synthetic-chain tests. No live configuration was enabled. SDK/MCP/CLI
-selection and armed health metadata remain J9C; the live deployment is blocked.
+SQLite in synthetic-chain tests. No live configuration was enabled.
+
+The [J9C1 SDK](superpowers/sdd/2026-09-06-J-arc-native/task-9c1-report.md) now
+selects escrow only with explicit `escrow` configuration: independently obtained
+full deployment identity, `gasBudgetWei`, `expiresInSeconds`, bounded
+`operationTimeoutMs`, a caller-owned durable one-purchase `journal`, and the
+ordinary explicit principal `maxAmountAtomic`. A rail preference alone does not
+enable gas spending. `callSkill` reads the current listing independently of the
+402 and preserves ENS endpoint/payee/asset/network checks before any gas.
+Armed health exposes the full public identity, checked against local pins.
+Listing ownership metadata is still a hub assertion, not independent buyer RPC
+ownership proof. All deployment/transaction proofs remain independently read.
+
+`SkillResult.escrowEvidence` contains local funding/queued evidence and all four
+create/budget/approve/fund transaction proofs, including buyer gas. Its bigint
+fields need explicit JSON projection. It is not proof of terminal settlement or
+refund; remote fields cannot replace it. Private journal data includes signed
+transactions, input and bearer capabilities; never publish that file. Keep the
+journal open until the Effect finishes (including interruption cleanup). A used
+file cannot automatically make another purchase. Reconcile uncertainty before
+any owner-directed retry. CLI/MCP private configuration and gas-inclusive
+accounting remain J9C2; the live deployment is blocked.
