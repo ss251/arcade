@@ -1,10 +1,12 @@
 /**
- * G15A offline budget boundary. No writer, payer import, transport or live mode.
+ * G15 offline budget boundary. CLI is read-only; writer is an offline library.
+ * No payer import, transport, recovery switch or live mode.
  * Reservations are potential exposure, never proof of a signature or payment.
  */
-import { createHash } from "node:crypto"
-import { constants, openSync, closeSync, lstatSync, fstatSync, readSync, realpathSync } from "node:fs"
-import { dirname, isAbsolute, normalize } from "node:path"
+import { createHash, randomBytes } from "node:crypto"
+import { constants, openSync, closeSync, lstatSync, fstatSync, readSync, realpathSync,
+  mkdirSync, opendirSync, writeSync, fsyncSync, unlinkSync, type Stats } from "node:fs"
+import { dirname, isAbsolute, normalize, join } from "node:path"
 
 export const GRAPH_COGS_POLICY = Object.freeze({
   namespace: "arcade-graph-cogs-2026-09-v1",
@@ -30,8 +32,9 @@ function insist(value: unknown): asserts value { if (!value) throw new Error(STA
 function shape(value: unknown, fields: readonly string[]): asserts value is Record<string, unknown> {
   insist(value !== null && typeof value === "object" && !Array.isArray(value))
   insist(Object.getPrototypeOf(value) === Object.prototype)
-  const names = Object.keys(value)
+  const names = Reflect.ownKeys(value)
   insist(names.length === fields.length && names.every((name, i) => name === fields[i]))
+  for (const name of names) insist("value" in Object.getOwnPropertyDescriptor(value, name)!)
 }
 export interface GraphReservationSummary {
   readonly reservations: number
@@ -87,11 +90,11 @@ export function checkGraphBalance(balanceAtomic: string) {
 
 /** Explicit read-only inspection path, NOT the eventual fixed live authority
  * namespace. No creation, chmod, recovery, cache refresh or missing-state reset. */
-export function readGraphReservations(path: string): GraphReservationSummary {
+function readPrivateBudgetText(path: string): string {
   let fd: number | undefined
   try {
     insist(typeof path === "string" && path.length <= 2048 && isAbsolute(path) && normalize(path) === path &&
-      path.endsWith(".jsonl") && !/[\u0000-\u001f\u007f]/.test(path) && typeof process.getuid === "function")
+      !/[\u0000-\u001f\u007f]/.test(path) && typeof process.getuid === "function")
     const uid = process.getuid(), parent = dirname(path), directory = lstatSync(parent), before = lstatSync(path)
     insist(directory.isDirectory() && !directory.isSymbolicLink() && directory.uid === uid &&
       (directory.mode & 0o777) === 0o700 && realpathSync(parent) === parent)
@@ -120,11 +123,192 @@ export function readGraphReservations(path: string): GraphReservationSummary {
       (dirAfter.mode & 0o777) === 0o700 && realpathSync(parent) === parent)
     const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, length))
     insist(Buffer.from(text).equals(bytes.subarray(0, length)))
-    const result = decodeGraphReservations(text)
     closeSync(fd); fd = undefined
-    return result
+    return text
   } catch { throw new Error(STATE_FAIL) }
   finally { if (fd !== undefined) try { closeSync(fd) } catch { /* already refused */ } }
+}
+export function readGraphReservations(path: string): GraphReservationSummary {
+  insist(typeof path === "string" && path.endsWith(".jsonl"))
+  return decodeGraphReservations(readPrivateBudgetText(path))
+}
+
+type DirectoryIdentity = Stats
+const WRITER_FAIL = "graph_cogs_writer_refused"
+function privateDirectory(path: string): DirectoryIdentity {
+  insist(typeof path === "string" && path.length <= 1900 && isAbsolute(path) && normalize(path) === path &&
+    !/[\u0000-\u001f\u007f]/.test(path) && typeof process.getuid === "function")
+  const st = lstatSync(path)
+  insist(st.isDirectory() && !st.isSymbolicLink() && st.uid === process.getuid() &&
+    (st.mode & 0o777) === 0o700 && realpathSync(path) === path)
+  return st
+}
+function sameDirectory(path: string, expected: DirectoryIdentity) {
+  const current = privateDirectory(path)
+  insist(current.ino === expected.ino && current.dev === expected.dev)
+}
+function syncDirectory(path: string, expected: DirectoryIdentity) {
+  sameDirectory(path, expected)
+  const fd = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
+  try {
+    const st = fstatSync(fd); insist(st.ino === expected.ino && st.dev === expected.dev)
+    fsyncSync(fd); sameDirectory(path, expected)
+  } finally { closeSync(fd) }
+}
+function writeBytes(fd: number, text: string, position: number) {
+  const bytes = Buffer.from(text)
+  insist(bytes.length > 0 && position + bytes.length <= MAX_BYTES)
+  let n = 0
+  while (n < bytes.length) {
+    const written = writeSync(fd, bytes, n, bytes.length - n, position + n)
+    insist(written > 0); n += written
+  }
+  fsyncSync(fd)
+}
+function freshBudgetFile(path: string, text: string) {
+  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
+  try {
+    const st = fstatSync(fd)
+    insist(st.isFile() && st.nlink === 1 && st.uid === process.getuid!() && (st.mode & 0o777) === 0o600 && st.size === 0)
+    writeBytes(fd, text, 0)
+    const after = fstatSync(fd), atPath = lstatSync(path)
+    insist(after.size === Buffer.byteLength(text) && atPath.ino === after.ino && atPath.dev === after.dev && !atPath.isSymbolicLink())
+  } finally { closeSync(fd) }
+  insist(readPrivateBudgetText(path) === text)
+}
+function ownClaim(directory: string, identity: DirectoryIdentity) {
+  sameDirectory(directory, identity)
+  const path = join(directory, ".claim")
+  const text = JSON.stringify({ policyHash: GRAPH_COGS_POLICY_HASH, claimId: randomBytes(32).toString("hex") }) + "\n"
+  freshBudgetFile(path, text); syncDirectory(directory, identity)
+  const pinned = lstatSync(path)
+  const check = () => {
+    sameDirectory(directory, identity)
+    const st = lstatSync(path)
+    insist(st.ino === pinned.ino && st.dev === pinned.dev && readPrivateBudgetText(path) === text)
+  }
+  return { check, release() { check(); unlinkSync(path); syncDirectory(directory, identity) } }
+}
+const headName = (n: number) => "head-" + String(n).padStart(2, "0") + ".json"
+const headText = (text: string, reservations: number) => JSON.stringify({
+  format: "arcade-graph-head-v1", policyHash: GRAPH_COGS_POLICY_HASH, reservations, journalHash: hash(text),
+}) + "\n"
+function writerState(directory: string) {
+  const text = readPrivateBudgetText(join(directory, "reservations.jsonl"))
+  const summary = decodeGraphReservations(text), expected = [".claim", "reservations.jsonl",
+    ...Array.from({ length: summary.reservations + 1 }, (_, i) => headName(i))].sort()
+  const handle = opendirSync(directory, { bufferSize: 16 }), names: string[] = []
+  try {
+    for (;;) {
+      const entry = handle.readSync(); if (entry === null) break
+      insist(names.length < 13 && entry.isFile()); names.push(entry.name)
+    }
+  } finally { handle.closeSync() }
+  insist(JSON.stringify(names.sort()) === JSON.stringify(expected))
+  const lines = text.trimEnd().split("\n")
+  for (let i = 0; i <= summary.reservations; i++) {
+    const prefix = lines.slice(0, i + 1).join("\n") + "\n"
+    insist(readPrivateBudgetText(join(directory, headName(i))) === headText(prefix, i))
+  }
+  return { text, summary }
+}
+
+/** Explicit offline/library initialization only. Existing namespaces are never
+ * reused or repaired. A future live consumer must bind one fixed owner root,
+ * NOT accept a disposable run directory or the CLI audit path as authority. */
+export function initializeGraphReservationState(parent: string): string {
+  try {
+    const parentIdentity = privateDirectory(parent), directory = join(parent, GRAPH_COGS_POLICY.namespace)
+    mkdirSync(directory, { mode: 0o700 })
+    const identity = privateDirectory(directory)
+    syncDirectory(parent, parentIdentity)
+    const claim = ownClaim(directory, identity)
+    freshBudgetFile(join(directory, "reservations.jsonl"), HEADER + "\n")
+    syncDirectory(directory, identity)
+    freshBudgetFile(join(directory, headName(0)), headText(HEADER + "\n", 0))
+    syncDirectory(directory, identity); claim.check(); writerState(directory)
+    claim.release(); return directory
+  } catch { throw new Error(WRITER_FAIL) } // Retain any partial state for inspection.
+}
+export interface GraphWriterHooks {
+  /** Test-only interruption seam after journal fsync, before the head receipt.
+   * Throwing never acknowledges, reclaims or rolls back the reservation. */
+  readonly afterJournalSync: () => void
+}
+export interface GraphReservationWriter {
+  readonly snapshot: () => GraphReservationSummary
+  readonly reserve: (input: unknown) => GraphReservationSummary
+  readonly close: () => void
+}
+/** Cooperating-process claim, not a malicious-filesystem or power-loss sandbox.
+ * No key or transport can be invoked by this writer. One unresolved reservation
+ * blocks all later writes; receipt reconciliation is deliberately absent. */
+export function openGraphReservationWriter(parent: string, hooks?: GraphWriterHooks): GraphReservationWriter {
+  try {
+    privateDirectory(parent)
+    const directory = join(parent, GRAPH_COGS_POLICY.namespace), identity = privateDirectory(directory)
+    let afterJournalSync: (() => void) | undefined
+    if (hooks !== undefined) {
+      shape(hooks, ["afterJournalSync"]); insist(typeof hooks.afterJournalSync === "function")
+      afterJournalSync = hooks.afterJournalSync as () => void
+    }
+    const claim = ownClaim(directory, identity)
+    let state = writerState(directory), closed = false, poisoned = false, busy = false
+    const current = () => {
+      try {
+        insist(!closed && !poisoned && !busy); claim.check()
+        const disk = writerState(directory); insist(disk.text === state.text); return disk
+      } catch { poisoned = true; throw new Error(WRITER_FAIL) }
+    }
+    return Object.freeze({
+      snapshot() {
+        try { return current().summary } catch { poisoned = true; throw new Error(WRITER_FAIL) }
+      },
+      reserve(input: unknown) {
+        if (busy) { poisoned = true; throw new Error(WRITER_FAIL) }
+        let mutation = false, ownsBusy = false
+        try {
+          // Validate/capture before mutation, without executing getters/toJSON.
+          shape(input, ["allocation", "queryHash", "balanceAtomic"])
+          insist(input.allocation === "evidence" || input.allocation === "video")
+          insist(typeof input.queryHash === "string" && HASH.test(input.queryHash))
+          insist(typeof input.balanceAtomic === "string"); checkGraphBalance(input.balanceAtomic)
+          const allocation = input.allocation, queryHash = input.queryHash, observed = current()
+          insist(observed.summary.unresolved === 0 && observed.summary.reservations < GRAPH_COGS_POLICY.totalLimit &&
+            (allocation !== "evidence" || observed.summary.evidence < GRAPH_COGS_POLICY.evidenceLimit))
+          const body = { sequence: observed.summary.reservations + 1, previousHash: observed.summary.lastHash,
+            allocation, queryHash, amountAtomic: GRAPH_COGS_POLICY.queryCostAtomic }
+          const line = JSON.stringify({ ...body, hash: hash(JSON.stringify(body)) }) + "\n", nextText = observed.text + line
+          const next = decodeGraphReservations(nextText)
+          busy = true; ownsBusy = true; claim.check()
+          const path = join(directory, "reservations.jsonl"), before = lstatSync(path)
+          const fd = openSync(path, constants.O_RDWR | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+          try {
+            const pinned = fstatSync(fd)
+            insist(pinned.isFile() && pinned.nlink === 1 && pinned.uid === process.getuid!() && (pinned.mode & 0o777) === 0o600 &&
+              pinned.ino === before.ino && pinned.dev === before.dev && pinned.size === Buffer.byteLength(observed.text))
+            mutation = true; writeBytes(fd, line, pinned.size)
+          } finally { closeSync(fd) }
+          claim.check(); insist(readPrivateBudgetText(path) === nextText)
+          afterJournalSync?.()
+          insist(!poisoned && !closed && busy); claim.check()
+          freshBudgetFile(join(directory, headName(next.reservations)), headText(nextText, next.reservations))
+          syncDirectory(directory, identity)
+          const persisted = writerState(directory); insist(persisted.text === nextText); claim.check()
+          state = persisted
+          return persisted.summary
+        } catch { if (mutation) poisoned = true; throw new Error(WRITER_FAIL) }
+        finally { if (ownsBusy) busy = false }
+      },
+      close() {
+        if (closed) { if (poisoned) throw new Error(WRITER_FAIL); return }
+        if (busy) { poisoned = true; throw new Error(WRITER_FAIL) }
+        try {
+          insist(!poisoned); current(); claim.release(); closed = true
+        } catch { poisoned = true; closed = true; throw new Error(WRITER_FAIL) }
+      },
+    })
+  } catch { throw new Error(WRITER_FAIL) } // Never remove another process's claim.
 }
 
 export function graphCogsMain(args: readonly string[]): number {
@@ -134,7 +318,7 @@ export function graphCogsMain(args: readonly string[]): number {
   }
   if (args.length === 0) {
     process.stdout.write(JSON.stringify({ liveEvidence: "NOT_RUN", liveEnabled: false, state: "not_checked",
-      remaining: ["durable-writer", "balance-rpc", "response-recorder", "validated-cache", "live-authority-review"] }) + "\n")
+      remaining: ["fixed-owner-root", "receipt-reconciler", "balance-rpc", "response-recorder", "validated-cache", "live-authority-review"] }) + "\n")
     return 1
   }
   if (args.length !== 2 || args[0] !== "--audit-reservations" || !args[1]?.startsWith("/")) {
@@ -142,7 +326,7 @@ export function graphCogsMain(args: readonly string[]): number {
   }
   try {
     const summary = readGraphReservations(args[1])
-    process.stdout.write(JSON.stringify({ liveEvidence: "NOT_RUN", state: "validated", ...summary }) + "\n")
+    process.stdout.write(JSON.stringify({ liveEvidence: "NOT_RUN", state: "validated", durableState: "not_checked", ...summary }) + "\n")
     return 1 // Valid local records do not pass the G15 live-evidence gate.
   } catch { process.stderr.write(STATE_FAIL + "\n"); return 1 }
 }

@@ -1,5 +1,18 @@
 # SDD ledger — Plan G
 
+2026-09-08 04:31 IST — G15B sole46408 gate PASS:5327Vitest242/70.35s;
+1448Bun98/12111assert197.13s;root/webstrict/clientSSR346/171ms. Six paths,
+three links/privacy0; two scripts and brief pins fixed after result annotations.
+Atomic commit/mainFF next; only synthetic owned storage mutated, no operational
+budget/key/RPC/spend/live approval replay or push. No repeated full gate.
+
+2026-09-08 04:26 IST — G15B offline writer implemented with exclusive claim,
+fsynced journal/immutable heads and no unresolved-reservation continuation.
+Actual child exit after journal sync and cross-process held claim tested.
+Re-entrant acknowledgement Red fixed;26Bun149assert266ms and2rootsstrict0
+after concrete Stats typing correction. Sole gate next; no real budget, keys,
+RPC/signature/payment/consumer integration or push. Live CLI remains disabled.
+
 2026-09-08 04:15 IST — G15A sole28601 gate PASS:5327Vitest242/69.03s;
 1436Bun98/12050assert196.23s;root/webstrict,clientSSR333/170ms. Eight-path
 scope/four-link/privacy audit; five immutable code/brief/shot pins unchanged

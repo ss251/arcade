@@ -1,5 +1,16 @@
 # Plan G — execution records
 
+## September 8 — G15 offline durability checkpoint
+
+The [writer brief](task-15-writer-brief.md) and
+[writer report](task-15-writer-report.md) add an exclusive private claim,
+fsynced journal/head receipts and refusal across interrupted/reopened state.
+Actual tests use only owned synthetic storage; no operational budget or payer.
+26 focused tests/149 assertions and exact strict passed. Sole full gate passed
+5327Vitest/1448Bun,root/webstrict and client/SSR builds; local commit follows.
+Live mode, owner-root binding, response recorder, cache and reconciliation remain
+unimplemented.
+
 ## September 8 — G15 offline reservation checkpoint
 
 The [released brief](task-15-budget-brief.md) and
