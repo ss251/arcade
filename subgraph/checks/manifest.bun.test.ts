@@ -19,7 +19,8 @@ const invalid = "Invalid staged subgraph manifest"
 const requiredAssets = [
   "schema.graphql", "src/fee-splitter.ts", "src/ids.ts", "abis/FeeSplitter.json", "abis/FeeSplitterV2.json",
   "src/identity.ts", "src/reputation.ts", "src/validation.ts", "src/registry.ts",
-  "abis/IdentityRegistry.json", "abis/ReputationRegistry.json", "abis/ValidationRegistry.json"
+  "abis/IdentityRegistry.json", "abis/ReputationRegistry.json", "abis/ValidationRegistry.json",
+  "abis/ERC8183.json", "abis/ArcadeJobHook.json", "src/escrow.ts", "src/escrow-hook.ts", "src/escrow-events.ts"
 ]
 
 const registryTemplates = [
@@ -168,7 +169,7 @@ describe("G6 reviewed static emitters with inactive G5 registries", () => {
     expect(JSON.parse(text("../splitters.json"))).toEqual(reviewedList())
   })
 
-  test("renders the reviewed V2 static source while retaining the exact pilot and four inactive templates", () => {
+  test("renders the reviewed V2 static source while retaining the exact pilot and six inactive templates", () => {
     const rendered = renderManifest(template(), chain(), reviewedList())
     const actual = Bun.YAML.parse(rendered) as { dataSources: unknown[]; templates: unknown[] }
     const historical = Bun.YAML.parse(render()) as { dataSources: unknown[]; templates: unknown[] }
@@ -270,7 +271,7 @@ describe("G6 reviewed static emitters with inactive G5 registries", () => {
         entities: ["Settlement", "Splitter"], abis: [{ name: "FeeSplitter", file: "./abis/FeeSplitter.json" }],
         eventHandlers: [{ event: "Settled(indexed address,uint256,uint256,uint256,indexed bytes32)", handler: "handleSettled" }] }
     }])
-    expect(parsed).toHaveProperty("templates", [{
+    expect((parsed as { templates: unknown[] }).templates.slice(0, 4)).toEqual([{
       kind: "ethereum", name: "FeeSplitterV2", network: "arc-testnet", source: { abi: "FeeSplitterV2" },
       mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript", file: "./src/fee-splitter.ts",
         entities: ["Settlement", "Splitter", "Tree", "TreeOccurrence"],
@@ -388,7 +389,7 @@ describe("G6 reviewed static emitters with inactive G5 registries", () => {
       await buildManifest(paths)
       expect(await readFile(paths.output, "utf8")).toBe(renderReviewed())
       expect((await readdir(new URL("./abis/", paths.output))).sort()).toEqual([
-        "FeeSplitter.json", "FeeSplitterV2.json", "IdentityRegistry.json", "ReputationRegistry.json", "ValidationRegistry.json"
+        "ArcadeJobHook.json", "ERC8183.json", "FeeSplitter.json", "FeeSplitterV2.json", "IdentityRegistry.json", "ReputationRegistry.json", "ValidationRegistry.json"
       ])
     })
   })

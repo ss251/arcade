@@ -77,6 +77,125 @@ const CHAIN = canonical({
   gateway: { wallet: "0x0077777d7EBA4688BDeF3E311b846F25870A19B9", domain: 26, facilitatorUrl: "https://gateway-api-testnet.circle.com", minValiditySeconds: 604900 }
 })
 
+const ESCROW_TEMPLATES = [
+  {
+    "kind": "ethereum",
+    "name": "ERC8183",
+    "network": "arc-testnet",
+    "source": {
+      "abi": "ERC8183"
+    },
+    "mapping": {
+      "kind": "ethereum/events",
+      "apiVersion": "0.0.9",
+      "language": "wasm/assemblyscript",
+      "file": "./src/escrow.ts",
+      "entities": [
+        "EscrowJob",
+        "EscrowEvent"
+      ],
+      "abis": [
+        {
+          "name": "ERC8183",
+          "file": "./abis/ERC8183.json"
+        }
+      ],
+      "eventHandlers": [
+        {
+          "event": "JobCreated(indexed uint256,indexed address,indexed address,address,uint48,address)",
+          "handler": "handleJobCreated"
+        },
+        {
+          "event": "ProviderSet(indexed uint256,indexed address,uint256)",
+          "handler": "handleProviderSet"
+        },
+        {
+          "event": "PayoutReceiverSet(indexed uint256,indexed address)",
+          "handler": "handlePayoutReceiverSet"
+        },
+        {
+          "event": "BudgetSet(indexed uint256,indexed address,uint256)",
+          "handler": "handleBudgetSet"
+        },
+        {
+          "event": "JobFunded(indexed uint256,indexed address,uint256)",
+          "handler": "handleJobFunded"
+        },
+        {
+          "event": "JobSubmitted(indexed uint256,indexed address,bytes32)",
+          "handler": "handleJobSubmitted"
+        },
+        {
+          "event": "JobCompleted(indexed uint256,indexed address,bytes32)",
+          "handler": "handleJobCompleted"
+        },
+        {
+          "event": "JobRejected(indexed uint256,indexed address,bytes32)",
+          "handler": "handleJobRejected"
+        },
+        {
+          "event": "JobExpired(indexed uint256)",
+          "handler": "handleJobExpired"
+        },
+        {
+          "event": "PaymentReleased(indexed uint256,indexed address,uint256)",
+          "handler": "handlePaymentReleased"
+        },
+        {
+          "event": "PlatformFeePaid(indexed uint256,indexed address,uint256)",
+          "handler": "handlePlatformFeePaid"
+        },
+        {
+          "event": "EvaluatorFeePaid(indexed uint256,indexed address,uint256)",
+          "handler": "handleEvaluatorFeePaid"
+        },
+        {
+          "event": "Refunded(indexed uint256,indexed address,uint256)",
+          "handler": "handleRefunded"
+        },
+        {
+          "event": "Settled(indexed uint256,uint256,uint256)",
+          "handler": "handleSettled"
+        }
+      ]
+    }
+  },
+  {
+    "kind": "ethereum",
+    "name": "ArcadeJobHook",
+    "network": "arc-testnet",
+    "source": {
+      "abi": "ArcadeJobHook"
+    },
+    "mapping": {
+      "kind": "ethereum/events",
+      "apiVersion": "0.0.9",
+      "language": "wasm/assemblyscript",
+      "file": "./src/escrow-hook.ts",
+      "entities": [
+        "EscrowJob",
+        "EscrowEvent"
+      ],
+      "abis": [
+        {
+          "name": "ArcadeJobHook",
+          "file": "./abis/ArcadeJobHook.json"
+        }
+      ],
+      "eventHandlers": [
+        {
+          "event": "ArcadeSettled(indexed uint256,bytes32,uint32,uint256,bytes32)",
+          "handler": "handleArcadeSettled"
+        },
+        {
+          "event": "ArcadeRefused(indexed uint256,bytes32)",
+          "handler": "handleArcadeRefused"
+        }
+      ]
+    }
+  }
+]
+
 function activeManifest(pins: readonly SplitterPin[]) {
   const manifest = {
     specVersion: "1.0.0", indexerHints: { prune: "never" }, schema: { file: "./schema.graphql" },
@@ -133,6 +252,7 @@ function activeManifest(pins: readonly SplitterPin[]) {
     }]
   }
   const pilot = manifest.dataSources[0]!
+  manifest.templates.push(...ESCROW_TEMPLATES)
   manifest.dataSources = pins.map((pin) => pin.address === PILOT ? pilot : {
     kind: "ethereum", name: "FeeSplitterA9", network: "arc-testnet",
     source: { address: pin.address, abi: "FeeSplitterV2", startBlock: pin.startBlock },
@@ -141,7 +261,7 @@ function activeManifest(pins: readonly SplitterPin[]) {
   return manifest
 }
 
-/** G6: required pilot, optional exact A9 pin; four inactive templates, no listing authority. */
+/** Required pilot, optional exact A9 pin; six inactive templates, no listing authority. */
 export function renderManifest(template: string, chainConfig: unknown, splitters: unknown): string {
   try {
     if (canonical(chainConfig) !== CHAIN) return fail()
@@ -202,7 +322,8 @@ export async function buildManifest(paths: ManifestPaths): Promise<void> {
     for (const relative of [
       "./schema.graphql", "./src/fee-splitter.ts", "./src/ids.ts", "./abis/FeeSplitter.json", "./abis/FeeSplitterV2.json",
       "./src/identity.ts", "./src/reputation.ts", "./src/validation.ts", "./src/registry.ts",
-      "./abis/IdentityRegistry.json", "./abis/ReputationRegistry.json", "./abis/ValidationRegistry.json"
+      "./abis/IdentityRegistry.json", "./abis/ReputationRegistry.json", "./abis/ValidationRegistry.json",
+      "./abis/ERC8183.json", "./abis/ArcadeJobHook.json", "./src/escrow.ts", "./src/escrow-hook.ts", "./src/escrow-events.ts"
     ]) {
       if (!(await stat(new URL(relative, output))).isFile()) return fail()
     }

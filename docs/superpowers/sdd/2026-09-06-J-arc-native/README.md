@@ -64,6 +64,7 @@ evidence remain separate open work; this index does not mark them accepted.
   [Private command brief](task-9c2-brief.md), [owner config and strict CLI](task-9c2a-report.md).
   [MCP ownership and gas-inclusive accounting](task-9c2b-report.md).
 - [Task11 offline brief](task-11-brief.md), [staged escrow event/schema contracts](task-11a-report.md).
+  [Inactive observation brief](task-11b1-brief.md), [event/lifecycle mapping record](task-11b1-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

@@ -56,7 +56,7 @@ describe("G1 offline smoke scaffold", () => {
       }]
     })
     expect(manifest.templates.map((entry) => entry.name)).toEqual([
-      "FeeSplitterV2", "IdentityRegistry", "ReputationRegistry", "ValidationRegistry"
+      "FeeSplitterV2", "IdentityRegistry", "ReputationRegistry", "ValidationRegistry", "ERC8183", "ArcadeJobHook"
     ])
     expect(manifest.dataSources.map((entry) => entry.name)).toEqual(["FeeSplitterA9", "FeeSplitterSmoke"])
   })

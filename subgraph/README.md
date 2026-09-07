@@ -1,9 +1,30 @@
 # ARCADE ledger
 
 Latest status: [G6 indexed A9 match](#september-6-2026--g6-indexed-a9-match).
-Local J11 escrow schema/ABIs are staged only; see [J11A](#j11a-offline-escrow-schema).
+Local J11 escrow mappings remain inactive; see [J11B1](#j11b1-inactive-escrow-observations).
 The dated local/G1 sections below are historical checkpoints. Neither a successful
 build nor an acknowledgment proves the later indexed-event acceptance gate.
+
+## J11B1 inactive escrow observations
+
+September7: two real inactive escrow/hook mapping templates now compile and
+have actual Matchstick runtime coverage. Neither template is instantiated or
+given a deployed address/start block; the two active splitter sources remain
+unchanged. Local Arc-testnet source context must bind proxy/hook/evaluator
+before any record is created. Metadata cannot activate them.
+
+Immutable event records preserve public facts and reject conflicting replays.
+An observed matching creation owns the job summary; absent history remains
+unlinked and monetary observations remain null until emitted. Last-observed
+status is not verified current state. Payment/fee/refund/hook events stay
+separate; no escrow Settlement or verified receipt Tree is created yet.
+Amounts are raw token units. Hook detachment/upgrades are not tracked, so the
+summary hook records creation, not a current administrative-state assertion.
+
+All88 actual mapping tests passed sequentially, including27 new escrow cases.
+The [J11B1 report](../docs/superpowers/sdd/2026-09-06-J-arc-native/task-11b1-report.md)
+separates these offline results from the still-blocked live deployment/indexing
+and next terminal-payment correlation work. No new CID or live query exists.
 
 ## J11A offline escrow schema
 

@@ -99,3 +99,69 @@ templates:
           handler: handleValidationRequest
         - event: ValidationResponse(indexed address,indexed uint256,indexed bytes32,uint8,string,bytes32,string)
           handler: handleValidationResponse
+  - kind: ethereum
+    name: ERC8183
+    network: arc-testnet
+    source:
+      abi: ERC8183
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/escrow.ts
+      entities:
+        - EscrowJob
+        - EscrowEvent
+      abis:
+        - name: ERC8183
+          file: ./abis/ERC8183.json
+      eventHandlers:
+        - event: "JobCreated(indexed uint256,indexed address,indexed address,address,uint48,address)"
+          handler: handleJobCreated
+        - event: "ProviderSet(indexed uint256,indexed address,uint256)"
+          handler: handleProviderSet
+        - event: "PayoutReceiverSet(indexed uint256,indexed address)"
+          handler: handlePayoutReceiverSet
+        - event: "BudgetSet(indexed uint256,indexed address,uint256)"
+          handler: handleBudgetSet
+        - event: "JobFunded(indexed uint256,indexed address,uint256)"
+          handler: handleJobFunded
+        - event: "JobSubmitted(indexed uint256,indexed address,bytes32)"
+          handler: handleJobSubmitted
+        - event: "JobCompleted(indexed uint256,indexed address,bytes32)"
+          handler: handleJobCompleted
+        - event: "JobRejected(indexed uint256,indexed address,bytes32)"
+          handler: handleJobRejected
+        - event: JobExpired(indexed uint256)
+          handler: handleJobExpired
+        - event: "PaymentReleased(indexed uint256,indexed address,uint256)"
+          handler: handlePaymentReleased
+        - event: "PlatformFeePaid(indexed uint256,indexed address,uint256)"
+          handler: handlePlatformFeePaid
+        - event: "EvaluatorFeePaid(indexed uint256,indexed address,uint256)"
+          handler: handleEvaluatorFeePaid
+        - event: "Refunded(indexed uint256,indexed address,uint256)"
+          handler: handleRefunded
+        - event: "Settled(indexed uint256,uint256,uint256)"
+          handler: handleSettled
+  - kind: ethereum
+    name: ArcadeJobHook
+    network: arc-testnet
+    source:
+      abi: ArcadeJobHook
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/escrow-hook.ts
+      entities:
+        - EscrowJob
+        - EscrowEvent
+      abis:
+        - name: ArcadeJobHook
+          file: ./abis/ArcadeJobHook.json
+      eventHandlers:
+        - event: "ArcadeSettled(indexed uint256,bytes32,uint32,uint256,bytes32)"
+          handler: handleArcadeSettled
+        - event: "ArcadeRefused(indexed uint256,bytes32)"
+          handler: handleArcadeRefused

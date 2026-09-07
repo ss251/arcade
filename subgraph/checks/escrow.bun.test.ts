@@ -29,7 +29,23 @@ function declarations(name: Name) {
   })
 }
 
-describe("J11A inactive escrow schema and ABI contracts", () => {
+describe("J11 inactive escrow schema and ABI contracts", () => {
+  test("mapping sources cannot instantiate templates or manufacture terminal settlements", () => {
+    for (const path of ["../src/escrow-events.ts", "../src/escrow.ts", "../src/escrow-hook.ts"]) {
+      expect(text(path)).not.toMatch(/\.create(?:WithContext)?\(|new (?:Settlement|Tree|Listing)\b/)
+    }
+  })
+  for (const [label, from, to] of [
+    ["address activation", "      abi: ERC8183\n", "      abi: ERC8183\n      address: '0x1111111111111111111111111111111111111111'\n"],
+    ["invented start block", "      abi: ArcadeJobHook\n", "      abi: ArcadeJobHook\n      startBlock: 1\n"],
+    ["wrong escrow handler", "handler: handleJobFunded", "handler: handleSettled"],
+    ["foreign hook mapping", "file: ./src/escrow-hook.ts", "file: ./src/fee-splitter.ts"]
+  ] as const) test(`refuses ${label} in staged templates`, () => {
+    const template = text("../subgraph.template.yaml"), changed = template.replace(from, to)
+    expect(changed).not.toBe(template)
+    expect(() => renderManifest(changed, JSON.parse(text("../../config/chains/arc-testnet.json")),
+      JSON.parse(text("../splitters.json")))).toThrow("Invalid staged subgraph manifest")
+  })
   for (const name of Object.keys(sources) as Name[]) {
     test(`${name} parses in the actual pinned Graph parser and matches local Solidity exactly`, () => {
       const path = new URL(`../abis/${name}.json`, import.meta.url)
@@ -41,15 +57,26 @@ describe("J11A inactive escrow schema and ABI contracts", () => {
         `${event.name}(${event.inputs.map(input => `${input.indexed ? "indexed " : ""}${input.type}`).join(",")})`))
     })
   }
-  test("retains both active splitter sources and exactly four pre-existing inactive templates", () => {
+  test("retains both active splitter sources and adds only two inactive escrow templates", () => {
     const manifest = Bun.YAML.parse(renderManifest(text("../subgraph.template.yaml"),
       JSON.parse(text("../../config/chains/arc-testnet.json")), JSON.parse(text("../splitters.json")))) as {
-        dataSources: Array<{ name: string }>; templates: Array<{ name: string }>
+        dataSources: Array<{ name: string }>; templates: Array<{ name: string } & Record<string, unknown>>
       }
     expect(manifest.dataSources.map((s: { name: string }) => s.name)).toEqual(["FeeSplitterA9", "FeeSplitterSmoke"])
     expect(manifest.templates.map((s: { name: string }) => s.name)).toEqual([
-      "FeeSplitterV2", "IdentityRegistry", "ReputationRegistry", "ValidationRegistry"])
-    expect(JSON.stringify(manifest)).not.toMatch(/ERC8183|ArcadeJobHook/)
+      "FeeSplitterV2", "IdentityRegistry", "ReputationRegistry", "ValidationRegistry", "ERC8183", "ArcadeJobHook"])
+    expect(JSON.stringify(manifest.dataSources)).not.toMatch(/ERC8183|ArcadeJobHook/)
+    for (const [index, name] of (["ERC8183", "ArcadeJobHook"] as const).entries()) {
+      expect(manifest.templates[index + 4]).toEqual({
+        kind: "ethereum", name, network: "arc-testnet", source: { abi: name },
+        mapping: { kind: "ethereum/events", apiVersion: "0.0.9", language: "wasm/assemblyscript",
+          file: name === "ERC8183" ? "./src/escrow.ts" : "./src/escrow-hook.ts",
+          entities: ["EscrowJob", "EscrowEvent"], abis: [{ name, file: `./abis/${name}.json` }],
+          eventHandlers: declarations(name).map(event => ({
+            event: `${event.name}(${event.inputs.map(input => `${input.indexed ? "indexed " : ""}${input.type}`).join(",")})`,
+            handler: `handle${event.name}` })) }
+      })
+    }
   })
   test("retains exact splitter provenance in active and historical mappings", () => {
     expect(text("../src/fee-splitter.ts")).toContain('settlement.rail = "eip3009"')

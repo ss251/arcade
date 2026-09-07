@@ -32,13 +32,13 @@ const expected: Readonly<Record<string, { readonly immutable: boolean; readonly 
     provider: "Bytes!", evaluator: "Bytes!", hook: "Bytes!", expiredAt: "BigInt!", status: "String!",
     paymentToken: "Bytes", budgetAtomic: "BigInt", fundedAtomic: "BigInt", deliverable: "Bytes",
     createdBlock: "BigInt!", createdAt: "BigInt!", createdTxHash: "Bytes!",
-    updatedBlock: "BigInt!", updatedAt: "BigInt!", events: "[EscrowEvent!]!"
+    updatedBlock: "BigInt!", updatedAt: "BigInt!", updatedLogIndex: "BigInt!", events: "[EscrowEvent!]!"
   } },
   EscrowEvent: { immutable: true, fields: {
     id: "Bytes!", escrow: "Bytes!", emitter: "Bytes!", jobId: "BigInt!", job: "EscrowJob",
     kind: "String!", actor: "Bytes", token: "Bytes", amountAtomic: "BigInt", cumulativeAtomic: "BigInt",
     agentId: "BigInt", hash: "Bytes", treeHash: "Bytes", receiptHash: "Bytes",
-    childCount: "BigInt", childTotalAtomic: "BigInt", blockNumber: "BigInt!",
+    childCount: "BigInt", childTotalAtomic: "BigInt", payloadHash: "Bytes!", blockNumber: "BigInt!",
     timestamp: "BigInt!", txHash: "Bytes!", logIndex: "BigInt!"
   } },
   Tree: { immutable: false, fields: {
@@ -217,7 +217,7 @@ describe("G2 ledger schema contract (offline)", () => {
       name: "FeeSplitterV2",
       mapping: expect.objectContaining({ entities: ["Settlement", "Splitter", "Tree", "TreeOccurrence"] })
     }))
-    expect(manifest).toHaveProperty("templates.length", 4)
+    expect(manifest).toHaveProperty("templates.length", 6)
   })
 
   test("labels local schema evolution separately from deployed G1 and unavailable aggregates", () => {

@@ -1,4 +1,4 @@
-# Local ledger with J11A staged escrow entities; deployed CIDs retain their schemas.
+# Local ledger with inactive J11 escrow mappings; deployed CIDs retain their schemas.
 # Canonical relationships require independently trusted bindings. Metadata claims
 # alone do not establish a hub listing, settlement provenance or current owner.
 
@@ -80,6 +80,7 @@ type EscrowJob @entity(immutable: false) {
   client: Bytes!
   provider: Bytes!
   evaluator: Bytes!
+  "Hook observed at creation; this mapping does not track administrative detachment or upgrades."
   hook: Bytes!
   expiredAt: BigInt!
   "Last observed lifecycle event, not independently verified current state."
@@ -94,6 +95,7 @@ type EscrowJob @entity(immutable: false) {
   createdTxHash: Bytes!
   updatedBlock: BigInt!
   updatedAt: BigInt!
+  updatedLogIndex: BigInt!
   events: [EscrowEvent!]! @derivedFrom(field: "job")
 }
 
@@ -117,6 +119,8 @@ type EscrowEvent @entity(immutable: true) {
   receiptHash: Bytes
   childCount: BigInt
   childTotalAtomic: BigInt
+  "Canonical fixed-parameter digest for conflicting-replay detection, not a receipt proof."
+  payloadHash: Bytes!
   blockNumber: BigInt!
   timestamp: BigInt!
   txHash: Bytes!

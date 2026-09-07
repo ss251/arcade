@@ -1,5 +1,19 @@
 # Plan J progress
 
+2026-09-07 23:23 IST — J11B1 sole73911 fullgatePASS5258Vitest240/71.88s;
+1360Bun92/11706assert193.13s;root/webstrict/clientSSR. Final5-rootstrict0,
+Graphcodegen/WASM and88actualMatchstickPASS.17paths147links/privacy0;
+11source/testpins checked before atomiccommit/exact-one mainFF. Two new
+templates remain inactive. J11B2 correlation next; no ownerkeys/RPC/spend/
+policychange/deploy/push. Existing live pauses unchanged.
+
+2026-09-07 23:17 IST — J11B1 inactive escrow/hook event mappings implemented.
+27new+61legacy actualMatchstick testsPASS, sequential owned/pinned runtime;
+186focusedBun5/431assert634ms. Local context/emitter binding, payload-conflict
+dedup and canonical order; unknown history stays null/unlinked. No escrow
+Settlement/Tree creation or live activation. Finalstrict/build/freeze/solegate
+next; terminalcorrelationJ11B2 thenwebJ11C. No ownerkeys/RPC/spend/policy/push.
+
 2026-09-07 22:58 IST — J11A sole28507 fullgatePASS5258Vitest240/71.21s;
 1350Bun92/11674assert192.53s;root/webstrict/clientSSR. Final176focusedBun5/
 399assert845ms;2-rootstrict0;Graph codegen/WASM+actual27legacyMatchstickPASS.
