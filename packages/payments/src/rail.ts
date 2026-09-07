@@ -9,12 +9,15 @@ import type {
   SettlementFailed
 } from "@arcade/core"
 import type { PaymentPayload, PaymentRequirements, SettledPayment, VerifiedPayment } from "./types.ts"
+import type { EscrowChallengeContext } from "./erc8183-wire.ts"
 
 export interface ChallengeInput {
   readonly priceAtomic: bigint
   readonly resource: string
   readonly payTo: string
   readonly description?: string
+  /** Current listing + actual root input, supplied by trusted dispatch for escrow only. */
+  readonly escrow?: EscrowChallengeContext
   /**
    * THIS seller's fee splitter, if they have one. Per call, never per process.
    *
@@ -70,7 +73,7 @@ export type SettleError = SettlementFailed | RpcRateLimited | RpcFailure
  * work, and settle only AFTER the output validates, which may be minutes later. That is
  * exactly why Circle's Express middleware (which settles inside the request) is unusable here.
  */
-export interface Rail {
+export interface Rail<Payload = PaymentPayload, Verified = VerifiedPayment, Completion = never> {
   readonly name: "eip3009" | "gateway" | "erc8183" | "test"
 
   /** Build the 402 body a buyer needs in order to pay. */
@@ -78,9 +81,9 @@ export interface Rail {
 
   /** Check the authorization is real, funded and unused. No chain writes. */
   readonly verify: (
-    payload: PaymentPayload,
+    payload: Payload,
     requirements: PaymentRequirements
-  ) => Effect.Effect<VerifiedPayment, VerifyError>
+  ) => Effect.Effect<Verified, VerifyError>
 
   /**
    * Cash the authorization. Called only after settle-on-success says yes.
@@ -90,7 +93,7 @@ export interface Rail {
    * ignores it, since the tree is still published in the receipt regardless of whether the
    * chain also holds a hash of it.
    */
-  readonly settle: (verified: VerifiedPayment, tree?: SettleTree) => Effect.Effect<SettledPayment, SettleError>
+  readonly settle: (verified: Verified, tree?: SettleTree, context?: Completion) => Effect.Effect<SettledPayment, SettleError>
 }
 
 export class RailTag extends Context.Tag("@arcade/payments/Rail")<RailTag, Rail>() {}

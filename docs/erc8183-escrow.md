@@ -135,3 +135,8 @@ No hash-only settlement or live rail activation is supplied by these helpers.
 See the [J7B2 proof record](superpowers/sdd/2026-09-06-J-arc-native/task-7b2-report.md)
 and [J7B3a coordinator/storage record](superpowers/sdd/2026-09-06-J-arc-native/task-7b3a-report.md),
 plus the [J7B3b transport verification](superpowers/sdd/2026-09-06-J-arc-native/task-7b3b-report.md).
+
+Separate closed escrow payload/requirements codecs and generic rail contracts
+now represent the capability and explicit request/receipt context without
+altering exact-payment schemas. The actual Effect adapter and hub integration
+are still pending. See [J7B4a wire decisions](superpowers/sdd/2026-09-06-J-arc-native/task-7b4a-report.md).

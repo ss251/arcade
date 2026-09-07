@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 13:28 IST — J7B4a sole68847 fullgatePASS:4,965Vitest223/69.18s,
+972Bun71/7,635assert/172.31s,root/webstrict and client/SSR builds. Four-root
+strict0; four code/test pins frozen; final11path scope/privacy audit and atomic
+commit/exactFF next. Actual guarded Effect rail7B4b thenJ8/J9 remain. No gate
+replay, owner key/liveRPC/send/spend/push or existing policy changes.
+
+2026-09-07 13:17 IST — J7B4a separate closed capability wire/requirements and
+generic Rail contracts implemented;12focusedVitest1/42ms PASS. Genuine schema
+record-copy mutation Red fixed by freezing the constructed metadata. Exact
+PaymentPayload/VerifiedPayment/session implementations unchanged. Final strict,
+scope freeze and sole full gate next. Actual branded Effect adapter is7B4b,
+then8/9; no owner key/RPC/send/spend/push or change to existing windows/caps.
+
 2026-09-07 12:58 IST — J7B3b sole93159 fullgatePASS:4,953Vitest222/69.20s,
 972Bun71/7,635assert/172.26s,root/webstrict,client355ms/SSR178ms. Four-root
 strict0;5code/testpins frozen. Final12pathsaudit (including Task7 brief status
