@@ -183,7 +183,13 @@ coordinator and private SQLite action lifecycle.
 [7B3b](../sdd/2026-09-06-J-arc-native/task-7b3b-report.md) adds concrete bounded
 RPC/signing ports.[7B4a](../sdd/2026-09-06-J-arc-native/task-7b4a-report.md)
 adds separate capability payload and generic request/settlement contracts.
-7B4b still owns the actual guarded Effect rail; Task7 remains in progress.
+[7B4b](../sdd/2026-09-06-J-arc-native/task-7b4b-report.md) now implements the
+guarded Effect rail on a dedicated typed tag; sole full gate56222 passed.
+The original API sketch below is superseded by the brief's capability-bound
+payload, independently pinned identity, durable action journal, lazy signing
+callback and explicit actual hub-job/output completion context. No raw-key/RPC
+discovery shortcut, public-jobId-only action, or dummy receipt hash is used.
+Hub activation and atomic inference admission remain Task8, not this factory.
 Existing exact-only payloads and tree-only settle arguments must not be
 populated with dummy escrow values or silently widened for sessions.
 

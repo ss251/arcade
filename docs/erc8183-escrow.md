@@ -126,7 +126,7 @@ zero on complete/reject; it is partial-claim accounting, not a terminal flag.
 Fee flooring can legitimately produce no PlatformFeePaid event at tiny prices.
 
 The guarded action coordinator, private SQLite journal and concrete bounded
-Arc RPC/signing ports are implemented and tested offline; active rail and hub
+Arc RPC/signing ports are implemented and tested offline; hub activation and
 execution admission remain unimplemented. The journal retains uncertain action
 and evaluator ownership across restarts and does not automatically replay sends
 or reverse them with reject. All cooperating workers must share one private
@@ -138,5 +138,11 @@ plus the [J7B3b transport verification](superpowers/sdd/2026-09-06-J-arc-native/
 
 Separate closed escrow payload/requirements codecs and generic rail contracts
 now represent the capability and explicit request/receipt context without
-altering exact-payment schemas. The actual Effect adapter and hub integration
-are still pending. See [J7B4a wire decisions](superpowers/sdd/2026-09-06-J-arc-native/task-7b4a-report.md).
+altering exact-payment schemas. The explicit Effect factory and dedicated
+Erc8183Tag now compose the guarded executor with the shared durable journal.
+Verification discards capabilities, brands results privately and checks EOA
+provider code at the canonical job snapshot. Settlement requires actual hub
+job/output/tree context and retains full monetary proof. Hub activation,
+atomic inference admission and buyer lifecycle remain pending; no live claim.
+See [J7B4a wire decisions](superpowers/sdd/2026-09-06-J-arc-native/task-7b4a-report.md)
+and [J7B4b rail verification](superpowers/sdd/2026-09-06-J-arc-native/task-7b4b-report.md).

@@ -67,7 +67,7 @@ export type SettleError = SettlementFailed | RpcRateLimited | RpcFailure
  * Two production implementations (`EIP3009Live`, `GatewayLive`) plus `RailTest` satisfy this
  * one interface. Layers construct the built inventory; an ordinary request selects
  * one of the listing's advertised choices, which is retained through settlement.
- * `erc8183` is a reserved contract here, not a built escrow implementation.
+ * `erc8183` has a separate payload and dedicated tag; the hub must explicitly integrate it.
  *
  * The split of verify/settle is load-bearing for D2: we verify BEFORE the seller does any
  * work, and settle only AFTER the output validates, which may be minutes later. That is

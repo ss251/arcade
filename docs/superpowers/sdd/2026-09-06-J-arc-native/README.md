@@ -39,6 +39,7 @@ evidence remain separate open work; this index does not mark them accepted.
   [Bounded Arc RPC and signing ports](task-7b3b-report.md).
   [Escrow wire/rail brief](task-7b4-brief.md),
   [separate payload and generic contracts](task-7b4a-report.md).
+  [Guarded Effect rail composition](task-7b4b-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

@@ -1,5 +1,19 @@
 # Plan J progress
 
+2026-09-07 13:45 IST — J7B4b sole56222 fullgatePASS:4,983Vitest224/68.76s,
+973Bun72/7,643assert/175.03s,root/webstrict,client566ms/SSR192ms. Sevenpins
+unchanged;13paths80links/privacy0. Task7 guarded runtime complete offline;
+atomiccommit/exactFF then Task8 strict socket contracts/runner authorization,
+durable hub admission/pipeline wiring and Task9 buyer lifecycle. Live activation
+remains gated by J6. No owner key/liveRPC/send/spend or policy change/push.
+
+2026-09-07 13:40 IST — J7B4b guarded Effect rail implemented;72focusedVitest4
+(18newrail cases), actual SQLite submit→complete→reopen-refusal1Bun8assert/444ms,
+seven-rootstrict0. Canonical provider EOA verification added after genuine Red.
+Fixtures retain default behavior and add consistent blocks/times/nonces for
+the new fake-chain lifecycle. Final scope freeze/sole fullgate next; Task8/9
+remain unimplemented. No owner key/liveRPC/send/spend/push or policy changes.
+
 2026-09-07 13:28 IST — J7B4a sole68847 fullgatePASS:4,965Vitest223/69.18s,
 972Bun71/7,635assert/172.31s,root/webstrict and client/SSR builds. Four-root
 strict0; four code/test pins frozen; final11path scope/privacy audit and atomic

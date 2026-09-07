@@ -27,9 +27,9 @@ It does not activate a rail or replace durable budget/execution reservations.
 7B2 adds offline action contracts, pre-settlement receipt projection and
 signed-intent/log/poststate proofs; see [verification](task-7b2-report.md).
 7B3a adds the [durable coordinator/journal](task-7b3a-report.md);7B3b adds the
-[bounded RPC/signing ports](task-7b3b-report.md), both verified offline.7B4 still
-adds [separate wire/type contracts](task-7b4a-report.md); the active Effect
-adapter remains7B4b work before Task8 wiring. No live send or rail activation
+[bounded RPC/signing ports](task-7b3b-report.md), both verified offline.7B4 adds
+[separate wire/type contracts](task-7b4a-report.md) and the explicit guarded
+[Effect rail factory](task-7b4b-report.md) before Task8 wiring. No live send or hub activation
 has occurred, and no exact schema/window is changed by the generic contract.
 
 7C/Task8 integration: typed wire dispatch, durable one-job/one-request reservation,

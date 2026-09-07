@@ -3,8 +3,9 @@ import { decodeFunctionData, encodeFunctionResult, hashDomain, keccak256, parseT
 import { ERC8183_ABI, ARCADE_JOB_HOOK_ABI } from "../../src/erc8183-abi.ts"
 import { fixture, addr, evaluator } from "./erc8183-action.ts"
 const abi = [...ERC8183_ABI, ...ARCADE_JOB_HOOK_ABI] as const
-export async function rpcFixture(kind: "budget" | "submit" | "complete" | "reject" = "complete") {
-  const f = await fixture(kind), calls: { method: string; params: unknown[] }[] = [], controller = new AbortController()
+export async function rpcFixture(kind: "budget" | "submit" | "complete" | "reject" = "complete",
+  options: { capability?: Hex; submittedAt?: number; timestamp?: number; blockNumber?: bigint; nonce?: number } = {}) {
+  const f = await fixture(kind, 300000n, options), calls: { method: string; params: unknown[] }[] = [], controller = new AbortController()
   let sent = false, acquisitions = 0
   const identity = { chainId: 5042002 as const, escrow: f.context.call.escrow, implementation: addr(11), hook: f.context.call.hook,
     evaluator: f.context.call.evaluator, treasury: f.context.treasury, token: f.context.call.token,
@@ -24,9 +25,9 @@ export async function rpcFixture(kind: "budget" | "submit" | "complete" | "rejec
   const answer = (method: string, params: unknown[]): unknown => {
     const state = sent ? f.after : f.snapshot
     if (method === "eth_chainId") return toHex(5042002)
-    if (method === "eth_getTransactionCount") return "0x3"
+    if (method === "eth_getTransactionCount") return toHex(f.terms.nonce)
     if (method === "eth_getBlockByNumber") {
-      const block = params[0] === "finalized" || params[0] === "latest" ? state : params[0] === "0x33" ? f.after : f.snapshot
+      const block = params[0] === "finalized" || params[0] === "latest" ? state : params[0] === toHex(f.after.blockNumber) ? f.after : f.snapshot
       return { number: toHex(block.blockNumber), hash: block.blockHash, timestamp: toHex(block.timestamp), transactions: [] }
     }
     if (method === "eth_getCode") return params[0] === identity.escrow ? "0x01" : params[0] === identity.implementation ? "0x02" :
@@ -34,7 +35,7 @@ export async function rpcFixture(kind: "budget" | "submit" | "complete" | "rejec
     if (method === "eth_getStorageAt") return "0x" + "00".repeat(12) + identity.implementation.slice(2)
     if (method === "eth_call") {
       const { functionName } = decodeFunctionData({ abi, data: (params[0] as { data: Hex }).data })
-      const value = functionName === "getJob" ? (params[1] === "0x33" ? f.after : f.snapshot).job : getters[functionName]
+      const value = functionName === "getJob" ? (params[1] === toHex(f.after.blockNumber) ? f.after : f.snapshot).job : getters[functionName]
       return encodeFunctionResult({ abi, functionName, result: value as never })
     }
     if (method === "eth_estimateGas") return toHex(833333n)
@@ -54,7 +55,7 @@ export async function rpcFixture(kind: "budget" | "submit" | "complete" | "rejec
     calls.push({ method: r.method, params: r.params })
     return Response.json({ jsonrpc: "2.0", id: r.id, result: answer(r.method, r.params) })
   }) as typeof globalThis.fetch
-  const options = { identity, signal: controller.signal, deadlineMs: performance.now() + 30000, nowSeconds: () => 1000,
+  const chainOptions = { identity, signal: controller.signal, deadlineMs: performance.now() + 30000, nowSeconds: () => f.snapshot.timestamp,
     gasCapWei: 2000000n, fetch, acquireSigner: async () => { acquisitions++; return evaluator } }
-  return { f, identity, calls, getters, controller, options, answer, acquisitions: () => acquisitions, sent: () => sent }
+  return { f, identity, calls, getters, controller, options: chainOptions, answer, acquisitions: () => acquisitions, sent: () => sent }
 }
