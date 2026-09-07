@@ -6,7 +6,8 @@
 import { createHash, randomBytes } from "node:crypto"
 import { constants, openSync, closeSync, lstatSync, fstatSync, readSync, realpathSync,
   mkdirSync, opendirSync, writeSync, fsyncSync, unlinkSync, type Stats } from "node:fs"
-import { dirname, isAbsolute, normalize, join } from "node:path"
+import { dirname, isAbsolute, normalize, join, resolve } from "node:path"
+import { encodeGraphQuery, GATEWAY_BASE, type QueryArgs } from "../skills/counterparty-graph/graph-client.ts"
 
 export const GRAPH_COGS_POLICY = Object.freeze({
   namespace: "arcade-graph-cogs-2026-09-v1",
@@ -211,23 +212,24 @@ export async function readGraphBalance(transport: GraphBalanceTransport, options
 
 /** Explicit read-only inspection path, NOT the eventual fixed live authority
  * namespace. No creation, chmod, recovery, cache refresh or missing-state reset. */
-function readPrivateBudgetText(path: string): string {
+function readBudgetText(path: string, privateFile = true, maxBytes = MAX_BYTES): string {
   let fd: number | undefined
   try {
     insist(typeof path === "string" && path.length <= 2048 && isAbsolute(path) && normalize(path) === path &&
       !/[\u0000-\u001f\u007f]/.test(path) && typeof process.getuid === "function")
+    insist(Number.isSafeInteger(maxBytes) && maxBytes > 0 && maxBytes <= 2 * 1024 * 1024)
     const uid = process.getuid(), parent = dirname(path), directory = lstatSync(parent), before = lstatSync(path)
     insist(directory.isDirectory() && !directory.isSymbolicLink() && directory.uid === uid &&
-      (directory.mode & 0o777) === 0o700 && realpathSync(parent) === parent)
+      (!privateFile || (directory.mode & 0o777) === 0o700) && realpathSync(parent) === parent)
     const validFile = (st: typeof before) => st.isFile() && !st.isSymbolicLink() && st.uid === uid &&
-      st.nlink === 1 && (st.mode & 0o777) === 0o600 && st.size > 0 && st.size <= MAX_BYTES
+      st.nlink === 1 && (!privateFile || (st.mode & 0o777) === 0o600) && st.size > 0 && st.size <= maxBytes
     insist(validFile(before))
     // NONBLOCK prevents a concurrent FIFO substitution from hanging before fstat.
     fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     const opened = fstatSync(fd)
     insist(validFile(opened) && opened.ino === before.ino && opened.dev === before.dev &&
       opened.size === before.size && opened.mtimeMs === before.mtimeMs && opened.ctimeMs === before.ctimeMs)
-    const bytes = Buffer.alloc(MAX_BYTES + 1)
+    const bytes = Buffer.alloc(maxBytes + 1)
     let length = 0
     while (length < bytes.length) {
       const n = readSync(fd, bytes, length, bytes.length - length, length)
@@ -241,7 +243,7 @@ function readPrivateBudgetText(path: string): string {
       atPath.size === opened.size && atPath.mtimeMs === opened.mtimeMs && atPath.ctimeMs === opened.ctimeMs)
     insist(dirAfter.ino === directory.ino && dirAfter.dev === directory.dev &&
       dirAfter.isDirectory() && !dirAfter.isSymbolicLink() && dirAfter.uid === uid &&
-      (dirAfter.mode & 0o777) === 0o700 && realpathSync(parent) === parent)
+      (!privateFile || (dirAfter.mode & 0o777) === 0o700) && realpathSync(parent) === parent)
     const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, length))
     insist(Buffer.from(text).equals(bytes.subarray(0, length)))
     closeSync(fd); fd = undefined
@@ -251,7 +253,88 @@ function readPrivateBudgetText(path: string): string {
 }
 export function readGraphReservations(path: string): GraphReservationSummary {
   insist(typeof path === "string" && path.endsWith(".jsonl"))
-  return decodeGraphReservations(readPrivateBudgetText(path))
+  return decodeGraphReservations(readBudgetText(path))
+}
+
+export const GRAPH_COGS_SOURCE_FILES = Object.freeze([
+  "bun.lock", "scripts/e2e-graph-cogs.ts", "skills/counterparty-graph/arcade.json",
+  "skills/counterparty-graph/graph-client.ts", "skills/counterparty-graph/queries/attestations.graphql",
+  "skills/counterparty-graph/queries/identities.graphql", "skills/counterparty-graph/run.ts",
+  "skills/counterparty-graph/synthesize.ts", "skills/counterparty-graph/validate-output.ts",
+] as const)
+export interface GraphSourceManifest {
+  readonly format: "arcade-graph-sources-v1"
+  readonly files: readonly Readonly<{ path: string; sha256: string }>[]
+  readonly sourceHash: string
+}
+export interface GraphQueryBinding {
+  readonly format: "arcade-graph-query-binding-v1"
+  readonly policyHash: string
+  readonly sourceHash: string
+  readonly endpoint: string
+  readonly payer: string
+  readonly token: string
+  readonly merchant: string
+  readonly amountAtomic: string
+  readonly kind: "identities" | "attestations"
+  readonly body: string
+  readonly bodySha256: string
+  readonly parentQueryHash: string | null
+  readonly blockHash: string | null
+  readonly queryHash: string
+}
+const sourceRoots = new WeakMap<GraphSourceManifest, string>()
+const bindings = new WeakSet<GraphQueryBinding>()
+function sourceFiles(root: string) {
+  insist(typeof root === "string" && isAbsolute(root) && normalize(root) === root &&
+    root.length <= 1800 && realpathSync(root) === root && lstatSync(root).isDirectory())
+  return GRAPH_COGS_SOURCE_FILES.map(path => Object.freeze({ path,
+    sha256: hash(readBudgetText(join(root, path), false,
+      path === "bun.lock" ? 2 * 1024 * 1024 : path.endsWith(".graphql") ? 8192 : 262144)),
+  }))
+}
+/** Disk provenance only, not runtime-code attestation or spending authority.
+ * Explicit root is a local fixture seam; the CLI has no source-root override. */
+export function readGraphSourceManifest(root = resolve(import.meta.dir, "..")): GraphSourceManifest {
+  try {
+    const files = sourceFiles(root)
+    insist(JSON.stringify(files) === JSON.stringify(sourceFiles(root)))
+    const manifest: GraphSourceManifest = Object.freeze({ format: "arcade-graph-sources-v1",
+      files: Object.freeze(files), sourceHash: hash(JSON.stringify(files)) })
+    sourceRoots.set(manifest, root); return manifest
+  } catch { throw new Error("graph_cogs_binding_refused") }
+}
+/** Stable request/cache-key ingredient. Parent/block are declarations, NOT a
+ * paid receipt or reconciler; binding never clears an unresolved reservation. */
+export function bindGraphQuery(args: QueryArgs, sources: GraphSourceManifest, parent?: unknown): GraphQueryBinding {
+  try {
+    const root = sourceRoots.get(sources)
+    insist(root !== undefined && hash(JSON.stringify(sourceFiles(root))) === sources.sourceHash)
+    const body = encodeGraphQuery(args), decoded = JSON.parse(body) as { query: string; variables: Record<string, unknown> }
+    const kind: GraphQueryBinding["kind"] = Object.hasOwn(decoded.variables, "address") ? "identities" : "attestations"
+    const querySource = sources.files.find(file => file.path === `skills/counterparty-graph/queries/${kind}.graphql`)
+    insist(querySource?.sha256 === hash(decoded.query))
+    let parentQueryHash: string | null = null, blockHash: string | null = null
+    if (kind === "identities") insist(parent === undefined && decoded.variables.address === GRAPH_COGS_POLICY.subject)
+    else {
+      shape(parent, ["binding", "blockHash"])
+      const previous = parent.binding as GraphQueryBinding
+      insist(bindings.has(previous) && previous.kind === "identities" && previous.sourceHash === sources.sourceHash &&
+        previous.policyHash === GRAPH_COGS_POLICY_HASH && typeof parent.blockHash === "string" &&
+        /^0x[0-9a-f]{64}$/.test(parent.blockHash) && !/^0x0{64}$/.test(parent.blockHash))
+      const declared = decoded.variables.block as { hash: string }
+      insist(declared.hash === parent.blockHash)
+      parentQueryHash = previous.queryHash; blockHash = parent.blockHash
+    }
+    // Re-read after encoding: changing a query/source during capture refuses.
+    insist(hash(JSON.stringify(sourceFiles(root))) === sources.sourceHash)
+    const value = { format: "arcade-graph-query-binding-v1" as const, policyHash: GRAPH_COGS_POLICY_HASH,
+      sourceHash: sources.sourceHash, endpoint: GATEWAY_BASE + GRAPH_COGS_POLICY.subgraph,
+      payer: GRAPH_COGS_POLICY.payer, token: GRAPH_COGS_POLICY.token, merchant: GRAPH_COGS_POLICY.merchant,
+      amountAtomic: GRAPH_COGS_POLICY.queryCostAtomic, kind, body, bodySha256: hash(body), parentQueryHash, blockHash }
+    const binding: GraphQueryBinding = Object.freeze({ ...value, queryHash: hash(JSON.stringify(value)) })
+    bindings.add(binding); return binding
+  } catch { throw new Error("graph_cogs_binding_refused") }
 }
 
 type DirectoryIdentity = Stats
@@ -295,7 +378,7 @@ function freshBudgetFile(path: string, text: string) {
     const after = fstatSync(fd), atPath = lstatSync(path)
     insist(after.size === Buffer.byteLength(text) && atPath.ino === after.ino && atPath.dev === after.dev && !atPath.isSymbolicLink())
   } finally { closeSync(fd) }
-  insist(readPrivateBudgetText(path) === text)
+  insist(readBudgetText(path) === text)
 }
 function ownClaim(directory: string, identity: DirectoryIdentity) {
   sameDirectory(directory, identity)
@@ -306,7 +389,7 @@ function ownClaim(directory: string, identity: DirectoryIdentity) {
   const check = () => {
     sameDirectory(directory, identity)
     const st = lstatSync(path)
-    insist(st.ino === pinned.ino && st.dev === pinned.dev && readPrivateBudgetText(path) === text)
+    insist(st.ino === pinned.ino && st.dev === pinned.dev && readBudgetText(path) === text)
   }
   return { check, release() { check(); unlinkSync(path); syncDirectory(directory, identity) } }
 }
@@ -315,7 +398,7 @@ const headText = (text: string, reservations: number) => JSON.stringify({
   format: "arcade-graph-head-v1", policyHash: GRAPH_COGS_POLICY_HASH, reservations, journalHash: hash(text),
 }) + "\n"
 function writerState(directory: string) {
-  const text = readPrivateBudgetText(join(directory, "reservations.jsonl"))
+  const text = readBudgetText(join(directory, "reservations.jsonl"))
   const summary = decodeGraphReservations(text), expected = [".claim", "reservations.jsonl",
     ...Array.from({ length: summary.reservations + 1 }, (_, i) => headName(i))].sort()
   const handle = opendirSync(directory, { bufferSize: 16 }), names: string[] = []
@@ -329,7 +412,7 @@ function writerState(directory: string) {
   const lines = text.trimEnd().split("\n")
   for (let i = 0; i <= summary.reservations; i++) {
     const prefix = lines.slice(0, i + 1).join("\n") + "\n"
-    insist(readPrivateBudgetText(join(directory, headName(i))) === headText(prefix, i))
+    insist(readBudgetText(join(directory, headName(i))) === headText(prefix, i))
   }
   return { text, summary }
 }
@@ -410,7 +493,7 @@ export function openGraphReservationWriter(parent: string, hooks?: GraphWriterHo
               pinned.ino === before.ino && pinned.dev === before.dev && pinned.size === Buffer.byteLength(observed.text))
             mutation = true; writeBytes(fd, line, pinned.size)
           } finally { closeSync(fd) }
-          claim.check(); insist(readPrivateBudgetText(path) === nextText)
+          claim.check(); insist(readBudgetText(path) === nextText)
           afterJournalSync?.()
           insist(!poisoned && !closed && busy); claim.check()
           freshBudgetFile(join(directory, headName(next.reservations)), headText(nextText, next.reservations))

@@ -1,10 +1,11 @@
 import { expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSync, linkSync, mkdirSync, realpathSync, existsSync, readdirSync } from "node:fs"
+import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSync, linkSync, mkdirSync, realpathSync, existsSync, readdirSync, copyFileSync, unlinkSync, renameSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
-import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, type GraphReservationWriter, type GraphBalanceTransport } from "./e2e-graph-cogs.ts"
+import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, type GraphReservationWriter, type GraphBalanceTransport } from "./e2e-graph-cogs.ts"
+import { document, AGENT0_BASE_SUBGRAPH_ID } from "../skills/counterparty-graph/graph-client.ts"
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 const header = () => JSON.stringify({ format: "arcade-graph-reservations-v1", policyHash: GRAPH_COGS_POLICY_HASH })
@@ -372,4 +373,94 @@ test("bounded empty response chunks cannot starve the deadline or trigger anothe
     calls++; return new Response(body, { headers: { "content-type": "application/json" } })
   }, { now: () => observedAt })).rejects.toThrow("graph_cogs_balance_unavailable")
   expect(calls).toBe(1); expect(cancelled).toBe(true)
+})
+
+function sourceCopy(parent: string) {
+  const dir = join(parent, "source"); mkdirSync(dir, { mode: 0o700 })
+  for (const path of GRAPH_COGS_SOURCE_FILES) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true, mode: 0o700 })
+    copyFileSync(resolve(import.meta.dir, "..", path), join(dir, path))
+  }
+  return dir
+}
+const identityQuery = () => ({ subgraphId: AGENT0_BASE_SUBGRAPH_ID, document: document("identities"), variables: { address: GRAPH_COGS_POLICY.subject } })
+test("canonical query bindings carry exact source/body digests without private paths", () => owned(parent => {
+  const dir = sourceCopy(parent), sources = readGraphSourceManifest(dir)
+  const bound = bindGraphQuery(identityQuery(), sources)
+  expect(Object.isFrozen(sources)).toBe(true); expect(Object.isFrozen(sources.files)).toBe(true)
+  expect(sources.files.every(row => Object.isFrozen(row))).toBe(true)
+  expect(() => Object.defineProperty(sources.files[0], "sha256", { value: hash("forged") })).toThrow()
+  expect(Object.isFrozen(bound)).toBe(true)
+  expect(bound.kind).toBe("identities"); expect(bound.parentQueryHash).toBe(null); expect(bound.blockHash).toBe(null)
+  expect(bound.policyHash).toBe(GRAPH_COGS_POLICY_HASH); expect(bound.sourceHash).toBe(sources.sourceHash)
+  expect(bound.bodySha256).toBe(hash(bound.body))
+  expect(JSON.parse(bound.body)).toEqual({ query: document("identities"), variables: { address: GRAPH_COGS_POLICY.subject } })
+  expect(bound.queryHash).toMatch(/^[a-f0-9]{64}$/)
+  expect(bindGraphQuery(identityQuery(), sources)).toEqual(bound)
+  expect(JSON.stringify({ sources, bound })).not.toContain(dir)
+  expect(sources.files.map(row => row.path)).toEqual([...GRAPH_COGS_SOURCE_FILES])
+}))
+test("forged manifests, foreign subjects and source changes cannot silently create new authority", () => owned(parent => {
+  const dir = sourceCopy(parent), sources = readGraphSourceManifest(dir)
+  expect(() => bindGraphQuery(identityQuery(), { ...sources })).toThrow("graph_cogs_binding_refused")
+  expect(() => bindGraphQuery({ ...identityQuery(), variables: { address: GRAPH_COGS_POLICY.payer } }, sources)).toThrow("graph_cogs_binding_refused")
+  writeFileSync(join(dir, "skills/counterparty-graph/run.ts"), "// changed fixture source\n")
+  expect(() => bindGraphQuery(identityQuery(), sources)).toThrow("graph_cogs_binding_refused")
+  const current = readGraphSourceManifest(dir)
+  expect(current.sourceHash).not.toBe(sources.sourceHash)
+}))
+test("attestation binding requires an identities parent from the same source and declared block", () => owned(parent => {
+  const dir = sourceCopy(parent), sources = readGraphSourceManifest(dir), first = bindGraphQuery(identityQuery(), sources)
+  const blockHash = "0x" + "b".repeat(64)
+  const args = { subgraphId: AGENT0_BASE_SUBGRAPH_ID, document: document("attestations"), variables: { agentIds: ["8453:7"], block: { hash: blockHash } } }
+  expect(() => bindGraphQuery(args, sources)).toThrow("graph_cogs_binding_refused")
+  const second = bindGraphQuery(args, sources, { binding: first, blockHash })
+  expect(second.kind).toBe("attestations"); expect(second.parentQueryHash).toBe(first.queryHash)
+  expect(second.blockHash).toBe(blockHash); expect(second.queryHash).not.toBe(first.queryHash)
+  expect(() => bindGraphQuery(args, sources, { binding: { ...first }, blockHash })).toThrow("graph_cogs_binding_refused")
+  expect(() => bindGraphQuery(args, sources, { binding: first, blockHash: "0x" + "c".repeat(64) })).toThrow("graph_cogs_binding_refused")
+  expect(() => bindGraphQuery(args, sources, { binding: second, blockHash })).toThrow("graph_cogs_binding_refused")
+  expect(() => bindGraphQuery(identityQuery(), sources, { binding: first, blockHash })).toThrow("graph_cogs_binding_refused")
+  writeFileSync(join(dir, "skills/counterparty-graph/run.ts"), "// different fixture version\n")
+  expect(() => bindGraphQuery(args, readGraphSourceManifest(dir), { binding: first, blockHash })).toThrow("graph_cogs_binding_refused")
+}))
+test("the existing query validator still rejects unsupported documents and open variables", () => owned(parent => {
+  const sources = readGraphSourceManifest(sourceCopy(parent))
+  for (const args of [{ ...identityQuery(), document: "query { arbitrary }" },
+    { ...identityQuery(), subgraphId: "foreign" },
+    { ...identityQuery(), variables: { address: GRAPH_COGS_POLICY.subject, secret: "fixture" } }]) {
+    expect(() => bindGraphQuery(args, sources)).toThrow("graph_cogs_binding_refused")
+  }
+}))
+test("source manifests refuse hardlinked allowlisted files", () => owned(parent => {
+  const dir = sourceCopy(parent), path = join(dir, "skills/counterparty-graph/run.ts")
+  linkSync(path, join(parent, "linked.ts"))
+  expect(() => readGraphSourceManifest(dir)).toThrow("graph_cogs_binding_refused")
+}))
+test("missing, oversized, invalid UTF-8 and symlinked source files refuse", () => {
+  for (const kind of ["missing", "oversized", "utf8", "symlink"] as const) owned(parent => {
+    const dir = sourceCopy(parent), path = join(dir, "skills/counterparty-graph/queries/identities.graphql")
+    if (kind === "missing") unlinkSync(path)
+    else if (kind === "oversized") writeFileSync(path, "a".repeat(8193))
+    else if (kind === "utf8") writeFileSync(path, Buffer.from([0xff]))
+    else { renameSync(path, join(parent, "query.graphql")); symlinkSync(join(parent, "query.graphql"), path) }
+    expect(() => readGraphSourceManifest(dir)).toThrow("graph_cogs_binding_refused")
+  })
+})
+test("a symlinked parent directory cannot stand in for source provenance", () => owned(parent => {
+  const dir = sourceCopy(parent), path = join(dir, "skills/counterparty-graph/queries")
+  renameSync(path, join(parent, "queries")); symlinkSync(join(parent, "queries"), path)
+  expect(() => readGraphSourceManifest(dir)).toThrow("graph_cogs_binding_refused")
+}))
+test("a fresh manifest with different query bytes cannot bind the client's original body", () => owned(parent => {
+  const dir = sourceCopy(parent), args = identityQuery()
+  writeFileSync(join(dir, "skills/counterparty-graph/queries/identities.graphql"), args.document + "\n# different fixture query\n")
+  expect(() => bindGraphQuery(args, readGraphSourceManifest(dir))).toThrow("graph_cogs_binding_refused")
+}))
+test("the default manifest reads only current allowlisted disk sources and grants no live authority", () => {
+  const sources = readGraphSourceManifest(), result = bindGraphQuery(identityQuery(), sources)
+  expect(sources.files).toHaveLength(9)
+  expect(sources.files.every(row => row.sha256 === hash(readFileSync(resolve(import.meta.dir, "..", row.path), "utf8")))).toBe(true)
+  expect(result.sourceHash).toBe(hash(JSON.stringify(sources.files)))
+  expect(GRAPH_COGS_POLICY.liveEnabled).toBe(false)
 })

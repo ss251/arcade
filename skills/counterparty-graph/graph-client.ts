@@ -157,6 +157,10 @@ function requestBody(args: QueryArgs): string {
   if (!hash(digest) || digest !== digest.toLowerCase()) fail()
   return JSON.stringify({ query: doc, variables: { agentIds: canonical, block: { hash: digest } } })
 }
+/** Inert encoder for local intent/cache binding; identical validator as paidQuery.
+ * Encoding a request grants no key access, signing authority or paid dispatch. */
+export function encodeGraphQuery(args: QueryArgs): string { return requestBody(args) }
+
 function decodeHeader(header: string | null): unknown {
   if (header === null || header.length === 0 || header.length > 16384 || !/^[A-Za-z0-9+/]+={0,2}$/.test(header)) fail()
   const raw = Buffer.from(header, "base64")

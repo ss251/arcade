@@ -7,7 +7,7 @@ import { PassThrough } from "node:stream"
 import { createHash } from "node:crypto"
 vi.mock("node:child_process", { spy: true })
 import { AGENT0_BASE_SUBGRAPH_ID, GATEWAY_BASE, PAYMENT_CHAIN, QUERY_COST_ATOMIC,
-  document, makePaidQuery, readPayerKey, runKeyCommand, type GraphResponseObservation } from "../graph-client.ts"
+  document, encodeGraphQuery, makePaidQuery, readPayerKey, runKeyCommand, type GraphResponseObservation } from "../graph-client.ts"
 
 // Actual installed x402 signer with simulated gateway/RPC; never live payment evidence.
 const KEY = `0x${"11".repeat(32)}` as const
@@ -61,6 +61,25 @@ function fixture(options: { change?: (v: ReturnType<typeof challenge>) => unknow
   return { net, calls, payloads }
 }
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs() })
+
+describe("inert request encoding", () => {
+  it("matches the original query transport bytes exactly", async () => {
+    const args = request(), encoded = encodeGraphQuery(args), f = fixture()
+    expect(encoded).toBe(JSON.stringify({ query: args.document, variables: args.variables }))
+    await makePaidQuery(KEY, { fetch: f.net })(args)
+    expect(f.calls.filter(call => call.url.startsWith(GATEWAY_BASE)).map(call => call.init.body)).toEqual([encoded, encoded])
+  })
+  it("uses the original closed validator without resolving transport or Keychain", () => {
+    const net = vi.fn(), keychain = vi.spyOn(childProcess, "spawn")
+    vi.stubGlobal("fetch", net)
+    try {
+      expect(encodeGraphQuery(request())).toContain('"variables"')
+      for (const args of [{ ...request(), subgraphId: "foreign" }, { ...request(), document: "query { arbitrary }" },
+        { ...request(), variables: { address: PAYER, extra: true } }]) expect(() => encodeGraphQuery(args)).toThrow()
+      expect(net).not.toHaveBeenCalled(); expect(keychain).not.toHaveBeenCalled()
+    } finally { vi.unstubAllGlobals() }
+  })
+})
 
 describe("awaited private response observation", () => {
   it("captures immutable complete bytes without exposing or changing the original response", async () => {

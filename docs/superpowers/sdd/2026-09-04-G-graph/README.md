@@ -1,5 +1,15 @@
 # Plan G — execution records
 
+## September 8 — G15 offline request/source binding
+
+The [binding brief](task-15-binding-brief.md) and
+[binding report](task-15-binding-report.md) add a closed-encoder export and
+frozen nine-file source/request digests. Parent/block relationships are declared,
+not verified payment or cache authority.44 focused Bun/68 client Vitest and
+four-root strict passed; protected receipt/query/signing suffix unchanged.
+Sole full gate passed5337Vitest/1466Bun,root/webstrict and client/SSR builds.
+Local commit follows; no operational state, key or payment.
+
 ## September 8 — G15 private response-observer checkpoint
 
 The [observer brief](task-15-observer-brief.md) and

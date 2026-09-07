@@ -1,5 +1,16 @@
 # SDD ledger — Plan G
 
+2026-09-08 05:22 IST — G15E sole39235 gate PASS:5337Vitest242/68.66s;
+1466Bun98/12237assert198.75s;root/webstrict/clientSSR332/181ms. Eight paths,
+3links/privacy0;5source/briefpins unchanged after result annotations. Atomic
+commit/mainFF next; protected client suffix unchanged, no full repeat/live/pay.
+
+2026-09-08 05:17 IST — G15E inert encoder and frozen request/source binding
+implemented after missing-export Red.44Bun/263assert1.083s;68Vitest425ms;
+4rootsstrict0 after two annotation corrections. Nine bounded allowlisted disk
+sources, alias/query-change/parent guards; protected client suffix unchanged.
+Sole gate next. No live/cache authority, operational state/key/RPC/spend/push.
+
 2026-09-08 05:00 IST — G15D sole24154 gate PASS:5335Vitest242/69.39s;
 1457Bun98/12193assert195.59s;root/webstrict/clientSSR pass (SSR174ms;
 client timing truncated). Seven paths/3links/privacy0;4source/briefpins fixed.
