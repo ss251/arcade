@@ -1,5 +1,15 @@
 # Plan G — execution records
 
+## September 8 — G15 offline reservation checkpoint
+
+The [released brief](task-15-budget-brief.md) and
+[implementation report](task-15-budget-report.md) record the first bounded
+reservation decoder/read-only audit, not the live cost-of-goods demonstration.
+All reservations remain unresolved; no keys, current balances, paid queries,
+cache or durable writer were exercised.14 focused tests/88 assertions and
+two-root strict passed. Sole full gate passed5327Vitest/1436Bun, root/webstrict
+and client/SSR builds. Atomic local commit follows; G15 live remains NOT_RUN.
+
 ## September 6 — G8 web follow-up
 
 G9 merged as c8d6337. The [web brief](task-8-web-brief.md) and

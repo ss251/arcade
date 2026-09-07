@@ -1,5 +1,17 @@
 # SDD ledger — Plan G
 
+2026-09-08 04:15 IST — G15A sole28601 gate PASS:5327Vitest242/69.03s;
+1436Bun98/12050assert196.23s;root/webstrict,clientSSR333/170ms. Eight-path
+scope/four-link/privacy audit; five immutable code/brief/shot pins unchanged
+after three result annotations. Atomic commit/exact-one mainFF next. No full
+repeat, paid evidence, writer/cache claim, keys, RPC, spending or push.
+
+2026-09-08 04:10 IST — G15A offline fixed policy/canonical reservation audit
+implemented. Missing-module Red, then actual accepted-BOM Red fixed by exact
+UTF-8 bytes.14Bun/88assert205ms and2rootsstrict0 passed; sole full gate next.
+No durable writer/cache/paid transport yet; all reservations unresolved and live
+CLI refused. Production client/payment caps untouched, no key/RPC/spend/push.
+
 2026-09-06 22:36 IST: G8 web sole gate 61261 passed 4,282 Vitest /191 files,
 872 Bun /58 files /6,383 assertions, root/web strict and builds 345ms/174ms.
 Final source unchanged, including G9's previously targeted detail-ID guard.

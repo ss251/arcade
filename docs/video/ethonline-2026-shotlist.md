@@ -213,6 +213,6 @@ does not establish current mainnet readiness.
 
 No fallback silently upgrades evidence. If a required shot cannot be produced,
 use a clearly labelled dated source view, revise the narration to match, or
-leave the capture pending. Missing `e2e-tree-settle.sh` / `e2e-graph-cogs.sh`,
-unimplemented Gateway live mode, paused Circle CLI and blocked escrow deployment
-are not runnable capture commands.
+leave the capture pending. Missing `e2e-tree-settle.sh`, the read-only-only
+`e2e-graph-cogs.sh` checkpoint, unimplemented Gateway live mode, paused Circle
+CLI and blocked escrow deployment are not runnable live-proof capture commands.
