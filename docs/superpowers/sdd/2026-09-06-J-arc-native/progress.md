@@ -1,5 +1,19 @@
 # Plan J progress
 
+2026-09-07 14:44 IST — J8B2 sole73692 fullgatePASS:5,025Vitest228/69.54s,
+973Bun72/7,641assert/173.20s,root/webstrict/clientSSRbuild. Four-rootstrict0;
+fourpins unchanged;9paths77links/privacy0. Atomiccommit/exactFF next, no replay.
+Signing journal/runtime/original-socket authority remain8B, then8C/8D/9.
+No keys/liveRPC/send/spend/push or existing window/cap/replay changes.
+
+2026-09-07 14:34 IST — J8B2 concrete read-only provider preflight implemented;
+40focusedVitest3PASS (14new),4-rootstrict0. Shared exact budget/submit state
+predicates with relay preparation, no validity changes. Tests cover canonical
+EOA/unused nonce, identity drift, reorg/chain/clock changes, cancellation and
+late response; no signer/gas/send API. Finalscopefreeze/solefullgate next.
+Provider signing journal/runtime and socket ownership still8B, then8C/8D/9.
+No keys/liveRPC/send/spend/push or existing policy/window/cap/replay changes.
+
 2026-09-07 14:22 IST — J8B1 sole49429 fullgatePASS:5,011Vitest227/68.99s,
 973Bun72/7,643assert/174.96s,root/webstrict/clientSSRbuild. Five-rootstrict0;
 fivepins unchanged;10paths73links/privacy0; movedvalidator byte-identical.

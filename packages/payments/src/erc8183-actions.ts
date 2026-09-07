@@ -61,6 +61,16 @@ function baseJob(context: EscrowActionContext, snapshot: EscrowSnapshot, nowSeco
     (job.payoutReceiver === ERC8183_ZERO || job.payoutReceiver === c.provider))
   return job
 }
+/** Same provider state checks used by relay preparation, exposed BEFORE signing.
+ * This checks supplied facts only; it is not a read, signing claim or authority grant. */
+export function assertEscrowProviderJob(context: unknown, snapshot: EscrowSnapshot, kind: "budget" | "submit", nowSeconds: number) {
+  const c = escrowActionContext(context), job = baseJob(c, snapshot, nowSeconds)
+  escrowCheck(kind === "budget" || kind === "submit")
+  if (kind === "budget") escrowCheck(job.status === 0 && job.budget === 0n && job.paymentToken === ERC8183_ZERO &&
+    job.submittedAt === 0 && job.expiredAt - nowSeconds >= c.call.timeoutSeconds + 600)
+  else escrowCheck(job.status === 1 && job.budget === c.call.amount && job.paymentToken === c.call.token &&
+    job.submittedAt === 0 && job.expiredAt > nowSeconds)
+}
 /** Trusted context must originate from verified capability + durable admission, not HTTP.
  * The executor must separately check unused provider nonce at this same canonical block,
  * deployment identity, EOA provider code, gas/sender nonce and durable action claims.
@@ -77,15 +87,12 @@ export async function prepareEscrowAction(
       kind === "complete" ? ["kind", "receipt"] : ["kind", "reason"])
     let data: Hex, providerNonce: Hex | undefined, providerDeadline: bigint | undefined, outputHash: Hex | undefined,
       reason: Hex | undefined, receipt: ReturnType<typeof escrowCompletionProjection> | undefined
-    if (kind === "budget") {
-      escrowCheck(job.status === 0 && job.budget === 0n && job.paymentToken === ERC8183_ZERO &&
-        job.submittedAt === 0 && job.expiredAt - nowSeconds >= c.call.timeoutSeconds + 600)
-    } else {
+    if (kind === "budget" || kind === "submit") assertEscrowProviderJob(c, snapshot, kind, nowSeconds)
+    else {
       escrowCheck(job.budget === c.call.amount && job.paymentToken === c.call.token &&
         (job.status === 1 ? job.submittedAt === 0 : job.status === 2 && job.submittedAt > 0 && job.submittedAt <= nowSeconds))
     }
     if (kind === "budget" || kind === "submit") {
-      if (kind === "submit") escrowCheck(job.status === 1 && job.expiredAt > nowSeconds)
       const base = { chainId: c.call.chainId, escrow: c.call.escrow, signer: c.call.provider, jobId: c.jobId,
         nonce: escrowUint(action.nonce, 72), deadline: escrowUint(action.deadline) }
       providerNonce = packProviderNonce(base.signer, base.nonce); providerDeadline = base.deadline

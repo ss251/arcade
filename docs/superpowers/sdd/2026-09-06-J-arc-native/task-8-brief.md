@@ -44,6 +44,10 @@ the hub's existing validator verbatim and commit only the runner's actual
 successful output under its current local listing/input. This data helper does
 not grant signing authority; durable claims, fresh chain identity checks and
 original-socket correlation remain required in the subsequent8B checkpoint(s).
+The [8B2 preflight](task-8b2-report.md) supplies a concrete bounded read-only
+Arc provider/job/nonce check and shares state predicates with relay preparation.
+The next8B checkpoint still must supply durable provider signing claims and
+the sign-only runtime; socket ownership/daemon integration remain required.
 
 ## Verification
 
