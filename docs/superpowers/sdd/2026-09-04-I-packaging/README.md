@@ -8,6 +8,8 @@ are merged; unresolved live gates are not prerequisites we can invent.
 
 - [Progress ledger](progress.md).
 - [Task1 handover brief](task-1-brief.md), [record](task-1-report.md).
+- [Task4 brief](task-4-brief.md), [generator checkpoint](task-4-report.md),
+  [operator contract](../../../continuity-generator.md).
 - [CLI interop status](../../../interop/circle-cli.md).
 
 Single-threaded; four-worker limits; one sequential full gate per atomic commit,
@@ -21,7 +23,7 @@ research. Secrets/bearer material/private journals never enter these records.
 | I1 CLI prerequisites | Historical record reused; no provisioning replay or current readiness claim |
 | I2 capture/decoder | Live capture paused with J4; safe offline tooling may be prepared, no counterfeit capture |
 | I3 CLI paid evidence | Paused with J4; no authorization or live purchase |
-| I4 continuity generator | Next offline implementation; distinguish prior-build and execution baselines, include J, avoid misleading overlapping counts |
+| I4 continuity generator | Implemented; pinned snapshot, all A–J declared-path activity,32 focused tests and sole full gate passed; I5 marker integration next |
 | I5 README | After generator; qualify live/offline claims and preserve product docs |
 | I6 architecture | Generator + DOM-backed render/visual verification; J12 Mermaid sources are not yet rendered |
 | I7 narration | Human-voice text and bounded word-budget checks; no TTS |
