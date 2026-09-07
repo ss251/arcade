@@ -1,5 +1,17 @@
 # SDD ledger — Plan G
 
+2026-09-08 05:00 IST — G15D sole24154 gate PASS:5335Vitest242/69.39s;
+1457Bun98/12193assert195.59s;root/webstrict/clientSSR pass (SSR174ms;
+client timing truncated). Seven paths/3links/privacy0;4source/briefpins fixed.
+Atomic commit/mainFF next; original receipt/query/signing suffix unchanged,
+no actual endpoint/key/journal/payment, full repeat or push.
+
+2026-09-08 04:54 IST — G15D optional immutable awaited response observer
+implemented inside original reader. Actual missing-observation Red;66Vitest/
+533ms,6nativeBun74assert2.93s,3rootsstrict0. Protected receipt/query/signing
+suffix byte-identical to654be5f. Sole full gate next; no real endpoint/key/
+payment/state, original policy/window/cap/replay change or push.
+
 2026-09-08 04:45 IST — G15C sole13090 gate PASS:5327Vitest242/69.34s;
 1457Bun98/12181assert197.59s;root/webstrict/clientSSR352/162ms. Six paths,
 three links/privacy0; two scripts and brief pins fixed after result annotations.

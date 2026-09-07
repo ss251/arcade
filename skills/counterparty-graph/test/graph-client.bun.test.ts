@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { encodeAbiParameters, encodeEventTopics, parseAbi } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
-import { AGENT0_BASE_SUBGRAPH_ID, GATEWAY_BASE, document, makePaidQuery, runKeyCommand } from "../graph-client.ts"
+import { AGENT0_BASE_SUBGRAPH_ID, GATEWAY_BASE, document, makePaidQuery, runKeyCommand, type GraphResponseObservation } from "../graph-client.ts"
 
 const KEY = `0x${"11".repeat(32)}` as const
 const PAYER = privateKeyToAccount(KEY).address
@@ -60,12 +60,21 @@ describe("actual owned loopback Graph transport (simulated payments only)", () =
         const response = await fetch(new URL(target, server.url), init)
         return new Response(response.body, { status: response.status, headers: response.headers })
       }, { preconnect: () => {} })
-      const query = makePaidQuery(KEY, { fetch: localFetch, timeoutMs: 3000 })
+      const observations: GraphResponseObservation[] = []
+      const query = makePaidQuery(KEY, { fetch: localFetch, timeoutMs: 3000, observeResponse: async observation => { observations.push(observation) } })
       if (mode === "success") expect(await query(args())).toMatchObject({ costAtomic: "10000", paymentTx: TX })
       else { await expect(query(args())).rejects.toThrow(/^graph query could not be completed$/); if (mode === "signed-500") await expect(query(args())).rejects.toThrow() }
       expect(unsigned).toBe(1); expect(signed).toBe(mode === "redirect" ? 0 : 1); expect(foreign).toBe(0)
       expect(JSON.stringify(wire)).not.toContain(KEY)
       expect(wire.every((w) => w.headers.authorization === undefined && w.headers.cookie === undefined && w.headers["x-api-key"] === undefined)).toBe(true)
+      expect(observations.length).toBe(mode === "redirect" ? 0 : wire.length)
+      expect(observations.every(value => value.complete && Object.isFrozen(value) && Object.isFrozen(value.headers))).toBe(true)
+      expect(JSON.stringify(observations)).not.toContain(KEY)
+      if (mode === "signed-500") {
+        const paid = observations.filter(value => value.phase === "paid")
+        expect(paid).toHaveLength(1); expect(paid[0]!.status).toBe(500)
+        expect(Buffer.from(paid[0]!.bodyBase64, "base64").toString()).toContain('"data"')
+      }
     } finally { await Promise.all([server.stop(true), other.stop(true)]) }
   })
 })

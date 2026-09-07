@@ -1,5 +1,6 @@
 /** Scoped Graph query payments. Query receipts are not agent-service proofs. */
 import { readFileSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { spawn } from "node:child_process"
 import { x402Client, x402HTTPClient, type PaymentRequired } from "@x402/fetch"
 import { ExactEvmScheme } from "@x402/evm/exact/client"
@@ -110,7 +111,28 @@ export function document(name: "identities" | "attestations"): string {
 export interface PaidResult { readonly data: Record<string, unknown>; readonly paymentTx: string | null; readonly costAtomic: string | null }
 export interface QueryArgs { readonly subgraphId: string; readonly document: string; readonly variables: Record<string, unknown> }
 export type PaidQuery = (args: QueryArgs) => Promise<PaidResult>
-export interface QueryOptions { readonly fetch?: typeof globalThis.fetch; readonly signal?: AbortSignal; readonly timeoutMs?: number; readonly now?: () => number }
+export interface GraphResponseObservation {
+  readonly phase: "challenge" | "paid" | "rpc"
+  readonly requestUrl: string
+  readonly requestBodySha256: string
+  readonly responseUrl: string
+  readonly redirected: boolean
+  readonly status: number
+  readonly complete: true
+  readonly headers: Readonly<Record<"content-type" | "content-length" | "content-encoding" | "payment-required" | "payment-response", string | null>>
+  readonly bodyBase64: string
+  readonly bodySha256: string
+}
+export interface QueryOptions {
+  readonly fetch?: typeof globalThis.fetch
+  readonly signal?: AbortSignal
+  readonly timeoutMs?: number
+  readonly now?: () => number
+  /** Trusted private journal seam, not public output. Raw provider bytes can be
+   * sensitive. Awaited inside the existing transport deadline; never owns the
+   * original Response, a key, mutable bytes or a signed request header. */
+  readonly observeResponse?: (observation: GraphResponseObservation, signal: AbortSignal) => Promise<void>
+}
 
 function requestBody(args: QueryArgs): string {
   keys(args, ["subgraphId", "document", "variables"])
@@ -161,8 +183,10 @@ function paymentRequired(v: unknown): PaymentRequired {
 /** One factory owns one finite run. No wrapper recovery, broadcast retries or ambient mutation. */
 export function makePaidQuery(privateKey: string, options: QueryOptions = {}): PaidQuery {
   const now = options.now ?? Date.now, transport = options.fetch ?? globalThis.fetch
+  const observeResponse = options.observeResponse
   const timeout = options.timeoutMs ?? 80000
-  if (!key(privateKey) || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 85000) fail()
+  if (!key(privateKey) || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 85000 ||
+    observeResponse !== undefined && typeof observeResponse !== "function") fail()
   const deadline = now() + timeout
   if (!Number.isSafeInteger(deadline)) fail()
   const account = privateKeyToAccount(privateKey), payer = account.address.toLowerCase()
@@ -187,6 +211,30 @@ export function makePaidQuery(privateKey: string, options: QueryOptions = {}): P
         while (reader) { const next = await reader.read(); active(); if (controller.signal.aborted) fail(); if (next.done) break; size += next.value.length; if (size > max) fail(); chunks.push(next.value) }
         if (length !== null && size !== Number(length)) fail()
         const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length }
+        if (observeResponse !== undefined) {
+          const selectedHeaders = Object.freeze({
+            "content-type": response.headers.get("content-type"),
+            "content-length": response.headers.get("content-length"),
+            "content-encoding": response.headers.get("content-encoding"),
+            "payment-required": response.headers.get("payment-required"),
+            "payment-response": response.headers.get("payment-response"),
+          })
+          let headerBytes = 0
+          for (const value of Object.values(selectedHeaders)) if (value !== null) {
+            const n = Buffer.byteLength(value); if (n > 16384) fail(); headerBytes += n
+          }
+          if (headerBytes > 32768) fail()
+          const sha = (value: string | Uint8Array) => createHash("sha256").update(value).digest("hex")
+          const observation: GraphResponseObservation = Object.freeze({
+            phase: url === RPC ? "rpc" : headers["PAYMENT-SIGNATURE"] === undefined ? "challenge" : "paid",
+            requestUrl: url, requestBodySha256: sha(body), responseUrl: response.url, redirected: response.redirected,
+            status: response.status, complete: true, headers: selectedHeaders,
+            bodyBase64: Buffer.from(bytes).toString("base64"), bodySha256: sha(bytes),
+          })
+          active(); if (controller.signal.aborted) fail()
+          await observeResponse(observation, controller.signal)
+          active(); if (controller.signal.aborted) fail()
+        }
         return { response, bytes }
       })()
       const aborted = new Promise<never>((_resolve, reject) => controller.signal.addEventListener("abort", () => reject(new Error(FAIL)), { once: true }))

@@ -1,5 +1,15 @@
 # Plan G — execution records
 
+## September 8 — G15 private response-observer checkpoint
+
+The [observer brief](task-15-observer-brief.md) and
+[observer report](task-15-observer-report.md) add immutable awaited complete
+response snapshots inside the existing reader, without replacing Response.
+66 focused Vitest/six native Bun checks and exact strict passed; the entire
+receipt/query/signing suffix remains byte-identical. Sole full gate passed
+5335Vitest/1457Bun,root/webstrict and web builds; local commit follows.
+No operational journal/cache or real payment is claimed.
+
 ## September 8 — G15 offline balance-reader checkpoint
 
 The [balance brief](task-15-balance-brief.md) and

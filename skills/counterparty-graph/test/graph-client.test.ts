@@ -4,9 +4,10 @@ import { privateKeyToAccount } from "viem/accounts"
 import { ExactEvmScheme } from "@x402/evm/exact/client"
 import * as childProcess from "node:child_process"
 import { PassThrough } from "node:stream"
+import { createHash } from "node:crypto"
 vi.mock("node:child_process", { spy: true })
 import { AGENT0_BASE_SUBGRAPH_ID, GATEWAY_BASE, PAYMENT_CHAIN, QUERY_COST_ATOMIC,
-  document, makePaidQuery, readPayerKey, runKeyCommand } from "../graph-client.ts"
+  document, makePaidQuery, readPayerKey, runKeyCommand, type GraphResponseObservation } from "../graph-client.ts"
 
 // Actual installed x402 signer with simulated gateway/RPC; never live payment evidence.
 const KEY = `0x${"11".repeat(32)}` as const
@@ -60,6 +61,89 @@ function fixture(options: { change?: (v: ReturnType<typeof challenge>) => unknow
   return { net, calls, payloads }
 }
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs() })
+
+describe("awaited private response observation", () => {
+  it("captures immutable complete bytes without exposing or changing the original response", async () => {
+    const f = fixture(), observed: GraphResponseObservation[] = []
+    const result = await makePaidQuery(KEY, { fetch: f.net, observeResponse: async (value) => {
+      observed.push(value)
+      expect(Object.isFrozen(value)).toBe(true); expect(Object.isFrozen(value.headers)).toBe(true)
+      expect(() => Object.defineProperty(value, "status", { value: 500 })).toThrow()
+      expect(() => Object.defineProperty(value.headers, "payment-required", { value: "changed" })).toThrow()
+    } })(request())
+    expect(result.paymentTx).toBe(TX)
+    expect(observed.map(value => value.phase)).toEqual(["challenge", "rpc", "rpc", "paid", "rpc", "rpc", "rpc"])
+    expect(observed).toHaveLength(f.calls.length)
+    const paid = observed.find(value => value.phase === "paid")!
+    expect(paid.status).toBe(200); expect(paid.headers["payment-response"]).toBeTruthy()
+    expect(JSON.parse(Buffer.from(paid.bodyBase64, "base64").toString()).data._meta.hasIndexingErrors).toBe(false)
+    expect(paid.bodySha256).toMatch(/^[a-f0-9]{64}$/); expect(paid.requestBodySha256).toMatch(/^[a-f0-9]{64}$/)
+    expect(paid.bodySha256).toBe(createHash("sha256").update(Buffer.from(paid.bodyBase64, "base64")).digest("hex"))
+    const paidCall = f.calls.find(call => new Headers(call.init.headers).has("payment-signature"))!
+    expect(paid.requestBodySha256).toBe(createHash("sha256").update(String(paidCall.init.body)).digest("hex"))
+    expect(JSON.stringify(observed)).not.toContain(KEY)
+    expect(Object.keys(paid.headers)).not.toContain("payment-signature")
+    expect(Object.keys(paid.headers)).not.toContain("authorization")
+  })
+  it.each([402, 500])("captures a complete signed HTTP %s before refusal and never repeats it", async (paidStatus) => {
+    const f = fixture({ paidStatus }), observed: GraphResponseObservation[] = []
+    const query = makePaidQuery(KEY, { fetch: f.net, observeResponse: async value => { observed.push(value) } })
+    await expect(query(request())).rejects.toThrow(/^graph query could not be completed$/)
+    await expect(query(request())).rejects.toThrow()
+    expect(f.payloads).toHaveLength(1)
+    const paid = observed.filter(value => value.phase === "paid")
+    expect(paid).toHaveLength(1); expect(paid[0]!.status).toBe(paidStatus)
+    expect(Buffer.from(paid[0]!.bodyBase64, "base64").toString()).toContain('"data"')
+  })
+  it("records an unsigned challenge without granting a callback authority to repair its policy", async () => {
+    const f = fixture({ change: c => ({ ...c, accepts: [{ ...c.accepts[0], amount: "10001" }] }) })
+    const observer = vi.fn(async (_value: GraphResponseObservation) => {})
+    await expect(makePaidQuery(KEY, { fetch: f.net, observeResponse: observer })(request())).rejects.toThrow()
+    expect(observer).toHaveBeenCalledTimes(1); expect(f.payloads).toHaveLength(0)
+  })
+  it("redacts an observer exception and refuses before any signing", async () => {
+    const f = fixture()
+    await expect(makePaidQuery(KEY, { fetch: f.net, observeResponse: async () => { throw Error(KEY) } })(request())).rejects.toThrow(/^graph query could not be completed$/)
+    expect(f.payloads).toHaveLength(0); expect(f.calls).toHaveLength(1)
+  })
+  it("cancels a stalled observer and never signs after it later resolves", async () => {
+    vi.useFakeTimers(); const f = fixture()
+    let release: (() => void) | undefined, signal: AbortSignal | undefined
+    const observer = async (_value: GraphResponseObservation, activeSignal: AbortSignal) => {
+      signal = activeSignal; await new Promise<void>(resolve => { release = resolve })
+    }
+    const result = makePaidQuery(KEY, { fetch: f.net, observeResponse: observer })(request()).catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(5100)
+    expect(await result).toMatchObject({ message: "graph query could not be completed" })
+    expect(signal?.aborted).toBe(true); release?.()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(f.payloads).toHaveLength(0); expect(f.calls).toHaveLength(1)
+  })
+  it("keeps signed uncertainty when a paid-response observer returns after its deadline", async () => {
+    vi.useFakeTimers(); const f = fixture()
+    let release: (() => void) | undefined, paidSignal: AbortSignal | undefined
+    const query = makePaidQuery(KEY, { fetch: f.net, observeResponse: async (value, signal) => {
+      if (value.phase === "paid") {
+        paidSignal = signal; await new Promise<void>(resolve => { release = resolve })
+      }
+    } })
+    const result = query(request()).catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(5100)
+    expect(await result).toMatchObject({ message: "graph query could not be completed" })
+    expect(paidSignal?.aborted).toBe(true); expect(f.payloads).toHaveLength(1); expect(f.calls).toHaveLength(4)
+    release?.(); await vi.advanceTimersByTimeAsync(1)
+    await expect(query(request())).rejects.toThrow()
+    expect(f.calls).toHaveLength(4); expect(f.payloads).toHaveLength(1)
+  })
+  it("captures the observer once rather than following later option mutation", async () => {
+    const f = fixture(), original = vi.fn(async (_value: GraphResponseObservation) => {}),
+      replacement = vi.fn(async (_value: GraphResponseObservation) => {})
+    const options = { fetch: f.net, observeResponse: original }
+    const query = makePaidQuery(KEY, options); options.observeResponse = replacement
+    await query(request())
+    expect(original).toHaveBeenCalledTimes(7); expect(replacement).not.toHaveBeenCalled()
+  })
+})
 
 describe("explicit payer selection", () => {
   it("uses only an explicit env key without probing Keychain", async () => {
