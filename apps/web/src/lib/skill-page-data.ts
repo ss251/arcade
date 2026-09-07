@@ -2,6 +2,7 @@ import { EnsNameExpired, type ListingDetail, type PublicReceiptRow } from "./hub
 import { addressOk, decodeListing, decodeReceipts, nameOk, skillIdOk } from "./hub-decode.ts"
 import { settlementReferenceKind } from "./format.ts"
 import { checkedGraphEvidence } from "../../../../packages/buyer/src/graph-evidence.ts"
+import { declaredRailsOf } from "./listing-rails.ts"
 
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
 export interface SkillPageListing extends Omit<ListingDetail, "inputSchema" | "outputSchema" | "bounds"> {
@@ -74,6 +75,8 @@ const payTest = (v: unknown): unknown => v === null ? null : { ...pick(v, ["atMs
 class NameMismatch extends Error {}
 const listingProjection = (value: unknown, id: string, resolvedSeller?: string): SkillPageListing => {
   const raw = record(value), out = pick(raw, ["id", "version", "serviceName", "description", "tags", "price", "replaces", "seller", "delisted", "ensName", "ensExpired"])
+  const rails = declaredRailsOf(raw)
+  if (rails !== undefined) out.rails = rails
   if (resolvedSeller !== undefined && skillIdOk(out.id) && addressOk(out.seller) &&
     (out.id !== id || out.seller.toLowerCase() !== resolvedSeller.toLowerCase())) throw new NameMismatch()
   const inputSchema = schemaCopy(own(raw, "inputSchema")), outputSchema = schemaCopy(own(raw, "outputSchema"))

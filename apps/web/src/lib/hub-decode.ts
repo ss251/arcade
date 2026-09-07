@@ -6,6 +6,7 @@ import { loadChainConfig } from "../../../../packages/core/src/chain-config.ts"
 import { NON_SETTLING } from "../../../../packages/core/src/job.ts"
 import { checkedGraphEvidence, type GraphEvidence } from "../../../../packages/buyer/src/graph-evidence.ts"
 import { settlementReferenceKind, type SettlementReferenceKind } from "./format.ts"
+import { declaredRailsOf, type ListingRail } from "./listing-rails.ts"
 
 export interface PayTest { readonly atMs: number; readonly jobId: string; readonly ok: boolean; readonly settleTx?: string }
 export interface ListingStats {
@@ -19,6 +20,8 @@ export interface ListingSummary {
   readonly payTested?: PayTest | null; readonly delisted?: boolean; readonly ensName?: string | null
   readonly ensExpired?: boolean; readonly stats?: ListingStats
   readonly graph?: GraphEvidence
+  /** Optional declared support, not currently offered challenges or payment authority. */
+  readonly rails?: readonly ListingRail[]
 }
 export interface ListingDetail extends ListingSummary {
   readonly inputSchema: unknown; readonly outputSchema: unknown; readonly bounds?: Record<string, unknown>
@@ -204,7 +207,8 @@ const listingSummary = (v: unknown): ListingSummary => {
     ...copyOptional("ensName", optional(r, "ensName", v => v === null ? null : nameOk(v) ? v : invalid())),
     ...copyOptional("ensExpired", optional(r, "ensExpired", bool)), ...copyOptional("delisted", optional(r, "delisted", bool)),
     ...copyOptional("payTested", optional(r, "payTested", v => v === null ? null : payTest(v))),
-    ...copyOptional("stats", optional(r, "stats", v => statsOf(v, id))), ...copyOptional("graph", graph) }
+    ...copyOptional("stats", optional(r, "stats", v => statsOf(v, id))), ...copyOptional("graph", graph),
+    ...copyOptional("rails", declaredRailsOf(r)) }
 }
 /** Schemas remain public data; copy bounded plain JSON, never an accessor/prototype. */
 const jsonValue = (v: unknown, depth = 0, budget = { left: 8192 }): unknown => {

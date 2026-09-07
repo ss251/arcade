@@ -19,6 +19,14 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.resetModules() }
 const noIO = () => { expect(io).not.toHaveBeenCalled(); expect(storage).not.toHaveBeenCalled() }
 
 describe("passive browser modules do not select a server environment on fresh import", () => {
+  it("imports and filters declared rails with no environment, wallet or storage reads", async () => {
+    try {
+      const { declaredRailsOf, filterCatalogue } = await import("../src/lib/listing-rails.ts")
+      const listing = { rails: ["erc8183", "gateway"] }
+      expect(declaredRailsOf(listing)).toEqual(["gateway", "erc8183"])
+      expect(filterCatalogue([listing], "eip3009")).toEqual([])
+    } finally { noIO() }
+  })
   it("imports and captures public context despite an invalid ambient selector", async () => {
     try {
       const { capturePurchaseContext } = await import("../src/lib/purchase-context.ts")

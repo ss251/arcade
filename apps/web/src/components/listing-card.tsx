@@ -1,5 +1,6 @@
 import { ago } from "../lib/format.ts"
 import type { ListingSummary, MarketStats } from "../lib/hub.ts"
+import { RailDeclaration } from "./rail-declaration.tsx"
 
 const age = (atMs: number, observedAtMs?: number): string =>
   observedAtMs === undefined || !Number.isSafeInteger(observedAtMs) || observedAtMs < 0
@@ -19,6 +20,7 @@ export function ListingCard({ listing, observedAtMs }: {
       </h2>
       <span className="card-price">{listing.price}</span>
       <p className="card-desc">{listing.description}</p>
+      <RailDeclaration listing={listing} />
       <div className="card-meta">
         <span className="card-id">{listing.id}</span>
         {listing.delisted === true ? <span className="market-badge is-refused">delisted</span> : null}

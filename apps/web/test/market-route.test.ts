@@ -29,6 +29,13 @@ it("renders actual H4-decoded catalogue data and independent failure states thro
     const ok = await read("ok")
     expect(ok).toContain("Diff Triage"); expect(ok).toContain("$1.24"); expect(ok).toContain("hub receipts")
     expect(ok).toContain("pay-tested"); expect(ok).toContain("recorded settled volume")
+    expect(ok).toContain("Accepted rails unavailable")
+    const rails = await read("rails")
+    expect(rails).toContain("Accepts (declared): gateway · exact · escrow")
+    expect(rails).toContain("Accepts (declared): exact")
+    expect(rails).toContain("Accepted rails unavailable")
+    expect(rails.replaceAll("<!-- -->", "")).toContain("3 of 3 catalogue listings shown")
+    expect(rails).toContain("not current payment availability")
     for (const mode of ["stats-down", "malformed-stats"]) {
       const html = await read(mode); expect(html).toContain("Diff Triage"); expect(html).toContain("Totals are unavailable")
       expect(html).not.toContain("$0.00")

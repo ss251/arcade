@@ -1,6 +1,7 @@
 import { Evidence, SchemaBlock } from "./evidence.tsx"
 import { IndexedEvidence } from "./graph-evidence.tsx"
 import { Nav } from "./nav.tsx"
+import { RailDeclaration } from "./rail-declaration.tsx"
 import { ago, txLink } from "../lib/format.ts"
 import type { PublicReceiptChild, PublicReceiptRow } from "../lib/hub-decode.ts"
 import type { SkillPageData } from "../lib/skill-page-data.ts"
@@ -70,6 +71,8 @@ export function SkillPage({ data }: { readonly data: SkillPageData }) {
           <p className="skill-description">{l.description}</p>
           <p className="skill-note">Version <span className="skill-code">{l.version}</span></p>
           <p>Seller <span className="skill-code skill-address">{l.seller}</span></p>
+          <RailDeclaration listing={l} />
+          <p className="skill-note">Hub-reported listing declarations, not current payment availability. This page does not offer browser escrow purchases.</p>
           {data.resolvedName === null || data.nameError !== null ? null : <p>Resolved name <span className="skill-code">{data.resolvedName}</span> — correlated by the hub observation.</p>}
           {eligible ? <div className="skill-next"><a href="/chat">Open chat</a><p>Availability and payment are checked separately. This page does not authorize a purchase.</p></div>
             : <p className="skill-notice">{l.delisted === true ? "Hub reports this listing delisted. " : ""}{l.ensExpired === true ? "Hub reports its name expired. " : ""}This detail is informational; no purchase availability is asserted.</p>}

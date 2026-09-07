@@ -141,6 +141,13 @@ describe("actual H8 Start route through the bounded H4 client", () => {
     expect(neither).not.toContain("No such listing")
   })
 
+  it("preserves declared rail labels through H4 and the real Start serialization", async () => {
+    const html = await page("rails")
+    expect(html).toContain("Accepts (declared): gateway · exact · escrow")
+    expect(html).toContain("does not offer browser escrow purchases")
+    expect(html).toContain("not current payment availability")
+  })
+
   it("distinguishes empty receipts and absent versus empty pay-test history", async () => {
     const empty = await page("empty-receipts")
     expect(empty).not.toContain("recorded-grandchild"); expect(scripts(empty)).not.toContain("receipts_unavailable")

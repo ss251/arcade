@@ -1,5 +1,23 @@
 # Plan J progress
 
+2026-09-08 00:26 IST — J11C1 sole94612 fullgatePASS5281Vitest241/69.17s;
+1362Bun92/11711assert190.66s;root/webstrict/clientSSR361ms/190ms.
+Final213focusedVitest8PASS6.41s and11-rootstrict0 usingactualwebconfigparser.
+22paths143links/privacy0;16frozen source/testpins checked before atomiccommit/
+exact-one mainFF. Actual offlinebrowser observations and cleanup limits
+recorded; declared support only, no browserescrow payment or liveavailability
+claim. J11C2 publicescrowreceipt evidence next; no keys/RPC/spend/deploy/push.
+
+2026-09-08 00:16 IST — J11C1 offline rail declarations/filter implemented.
+Initial3genuineREDs, then198focusedtestsPASS; actual11routecasesPASS after
+one React-comment assertion correction;10-rootstrict0. ExistingCSSprefix
+unchanged; oldH8scope tightened and completepre-J11hash added. Actual in-app
+browser keyboard/filter+390mobile/1280desktop screenshots inspected after
+sharedChrome permissionblock; bothownedtabsclosed,viewportreset. Catalogue
+five-minute cutoff prevented finalcounterread; PID/portsverifiedgone. Separate
+detail1/receipts1/other0,gracefulexit0/portsclosed. Finalfocus/strict/freeze/
+sole4workerfullgate next. J11C2receipt evidence remains; no keys/live/spend/push.
+
 2026-09-07 23:59 IST — J11B2 sole87306 fullgatePASS5258Vitest240/70.52s;
 1362Bun92/11713assert192.57s;root/webstrict/clientSSR342ms/175ms.
 Final188focusedBun5/436assert731ms;5-rootstrict0;Graphcodegen/WASM;

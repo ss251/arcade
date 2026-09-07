@@ -1521,3 +1521,12 @@ a {
 /* Keep both full ENS mismatch addresses readable inside the chat column. */
 .purchase-refusal { overflow-wrap: anywhere; }
 .purchase-refusal + .deny { min-height: 44px; min-width: 44px; margin: 12px 0; }
+
+/* J11 declared rail data, not a new payment action or semantic colour. */
+.market .listing-rails { grid-column: 1 / -1; margin: 0; color: var(--slate); font-size: .8125rem; overflow-wrap: anywhere; }
+.skill-page .listing-rails { color: var(--slate); font-size: .875rem; }
+.market .market-rail-filter { display: grid; justify-items: start; gap: 8px; margin: 0 0 24px; min-width: 0; }
+.market .market-rail-filter label { font-size: .875rem; font-weight: 600; }
+.market .market-rail-filter select { min-height: 44px; max-width: 100%; padding: 8px 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+.market .market-rail-filter select:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.market .market-rail-filter p { margin: 0; color: var(--slate); font-size: .8125rem; max-width: 78ch; overflow-wrap: anywhere; }

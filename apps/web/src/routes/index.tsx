@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { Nav } from "~/components/nav.tsx"
-import { Counters, ListingCard } from "~/components/listing-card.tsx"
+import { Counters } from "~/components/listing-card.tsx"
+import { MarketListings } from "~/components/market-listings.tsx"
 import * as hub from "~/lib/hub.ts"
 
 /** Each H4 read owns its existing finite deadline. Neither failure erases the other feed. */
@@ -35,11 +36,7 @@ function Market() {
         are reported by the hub, not independently verified here.
       </p>
       {data.listings === null ? <p className="market-notice" role="status">Listings are unavailable right now.</p>
-        : data.listings.length === 0 ? <p className="market-notice">No eligible listings were returned by this catalogue.</p>
-        : <section className="market-cards" aria-label="Available catalogue listings">
-            {data.listings.map(listing => <ListingCard key={`${listing.seller.toLowerCase()}:${listing.id}`}
-              listing={listing} observedAtMs={data.observedAtMs} />)}
-          </section>}
+        : <MarketListings listings={data.listings} observedAtMs={data.observedAtMs} />}
     </main>
   )
 }

@@ -3,7 +3,7 @@ import { createServer } from "vite"
 import { marketListing, marketStats } from "./market-data.ts"
 
 let mode = "ok", reads = { listings: 0, stats: 0, other: 0 }
-const modes = new Set(["ok", "empty", "stats-down", "listings-down", "both-down", "malformed-stats", "malformed-listings", "long"])
+const modes = new Set(["ok", "empty", "stats-down", "listings-down", "both-down", "malformed-stats", "malformed-listings", "long", "rails"])
 const json = (res: import("node:http").ServerResponse, body: unknown, status = 200) => {
   res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(body))
 }
@@ -18,6 +18,11 @@ const hub = httpServer((req, res) => {
   if (url.pathname === "/listings") {
     reads.listings++
     if (mode === "listings-down" || mode === "both-down") { json(res, { error: "PRIVATE_HUB_DIAGNOSTIC" }, 503); return }
+    if (mode === "rails") {
+      json(res, [marketListing({ rails: ["erc8183", "gateway", "eip3009"] }),
+        marketListing({ id: "exact-skill", serviceName: "Exact Skill", rails: ["eip3009"] }),
+        marketListing({ id: "legacy-skill", serviceName: "Legacy Skill" })]); return
+    }
     json(res, mode === "empty" ? [] : mode === "malformed-listings" ? [{ ...marketListing(), seller: "INVALID_PRIVATE_SELLER" }] : [marketListing(mode === "long"
       ? { ensName: `${"a".repeat(63)}.${"b".repeat(63)}.arcade.eth`, price: "$999999999999999999999999.999999", description: "word".repeat(125) }
       : { payTested: { atMs: Date.now() - 7_200_000, jobId: "", ok: true } })]); return

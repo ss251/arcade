@@ -9,7 +9,7 @@ const privateJob = "job_PRIVATECANARY0000000000000001", privateHistory = "job_PR
 const modes = new Set(["ok", "detail-down", "receipts-down", "both-down", "empty-receipts", "absent-history",
   "empty-history", "unknown-evidence", "zero-evidence", "stale-evidence", "unverified-evidence", "ens-ok",
   "ens-expired", "ens-down", "ens-seller-mismatch", "ens-skill-mismatch", "redirect", "long",
-  "graph-ready", "graph-zero", "graph-invalid", "graph-long"])
+  "graph-ready", "graph-zero", "graph-invalid", "graph-long", "rails"])
 let mode = "ok", reads = { detail: 0, receipts: 0, names: 0, other: 0 }
 let closing = false, web: ViteDevServer | undefined, startup: Promise<void> | undefined, closeWork: Promise<void> | undefined
 let hubOrigin = ""
@@ -24,6 +24,7 @@ function detail() {
     id: "diff-triage", version: "0.1.0", serviceName: mode === "long" ? "D".repeat(32) : "Diff Triage", seller,
     price: mode === "long" ? "$115792089237316195423570985008687907853269984665640564039457584007913129.639935" : "$0.12", tags: ["code"],
     description: mode === "long" ? "word".repeat(125) : "Reviews <script>SCHEMA_ESCAPE_PROBE</script> safely.",
+    ...(mode === "rails" ? { rails: ["erc8183", "eip3009", "gateway"] } : {}),
     inputSchema: { type: "object", properties: { diff: { type: "string", description: mode === "long"
       ? "bounded-schema-line-".repeat(200) : "<img src=x onerror=SCHEMA_ESCAPE_PROBE>" } } },
     outputSchema: { type: "object", properties: { verdict: { type: "string" } } },
