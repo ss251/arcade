@@ -1,0 +1,48 @@
+{
+  "kind": "proof-only-identity-check",
+  "liveFundingProof": false,
+  "at": "2026-09-07T03:00:27.403Z",
+  "chainId": 5042002,
+  "blockNumber": "60847327",
+  "blockHash": "0xa04eeebcfb6150f3660bcfe87cff262c2a36da35b554537f82843ef882efe8ff",
+  "blockTimestamp": "2026-09-07T03:00:23.000Z",
+  "roles": [
+    {
+      "role": "wallet",
+      "verified": {
+        "role": "wallet",
+        "proxy": "0x0077777d7eba4688bdef3e311b846f25870a19b9",
+        "implementation": "0xa33d52b46964495ea6e2bb09ce85faed05776e28",
+        "normalizedHash": "0xbe79daa02f5d5359b4f6118d70b72e10ddd1c87b63e9e4ee39fdafa9bb2c2cbf"
+      },
+      "proxy": "0x0077777d7eba4688bdef3e311b846f25870a19b9",
+      "proxyBytes": 163,
+      "proxyHash": "0x874a21508289bf01ee9802032607ae53ba0a4f47f28143a8493921b8db102187",
+      "implementation": "0xa33d52b46964495ea6e2bb09ce85faed05776e28",
+      "implementationBytes": 22818,
+      "implementationHash": "0x69ed7283bbdb751a492d5e4320bd99db7ff6b9ef911afb2032521a59526706b4",
+      "metadataHex": "a26469706673582212202a0ecdc1ddae8aefe4f82d8466f43955b2be249dd9cda56fb8564255aab8446564736f6c634300081d",
+      "metadataCid": "QmRApvd7kbwWyDDa7BSX66vuPRMy2gBRoG1NQdneLL4Rjz"
+    },
+    {
+      "role": "minter",
+      "verified": {
+        "role": "minter",
+        "proxy": "0x0022222abe238cc2c7bb1f21003f0a260052475b",
+        "implementation": "0x9ef4c7ad4f577be713972310e655337bfd0b84bf",
+        "normalizedHash": "0xdbe0b31fd3677a8d7d5f6e729e8247115b7a041e1e5d8d958dd8b18e06747aca"
+      },
+      "proxy": "0x0022222abe238cc2c7bb1f21003f0a260052475b",
+      "proxyBytes": 163,
+      "proxyHash": "0x874a21508289bf01ee9802032607ae53ba0a4f47f28143a8493921b8db102187",
+      "implementation": "0x9ef4c7ad4f577be713972310e655337bfd0b84bf",
+      "implementationBytes": 12101,
+      "implementationHash": "0x0c479785c0c0f5a450bcf3200c854db9da6e4b585a5b694ca4eac85396cc28f5",
+      "metadataHex": "a2646970667358221220a22698663fbb412bbcf08bb97bcb8db175587b4f060769e51329b77da758a0b364736f6c634300081d",
+      "metadataCid": "QmZFctbmh6YRsscND55aHSMJchdDFw5XHcByuewaqtXaJN"
+    }
+  ],
+  "requests": 9,
+  "keys": 0,
+  "sends": 0
+}

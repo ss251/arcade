@@ -22,6 +22,7 @@ evidence remain separate open work; this index does not mark them accepted.
 - [Task5C brief](task-5c-brief.md), [canonical URL correction/preflight](task-5c-url-report.md).
   [Reproduced Minter source identity](task-5c1-report.md).
   [Pending-batch response compatibility](task-5c2-report.md).
+  [Owned proof evidence/safety contracts](task-5c3a-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

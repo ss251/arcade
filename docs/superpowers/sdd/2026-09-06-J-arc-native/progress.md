@@ -1,5 +1,19 @@
 # Plan J progress
 
+2026-09-07 08:40 IST — J5C3A sole71856PASS:4,825Vitest214/65.76s,
+927Bun62/6,656assert/171.85s,root/webstrict,client356ms/SSR167ms. Three code/test
+pins unchanged,7paths/28links/privacy0. Finalaudit/atomiccommit/exactoneFFmain
+next. Actual runtime orchestration, owned services and live entry still pending;
+foundation/source identity evidence does not consume any J5 live approval.
+J4 remains PAUSED; no existing validity/cap/replay/F11 acceptance change or push.
+
+2026-09-07 08:36 IST — J5C2 merged886218a/exactoneFFcleanmain. J5C3A
+fixed proof terms/calldata, recovered transaction checks, reviewed Wallet/Minter
+identity, exact mint-log checks and fresh fsynced closed-schema journal added.
+10Bun/78assert/229ms,3-rootstrict0; actual nine-read identity probe passes.
+No live entry/runtime orchestration yet; scope/freeze/solegate next. All J5
+key/grant/deposit/spend/payment approvals unused. J4 PAUSED; existing policy intact.
+
 2026-09-07 08:23 IST — J5C2 sole59093PASS:4,825Vitest214/68.09s,
 917Bun61/6,579assert/171.96s,root/webstrict,client494ms/SSR203ms. Focused11/
 108assert/1.76s and2-rootstrict0;6paths/27links/privacy0,two code/test pins
