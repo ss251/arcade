@@ -231,3 +231,10 @@ ports in offline tests. It rechecks authority, balance, allowance, nonce and
 current facts after signing, and persists the private result token before
 returning funding/queued evidence. Concrete buyer Arc ports and actual
 SDK/MCP/CLI integration remain next; this is not live execution or settlement.
+
+[J9B4 concrete Arc ports](superpowers/sdd/2026-09-06-J-arc-native/task-9b4-report.md)
+now supply the buyer-specific full-pinned reader, same-block observations,
+bounded exact signing, once-only send and independent mined-wire reconstruction.
+The full driver composes with these ports, actual owned-loopback HTTP and private
+SQLite in synthetic-chain tests. No live configuration was enabled. SDK/MCP/CLI
+selection and armed health metadata remain J9C; the live deployment is blocked.

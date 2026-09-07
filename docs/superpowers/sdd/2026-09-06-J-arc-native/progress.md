@@ -1,5 +1,16 @@
 # Plan J progress
 
+2026-09-07 21:28 IST — J9B4 sole30793 fullgatePASS5,246Vitest239/74.12s;
+1,284Bun87/10,731assert191.83s;root/webstrict/clientSSR.11paths138links/privacy0;
+fivefrozen code/test pins checked before atomiccommit/exact-one mainFF. Actual
+SDK/MCP/CLI + localpins/currentlisting/ENS/armedhealth J9C next. No live/push.
+
+2026-09-07 21:21 IST — J9B4 concrete Arc buyer ports implemented. Actual
+viem decoding/signing/receipt proofs over synthetic RPC and owned-loopback+
+SQLite driver composition pass focused tests. Full gate pending final focused
+strict checks/freeze. No ownerkeys/realRPC/spend/send/activation/policy/push.
+J9C actual SDK/MCP/CLI and armed local-pinned health next; live pauses unchanged.
+
 2026-09-07 21:10 IST — J9B3 sole9678 fullgatePASS5,226Vitest238/72.15s;
 1,282Bun86/10,282assert192.40s;root/webstrict/clientSSR.10paths133links/privacy0;
 fourfrozen code/test pins checked before atomiccommit/exact-one mainFF. Next

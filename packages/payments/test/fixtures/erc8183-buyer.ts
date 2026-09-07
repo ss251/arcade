@@ -12,13 +12,13 @@ export const addr = (n: number) => ("0x" + n.toString(16).padStart(40, "0")) as 
 export const hash = (n: number) => ("0x" + n.toString(16).padStart(64, "0")) as Hex
 export const buyer = privateKeyToAccount(generatePrivateKey()), provider = privateKeyToAccount(generatePrivateKey()),
   evaluator = privateKeyToAccount(generatePrivateKey())
-export async function buyerFixture(kind: "create" | "approve" | "fund" | "budget" = "create") {
+export async function buyerFixture(kind: "create" | "approve" | "fund" | "budget" = "create", options: { origin?: string } = {}) {
   const identity = { chainId: 5042002, escrow: addr(10), implementation: addr(11), hook: addr(12),
     evaluator: evaluator.address.toLowerCase(), treasury: addr(4), token: "0x3600000000000000000000000000000000000000",
     proxyCodeHash: keccak256("0x01"), implementationCodeHash: keccak256("0x02"), hookCodeHash: keccak256("0x03") }
   const call = { chainId: 5042002, escrow: identity.escrow, hook: identity.hook, evaluator: identity.evaluator, token: identity.token,
     provider: provider.address.toLowerCase(), providerAgentId: 8n, amount: 300000n, method: "POST", skillId: "skill", skillVersion: "1.0.0",
-    resource: "https://example.test/x/" + provider.address.toLowerCase() + "/skill", inputHash: hashJson({ fixture: true }), timeoutSeconds: 60 }
+    resource: (options.origin ?? "https://example.test") + "/x/" + provider.address.toLowerCase() + "/skill", inputHash: hashJson({ fixture: true }), timeoutSeconds: 60 }
   const requirements = buildEscrowRequirements(identity, { priceAtomic: call.amount, resource: call.resource, payTo: call.provider,
     escrow: { skillId: call.skillId, skillVersion: call.skillVersion, inputHash: call.inputHash,
       providerAgentId: call.providerAgentId, timeoutSeconds: call.timeoutSeconds } }, 1800)

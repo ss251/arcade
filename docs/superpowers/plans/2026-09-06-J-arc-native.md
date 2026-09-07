@@ -273,6 +273,9 @@ actual SDK/MCP/CLI remain; no live buyer proof is claimed.
 [J9B3](../sdd/2026-09-06-J-arc-native/task-9b3-report.md) composes durable
 once-only purchase ordering and bounded actual HTTP envelopes with synthetic
 chain ports. J9B4 concrete buyer Arc/signing ports and J9C SDK/MCP/CLI remain.
+[J9B4](../sdd/2026-09-06-J-arc-native/task-9b4-report.md) adds concrete buyer
+Arc ports and owned-loopback/SQLite composition over synthetic RPC. Only J9C
+actual SDK/MCP/CLI and local-pinned armed health remain in this offline task.
 
 - [ ] `fetch-with-payment.ts` `erc8183` branch: `createJob(payTo, evaluator, now+expiresInSeconds, description, hook, providerAgentId)` with the buyer key → `jobId` from `JobCreated`; `POST …/escrow {jobId}`; `approve(escrow, amount)`; `fund(jobId, USDC, amount, "0x")`; retry the call with `PAYMENT-SIGNATURE = {accepted, payload:{jobId}}`. Each on-chain step uses the existing backoff; `--max-amount` still gates. Journal the three tx hashes into the SDK result.
 - [ ] MCP and CLI expose `rail: "erc8183"`; hire-by-name unchanged (payTo lock still applies).
