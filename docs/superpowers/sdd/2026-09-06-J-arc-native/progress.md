@@ -1,5 +1,17 @@
 # Plan J progress
 
+2026-09-07 20:40 IST — J9B2 sole62279 fullgatePASS5,204Vitest237/72.24s;
+1,250Bun85/10,048assert190.62s;root/webstrict/clientSSR.8paths129links/privacy0;
+2frozen code/test pins checked before atomic commit/exact-one mainFF. Next
+bounded buyerdriver/Arc ports thenSDK/MCP/CLI. No live/policy/ownerkey/push.
+
+2026-09-07 20:35 IST — J9B2 concrete one-purchase private SQLite journal
+implemented.13focusedBun/96assertPASS917ms;2-rootstrict0. Cross-handle claim,
+privatebody/cap, exact intent/hash/attempt/proof phases, cumulativebuyergas,
+nonce/phase fences, irreversibleuncertainty and privateacceptedtokenrecovery.
+No automaticresume/newcapability onreopen. Freeze/solegate next, then bounded
+driver/Arc ports andactualSDK/MCP/CLI. No ownerkey/RPC/send/spend/policy/push.
+
 2026-09-07 20:13 IST — J9B1 sole2336 fullgatePASS5,204Vitest237/72.30s;
 1,237Bun84/9,952assert189.90s;root/webstrict/clientSSR.11paths126links/privacy0;
 5frozen code/test pins checked before atomic commit/exact-one mainFF. Actual

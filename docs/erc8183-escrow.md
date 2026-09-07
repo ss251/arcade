@@ -218,3 +218,11 @@ receipt logs and full job readback. JobCreated ID alone is only a lookup hint.
 The hub's budget relay requires independent mined/provider-signature proof;
 its HTTP hash is not authority. These offline proofs label funding, not settlement,
 and do not expose private capability or signed bytes as public SDK evidence.
+
+The [J9B2 private journal](superpowers/sdd/2026-09-06-J-arc-native/task-9b2-report.md)
+now records one purchase per owned file, with durable ordered action claims,
+cumulative buyer gas and private accepted-token recovery. Reopening cannot
+resume a payment or claim a new purchase. This concrete path requires distinct
+buyer/evaluator accounts and all three buyer transactions, with zero initial
+allowance; it does not lock the wallet across separate files/programs. The
+network/signing driver and actual SDK integration are still pending.

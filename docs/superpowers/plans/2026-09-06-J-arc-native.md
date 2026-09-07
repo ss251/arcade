@@ -267,6 +267,9 @@ remain. Use J8's closed input+capability budget/root envelopes, not bare jobId;
 backoff is read-only, never an ambiguous write retry. No validity-policy changes.
 [J9B1](../sdd/2026-09-06-J-arc-native/task-9b1-report.md) adds offline signed/mined/
 event/full-job proofs; private durable journal/runtime and actual SDK remain.
+[J9B2](../sdd/2026-09-06-J-arc-native/task-9b2-report.md) supplies one-purchase
+private storage with no automatic reopen/resume. Bounded driver/Arc ports and
+actual SDK/MCP/CLI remain; no live buyer proof is claimed.
 
 - [ ] `fetch-with-payment.ts` `erc8183` branch: `createJob(payTo, evaluator, now+expiresInSeconds, description, hook, providerAgentId)` with the buyer key → `jobId` from `JobCreated`; `POST …/escrow {jobId}`; `approve(escrow, amount)`; `fund(jobId, USDC, amount, "0x")`; retry the call with `PAYMENT-SIGNATURE = {accepted, payload:{jobId}}`. Each on-chain step uses the existing backoff; `--max-amount` still gates. Journal the three tx hashes into the SDK result.
 - [ ] MCP and CLI expose `rail: "erc8183"`; hire-by-name unchanged (payTo lock still applies).
