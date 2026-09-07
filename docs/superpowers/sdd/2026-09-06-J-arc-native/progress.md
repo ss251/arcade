@@ -1,5 +1,17 @@
 # Plan J progress
 
+2026-09-07 22:58 IST — J11A sole28507 fullgatePASS5258Vitest240/71.21s;
+1350Bun92/11674assert192.53s;root/webstrict/clientSSR. Final176focusedBun5/
+399assert845ms;2-rootstrict0;Graph codegen/WASM+actual27legacyMatchstickPASS.
+14paths141links/privacy0;8source/testpins checked before atomiccommit/mainFF.
+J11B inactive mappings next; J4/J5/J6live pauses unchanged. No keys/spend/push.
+
+2026-09-07 22:51 IST — J11A local schema/ABI staging implemented.176focusedBun5/
+399assertPASS886ms; Graph codegen/WASM PASS; actual27legacyMatchstick tests
+PASS2.251s on hash-pinned runtime. Active manifest/pins/templates unchanged;
+escrow mappings remain J11B, web J11C, live activation deployment-blocked.
+Targeted strict/freeze/solegate next. No ownerkeys/realRPC/spending/policy/push.
+
 2026-09-07 22:44 IST — J9C2B sole gate8030 PASS exit0: sequential bounded
 Vitest/Bun, root/web TypeScript and client/SSR build. Final output truncated;
 no invented aggregate counts or gate replay. Eight paths/148 links/privacy0,

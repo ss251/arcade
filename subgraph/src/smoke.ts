@@ -21,6 +21,7 @@ export function handleSettled(event: Settled): void {
   splitter.save()
 
   const s = new Settlement(id)
+  s.rail = "eip3009"
   s.splitter = splitter.id
   s.buyer = event.params.buyer
   s.totalAtomic = event.params.total

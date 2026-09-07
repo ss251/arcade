@@ -1,4 +1,4 @@
-# Local G2 ledger schema. The deployed G1 CID retains its original smoke schema.
+# Local ledger with J11A staged escrow entities; deployed CIDs retain their schemas.
 # Canonical relationships require independently trusted bindings. Metadata claims
 # alone do not establish a hub listing, settlement provenance or current owner.
 
@@ -52,19 +52,75 @@ type Splitter @entity(immutable: false) {
 type Settlement @entity(immutable: true) {
   "Transaction hash plus log index: an event occurrence, not an arbitrary digest."
   id: Bytes!
-  splitter: Splitter!
+  "Handler-classified payment rail, not inferred from a remote receipt."
+  rail: String!
+  "Present for exact splitter settlements; never a fabricated escrow splitter."
+  splitter: Splitter
+  escrowJob: EscrowJob
   buyer: Bytes!
   "All money fields are 6-decimal ERC-20 USDC atomic integers."
   totalAtomic: BigInt!
   sellerAtomic: BigInt!
   feeAtomic: BigInt!
   "Public EIP-3009 authorization nonce emitted by the splitter."
-  nonce: Bytes!
+  nonce: Bytes
   "Hash summary for tree-bearing events only; it can become ambiguous."
   tree: Tree
   blockNumber: BigInt!
   timestamp: BigInt!
   txHash: Bytes!
+}
+
+type EscrowJob @entity(immutable: false) {
+  "chainId:proxy:jobId; job IDs alone are not globally unique."
+  id: ID!
+  chainId: BigInt!
+  escrow: Bytes!
+  jobId: BigInt!
+  client: Bytes!
+  provider: Bytes!
+  evaluator: Bytes!
+  hook: Bytes!
+  expiredAt: BigInt!
+  "Last observed lifecycle event, not independently verified current state."
+  status: String!
+  paymentToken: Bytes
+  "Unknown until the corresponding event is observed; never default zero."
+  budgetAtomic: BigInt
+  fundedAtomic: BigInt
+  deliverable: Bytes
+  createdBlock: BigInt!
+  createdAt: BigInt!
+  createdTxHash: Bytes!
+  updatedBlock: BigInt!
+  updatedAt: BigInt!
+  events: [EscrowEvent!]! @derivedFrom(field: "job")
+}
+
+type EscrowEvent @entity(immutable: true) {
+  "Actual transaction/log occurrence; independent of caller-supplied receipt hashes."
+  id: Bytes!
+  escrow: Bytes!
+  emitter: Bytes!
+  jobId: BigInt!
+  "Absent without an observed JobCreated; do not invent missing job history."
+  job: EscrowJob
+  kind: String!
+  actor: Bytes
+  token: Bytes
+  amountAtomic: BigInt
+  cumulativeAtomic: BigInt
+  agentId: BigInt
+  "Emitted deliverable/reason only; not an off-chain execution verification."
+  hash: Bytes
+  treeHash: Bytes
+  receiptHash: Bytes
+  childCount: BigInt
+  childTotalAtomic: BigInt
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+  logIndex: BigInt!
 }
 
 type Tree @entity(immutable: false) {

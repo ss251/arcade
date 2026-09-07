@@ -1,0 +1,310 @@
+[
+  {
+    "anonymous": false,
+    "name": "JobCreated",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "provider",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "evaluator",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "expiredAt",
+        "type": "uint48",
+        "indexed": false
+      },
+      {
+        "name": "hook",
+        "type": "address",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "ProviderSet",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "provider",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "PayoutReceiverSet",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "payoutReceiver",
+        "type": "address",
+        "indexed": true
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "BudgetSet",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "JobFunded",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "JobSubmitted",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "provider",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "deliverable",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "JobCompleted",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "evaluator",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "reason",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "JobRejected",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "rejector",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "reason",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "JobExpired",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "PaymentReleased",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "PlatformFeePaid",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "platformTreasury",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "EvaluatorFeePaid",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "evaluator",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "Refunded",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "Settled",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "cumulativeAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "delta",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  }
+]

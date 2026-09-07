@@ -1,10 +1,29 @@
 # ARCADE ledger
 
 Latest status: [G6 indexed A9 match](#september-6-2026--g6-indexed-a9-match).
+Local J11 escrow schema/ABIs are staged only; see [J11A](#j11a-offline-escrow-schema).
 The dated local/G1 sections below are historical checkpoints. Neither a successful
 build nor an acknowledgment proves the later indexed-event acceptance gate.
 
+## J11A offline escrow schema
+
+September7: staged ERC8183/ArcadeJobHook event subsets match the pinned local
+Solidity source. New EscrowJob/EscrowEvent schema preserves full integer widths,
+immutable occurrences and nullable unknown observations. Settlement gains a rail
+and optional escrowJob; legacy exact mappings retain their actual splitter and
+nonce with rail=eip3009. Future escrow must not invent those legacy fields.
+
+The active manifest, two splitter sources and four inactive templates are
+unchanged. No escrow event is indexed or job created by this checkpoint.
+Local Graph codegen/WASM and the actual27-test legacy Matchstick suite passed;
+that does not prove deployed escrow compatibility, escrow mappings or indexing.
+See the [J11A report](../docs/superpowers/sdd/2026-09-06-J-arc-native/task-11a-report.md).
+Proxy/hook activation and Studio v0.0.2 remain blocked by the missing usable
+approved deployment and independently verified source pins/start blocks.
+
 ## Historical G1 smoke checkpoint
+
+See the dated evidence below for live scope; local additions do not update a CID.
 
 This temporary smoke subgraph maps the **v1 pilot FeeSplitter's `Settled` event**
 to immutable `Settlement` entities. It does not yet index FeeSplitterV2 trees or

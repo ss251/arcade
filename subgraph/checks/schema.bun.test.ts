@@ -24,8 +24,22 @@ const expected: Readonly<Record<string, { readonly immutable: boolean; readonly 
     settlementCount: "BigInt!", settledVolumeAtomic: "BigInt!", settlements: "[Settlement!]!"
   } },
   Settlement: { immutable: true, fields: {
-    id: "Bytes!", splitter: "Splitter!", buyer: "Bytes!", totalAtomic: "BigInt!", sellerAtomic: "BigInt!",
-    feeAtomic: "BigInt!", nonce: "Bytes!", tree: "Tree", blockNumber: "BigInt!", timestamp: "BigInt!", txHash: "Bytes!"
+    id: "Bytes!", rail: "String!", splitter: "Splitter", escrowJob: "EscrowJob", buyer: "Bytes!", totalAtomic: "BigInt!", sellerAtomic: "BigInt!",
+    feeAtomic: "BigInt!", nonce: "Bytes", tree: "Tree", blockNumber: "BigInt!", timestamp: "BigInt!", txHash: "Bytes!"
+  } },
+  EscrowJob: { immutable: false, fields: {
+    id: "ID!", chainId: "BigInt!", escrow: "Bytes!", jobId: "BigInt!", client: "Bytes!",
+    provider: "Bytes!", evaluator: "Bytes!", hook: "Bytes!", expiredAt: "BigInt!", status: "String!",
+    paymentToken: "Bytes", budgetAtomic: "BigInt", fundedAtomic: "BigInt", deliverable: "Bytes",
+    createdBlock: "BigInt!", createdAt: "BigInt!", createdTxHash: "Bytes!",
+    updatedBlock: "BigInt!", updatedAt: "BigInt!", events: "[EscrowEvent!]!"
+  } },
+  EscrowEvent: { immutable: true, fields: {
+    id: "Bytes!", escrow: "Bytes!", emitter: "Bytes!", jobId: "BigInt!", job: "EscrowJob",
+    kind: "String!", actor: "Bytes", token: "Bytes", amountAtomic: "BigInt", cumulativeAtomic: "BigInt",
+    agentId: "BigInt", hash: "Bytes", treeHash: "Bytes", receiptHash: "Bytes",
+    childCount: "BigInt", childTotalAtomic: "BigInt", blockNumber: "BigInt!",
+    timestamp: "BigInt!", txHash: "Bytes!", logIndex: "BigInt!"
   } },
   Tree: { immutable: false, fields: {
     id: "Bytes!", root: "Settlement", childCount: "Int", childTotalAtomic: "BigInt!",
@@ -84,7 +98,8 @@ const violations = (source: string): string[] => {
     if (immutable?.kind !== Kind.BOOLEAN || immutable.value !== spec.immutable) problems.push(`${name}: immutable`)
   }
   for (const [entity, field, target] of [
-    ["Splitter", "settlements", "splitter"], ["Agent", "feedback", "agent"], ["Agent", "validations", "agent"]
+    ["Splitter", "settlements", "splitter"], ["Agent", "feedback", "agent"], ["Agent", "validations", "agent"],
+    ["EscrowJob", "events", "job"]
   ] as const) {
     const value = nodes.find((n) => n.name.value === entity)?.fields?.find((f) => f.name.value === field)
       ?.directives?.find((d) => d.name.value === "derivedFrom")?.arguments?.find((a) => a.name.value === "field")?.value
@@ -117,7 +132,7 @@ const realQuery = (name: string): string => {
 }
 
 describe("G2 ledger schema contract (offline)", () => {
-  test("defines exactly the planned eight entities plus immutable occurrences, claims and registry events", () => {
+  test("defines the existing ledger plus offline escrow jobs and immutable observations", () => {
     expect(violations(current())).toEqual([])
   })
 
@@ -131,7 +146,16 @@ describe("G2 ledger schema contract (offline)", () => {
 
   for (const [from, to, problem] of [
     ["totalAtomic: BigInt!", "totalAtomic: Float!", "Settlement.totalAtomic"],
-    ["splitter: Splitter!", "splitter: Splitter", "Settlement.splitter"],
+    ["splitter: Splitter\n", "splitter: Splitter!\n", "Settlement.splitter"],
+    ["nonce: Bytes\n", "nonce: Bytes!\n", "Settlement.nonce"],
+    ["rail: String!", "rail: String", "Settlement.rail"],
+    ["escrowJob: EscrowJob\n", "escrowJob: EscrowJob!\n", "Settlement.escrowJob"],
+    ["jobId: BigInt!", "jobId: Int!", "EscrowJob.jobId"],
+    ["budgetAtomic: BigInt\n", "budgetAtomic: BigInt!\n", "EscrowJob.budgetAtomic"],
+    ["fundedAtomic: BigInt\n", "fundedAtomic: Float\n", "EscrowJob.fundedAtomic"],
+    ["type EscrowEvent @entity(immutable: true)", "type EscrowEvent @entity(immutable: false)", "EscrowEvent: immutable"],
+    ["childCount: BigInt\n", "childCount: Int\n", "EscrowEvent.childCount"],
+    ["job: EscrowJob\n", "job: EscrowJob!\n", "EscrowEvent.job"],
     ["root: Settlement\n", "root: Settlement!\n", "Tree.root"],
     ["childCount: Int\n", "childCount: Int!\n", "Tree.childCount"],
     ["childCount: BigInt!", "childCount: Int!", "TreeOccurrence.childCount"],

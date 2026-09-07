@@ -1,0 +1,51 @@
+[
+  {
+    "anonymous": false,
+    "name": "ArcadeSettled",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "treeHash",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "childCount",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "childTotalAtomic",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "receiptHash",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "ArcadeRefused",
+    "type": "event",
+    "inputs": [
+      {
+        "name": "jobId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "reason",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  }
+]

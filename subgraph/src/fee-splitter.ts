@@ -11,6 +11,7 @@ function record(
 ): Settlement {
   const splitter = splitterFor(event.address, "static", event.block.number)
   const settlement = new Settlement(id)
+  settlement.rail = "eip3009"
   settlement.splitter = splitter.id
   settlement.buyer = buyer
   settlement.totalAtomic = total

@@ -308,6 +308,11 @@ Task10 live proof is still blocked on deployment and existing owner checkpoints.
 
 ### Task 11: Subgraph and web (J5 surface)
 
+[J11 brief](../sdd/2026-09-06-J-arc-native/task-11-brief.md) separates schema/ABI
+staging, inactive mappings, and existing-design web. [J11A](../sdd/2026-09-06-J-arc-native/task-11a-report.md)
+stages event/schema contracts and legacy rail facts only; no escrow mapping or
+source activation yet. Live Task10 and Studio redeploy remain deployment-blocked.
+
 - [ ] Subgraph: data sources for the escrow proxy and hook; `EscrowJob` entity; `Settlement.rail`; mapping tests (matchstick); redeploy `v0.0.2` to Studio (deploy key inline).
 - [ ] Web: receipt page rail badge and job links; listing page "accepts: gateway · exact · escrow"; marketplace filter. `bun run web:build` + snapshot.
 - [ ] Commit: `feat(subgraph,web): escrow jobs indexed and shown`.

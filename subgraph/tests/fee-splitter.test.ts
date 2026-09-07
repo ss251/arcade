@@ -86,6 +86,8 @@ describe("settlement mapping behavior", () => {
   test("persists exact emitted fields and no invented coverage", () => {
     handleSettled(settledEvent())
     assert.entityCount("Settlement", 1)
+    assert.fieldEquals("Settlement", id(), "rail", "eip3009")
+    absent("Settlement", id(), "escrowJob")
     assert.fieldEquals("Settlement", id(), "splitter", SPLITTER)
     assert.fieldEquals("Settlement", id(), "buyer", BUYER)
     assert.fieldEquals("Settlement", id(), "totalAtomic", "10000")
