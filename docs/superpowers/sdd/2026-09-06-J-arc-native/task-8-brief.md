@@ -39,6 +39,12 @@ Task9 follows with journaled buyer create/budget/approve/fund/retry lifecycle.
 Any subdivisions must retain concrete production composition and honest WIP
 status; type contracts alone do not complete Task8.
 
+8B's first checkpoint is [local completion binding](task-8b1-report.md): share
+the hub's existing validator verbatim and commit only the runner's actual
+successful output under its current local listing/input. This data helper does
+not grant signing authority; durable claims, fresh chain identity checks and
+original-socket correlation remain required in the subsequent8B checkpoint(s).
+
 ## Verification
 
 TDD for strict unknown-field/overflow/correlation tests, unchanged legacy decode,

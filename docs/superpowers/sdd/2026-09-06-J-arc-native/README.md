@@ -42,6 +42,7 @@ evidence remain separate open work; this index does not mark them accepted.
   [Guarded Effect rail composition](task-7b4b-report.md).
 - [Task8 integration brief](task-8-brief.md),
   [strict socket contracts checkpoint](task-8a-report.md).
+  [Runner-local completion binding](task-8b1-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

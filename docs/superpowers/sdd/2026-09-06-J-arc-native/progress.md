@@ -1,5 +1,22 @@
 # Plan J progress
 
+2026-09-07 14:22 IST — J8B1 sole49429 fullgatePASS:5,011Vitest227/68.99s,
+973Bun72/7,643assert/174.96s,root/webstrict/clientSSRbuild. Five-rootstrict0;
+fivepins unchanged;10paths73links/privacy0; movedvalidator byte-identical.
+Atomiccommit/exactFF next. Provider signing journal/canonical read-only preflight
+and original-socket authority remain8B work, then8C/8D/9. No gate replay, keys,
+liveRPC/send/spend/push or existing policy/window/cap/replay changes.
+
+2026-09-07 14:15 IST — J8B1 runner-local completion binding implemented;
+49focusedVitest2PASS (13new),5-rootstrict0. Hub validator moved verbatim to
+core and original path reexports samefunction; existing36tests unchangedPASS.
+Initial missing-module/import/Bounds fixture failures corrected; known nested
+Bounds class captured explicitly, not arbitrary prototypes. New helper binds
+actual input/listing/provider/agent/successful schema-valid output and retains
+hashes only. It grants no signature/inference authority;8B signing claims,
+canonical chain checks/socket ownership then8C/8D/9 remain. Scopefreeze/fullgate
+next; no keys/liveRPC/send/spend/push or existing limits/policy change.
+
 2026-09-07 13:59 IST — J8A sole18650 fullgatePASS:4,998Vitest226/70.00s,
 973Bun72/7,643assert/174.09s,root/webstrict/clientSSRbuild. Seven-rootstrict0;
 sevenpins unchanged;13paths80links/privacy0. Atomiccommit/exactFF next;8B

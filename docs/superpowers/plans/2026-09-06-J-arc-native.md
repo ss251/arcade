@@ -207,6 +207,10 @@ capability-free messages and lossless public context conversion only; handlers,
 signing, durable hub admission and pipeline activation remain pending. Public
 jobId alone is not caller authority, and a claimed output hash is not runner
 authorization; the brief explicitly corrects those abbreviated sketches below.
+[8B1 local completion data](../sdd/2026-09-06-J-arc-native/task-8b1-report.md)
+shares the unchanged hub validator with the runner and binds actual validated
+output/input/listing. Durable signing claims and socket/chain authority remain
+unimplemented; a completion data object alone is not permission to sign.
 
 - [ ] Socket messages `EscrowBudgetRequest{jobId, token, amount, escrow, chainId}` → runner replies `EscrowBudgetSigned{jobId, signature, nonce, deadline}`; `EscrowSubmitRequest{jobId, deliverable}` → `EscrowSubmitSigned{…}`. Runner signs with the seller key only; refuses if `amount` ≠ its listing price or `escrow` ≠ chain config. Runner never broadcasts.
 - [ ] `POST /x/:seller/:skill/escrow {jobId}`: validations from spec §7.3 step 3, relay `setBudgetWithAuthorization`, respond `{jobId, budget, token, escrow, fundBy}`; 409 when the job is not Open/ours; rate-limited per payer.
