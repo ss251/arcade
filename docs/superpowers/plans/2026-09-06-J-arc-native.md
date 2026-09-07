@@ -143,6 +143,16 @@ needs the guarded destination adapter; an SDK result is not independent proof.
 
 ### Task 6: ERC-8183 contracts — vendor, hook, deploy script (J5)
 
+Execution checkpoint6A vendors the exact pin and implements/tests the hook.
+The unchanged authorization runtime exceeds EIP-170 under the tested legacy and
+via-IR compiler settings; deployment remains blocked, not a passing build-size
+gate. The zero-hook setter below is also impossible on this pin: initialization
+already enables it, so verify its getter instead. Hook callback data wraps
+optParams with actor/reason. See the [source brief](../sdd/2026-09-06-J-arc-native/task-6a-brief.md)
+and [verification record](../sdd/2026-09-06-J-arc-native/task-6a-report.md).
+Treasury confirmation remains a separate OWNER checkpoint. Continue6B's bounded
+deployer and7–9 offline without attempting an oversized deployment.
+
 - [ ] Vendor `erc-8183/base-contracts` at the pinned commit `142e669c1fd3` (2026-06-30, "Merge pull request #24 … meta-transactions-and-claims"; re-pin only if `forge build` fails and record the new sha here) into `lib/erc8183` (submodule) plus OZ upgradeable if missing; `foundry.toml` remappings per their `foundry.toml`; `forge build` clean.
 - [ ] `contracts/ArcadeJobHook.sol`: `IERC8183Hook` + ERC-165; `immutable escrow`, `immutable evaluator`; `beforeAction(jobId, selector, data)`: if `selector == fund` require `IERC8183(escrow).getJob(jobId).evaluator == evaluator`; `afterAction`: on `complete` decode `optParams` → `(bytes32 treeHash, uint32 childCount, uint256 childTotalAtomic, bytes32 receiptHash)` and emit `ArcadeSettled(jobId, treeHash, childCount, childTotalAtomic, receiptHash)`; on `reject` emit `ArcadeRefused(jobId, reason)`; `onlyEscrow` on both. Foundry tests: gate reverts for a foreign evaluator; events on complete/reject; ERC-165.
 - [ ] `scripts/deploy-erc8183.ts` (viem, deployer key inline): deploy implementation, `ERC1967Proxy` with `initialize(treasury, deployer)`, `setPlatformFee(500, treasury)`, `setEvaluatorFee(0)`, `setPaymentTokenAllowed(USDC, true)`, `setHookWhitelist(address(0), true)`, deploy `ArcadeJobHook(escrow, evaluator)`, `setHookWhitelist(hook, true)`; verify every getter; write `config/chains/arc-testnet.json.erc8183 = {escrow, hook, evaluator, reference: "0x0747EEf0706327138c69792bF28Cd525089e4583", pin}` and journal to `docs/evidence/J/erc8183-deploy.json`. Treasury = OWNER value (default `0xcf82…A78a`).

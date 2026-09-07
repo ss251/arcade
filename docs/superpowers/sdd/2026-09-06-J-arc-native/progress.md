@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 10:20 IST — J6A sole36921 fullTESTgatePASS:31Foundry3/25.62ms;
+4,825Vitest214/67.00s;955Bun67/7,272assert/172.70s;root/webstrict;
+client373ms/SSR196ms. Separate deploymentSIZEgate FAIL remains explicit.
+Elevenpaths/45links/privacy0; finalaudit/atomiccommit/exactFFnext. No keys,
+money/deployment, cap change, agents or push.6B preflight then7–9 offline.
+
+2026-09-07 10:15 IST — J6A exact upstream/dependency gitlinks, hook and15real-
+proxy focused tests implemented. Legacy/viaIR tests pass with offline Forge;
+size preflight FAILS:27574legacy/26167viaIR200/25776viaIR1 vs24576limit.
+No source re-pin/pruning or limit change. Scope/freeze/sole test gate next;
+deployment NOT_RUN, size and explicit treasury prerequisites pending. Continue
+6B fail-closed deployer then7–9 offline; J4/J5 live remain paused, no keys/spend.
+
 2026-09-07 09:58 IST — J5C3C sole22011PASS:4,825Vitest214/67.16s,
 955Bun67/7,272assert/173.13s,root/webstrict,client354ms/SSR186ms. Thirteen
 code/script/test pins unchanged,18paths/32links/privacy0. Finalaudit/atomiccommit/

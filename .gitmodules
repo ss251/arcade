@@ -1,0 +1,3 @@
+[submodule "erc8183"]
+	path = lib/erc8183
+	url = https://github.com/erc-8183/base-contracts.git

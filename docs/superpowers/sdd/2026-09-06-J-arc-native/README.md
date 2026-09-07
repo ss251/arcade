@@ -25,6 +25,9 @@ evidence remain separate open work; this index does not mark them accepted.
   [Owned proof evidence/safety contracts](task-5c3a-report.md).
   [Bounded owner-chain driver](task-5c3b-report.md).
   [Owned delivery/purchase composition and live timing pause](task-5c3c-report.md).
+- [Task6 pinned source and hook brief](task-6a-brief.md),
+  [hook verification and size blocker](task-6a-report.md),
+  [escrow build guide](../../../erc8183-escrow.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends
