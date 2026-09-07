@@ -403,9 +403,10 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
   // They validate each bounded row once, without loading its job or all siblings.
   const currentReceipts = db.transaction(() => {
     escrow.assertHealthy()
+    const escrowReceipts = escrow.getReceipts()
     try {
       const headers = new Map(listSessionHeaders().map(header => [header.session.id, header.session]))
-      const result = [...Effect.runSync(inner.allReceipts)]
+      const result = [...Effect.runSync(inner.allReceipts), ...escrowReceipts]
       const rows = db.query<CallRow & { receipt_json: string | null; receipt_id: string | null; accrual_id: string | null; receipt_at: number | null }, []>(
         `SELECT session_calls.*, receipts.json AS receipt_json, receipts.job_id AS receipt_id, receipts.accrual_id, receipts.created_at_ms AS receipt_at
          FROM session_calls LEFT JOIN receipts ON receipts.job_id = session_calls.job_id

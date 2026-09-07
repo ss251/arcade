@@ -1,57 +1,37 @@
 /** Durable inference ownership on the hub's existing SQLite connection. No RPC/signing. */
 import type { Database } from "bun:sqlite"
-import { Data, Effect, Schema } from "effect"
-import { docBytes, hashJson, Job } from "@arcade/core"
+import { Data, Effect } from "effect"
+import { hashJson, Job } from "@arcade/core"
 import { escrowActionContext, escrowCheck, escrowContextFromWire, escrowContextToWire,
   escrowProviderContextHash, EscrowFactsRefused, type EscrowActionContext } from "@arcade/payments"
+import { captureEscrowTerminal, decodeEscrowTerminal, escrowTerminalWire, escrowReceiptWire,
+  escrowJobWire as jobWire, decodeEscrowJob as decodeJob } from "./escrow-terminal.ts"
 export class EscrowStoreRefused extends Data.TaggedError("EscrowStoreRefused") {}
 export class EscrowStorageUnavailable extends Data.TaggedError("EscrowStorageUnavailable") {}
 export interface EscrowAdmission {
   readonly context: EscrowActionContext; readonly job: Job
-  readonly state: "admitted" | "executing" | "uncertain"
+  readonly state: "admitted" | "executing" | "uncertain" | "settled" | "refunded"
 }
 export interface EscrowStore {
   readonly durability: "durable" | "volatile"
   readonly admit: (context: unknown, queued: Job) => Effect.Effect<{ created: boolean; jobId: string }, EscrowStoreRefused | EscrowStorageUnavailable>
   readonly begin: (context: unknown, jobId: string) => Effect.Effect<{ claimed: boolean }, EscrowStoreRefused | EscrowStorageUnavailable>
   readonly uncertain: (context: unknown, jobId: string) => Effect.Effect<void, EscrowStoreRefused | EscrowStorageUnavailable>
+  readonly finish: (context: unknown, terminal: unknown) => Effect.Effect<{ created: boolean }, EscrowStoreRefused | EscrowStorageUnavailable>
   readonly get: (jobId: string) => Effect.Effect<EscrowAdmission | undefined, EscrowStoreRefused | EscrowStorageUnavailable>
 }
 const keyOf = (c: EscrowActionContext) => `${c.call.chainId}:${c.call.escrow}:${c.jobId}`
-const bytes = (value: unknown) => { const encoded = docBytes(value); escrowCheck(Buffer.byteLength(encoded) <= 1048576); return encoded }
 const jobIdOf = (id: unknown): string => { escrowCheck(typeof id === "string" && /^job_[A-Za-z0-9]{16,128}$/.test(id)); return id }
-/** Preserve JSON input ordering and scope bigint conversion to priceAtomic ONLY. */
-function jobWire(job: Job): string {
-  const plain: Record<string, unknown> = {}
-  escrowCheck(job && typeof job === "object" && [Object.prototype, Job.prototype].includes(Object.getPrototypeOf(job)))
-  for (const key of Reflect.ownKeys(job)) {
-    escrowCheck(typeof key === "string" && ["id", "skillId", "seller", "buyer", "priceAtomic", "input", "status", "createdAtMs",
-      "outcome", "rootJobId", "parentJobId", "hop", "ancestors"].includes(key))
-    const d = Object.getOwnPropertyDescriptor(job, key); escrowCheck(d && d.enumerable && "value" in d)
-    if (d.value === undefined) continue
-    if (key === "priceAtomic") {
-      escrowCheck(typeof d.value === "bigint" && d.value > 0n && d.value < 2n ** 256n)
-      plain[key] = String(d.value)
-    } else plain[key] = d.value
-  }
-  return bytes(plain)
-}
-function decodeJob(encoded: string): Job {
-  escrowCheck(Buffer.byteLength(encoded) <= 1048576)
-  const wire = JSON.parse(encoded)
-  escrowCheck(wire && typeof wire === "object" && !Array.isArray(wire) && typeof wire.priceAtomic === "string" && /^(0|[1-9][0-9]{0,77})$/.test(wire.priceAtomic))
-  const job = Schema.decodeUnknownSync(Job, { onExcessProperty: "error" })({ ...wire, priceAtomic: BigInt(wire.priceAtomic) })
-  escrowCheck(jobWire(job) === encoded); return job
-}
 function matches(context: EscrowActionContext, job: Job) {
   const c = context.call
   jobIdOf(job.id)
   escrowCheck(job.skillId === c.skillId && job.seller === c.provider && job.buyer === context.client && job.priceAtomic === c.amount &&
     hashJson(job.input) === c.inputHash && job.rootJobId === job.id && job.hop === 0 && job.parentJobId === undefined &&
-    job.ancestors?.length === 0 && Number.isSafeInteger(job.createdAtMs) && job.createdAtMs >= 0 && job.outcome === undefined)
+    job.ancestors?.length === 0 && Number.isSafeInteger(job.createdAtMs) && job.createdAtMs >= 0)
 }
 interface Row { key: string; job_id: string; context_json: string; context_hash: string; state: string; job_digest: string
-  id: string; escrow_key: string; status: string; created_at_ms: number; json: string }
+  id: string; escrow_key: string; status: string; created_at_ms: number; json: string
+  terminal_json: string | null; terminal_digest: string | null }
 const SELECT = `SELECT escrow_admissions.*, jobs.id, jobs.escrow_key, jobs.status, jobs.created_at_ms, jobs.json
   FROM escrow_admissions JOIN jobs ON jobs.id = escrow_admissions.job_id`
 /** Called before the legacy reaper or cache load. Migration never rewrites existing jobs. */
@@ -61,6 +41,10 @@ export function openEscrowStore(db: Database, bootId: string, durability: Escrow
     key TEXT PRIMARY KEY, job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id), context_json TEXT NOT NULL,
     context_hash TEXT NOT NULL, state TEXT NOT NULL, job_digest TEXT NOT NULL);
     CREATE UNIQUE INDEX IF NOT EXISTS jobs_escrow_key ON jobs(escrow_key) WHERE escrow_key IS NOT NULL;`)
+  for (const column of ["terminal_json", "terminal_digest"]) if (!db.query<{ name: string }, []>("PRAGMA table_info(escrow_admissions)").all().some(c => c.name === column))
+    db.exec(`ALTER TABLE escrow_admissions ADD COLUMN ${column} TEXT`)
+  db.exec(`CREATE TABLE IF NOT EXISTS escrow_terminal_refs (tx_hash TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES escrow_admissions(job_id), kind TEXT NOT NULL);`)
   const topology = () => {
     if ((db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM escrow_admissions").get()?.n ?? 10001) > 10000 ||
       db.query(`SELECT 1 FROM jobs LEFT JOIN escrow_admissions ON escrow_admissions.key = jobs.escrow_key
@@ -68,7 +52,13 @@ export function openEscrowStore(db: Database, bootId: string, durability: Escrow
       db.query(`SELECT 1 FROM escrow_admissions LEFT JOIN jobs ON jobs.id = escrow_admissions.job_id
         WHERE jobs.id IS NULL OR jobs.escrow_key IS NULL OR jobs.escrow_key != escrow_admissions.key LIMIT 1`).get() ||
       db.query("SELECT 1 FROM escrow_admissions JOIN session_calls ON session_calls.job_id = escrow_admissions.job_id LIMIT 1").get() ||
-      db.query("SELECT 1 FROM escrow_admissions JOIN receipts ON receipts.job_id = escrow_admissions.job_id LIMIT 1").get()) throw new EscrowStorageUnavailable()
+      db.query(`SELECT 1 FROM escrow_admissions LEFT JOIN receipts ON receipts.job_id = escrow_admissions.job_id
+        WHERE state NOT IN ('admitted','executing','uncertain','settled','refunded') OR
+        (state IN ('settled','refunded') AND terminal_json IS NULL) OR (state IN ('admitted','executing') AND terminal_json IS NOT NULL) OR
+        (terminal_json IS NULL) != (terminal_digest IS NULL) OR (terminal_json IS NULL) != (receipts.job_id IS NULL) LIMIT 1`).get() ||
+      (db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM escrow_terminal_refs").get()?.n ?? 20001) > 20000 ||
+      db.query(`SELECT 1 FROM escrow_terminal_refs LEFT JOIN escrow_admissions ON escrow_admissions.job_id = escrow_terminal_refs.job_id
+        WHERE escrow_admissions.job_id IS NULL OR terminal_json IS NULL LIMIT 1`).get()) throw new EscrowStorageUnavailable()
   }
   const capture = (row: Row): EscrowAdmission => {
     try {
@@ -77,9 +67,19 @@ export function openEscrowStore(db: Database, bootId: string, durability: Escrow
       escrowCheck(JSON.stringify(escrowContextToWire(context)) === row.context_json && keyOf(context) === row.key &&
         row.escrow_key === row.key && row.id === row.job_id && row.id === job.id && row.status === job.status &&
         row.created_at_ms === job.createdAtMs && row.context_hash === escrowProviderContextHash(context) &&
-        row.job_digest === hashJson(JSON.parse(row.json)) && ["admitted", "executing", "uncertain"].includes(row.state) &&
-        (row.state === "admitted" ? job.status === "queued" : row.state === "executing" ? job.status === "running" : ["queued", "running"].includes(job.status)))
+        row.job_digest === hashJson(JSON.parse(row.json)) && ["admitted", "executing", "uncertain", "settled", "refunded"].includes(row.state))
       matches(context, job)
+      if (row.terminal_json === null) escrowCheck(job.outcome === undefined &&
+        (row.state === "admitted" ? job.status === "queued" : row.state === "executing" ? job.status === "running" : row.state === "uncertain" && ["queued", "running"].includes(job.status)))
+      else {
+        const terminal = decodeEscrowTerminal(context, row.terminal_json), receipt = terminal.receipt
+        const saved = db.query<{ json: string; created_at_ms: number; accrual_id: string | null }, [string]>("SELECT * FROM receipts WHERE job_id = ?").get(job.id)
+        escrowCheck(row.terminal_digest === hashJson(JSON.parse(row.terminal_json)) && jobWire(terminal.job) === row.json &&
+          row.state === receipt.escrow!.state && saved?.json === escrowReceiptWire(receipt) && saved.created_at_ms === receipt.createdAtMs && saved.accrual_id === null)
+        const refs = db.query<{ tx_hash: string; kind: string }, [string]>("SELECT tx_hash,kind FROM escrow_terminal_refs WHERE job_id = ? LIMIT 3").all(job.id)
+        const proofs = [terminal.proof, terminal.submission?.proof ?? null].filter(p => p !== null)
+        escrowCheck(refs.length === proofs.length && proofs.every(p => refs.some(r => r.tx_hash === p.txHash && r.kind === p.kind)))
+      }
       return { context, job, state: row.state as EscrowAdmission["state"] }
     } catch { throw new EscrowStorageUnavailable() }
   }
@@ -98,7 +98,7 @@ export function openEscrowStore(db: Database, bootId: string, durability: Escrow
     try: work, catch: error => error instanceof EscrowFactsRefused || error instanceof EscrowStoreRefused ? new EscrowStoreRefused() : new EscrowStorageUnavailable() }))
   const request = <A>(work: () => A): A => { try { return work() } catch { throw new EscrowStoreRefused() } }
   const admit = db.transaction((context: EscrowActionContext, job: Job) => {
-    topology(); matches(context, job); escrowCheck(durability === "durable" && job.status === "queued")
+    topology(); matches(context, job); escrowCheck(durability === "durable" && job.status === "queued" && job.outcome === undefined)
     const key = keyOf(context), existing = db.query<Row, [string]>(SELECT + " WHERE escrow_admissions.key = ?").get(key)
     if (existing) {
       capture(existing); escrowCheck(existing.context_hash === escrowProviderContextHash(context))
@@ -123,6 +123,7 @@ export function openEscrowStore(db: Database, bootId: string, durability: Escrow
     escrowCheck(previous !== undefined && escrowProviderContextHash(previous.context) === escrowProviderContextHash(context))
     if (kind === "begin" && previous.state !== "admitted") return { claimed: false }
     if (kind === "uncertain" && previous.state === "uncertain") return { claimed: false }
+    escrowCheck(previous.state === "admitted" || previous.state === "executing")
     const job = kind === "begin" ? Job.make({ ...previous.job, status: "running" }) : previous.job, json = jobWire(job)
     db.query("UPDATE jobs SET status = ?, json = ?, boot_id = ? WHERE id = ? AND escrow_key = ?")
       .run(job.status, json, bootId, id, keyOf(context))
@@ -133,6 +134,35 @@ export function openEscrowStore(db: Database, bootId: string, durability: Escrow
       escrowProviderContextHash(persisted.context) !== escrowProviderContextHash(context)) throw new EscrowStorageUnavailable()
     return { claimed: kind === "begin" }
   })
+  const finish = db.transaction((raw: unknown, rawTerminal: unknown) => {
+    escrowCheck(durability === "durable")
+    const context = request(() => escrowActionContext(raw)), terminal = request(() => captureEscrowTerminal(context, rawTerminal))
+    const id = terminal.job.id, previous = read(id), json = escrowTerminalWire(terminal)
+    escrowCheck(previous !== undefined && escrowProviderContextHash(previous.context) === escrowProviderContextHash(context))
+    const existing = db.query<Row, [string]>(SELECT + " WHERE escrow_admissions.job_id = ?").get(id)!
+    if (existing.terminal_json !== null) { escrowCheck(existing.terminal_json === json); return { created: false } }
+    escrowCheck(["admitted", "executing", "uncertain"].includes(previous.state) &&
+      (terminal.receipt.escrow!.state !== "settled" || previous.state === "executing") &&
+      (previous.state !== "uncertain" || terminal.receipt.escrow!.state === "uncertain") &&
+      terminal.job.createdAtMs === previous.job.createdAtMs &&
+      jobWire(Job.make({ ...terminal.job, status: previous.job.status, outcome: undefined })) === jobWire(previous.job))
+    for (const p of [terminal.proof, terminal.submission?.proof ?? null]) if (p !== null) {
+      escrowCheck(db.query("SELECT 1 FROM escrow_terminal_refs WHERE tx_hash = ?").get(p.txHash) === null)
+      db.query("INSERT INTO escrow_terminal_refs (tx_hash,job_id,kind) VALUES (?,?,?)").run(p.txHash, id, p.kind)
+    }
+    db.query("INSERT INTO receipts (job_id,accrual_id,created_at_ms,json) VALUES (?,NULL,?,?)")
+      .run(id, terminal.receipt.createdAtMs, escrowReceiptWire(terminal.receipt))
+    const jobJson = jobWire(terminal.job)
+    db.query("UPDATE jobs SET status = ?, json = ?, boot_id = ? WHERE id = ? AND escrow_key = ?")
+      .run(terminal.job.status, jobJson, bootId, id, keyOf(context))
+    db.query("UPDATE escrow_admissions SET state = ?, job_digest = ?, terminal_json = ?, terminal_digest = ? WHERE job_id = ?")
+      .run(terminal.receipt.escrow!.state, hashJson(JSON.parse(jobJson)), json, hashJson(JSON.parse(json)), id)
+    const persisted = read(id)
+    if (persisted?.state !== terminal.receipt.escrow!.state || jobWire(persisted.job) !== jobJson ||
+      db.query<{ terminal_json: string }, [string]>("SELECT terminal_json FROM escrow_admissions WHERE job_id = ?").get(id)?.terminal_json !== json)
+      throw new EscrowStorageUnavailable()
+    return { created: true }
+  })
   const store: EscrowStore = Object.freeze<EscrowStore>({ durability,
     admit: (raw, queued) => effect(() => {
       const input = request(() => ({ context: escrowActionContext(raw), job: decodeJob(jobWire(queued)) }))
@@ -140,8 +170,17 @@ export function openEscrowStore(db: Database, bootId: string, durability: Escrow
     }),
     begin: (context, id) => effect(() => transition.immediate(context, id, "begin")),
     uncertain: (context, id) => effect(() => { transition.immediate(context, id, "uncertain") }),
+    finish: (context, terminal) => effect(() => finish.immediate(context, terminal)),
     get: id => effect(() => db.transaction(read).deferred(id)) })
   return Object.freeze({ store, owned,
+    getReceipts: () => {
+      try {
+        topology()
+        return db.query<Row, []>(SELECT + " WHERE terminal_json IS NOT NULL LIMIT 10001").all().map(row => {
+          const value = capture(row); return decodeEscrowTerminal(value.context, row.terminal_json!).receipt
+        })
+      } catch { throw new EscrowStorageUnavailable() }
+    },
     assertHealthy: () => { try { topology() } catch { throw new EscrowStorageUnavailable() } },
     getJob: (id: string) => { try { return db.transaction(read).deferred(id)?.job } catch { throw new EscrowStorageUnavailable() } } })
 }

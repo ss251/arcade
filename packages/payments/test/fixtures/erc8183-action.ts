@@ -13,13 +13,14 @@ const evaluator = privateKeyToAccount(generatePrivateKey()), provider = privateK
 const tokenAbi = parseAbi(["event Transfer(address indexed from,address indexed to,uint256 value)"])
 const amountData = (n: bigint) => encodeAbiParameters(parseAbiParameters("uint256"), [n])
 async function fixture(kind: PreparedEscrowAction["kind"] = "complete", amount = 300000n,
-  options: { capability?: Hex; submittedAt?: number; timestamp?: number; blockNumber?: bigint; nonce?: number } = {}) {
+  options: { capability?: Hex; submittedAt?: number; timestamp?: number; blockNumber?: bigint; nonce?: number;
+    inputHash?: Hex; outputHash?: Hex; hubJobId?: string } = {}) {
   const now = options.timestamp ?? 1000, block = options.blockNumber ?? 50n, nonce = options.nonce ?? 3
   const afterBlock = block + 1n, afterHash = hash(Number(afterBlock))
   let context = escrowActionContext({ call: { chainId: 5042002, escrow: addr(10), hook: addr(4), evaluator: evaluator.address,
     token: "0x3600000000000000000000000000000000000000", provider: provider.address, providerAgentId: 8n,
     amount, resource: "https://example.test/x/seller/skill", method: "POST", skillId: "skill",
-    skillVersion: "1.0.0", inputHash: hash(99), timeoutSeconds: 60 },
+    skillVersion: "1.0.0", inputHash: options.inputHash ?? hash(99), timeoutSeconds: 60 },
     jobId: 7n, client: addr(1), expiredAt: 2000, requestHash: hash(88), treasury: addr(5) })
   if (options.capability !== undefined) context = escrowActionContext({ ...context,
     requestHash: escrowRequestDescription(context.call, context.client, context.expiredAt, options.capability)
@@ -33,10 +34,10 @@ async function fixture(kind: PreparedEscrowAction["kind"] = "complete", amount =
   const base = { chainId: 5042002, escrow: c.escrow, signer: provider.address, jobId: 7n, nonce: 2n, deadline: BigInt(now + 600) }
   const input = kind === "budget" ? { kind, nonce: 2n, deadline: base.deadline,
     signature: await provider.signTypedData(setBudgetAuthorization({ ...base, token: c.token, amount }, now)) } :
-    kind === "submit" ? { kind, nonce: 2n, deadline: base.deadline, outputHash: hash(9),
-      signature: await provider.signTypedData(submitAuthorization({ ...base, deliverable: hash(9) }, now)) } :
-    kind === "reject" ? { kind, reason: "output_invalid" } : { kind, receipt: { hubJobId: "job_" + "a".repeat(32),
-      outputHash: hash(9), treeHash: ERC8183_ZERO_HASH, childCount: 0, childTotalAtomic: 0n } }
+    kind === "submit" ? { kind, nonce: 2n, deadline: base.deadline, outputHash: options.outputHash ?? hash(9),
+      signature: await provider.signTypedData(submitAuthorization({ ...base, deliverable: options.outputHash ?? hash(9) }, now)) } :
+    kind === "reject" ? { kind, reason: "output_invalid" } : { kind, receipt: { hubJobId: options.hubJobId ?? "job_" + "a".repeat(32),
+      outputHash: options.outputHash ?? hash(9), treeHash: ERC8183_ZERO_HASH, childCount: 0, childTotalAtomic: 0n } }
   const action = await prepareEscrowAction(context, snapshot, input, now)
   const transaction = { type: "eip1559" as const, chainId: 5042002, to: c.escrow, value: 0n,
     data: action.data, nonce, gas: 1000000n, maxFeePerGas: 2n, maxPriorityFeePerGas: 0n }
@@ -51,7 +52,7 @@ async function fixture(kind: PreparedEscrowAction["kind"] = "complete", amount =
   if (kind === "budget" || kind === "submit") {
     event(c.escrow, ERC8183_ABI, "AuthorizationUsed", { signer: c.provider, nonce: action.providerNonce }, "0x")
     if (kind === "budget") event(c.escrow, ERC8183_ABI, "BudgetSet", { jobId: 7n, token: c.token }, amountData(amount))
-    else event(c.escrow, ERC8183_ABI, "JobSubmitted", { jobId: 7n, provider: c.provider }, hash(9))
+    else event(c.escrow, ERC8183_ABI, "JobSubmitted", { jobId: 7n, provider: c.provider }, options.outputHash ?? hash(9))
   } else if (kind === "reject") {
     transfer(context.client, amount)
     event(c.escrow, ERC8183_ABI, "Refunded", { jobId: 7n, client: context.client }, amountData(amount))

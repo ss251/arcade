@@ -227,6 +227,11 @@ adds actual atomic admission and one-shot inference ownership, reciprocal
 restart/stale-writer guards and exact input preservation. Budget HTTP and
 atomic terminal/pipeline activation remain C2/D; see the
 [8C brief](../sdd/2026-09-06-J-arc-native/task-8c-brief.md).
+The [8D1 terminal checkpoint](../sdd/2026-09-06-J-arc-native/task-8d1-report.md)
+adds explicit confirmed movement/uncertainty metadata and atomic current-disk
+job/receipt/proof/reference persistence. Receipt-reader/result compatibility,
+budget HTTP, pipeline/boot and post-durable attestation still remain. See the
+[terminal brief](../sdd/2026-09-06-J-arc-native/task-8d-terminal-brief.md).
 
 - [ ] Socket messages `EscrowBudgetRequest{jobId, token, amount, escrow, chainId}` → runner replies `EscrowBudgetSigned{jobId, signature, nonce, deadline}`; `EscrowSubmitRequest{jobId, deliverable}` → `EscrowSubmitSigned{…}`. Runner signs with the seller key only; refuses if `amount` ≠ its listing price or `escrow` ≠ chain config. Runner never broadcasts.
 - [ ] `POST /x/:seller/:skill/escrow {jobId}`: validations from spec §7.3 step 3, relay `setBudgetWithAuthorization`, respond `{jobId, budget, token, escrow, fundBy}`; 409 when the job is not Open/ours; rate-limited per payer.

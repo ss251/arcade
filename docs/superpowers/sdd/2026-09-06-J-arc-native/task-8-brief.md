@@ -57,8 +57,10 @@ ownership after result cleanup, independently verifies replies and fences
 replacement/disconnect/duplicate attempts. Its volatile retention is not durable
 admission: that and pipeline remain8C/8D. No deployment or settlement is enabled.
 The [8C brief](task-8c-brief.md) now routes to the concrete
-[8C1 Store implementation](task-8c1-report.md). Budget HTTP, atomic terminal
-evidence and pipeline activation still remain; no live completion is implied.
+[8C1 Store implementation](task-8c1-report.md). The
+[terminal brief](task-8d-terminal-brief.md) routes through the
+[8D1 atomic terminal Store](task-8d1-report.md). Receipt reader/result compatibility,
+budget HTTP, attestation and pipeline activation remain; no live completion is implied.
 
 ## Verification
 

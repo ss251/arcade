@@ -1,5 +1,21 @@
 # Plan J progress
 
+2026-09-07 17:07 IST — J8D1 sole35269 gate NOT clean:5,069Vitest233PASS71.31s;
+Bun1,071PASS/1existingrelay cleanup-hook timeout/78files/8,148assert185.68s.
+Unchanged isolated pending-upstream case PASS108.38ms/2assert; no full-gate
+replay. Skipped strict/build checks run separately. Preserve J8D1 as its own
+commit, then separate fixture cleanup with a new single full gate; keep main
+atbd312401 until combined verification succeeds. No live/policy change/push.
+
+2026-09-07 17:00 IST — J8D1 terminal evidence/Store implemented offline. Closed
+receipt movement/refund/uncertainty, ordered IO/scoped bigint codec, same-root
+output/tree/submission binding and atomic terminal job/receipt/proof/reference
+transaction with exact readback.57SQLite315assert/2.47s (36new+21admission),
+22Vitest2/0.879s (12new+10action-evidence),8-rootstrict0. No activation yet;
+reader/result compatibility then C2/D actual root/budget/boot and9 remain.
+Finalscope/privacyfreeze and solefullgate next; no key/liveRPC/send/spend/deploy/
+replay/push or existing window/cap/replay change. J4/J5/J6 live pauses unchanged.
+
 2026-09-07 16:34 IST — J8C1 sole93114 full gate PASS:5,057Vitest232/70.64s;
 1,036Bun77/7,949assertions/180.52s;root/webstrict/clientSSRbuild.21newSQLite
 118assert/1.71s, four-rootstrict0;10paths96links/privacy0. Four frozen code pins

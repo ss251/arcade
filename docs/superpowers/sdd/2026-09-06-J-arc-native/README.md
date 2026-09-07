@@ -49,6 +49,7 @@ evidence remain separate open work; this index does not mark them accepted.
   [Explicit daemon/socket integration](task-8b3c1-report.md).
   [Authenticated hub broker correlation](task-8b3c2-report.md).
   [Durable admission brief](task-8c-brief.md), [atomic Store checkpoint](task-8c1-report.md).
+  [Terminal evidence brief](task-8d-terminal-brief.md), [atomic terminal checkpoint](task-8d1-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

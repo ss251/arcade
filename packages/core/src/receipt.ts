@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { keccak256, toHex } from "viem"
+import { EscrowReceiptEvidence } from "./escrow-receipt.ts"
 
 /**
  * The receipt is the product's trust artifact: it is what makes the take-rate auditable
@@ -39,7 +40,7 @@ export class Receipt extends Schema.Class<Receipt>("Receipt")({
   buyer: Schema.String,
   seller: Schema.String,
 
-  /** Total charged to the buyer, 6-dec atomic. */
+  /** Quoted price, 6-dec atomic; not evidence of a charge on an unsettled receipt. */
   priceAtomic: Schema.BigIntFromSelf,
   /** Seller's share. `sellerAtomic + feeAtomic === priceAtomic`, exactly. */
   sellerAtomic: Schema.BigIntFromSelf,
@@ -66,6 +67,8 @@ export class Receipt extends Schema.Class<Receipt>("Receipt")({
 
   rail: RailName,
   network: Schema.String,
+  /** Actual escrow movement or uncertainty, separate from the quoted allocation above. */
+  escrow: Schema.optionalWith(EscrowReceiptEvidence, { exact: true }),
 
   /** Wall-clock from job creation to terminal state. */
   latencyMs: Schema.Number,
