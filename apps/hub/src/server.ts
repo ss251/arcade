@@ -63,6 +63,7 @@ import { scrubReceipt } from "./receipts-feed.ts"
 export { scrubReceipt, type PublicReceiptRow, type PublicReceiptChild } from "./receipts-feed.ts"
 import { listingReceiptFeed, publicStats, receiptLimit } from "./public-feeds.ts"
 import { receiptChildExplorer, receiptExplorer } from "./receipt-reference.ts"
+import { escrowResultDelivery } from "./escrow-result.ts"
 import { sellerSummary, SellerSummaryUnavailable } from "./summary.ts"
 import { buildTreeView } from "./tree-view.ts"
 import { chainCheck, chainMetadataCheck, chainStartupRefusal } from "./chain-check.ts"
@@ -1377,18 +1378,22 @@ const main = Effect.gen(function* () {
             // merely EXISTING was enough — and the pipeline writes one on every terminal
             // outcome, settled or not. So a job whose settlement failed still handed over
             // the work: the seller produced it, the buyer received it, nobody paid. D2 says
-            // a failed job leaves the buyer's balance untouched; it has to also leave the
+            // On the authorization-only legacy path a failed job leaves the buyer's
+            // balance untouched; it has to also leave the
             // buyer without the goods, or "non-settlement is the refund" is a transfer.
-            const delivered = receipt.settled === true
+            // Escrow has already funded a contract: only confirmed refund proves
+            // money returned, and uncertainty must never use the legacy fallback.
+            const escrowResult = escrowResultDelivery(receipt, job)
+            if (escrowResult?.kind === "unavailable") return resultJson({ error: "escrow_evidence_unavailable" }, 503)
+            const delivered = escrowResult === undefined ? receipt.settled === true : escrowResult.kind === "delivered"
             return resultJson({
               job_id: jobId,
               status: job?.outcome?.status ?? (receipt.settled ? "succeeded" : "failed"),
-              result: delivered ? (job?.outcome?.output ?? null) : null,
+              result: escrowResult?.kind === "delivered" ? escrowResult.output : delivered ? (job?.outcome?.output ?? null) : null,
               ...(delivered
                 ? {}
                 : {
-                    detail:
-                      job?.outcome?.error ??
+                    detail: escrowResult?.kind === "withheld" ? escrowResult.detail : job?.outcome?.error ??
                       "not settled — you were not charged, and no result is released"
                   }),
               receipt: {

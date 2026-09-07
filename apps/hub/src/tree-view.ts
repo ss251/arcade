@@ -1,5 +1,6 @@
-import { formatPrice, Receipt, ReceiptChild, treeHashOf } from "@arcade/core"
+import { formatPrice, Receipt, ReceiptChild } from "@arcade/core"
 import { scrubReceipt } from "./receipts-feed.ts"
+import { escrowReceiptView, receiptChildRailCompatible, recordedTreeHash } from "./escrow-receipt-view.ts"
 
 export interface TreeNode {
   readonly nodeId: string
@@ -45,6 +46,8 @@ const own = (value: unknown, key: string): unknown => {
 
 /** Snapshot only consumed data fields; never execute a receipt accessor or toJSON. */
 const snapshot = (value: unknown): Receipt | undefined => {
+  const escrow = escrowReceiptView(value)
+  if (escrow === null) return undefined
   const id = own(value, "jobId"), skill = own(value, "skillId"), version = own(value, "skillVersion")
   const buyer = own(value, "buyer"), seller = own(value, "seller"), rail = own(value, "rail"), network = own(value, "network")
   const price = own(value, "priceAtomic"), sellerShare = own(value, "sellerAtomic"), fee = own(value, "feeAtomic")
@@ -52,7 +55,7 @@ const snapshot = (value: unknown): Receipt | undefined => {
   const root = own(value, "rootJobId"), parent = own(value, "parentJobId"), hop = own(value, "hop")
   const ceiling = own(value, "treeCeilingAtomic"), committed = own(value, "treeCommittedAtomic")
   if (!jobId(id) || !text(skill) || !text(version) || !text(buyer, 128) || !text(seller, 128) ||
-    typeof rail !== "string" || !["eip3009", "gateway", "test"].includes(rail) || !text(network, 128) ||
+    typeof rail !== "string" || !["eip3009", "gateway", "test", "erc8183"].includes(rail) || !text(network, 128) ||
     !atomic(price) || !atomic(sellerShare) || !atomic(fee) || sellerShare + fee !== price ||
     !integer(feeBps, 10_000) || typeof settled !== "boolean" || !integer(latency) || !integer(created) ||
     root !== undefined && !jobId(root) || parent !== undefined && !jobId(parent) ||
@@ -69,6 +72,7 @@ const snapshot = (value: unknown): Receipt | undefined => {
   return Receipt.make({ jobId: id, skillId: skill, skillVersion: version, buyer, seller,
     priceAtomic: price, sellerAtomic: sellerShare, feeAtomic: fee, feeBps,
     rail: rail as Receipt["rail"], network, settled, latencyMs: latency, createdAtMs: created,
+    ...(escrow === undefined ? {} : { escrow, ancestors: [] }),
     reason: text(reason, 1024) ? reason : "",
     ...(kindAbsent ? {} : { settleRefKind: kind }),
     ...(text(tx, 128) ? { settleTx: tx } : {}), ...(text(treeHash, 128) ? { treeHash } : {}),
@@ -131,7 +135,7 @@ const build = (rootJobId: string, receipts: ReadonlyArray<Receipt>): TreeView | 
   }
   if (root.treeHash === undefined || root.treeCommittedAtomic === undefined || root.treeCeilingAtomic === undefined) {
     flags.add("commitment-missing")
-  } else if (treeHashOf(rootJobId, [...committed.values()]) !== root.treeHash ||
+  } else if (recordedTreeHash(root.rail, rootJobId, [...committed.values()]) !== root.treeHash ||
     [...committed.values()].filter(c => c.settled).reduce((sum, c) => sum + c.priceAtomic, 0n) !== root.treeCommittedAtomic ||
     root.treeCommittedAtomic > root.treeCeilingAtomic) flags.add("commitment-mismatch")
   if (flags.size > 0) { emit(root, "0", null); return finish() }
@@ -145,7 +149,7 @@ const build = (rootJobId: string, receipts: ReadonlyArray<Receipt>): TreeView | 
     if (r === undefined) { flags.add("evidence-malformed"); continue }
     privateValues.add(r.jobId.toLowerCase()); privateValues.add(r.buyer.toLowerCase())
     if (r.rootJobId !== rootJobId || r.parentJobId === undefined || r.hop === undefined || r.hop < 1 ||
-      r.network !== root.network || r.rail !== root.rail) { flags.add("lineage-invalid"); continue }
+      r.network !== root.network || !receiptChildRailCompatible(root.rail, r.rail)) { flags.add("lineage-invalid"); continue }
     if (own(raw, "children") !== undefined) { flags.add("evidence-malformed"); continue }
     if (conflicts.has(r.jobId)) continue
     const previous = byJob.get(r.jobId)

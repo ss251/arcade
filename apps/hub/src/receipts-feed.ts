@@ -1,5 +1,6 @@
 import { formatPrice, NON_SETTLING, type Receipt } from "@arcade/core"
-import { hasSessionMarker, receiptChildExplorer, receiptExplorer } from "./receipt-reference.ts"
+import { hasSessionMarker, receiptChildExplorer, receiptExplorer, receiptRefundExplorer } from "./receipt-reference.ts"
+import { escrowReceiptView, escrowReceiptReason } from "./escrow-receipt-view.ts"
 
 /** Absence alone is legacy. Never invoke a kind accessor or erase invalid presence. */
 const publicKind = (receipt: Receipt): Pick<PublicReceiptRow, "settleRefKind"> => {
@@ -21,6 +22,9 @@ export interface PublicReceiptChild {
 }
 
 export interface PublicReceiptRow {
+  readonly escrow?: { readonly state: "settled" | "refunded" | "uncertain"; readonly escrowJobId: string;
+    readonly contract: string; readonly amountAtomic: string; readonly sellerPaidAtomic?: string; readonly feePaidAtomic?: string;
+    readonly refundAtomic?: string; readonly refundTx?: string; readonly refundExplorer?: string | null }
   readonly skillId: string
   readonly priceAtomic: string
   readonly sellerAtomic: string
@@ -73,45 +77,54 @@ const reasons = new Set([
  * capabilities, buyer, nonce, signature, ancestry and provider errors stay private,
  * including fields future versions add. Import-safe: this module never boots a hub.
  */
-export const scrubReceipt = (r: Receipt): PublicReceiptRow => ({
-  skillId: r.skillId,
-  skillVersion: r.skillVersion,
-  seller: r.seller,
-  rail: r.rail,
-  network: r.network,
-  priceAtomic: r.priceAtomic.toString(),
-  sellerAtomic: r.sellerAtomic.toString(),
-  feeAtomic: r.feeAtomic.toString(),
-  feeBps: r.feeBps,
-  price: formatPrice(r.priceAtomic),
-  sellerShare: formatPrice(r.sellerAtomic),
-  fee: formatPrice(r.feeAtomic),
-  settled: r.settled,
-  reason: reasons.has(r.reason) ? r.reason : r.settled ? "settled" : "not settled",
-  latencyMs: r.latencyMs,
-  createdAtMs: r.createdAtMs,
-  ...(r.settled && reference(r.rail, r.settleTx) ? { settleTx: r.settleTx } : {}),
-  explorer: receiptExplorer(r),
-  session: hasSessionMarker(r),
-  ...publicKind(r),
-  hop: r.hop ?? 0,
-  ...(hash(r.treeHash) ? { treeHash: r.treeHash } : {}),
-  ...(hash(r.feeSweepTx) ? { feeSweepTx: r.feeSweepTx } : {}),
-  ...(r.sellerCostUsd !== undefined && Number.isFinite(r.sellerCostUsd) && r.sellerCostUsd >= 0
-    ? { sellerCostUsd: r.sellerCostUsd } : {}),
-  ...(r.treeCeilingAtomic === undefined ? {} : { treeCeilingAtomic: r.treeCeilingAtomic.toString() }),
-  ...(r.treeCommittedAtomic === undefined ? {} : { treeCommittedAtomic: r.treeCommittedAtomic.toString() }),
-  ...(r.canary === undefined ? {} : { canary: r.canary }),
-  children: (r.children ?? []).map(c => ({
-    // The pipeline's unresolved-child fallback is literally the private job id.
-    skillId: c.skillId === c.jobId ? "unknown-skill" : c.skillId,
-    priceAtomic: c.priceAtomic.toString(),
-    price: formatPrice(c.priceAtomic),
-    settled: c.settled,
-    ...(c.settled && reference(r.rail, c.settleTx) ? { settleTx: c.settleTx } : {}),
-    explorer: receiptChildExplorer(r, c)
-  }))
-})
+export const scrubReceipt = (r: Receipt): PublicReceiptRow => {
+  const escrow = escrowReceiptView(r), settled = escrow === undefined ? r.settled : escrow?.state === "settled"
+  const metadata: Pick<PublicReceiptRow, "escrow"> = escrow == null ? {} : { escrow: {
+    state: escrow.state, escrowJobId: escrow.jobId, contract: escrow.escrow, amountAtomic: escrow.amountAtomic,
+    ...(escrow.state === "settled" ? { sellerPaidAtomic: escrow.sellerAtomic, feePaidAtomic: escrow.feeAtomic } : {}),
+    ...(escrow.state === "refunded" ? { refundAtomic: escrow.refundAtomic, refundTx: escrow.txHash, refundExplorer: receiptRefundExplorer(r) } : {})
+  } }
+  return {
+    skillId: r.skillId,
+    skillVersion: r.skillVersion,
+    seller: r.seller,
+    rail: r.rail,
+    network: r.network,
+    priceAtomic: r.priceAtomic.toString(),
+    sellerAtomic: r.sellerAtomic.toString(),
+    feeAtomic: r.feeAtomic.toString(),
+    feeBps: r.feeBps,
+    price: formatPrice(r.priceAtomic),
+    sellerShare: formatPrice(r.sellerAtomic),
+    fee: formatPrice(r.feeAtomic),
+    settled,
+    reason: escrow === undefined ? reasons.has(r.reason) ? r.reason : r.settled ? "settled" : "not settled" : escrowReceiptReason(escrow),
+    latencyMs: r.latencyMs,
+    createdAtMs: r.createdAtMs,
+    ...(settled && reference(r.rail, r.settleTx) ? { settleTx: r.settleTx } : {}),
+    ...metadata,
+    explorer: receiptExplorer(r),
+    session: hasSessionMarker(r),
+    ...publicKind(r),
+    hop: r.hop ?? 0,
+    ...(hash(r.treeHash) ? { treeHash: r.treeHash } : {}),
+    ...(hash(r.feeSweepTx) ? { feeSweepTx: r.feeSweepTx } : {}),
+    ...(r.sellerCostUsd !== undefined && Number.isFinite(r.sellerCostUsd) && r.sellerCostUsd >= 0
+      ? { sellerCostUsd: r.sellerCostUsd } : {}),
+    ...(r.treeCeilingAtomic === undefined ? {} : { treeCeilingAtomic: r.treeCeilingAtomic.toString() }),
+    ...(r.treeCommittedAtomic === undefined ? {} : { treeCommittedAtomic: r.treeCommittedAtomic.toString() }),
+    ...(r.canary === undefined ? {} : { canary: r.canary }),
+    children: (r.children ?? []).map(c => ({
+      // The pipeline's unresolved-child fallback is literally the private job id.
+      skillId: c.skillId === c.jobId ? "unknown-skill" : c.skillId,
+      priceAtomic: c.priceAtomic.toString(),
+      price: formatPrice(c.priceAtomic),
+      settled: c.settled,
+      ...(escrow === undefined && c.settled && reference(r.rail, c.settleTx) ? { settleTx: c.settleTx } : {}),
+      explorer: receiptChildExplorer(r, c)
+    }))
+  }
+}
 
 /** Existing import compatibility; never a second projection. */
 export const publicReceipt = scrubReceipt

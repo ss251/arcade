@@ -6,10 +6,11 @@ import { EscrowReceiptEvidence } from "./escrow-receipt.ts"
  * The receipt is the product's trust artifact: it is what makes the take-rate auditable
  * and what gates a rating (only a paying caller holds one).
  *
- * The platform fee is ACCRUED, not settled per call — two on-chain cheques would cost
+ * On the EIP-3009 rail the platform fee is ACCRUED, not settled per call — two on-chain cheques would cost
  * ~4.4% of a $0.10 call on the EIP-3009 rail (measured: 0.00218 USDC/settlement).
  * `feeSweepTx` is backfilled into every receipt a sweep covers, so the fee is still
  * traceable on-chain; it is simply batched, exactly as Gateway batches settlement.
+ * Escrow instead pays its platform fee in the confirmed complete transaction.
  */
 
 export const RailName = Schema.Literal("eip3009", "gateway", "erc8183", "test")

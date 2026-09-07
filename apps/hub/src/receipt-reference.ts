@@ -1,4 +1,5 @@
 import { loadChainConfig } from "../../../packages/core/src/chain-config.ts"
+import { escrowReceiptView } from "./escrow-receipt-view.ts"
 
 const ABSENT = Symbol("absent"), INVALID = Symbol("invalid")
 /** Only recorded own data conveys authority; inherited/accessor values do not. */
@@ -35,11 +36,23 @@ const reference = (context: unknown, value: unknown): string | null => {
 }
 
 /** A recorded reference for inspection, not a fresh mining/status verification. */
-export const receiptExplorer = (receipt: unknown): string | null => reference(receipt, receipt)
+export const receiptExplorer = (receipt: unknown): string | null => {
+  const escrow = escrowReceiptView(receipt)
+  if (escrow === undefined) return reference(receipt, receipt)
+  const explorer = explorers.get("eip155:5042002")
+  return escrow?.state === "settled" && explorer !== undefined ? `${explorer}/tx/${escrow.txHash}` : null
+}
+
+/** A recorded refund is distinct from a successful settlement/result release. */
+export const receiptRefundExplorer = (receipt: unknown): string | null => {
+  const escrow = escrowReceiptView(receipt), explorer = explorers.get("eip155:5042002")
+  return escrow?.state === "refunded" && explorer !== undefined ? `${explorer}/tx/${escrow.txHash}` : null
+}
 
 /** Compact descendants lack provenance fields: use the original root context,
  * but the child's own settled/reference fields, independent of root success. */
-export const receiptChildExplorer = (root: unknown, child: unknown): string | null => reference(root, child)
+export const receiptChildExplorer = (root: unknown, child: unknown): string | null =>
+  escrowReceiptView(root) === undefined ? reference(root, child) : null
 
 /** Expose only provenance, never the private correlation identifier itself. */
 export const hasSessionMarker = (receipt: unknown): boolean => {

@@ -1,5 +1,21 @@
 # Plan J progress
 
+2026-09-07 17:45 IST — J8D2 sole71381 fullgatePASS:5,097Vitest234/75.89s;
+1,075Bun79/8,209assert182.66s;root/webstrict/clientSSR.17paths107links/privacy0
+freeze; compare11code/test pins, commit and exact-one main FF next. Then C2/D
+budget/root pipeline, durable boot, attestation and9. No new live authority,
+key reads, RPC, spending, deployment, policy changes or push.
+
+2026-09-07 17:36 IST — J8D2 reader/result compatibility implemented offline:
+closed outer/nested escrow evidence; public actual-movement whitelist; qualified
+completion/refund links; mixed-rail full-child provenance; uncertain margin
+withheld. Real token route uses escrow delivery guard/fixed withheld wording.
+Four initial Reds fixed; seven ambient-network import regressions caught by
+existing tests then fixed via direct data imports.184Vitest5PASS2.30s; final
+expanded28newcasesPASS1.07s;3actualBunhub/SQLite63assertPASS1.447s;11-rootstrict0.
+Freeze/privacy and sole full gate next. No C2 budget/root/boot activation yet;
+then actualcomposition/attestation and9. No ownerkeys/RPC/spend/deploy/policy/push.
+
 2026-09-07 17:14 IST — Distinct relay-fixture follow-up sole66986 fullgatePASS:
 5,069Vitest233/70.60s;1,072Bun78/8,146assert181.70s;root/webstrict/clientSSR.
 Focused22Bun84assert/405ms;fourpaths/fourlinks/privacy0; fixture frozen. Final

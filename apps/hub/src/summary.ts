@@ -1,5 +1,6 @@
-import { formatPrice, ReceiptChild, treeHashOf, type Receipt } from "@arcade/core"
+import { formatPrice, ReceiptChild, type Receipt } from "@arcade/core"
 import type { ListingRecord, RunnerRecord } from "./store.ts"
+import { escrowReceiptView, receiptChildRailCompatible, recordedTreeHash } from "./escrow-receipt-view.ts"
 
 /** A route can map this named, fixed diagnostic to an unavailable response. */
 export class SellerSummaryUnavailable extends Error {
@@ -23,7 +24,7 @@ const address = (value: unknown): string | undefined =>
 const id = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value)
 const skill = (value: unknown): value is string => typeof value === "string" && /^[a-z0-9][a-z0-9-]{1,63}$/.test(value)
 const hash = (value: unknown): value is string => typeof value === "string" && /^0x[0-9a-fA-F]{64}$/.test(value) && !/^0x0{64}$/.test(value)
-const railName = (value: unknown): value is Receipt["rail"] => value === "eip3009" || value === "gateway" || value === "test"
+const railName = (value: unknown): value is Receipt["rail"] => value === "eip3009" || value === "gateway" || value === "test" || value === "erc8183"
 // Locators only: Gateway transfer UUIDs and simulated rail references are not chain proof.
 const reference = (rail: Receipt["rail"], value: unknown): value is string => hash(value) || typeof value === "string" && (
   rail === "gateway" && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value) ||
@@ -81,6 +82,7 @@ export interface SellerSummary {
 interface Lineage { root: string; parent: string | undefined; hop: number; ancestors: readonly string[] }
 interface Child { jobId: string; skillId: string; price: bigint; settled: boolean; tx: string | undefined }
 interface Row extends Child {
+  escrow?: string; settlementComplete: boolean
   seller: string; buyer: string; net: bigint; fee: bigint; cost: bigint | null
   version: string; network: string; rail: Receipt["rail"]; at: number
   lineage: Lineage | null; children: readonly Child[] | null; committed: bigint | null
@@ -97,13 +99,18 @@ const lineageOf = (r: unknown): Lineage | null => {
 }
 const childOf = (r: unknown, rail: Receipt["rail"]): Child => {
   const jobId = own(r, "jobId"), skillId = own(r, "skillId"), price = own(r, "priceAtomic"), settled = own(r, "settled"), tx = own(r, "settleTx")
-  if (!id(jobId) || !skill(skillId) || !atomic(price) || typeof settled !== "boolean" || (tx !== undefined && !reference(rail, tx))) refuse()
+  // Compact escrow-root manifests lack child provenance. Only locator syntax is
+  // checked here; completeness below requires the actual full child receipt.
+  const locator = rail === "erc8183" ? reference("eip3009", tx) || reference("gateway", tx) || reference("test", tx) : reference(rail, tx)
+  if (!id(jobId) || !skill(skillId) || !atomic(price) || typeof settled !== "boolean" || (tx !== undefined && !locator)) refuse()
   // The canonical tree commits the original locator bytes, including hex letter case.
   return { jobId, skillId, price, settled, tx: typeof tx === "string" ? tx : undefined }
 }
 const rowOf = (r: unknown, now: number): Row => {
   const rail = own(r, "rail")
   if (!railName(rail)) refuse()
+  const escrow = escrowReceiptView(r)
+  if (escrow === null) refuse()
   const child = childOf(r, rail), seller = address(own(r, "seller")), buyer = address(own(r, "buyer"))
   const net = own(r, "sellerAtomic"), fee = own(r, "feeAtomic"), cost = own(r, "sellerCostUsd"), at = own(r, "createdAtMs")
   const version = own(r, "skillVersion"), network = own(r, "network")
@@ -111,9 +118,11 @@ const rowOf = (r: unknown, now: number): Row => {
     !instant(at) || at > now || !text(version, 128) || network !== "eip155:5042002") refuse()
   const rawChildren = own(r, "children"), committed = own(r, "treeCommittedAtomic"), treeHash = own(r, "treeHash")
   return { ...child, seller, buyer, net, fee, cost: cost === undefined ? null : usdToAtomic(cost as number), at, version, network, rail,
+    ...(escrow === undefined ? {} : { escrow: JSON.stringify(escrow) }), settlementComplete: escrow?.state !== "uncertain",
     lineage: lineageOf(r), children: rawChildren === undefined ? null : list(rawChildren, MAX_DESCENDANTS).map(c => childOf(c, rail))
       .sort((a, b) => a.jobId < b.jobId ? -1 : a.jobId > b.jobId ? 1 : 0),
-    committed: atomic(committed) ? committed : null, treeHash: treeHash === undefined ? undefined : hash(treeHash) ? treeHash.toLowerCase() : null }
+    committed: atomic(committed) ? committed : null, treeHash: treeHash === undefined ? undefined :
+      hash(treeHash) || rail === "erc8183" && treeHash === "0x" + "0".repeat(64) ? (treeHash as string).toLowerCase() : null }
 }
 // Compare only the bounded accounting projection. Private diagnostics and fee-sweep
 // backfills are irrelevant; economically contradictory duplicates cannot pick a winner.
@@ -134,9 +143,9 @@ const rootOf = (r: Row, rows: ReadonlyMap<string, Row>): Row | undefined => {
   return undefined
 }
 
-interface Totals { calls: number; settled: number; revenue: bigint; fees: bigint; net: bigint; cost: bigint; spend: bigint; costComplete: boolean; spendComplete: boolean }
-const empty = (): Totals => ({ calls: 0, settled: 0, revenue: 0n, fees: 0n, net: 0n, cost: 0n, spend: 0n, costComplete: true, spendComplete: true })
-const margin = (t: Totals): bigint | null => t.costComplete && t.spendComplete ? t.net - t.cost - t.spend : null
+interface Totals { calls: number; settled: number; revenue: bigint; fees: bigint; net: bigint; cost: bigint; spend: bigint; costComplete: boolean; spendComplete: boolean; settlementComplete: boolean }
+const empty = (): Totals => ({ calls: 0, settled: 0, revenue: 0n, fees: 0n, net: 0n, cost: 0n, spend: 0n, costComplete: true, spendComplete: true, settlementComplete: true })
+const margin = (t: Totals): bigint | null => t.costComplete && t.spendComplete && t.settlementComplete ? t.net - t.cost - t.spend : null
 
 /**
  * Pure summary over a complete hub snapshot, not a financial/chain verifier. `children`
@@ -190,7 +199,7 @@ export const sellerSummary = (
         const full = rows.get(c.jobId)
         // Actual root manifests contain non-released reservations as well as commits.
         // An unsettled entry still present is unresolved, not evidence of a free hire.
-        if (!c.settled || children.has(c.jobId) || c.jobId === rootId || full === undefined || roots.get(c.jobId) !== root || full.rail !== root?.rail ||
+        if (!c.settled || children.has(c.jobId) || c.jobId === rootId || full === undefined || roots.get(c.jobId) !== root || root === undefined || !receiptChildRailCompatible(root.rail, full.rail) ||
           full.skillId !== c.skillId || full.price !== c.price || full.settled !== c.settled || full.tx !== c.tx) valid = false
         children.set(c.jobId, c)
         if (c.settled) committed += c.price
@@ -198,7 +207,7 @@ export const sellerSummary = (
       if (root?.committed !== committed) valid = false
       // Completeness means coherent local ledger data, not independently mined proof.
       // Missing hashes do not invent blockchain verification; a supplied hash must match.
-      if (root !== undefined && root.treeHash !== undefined && root.treeHash !== treeHashOf(rootId, (manifest ?? []).map(c => ReceiptChild.make({
+      if (root !== undefined && root.treeHash !== undefined && root.treeHash !== recordedTreeHash(root.rail, rootId, (manifest ?? []).map(c => ReceiptChild.make({
         jobId: c.jobId, skillId: c.skillId, priceAtomic: c.price, settled: c.settled,
         ...(c.tx === undefined ? {} : { settleTx: c.tx })
       })))) valid = false
@@ -208,7 +217,7 @@ export const sellerSummary = (
     const spend = new Map<string, bigint>(), unknownFunding = new Set<string>()
     for (const r of rows.values()) {
       const root = roots.get(r.jobId)
-      if (!r.settled || r.lineage?.parent === undefined || root === undefined || r.rail !== root.rail) continue
+      if (!r.settled || r.lineage?.parent === undefined || root === undefined || !receiptChildRailCompatible(root.rail, r.rail)) continue
       const parent = rows.get(r.lineage.parent)
       if (parent?.seller !== key) continue
       if (r.buyer !== key) { unknownFunding.add(parent.jobId); continue }
@@ -220,6 +229,7 @@ export const sellerSummary = (
       const per = perSkill.get(r.skillId) ?? empty()
       for (const t of [total, per]) {
         t.calls++
+        if (!r.settlementComplete) t.settlementComplete = false
         if (r.settled) { t.settled++; t.revenue += r.price; t.fees += r.fee; t.net += r.net }
         if (r.cost === null) t.costComplete = false
         else t.cost += r.cost

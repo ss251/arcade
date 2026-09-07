@@ -59,8 +59,10 @@ admission: that and pipeline remain8C/8D. No deployment or settlement is enabled
 The [8C brief](task-8c-brief.md) now routes to the concrete
 [8C1 Store implementation](task-8c1-report.md). The
 [terminal brief](task-8d-terminal-brief.md) routes through the
-[8D1 atomic terminal Store](task-8d1-report.md). Receipt reader/result compatibility,
-budget HTTP, attestation and pipeline activation remain; no live completion is implied.
+[8D1 atomic terminal Store](task-8d1-report.md). The
+[8D2 reader/result checkpoint](task-8d2-report.md) adds explicit recorded evidence,
+mixed-rail child provenance and actual token-gated result withholding. Budget HTTP,
+attestation and pipeline/boot activation remain; no live completion is implied.
 
 ## Verification
 
