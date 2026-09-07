@@ -66,6 +66,9 @@ attestation and pipeline/boot activation remain; no live completion is implied.
 The [8D3 closure checkpoint](task-8d3-report.md) closes escrow child admission
 on current SQLite before a stable receipt tree can be committed. Existing
 capability expiry and legacy root behavior remain unchanged.
+The [8D4 pipeline checkpoint](task-8d4-report.md) composes durable execution,
+tree closure, guarded terminal actions and post-durable attestation. Actual
+budget/root HTTP and explicit pinned boot remain before Task9.
 
 ## Verification
 

@@ -57,14 +57,19 @@ export function makeEscrowBroker(options: {
     parentJobId?: string; hireCapability?: string; escrow: EscrowContextWire }) => {
     try {
       const context = escrowContextFromWire(args.escrow)
-      escrowCheck(/^job_[A-Za-z0-9]{16,128}$/.test(args.jobId) && args.parentJobId === undefined && args.hireCapability === undefined &&
+      // Internal pipeline may forward its hub-minted root capability. The receiving
+      // ordinary child route still verifies its MAC and durable root admission.
+      escrowCheck(/^job_[A-Za-z0-9]{16,128}$/.test(args.jobId) && args.parentJobId === undefined &&
+        (args.hireCapability === undefined || typeof args.hireCapability === "string" && args.hireCapability.length <= 1024 &&
+          /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(args.hireCapability)) &&
         args.skillId === context.call.skillId && args.skillVersion === context.call.skillVersion && args.timeoutSec === context.call.timeoutSeconds)
       const input: unknown = JSON.parse(docBytes(args.input)); escrowCheck(hashJson(input) === context.call.inputHash)
       const job = lookup(context, true)
       escrowCheck(job.hubJobId === undefined && !job.ended && !hubJobs.has(args.jobId))
       job.hubJobId = args.jobId; hubJobs.set(args.jobId, job)
       return { conn: job.lease.conn, message: { _tag: "JobAssignment", jobId: args.jobId, skillId: args.skillId,
-        skillVersion: args.skillVersion, timeoutSec: args.timeoutSec, input, escrow: escrowContextToWire(context) } as HubMessage }
+        skillVersion: args.skillVersion, timeoutSec: args.timeoutSec, input, escrow: escrowContextToWire(context),
+        ...(args.hireCapability === undefined ? {} : { hireCapability: args.hireCapability }) } as HubMessage }
     } catch { throw refused() }
   }
   const complete = (hubJobId: string, outcome: JobOutcome) => {

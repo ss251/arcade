@@ -236,6 +236,10 @@ The [8D2 reader/result checkpoint](../sdd/2026-09-06-J-arc-native/task-8d2-repor
 adds coherent escrow summaries/references/public evidence, actual legacy child
 provenance in mixed-rail trees, and token-gated output/refund/uncertainty handling.
 Budget HTTP, root pipeline/boot and post-durable attestation still remain.
+The [8D3 tree closure](../sdd/2026-09-06-J-arc-native/task-8d3-report.md) and
+[8D4 typed pipeline](../sdd/2026-09-06-J-arc-native/task-8d4-report.md) now provide
+durable execution/tree accounting, guarded actions and post-durable attestation.
+Budget/root HTTP and explicit pinned boot are still unwired; Task8 remains open.
 
 - [ ] Socket messages `EscrowBudgetRequest{jobId, token, amount, escrow, chainId}` → runner replies `EscrowBudgetSigned{jobId, signature, nonce, deadline}`; `EscrowSubmitRequest{jobId, deliverable}` → `EscrowSubmitSigned{…}`. Runner signs with the seller key only; refuses if `amount` ≠ its listing price or `escrow` ≠ chain config. Runner never broadcasts.
 - [ ] `POST /x/:seller/:skill/escrow {jobId}`: validations from spec §7.3 step 3, relay `setBudgetWithAuthorization`, respond `{jobId, budget, token, escrow, fundBy}`; 409 when the job is not Open/ours; rate-limited per payer.

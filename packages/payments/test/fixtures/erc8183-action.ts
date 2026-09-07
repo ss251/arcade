@@ -14,7 +14,8 @@ const tokenAbi = parseAbi(["event Transfer(address indexed from,address indexed 
 const amountData = (n: bigint) => encodeAbiParameters(parseAbiParameters("uint256"), [n])
 async function fixture(kind: PreparedEscrowAction["kind"] = "complete", amount = 300000n,
   options: { capability?: Hex; submittedAt?: number; timestamp?: number; blockNumber?: bigint; nonce?: number;
-    inputHash?: Hex; outputHash?: Hex; hubJobId?: string } = {}) {
+    inputHash?: Hex; outputHash?: Hex; hubJobId?: string;
+    receiptTree?: { treeHash: Hex; childCount: number; childTotalAtomic: bigint } } = {}) {
   const now = options.timestamp ?? 1000, block = options.blockNumber ?? 50n, nonce = options.nonce ?? 3
   const afterBlock = block + 1n, afterHash = hash(Number(afterBlock))
   let context = escrowActionContext({ call: { chainId: 5042002, escrow: addr(10), hook: addr(4), evaluator: evaluator.address,
@@ -37,7 +38,7 @@ async function fixture(kind: PreparedEscrowAction["kind"] = "complete", amount =
     kind === "submit" ? { kind, nonce: 2n, deadline: base.deadline, outputHash: options.outputHash ?? hash(9),
       signature: await provider.signTypedData(submitAuthorization({ ...base, deliverable: options.outputHash ?? hash(9) }, now)) } :
     kind === "reject" ? { kind, reason: "output_invalid" } : { kind, receipt: { hubJobId: options.hubJobId ?? "job_" + "a".repeat(32),
-      outputHash: options.outputHash ?? hash(9), treeHash: ERC8183_ZERO_HASH, childCount: 0, childTotalAtomic: 0n } }
+      outputHash: options.outputHash ?? hash(9), ...(options.receiptTree ?? { treeHash: ERC8183_ZERO_HASH, childCount: 0, childTotalAtomic: 0n }) } }
   const action = await prepareEscrowAction(context, snapshot, input, now)
   const transaction = { type: "eip1559" as const, chainId: 5042002, to: c.escrow, value: 0n,
     data: action.data, nonce, gas: 1000000n, maxFeePerGas: 2n, maxPriorityFeePerGas: 0n }
@@ -68,7 +69,8 @@ async function fixture(kind: PreparedEscrowAction["kind"] = "complete", amount =
     event(c.escrow, ERC8183_ABI, "PaymentReleased", { jobId: 7n, recipient: c.provider }, amountData(amount - fee))
     event(c.escrow, ERC8183_ABI, "JobCompleted", { jobId: 7n, evaluator: c.evaluator }, action.reason!)
     event(c.hook, ARCADE_JOB_HOOK_ABI, "ArcadeSettled", { jobId: 7n },
-      encodeAbiParameters(parseAbiParameters("bytes32,uint32,uint256,bytes32"), [ERC8183_ZERO_HASH, 0, 0n, action.receipt!.hash]))
+      encodeAbiParameters(parseAbiParameters("bytes32,uint32,uint256,bytes32"), [action.receipt!.tree.treeHash,
+        action.receipt!.tree.childCount, action.receipt!.tree.childTotalAtomic, action.receipt!.hash]))
   }
   const receipt: TransactionReceipt = { transactionHash: signed.hash, blockNumber: afterBlock, blockHash: afterHash, transactionIndex: 0,
     from: c.evaluator, to: c.escrow, status: "success", type: "eip1559", gasUsed: 100000n, effectiveGasPrice: 2n,

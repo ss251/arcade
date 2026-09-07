@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 18:27 IST — J8D4 sole20833 fullgatePASS:5,097Vitest234/72.20s;
+1,142Bun81/8,592assert184.90s;root/webstrict/clientSSR.42newBun252assert1.78s;
+79existingVitest7/2.32s;4-rootstrict0;10paths114links/privacy0. Compare four
+frozen pins, atomic commit/exact-one main FF next. Budget/root HTTP and pinned
+durable boot remain unwired; then9. No live/policy change/ownerkeys/spend/push.
+
+2026-09-07 18:22 IST — J8D4 typed escrow pipeline implemented offline: durable
+one-claim dispatch, current listing/input binding, hub-minted root capability,
+closed actual child tree, submit/complete or proven refund, explicit uncertainty,
+post-durable bounded attestation. Existing79Vitest7PASS2.32s. Final focused
+pipeline count/strict/freeze and sole gate next. Budget/root HTTP and pinned
+durable boot remain unwired; then9. No live/policy change/keys/spend/deploy/push.
+
 2026-09-07 18:02 IST — J8D3 sole35455 fullgatePASS:5,097Vitest234/71.00s;
 1,100Bun80/8,340assert183.54s;root/webstrict/clientSSR.5-rootstrict0;
 10paths75links/privacy0; compare five frozen pins then atomic commit/exact main
