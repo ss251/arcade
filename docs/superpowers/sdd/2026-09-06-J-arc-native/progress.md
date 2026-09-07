@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 11:21 IST — J7B1 sole37680 fullgatePASS:4,883Vitest218/66.33s;
+964Bun69/7,317assert/172.66s;root/webstrict/client+SSR(185ms)builds.
+Five frozen code/test pins to recheck;11paths57links/privacy0 initial audit.
+Final audit/atomiccommit/exactFF next, then7B2 guarded actions and8/9 offline.
+J4/J5 live andJ6 size/treasury pauses unchanged; no keys/RPC/send/spend/push.
+
+2026-09-07 11:16 IST — J7B1 offline capability/request binding, separate Open
+budget/Funded verification and finalized identity/state reader implemented.
+Focused32Vitest/2files/24ms and five-rootstrict0PASS; final stage discriminator
+added before freeze. Sole full gate/audit/commit/exactFF next. No installed
+rail, durable reservation or send yet; continue7B2 then8/9. No RPC/keys/spend,
+existing window/cap/replay changes, agents or push. J4/J5/J6 live pauses remain.
+
 2026-09-07 10:58 IST — J7A sole99429PASS:4,851Vitest216/66.77s;
 964Bun69/7,319assert/173.45s;root/webstrict;client343ms/SSR177ms.
 Sixfrozencode/testpins unchanged; final12pathsaudit next. J6 unsigned2RPC

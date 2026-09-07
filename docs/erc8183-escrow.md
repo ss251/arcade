@@ -78,3 +78,32 @@ verify `whitelistedHooks(0)`, then whitelist the actual hook.
 
 See the [Task6 brief](superpowers/sdd/2026-09-06-J-arc-native/task-6a-brief.md)
 and [verification record](superpowers/sdd/2026-09-06-J-arc-native/task-6a-report.md).
+
+## Root request ownership (offline implementation, not yet an active rail)
+
+A public jobId is not payer authority. The buyer generates a fresh32-byte
+capability and calls escrowRequestDescription with the trusted challenge,
+listing/request context, its client address and absolute job expiry. The
+on-chain description is a versioned hash commitment, not the raw secret.
+The private budget request and funded retry carry payload:
+
+```json
+{"jobId":"123","capability":"<private 32-byte hex capability>"}
+```
+
+The hub reconstructs the description using the current listing and actual
+input. It must not trust caller-provided payer, price, input hash or other
+echoed metadata. The commitment binds chain/deployment, token/provider/agent,
+client/amount, resource/method, listing/version, input hash, timeout and expiry.
+Existing hashJson commits JSON property order; the buyer must preserve its
+input across commitment and retry. Keep the capability out of public logs,
+receipts/evidence and chain records. A contract-wallet client can use this
+proof without a new EOA signature; live Circle escrow proof is still pending.
+
+The new reader checks pinned code, implementation slot, domain, hook/fees and
+job facts at one finalized height and independently rechecks that block hash.
+The configured identities must come from verified deployment evidence, which
+does not yet exist. A fresh snapshot or correct capability does not replace
+durable once-only admission or guarded hash-before-send journaling. No escrow
+rail is advertised until those pieces and deployment prerequisites are ready.
+See the [J7B1 record](superpowers/sdd/2026-09-06-J-arc-native/task-7b1-report.md).
