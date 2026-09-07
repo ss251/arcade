@@ -15,6 +15,7 @@ evidence remain separate open work; this index does not mark them accepted.
 - [Task 4 brief](task-4-brief.md), [proof contracts](task-4a-report.md),
   [read-only CLI preflight](../../../evidence/J/circle-cli-preflight.md).
 - [Progress ledger](progress.md).
+- [Task5 brief](task-5-brief.md), [policy/binding checkpoint](task-5a-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends

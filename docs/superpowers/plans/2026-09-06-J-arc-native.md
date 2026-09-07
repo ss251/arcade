@@ -120,13 +120,20 @@ immediate200 assertion below. Raw journals stay private; only scrubbed summaries
 belong in docs/evidence. Local discovery overrides never imply public listing.
 Task4A passed its sole full gate. Before funding, source inspection found the
 CLI's forced30-day validity incompatible with ARCADE's604900-second pin.
-An explicit bounded testnet-profile decision is pending; no expiry change or
-live payment is authorized by this execution note.
+J4 live is PAUSED by the Sep7 conductor decision; no expiry/cap/replay change.
+No paid attempt occurred, so no exact sent validBefore exists. Root Gateway
+first predicts requirements_mismatch on echoed timeout; vanilla root EIP-3009
+has no maximum lifetime. See the precise source-only trace in the preflight.
 
 - [ ] `scripts/e2e-circle-cli.sh`: start hub (both rails) + runner locally, then: `curl -i` the unpaid 402 (all accepts), `circle services inspect <url> --output json` (assert scheme `GatewayWalletBatched`, price, method), `circle gateway balance --address <agent> --chain ARC-TESTNET`, `circle services pay <url> -X POST --address <agent> --chain ARC-TESTNET --max-amount 0.01 --data '<canaryInput>' --output json`; assert HTTP 200 body and a receipt whose payer is the Circle SCA. Journal to `docs/evidence/J/circle-cli.jsonl`. Agent wallet from Plan I Task 1; if the CLI refuses the chain, capture the exact error and fall back to `--estimate` evidence plus the header replay from Plan I Task 2. Do not guess at CLI behaviour; record it.
 - [ ] Commit: `test(e2e): Circle CLI agent wallet inspects and pays an ARCADE listing on Arc testnet`.
 
 ### Task 5: Unified Balance delegate funding (J3)
+
+Execution checkpoints:5A policy/typed bindings,5B durable guarded CLI runtime,
+5C separate approved live proof. [Task5 brief](../sdd/2026-09-06-J-arc-native/task-5-brief.md)
+records SDK shape, polling and fee-bound corrections. The shorthand `to` below
+needs the guarded destination adapter; an SDK result is not independent proof.
 
 - [ ] Add `@circle-fin/unified-balance-kit` + `@circle-fin/adapter-viem-v2` to `packages/buyer`. `unified-balance-funding.ts`: `delegateStatus(owner, delegate, sourceChain)`, `spendFromOwner({owner, sourceChain, amount, recipient: delegate})` with `to: {chain: "Arc_Testnet", recipientAddress}`; all amounts strings with 6-dp validation; journal reuse from `gateway-funding-journal.ts`.
 - [ ] CLI `arcade fund --from-unified-balance --owner 0x… --source Base_Sepolia|Arc_Testnet --amount 0.50`: prints the owner's `addDelegate` command verbatim when status is `none`/`pending` and exits 2; spends only when `ready`; `--dry-run` prints the plan.

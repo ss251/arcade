@@ -1,5 +1,21 @@
 # Plan J progress
 
+2026-09-07 06:22 IST — Task5A sole8824PASS:4,728Vitest210/66.59s,
+874Bun57/6,374assert/167.68s,root/webstrict,client365ms/SSR186ms.47focused
+tests/2files/652ms and4-rootstrict0; six frozen code/package/lock pins. Final
+12-path/33-link/privacy audit and atomic commit/exactFF next.5B durable guarded
+runtime/CLI and5C live remain unimplemented. J4 live remains PAUSED; no policy
+changes, keys, money movement, agents or push. Next J step is5B, not J4 retry.
+
+2026-09-07 06:16 IST — J4A merged9305ff2; J4 live explicitly PAUSED. No
+validBefore was sent and no live refusal captured. Source trace added: root
+Gateway first predicts HTTP402 payment_invalid/requirements_mismatch for echoed
+2592000 vs604900; independent Gateway time bound remains; root vanilla verifier
+has no maximum lifetime. No validity/cap/replay changes. J5A policy/SDK binding
+implemented with pinned kit/adapter;47focused tests passed, strict test-only
+annotation correction pending final check.5B runtime/journal/CLI and5C live
+proof remain unimplemented. No keys, sends, agents, push or mainnet changes.
+
 2026-09-07 04:01 IST — Task4A sole56380PASS:4,681Vitest208/65.43s,
 874Bun57/6,374assert/167.35s,root/webstrict,client399ms/SSR174ms. Two frozen
 source/test pins; final8-path audit/atomic commit/exactFFmain next. J4B live
@@ -93,10 +109,9 @@ notrun; later escrow-state/Circlepayer/queued202 assumptions explicitly flagged.
   compatibility; original failures and split verification retained.
 - Task3 MERGED:3A519a244;3B459f5fb WITH_CONCERNS for recorded split gate.
   No live-payment claim.
-- Task4 IN_PROGRESS:4A COMPLETE after sole full gate, final audit/commit/merge
-  next.4B runtime unimplemented and live proof NOT_RUN; validity-policy owner
-  decision pending. Existing deposit/payment approvals remain unused.
-- Task5 NOT_STARTED: Unified Balance delegate funding and separate live proof.
+- Task4 PAUSED:4A MERGED9305ff2.4B runtime unimplemented; live NOT_RUN. No
+  policy change; existing deposit/payment approvals remain unused.
+- Task5 IN_PROGRESS:5A policy/binding;5B runtime/journal/CLI and5C live NOT_RUN.
 - Task6 NOT_STARTED: pinned escrow contracts/hook; one approved deployment unused.
 - Task7 NOT_STARTED: escrow rail/relayed authorizations.
 - Task8 NOT_STARTED: hub/runner/pipeline escrow coordination.

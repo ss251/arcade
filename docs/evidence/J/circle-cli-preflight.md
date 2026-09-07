@@ -52,3 +52,37 @@ still reported604800seconds as the Arc minimum. At22:29:49UTC, the
 still reported1.0.0 as latest. No upgrade, CLI patch, expiry-policy relaxation,
 funding or paid retry was performed. Owner direction on a bounded testnet
 compatibility profile is pending.
+
+## Root refusal trace (source-only clarification, Sep7)
+
+No J4 `services pay`, signature, deposit or paid request has run. **An exact
+sent `validBefore` does not exist.** No live error response was captured.
+At baseline9305ff2, the predicted refusal concerns the root Gateway route,
+not the session route:
+
+- CLI1.0.0 `dist/index.js:49411-49422` clamps Gateway timeout to2592000;
+  `:49524-49548` echoes that effective option in `accepted`. Its installed
+  x402-batching client `:120-133` constructs `validAfter=signerNow-600` and
+  `validBefore=signerNow+2592000`.
+- [Root admission](../../../apps/hub/src/server.ts) line1232 would first return
+  HTTP402 `{"error":"payment_invalid","detail":"requirements_mismatch"}`:
+  [matchesRequirements](../../../apps/hub/src/challenge.ts) lines54-58 requires
+  echoed timeout2592000 to equal advertised604900. This precedes `rail.verify`.
+- Independently, [Gateway verification](../../../packages/payments/src/gateway.ts)
+  line100 pins the echoed timeout; line112 requires
+  `validBefore<=verifierNow+604900` and `validBefore-validAfter<=605500`.
+  Refusal maps at148/173 to `InvalidSignature` with reason
+  `Gateway authorization refused`; if reached, the root HTTP error at1235 is
+  `{"error":"payment_invalid","detail":"InvalidSignature"}`.
+  Line72 is configuration validation, not the first payment refusal.
+
+[Root vanilla EIP-3009](../../../packages/payments/src/eip3009.ts) lines295-300
+checks only `now` inside `[validAfter,validBefore)`, without a maximum lifetime.
+That path needs no validity-policy change for this issue, but still requires
+its other identity/domain/splitter/metadata gates and a real proof. Root-only
+does not mean vanilla-only: the dual-rail CLI chooses Gateway. Session limits
+are separate and unchanged. Absolute signing/verifying times cannot be stated
+for an attempt that never occurred.
+
+J4 live remains paused under the conductor decision. No policy/cap/replay
+changes; an estimate or header replay alone is not a successful live purchase.
