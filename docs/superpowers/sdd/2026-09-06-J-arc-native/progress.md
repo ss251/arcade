@@ -1,5 +1,19 @@
 # Plan J progress
 
+2026-09-07 17:14 IST — Distinct relay-fixture follow-up sole66986 fullgatePASS:
+5,069Vitest233/70.60s;1,072Bun78/8,146assert181.70s;root/webstrict/clientSSR.
+Focused22Bun84assert/405ms;fourpaths/fourlinks/privacy0; fixture frozen. Final
+pin audit, separate test commit and two-commit main FF frombd312401 next.
+J8D1's original failed gate is retained honestly; neither full gate ran twice.
+Then reader/result compatibility, C2/D budget/root/boot and9. No live/policy/push.
+
+2026-09-07 17:09 IST — J8D1 committed separately asc50ee6f; main staysbd312401.
+Skipped root/webstrict/clientSSR checks PASS62413; nine frozenpins unchanged,
+15paths102links/privacy0. Separate fixture-only cleanup now releases its owned
+pending handler in finally AFTER all original timeout/no-further-send assertions.
+No production deadline or payment policy edits. Focused relay then new single
+full gate, commit and two-commit exact FF next. No full-gate rerun for J8D1.
+
 2026-09-07 17:07 IST — J8D1 sole35269 gate NOT clean:5,069Vitest233PASS71.31s;
 Bun1,071PASS/1existingrelay cleanup-hook timeout/78files/8,148assert185.68s.
 Unchanged isolated pending-upstream case PASS108.38ms/2assert; no full-gate

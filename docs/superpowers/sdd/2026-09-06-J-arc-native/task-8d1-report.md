@@ -86,6 +86,10 @@ cleanup. The isolated unchanged test passed once in108.38ms (2assertions,
 for this checkpoint. Skipped root/web strict and client/SSR build checks passed
 separately as62413 (no test suite repeated); a distinct
 fixture-cleanup commit must pass its own gate before the combined main merge.
+See the [separate fixture lifecycle follow-up](task-8d1-relay-cleanup-report.md).
+That distinct follow-up's sole66986 gate passed5,069Vitest/233files and
+1,072Bun/78files, plus root/web strict and client/SSR builds. J8D1 source stayed
+unchanged throughout; its own earlier full-gate failure remains recorded above.
 
 No owner keys, real RPC, sends, spending, deployment, consumed-approval replay,
 production changes or push. J4/J5 live pauses and J6 owner/size blockers remain.

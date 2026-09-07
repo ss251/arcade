@@ -237,11 +237,20 @@ describe("job-local Agent SDK relay (simulated upstream only)", () => {
 
   it("bounds a permanently pending upstream and prevents post-timeout sends", async () => {
     let hits = 0
-    const server = upstream(() => { hits++; return new Promise<Response>(() => {}) })
+    let release: (() => void) | undefined
+    const pending = new Promise<Response>(resolve => { release = () => resolve(Response.json({ fixtureCleanup: true })) })
+    const server = upstream(() => { hits++; return pending })
     const relay = await open(server.url.origin, { timeoutMs: 100 })
-    try { await post(relay) } catch { /* closing the owned listener is also fail-closed */ }
-    await relay.close()
-    await expect(post(relay)).rejects.toThrow()
-    expect(hits).toBe(1)
+    try {
+      try { await post(relay) } catch { /* closing the owned listener is also fail-closed */ }
+      await relay.close()
+      await expect(post(relay)).rejects.toThrow()
+      expect(hits).toBe(1)
+    } finally {
+      // It stays pending through every timeout/no-further-send assertion. Only
+      // then release the owned handler so afterEach can finish server.stop(true).
+      release?.()
+      await relay.close()
+    }
   }, 2_000)
 })
