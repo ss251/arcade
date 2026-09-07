@@ -1,5 +1,18 @@
 # Plan J progress
 
+2026-09-07 12:58 IST — J7B3b sole93159 fullgatePASS:4,953Vitest222/69.20s,
+972Bun71/7,635assert/172.26s,root/webstrict,client355ms/SSR178ms. Four-root
+strict0;5code/testpins frozen. Final12pathsaudit (including Task7 brief status
+correction), atomiccommit/exactFF next;7B4 then8/9 remain. No fullgate replay,
+concurrent gate, owner key/liveRPC/send/spend or push. J4/J5/J6 pauses unchanged.
+
+2026-09-07 12:52 IST — J7B3b concrete bounded Arc RPC/sign-only ports
+implemented;28focusedVitest1/195ms PASS. Real owned loopback HTTP + SQLite +
+executor budget integration1Bun/278assert/413ms PASS on fake chain only, including
+reopen refusal before more RPC. Final four-rootstrict/scopefreeze/solefullgate
+next.7B4 explicit escrow payload/request/settlement context and active rail then
+J8/J9 remain; J4/J5/J6 live pauses unchanged. No owner keys/liveRPC/spend/push.
+
 2026-09-07 12:33 IST — J7B3a sole64377 fullgatePASS:4,925Vitest221/69.01s,
 971Bun70/7,357assert/173.77s,root/webstrict,client345ms/SSR182ms. Six-root
 strict0;8code/testpins frozen;14paths64links/privacy0 initialaudit. Finalaudit,

@@ -26,8 +26,10 @@ reader; see the [wire decision and verification record](task-7b1-report.md).
 It does not activate a rail or replace durable budget/execution reservations.
 7B2 adds offline action contracts, pre-settlement receipt projection and
 signed-intent/log/poststate proofs; see [verification](task-7b2-report.md).
-7B3 must compose the bounded transport and durable guarded action lifecycle
-before the active Effect rail and Task8 wiring. No journal or send exists yet.
+7B3a adds the [durable coordinator/journal](task-7b3a-report.md);7B3b adds the
+[bounded RPC/signing ports](task-7b3b-report.md), both verified offline.7B4 still
+owes explicit escrow payload/request/settlement context and the active Effect
+rail before Task8 wiring. No live send or rail activation has occurred.
 
 7C/Task8 integration: typed wire dispatch, durable one-job/one-request reservation,
 provider socket authorization, pipeline submit then complete or reject, and

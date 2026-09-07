@@ -5,8 +5,12 @@ remain paused; J6 deployment size and treasury checkpoints remain open.
 This work is offline and must not activate or advertise an escrow rail.
 
 Small commit boundaries:7B3a implements the coordinator and real private SQLite
-action journal;7B3b supplies the concrete bounded RPC/signing transport and
-Effect rail. Finishing7B3a does not finish Task7 or permit live activation.
+action journal;7B3b supplies the concrete bounded RPC/signing transport. The
+following7B4 checkpoint must add explicit escrow payload/request/settlement
+context contracts and the Effect rail. Current exact-only PaymentPayload and
+tree-only settlement arguments cannot represent an escrow capability and
+pre-settlement receipt projection; do not fill those gaps with dummy values.
+Finishing7B3 does not finish Task7 or permit live activation.
 
 ## Execution contract
 

@@ -36,6 +36,7 @@ evidence remain separate open work; this index does not mark them accepted.
   [Action contracts and receipt proofs](task-7b2-report.md).
   [Guarded execution brief](task-7b3-brief.md),
   [coordinator and private durable journal](task-7b3a-report.md).
+  [Bounded Arc RPC and signing ports](task-7b3b-report.md).
 
 Tasks execute root-only with four-worker limits, one sequential full gate per
 commit and prompt fast-forward merges without squash or push. Testnet sends
