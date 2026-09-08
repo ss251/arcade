@@ -184,4 +184,37 @@ describe("validateJson", () => {
   it("keeps validateOutput as an alias", () => {
     expect(validateOutput).toBe(validateJson)
   })
+
+  describe("pattern is bounded on both sides, because both sides are untrusted", () => {
+    // The input gate runs this against a seller's pattern and a caller's body BEFORE any
+    // payment, on a single-threaded hub. A catastrophically backtracking pattern is
+    // therefore an unauthenticated, free denial of service.
+    const evil = { type: "object", required: ["text"], properties: { text: { type: "string", pattern: "^(a+)+$" } } }
+
+    it("still honours an ordinary pattern", () => {
+      const schema = { type: "object", properties: { id: { type: "string", pattern: "^[a-z]+$" } } }
+      expect(validateJson({ id: "abc" }, schema)).toBe(true)
+      expect(validateJson({ id: "ABC" }, schema)).toBe(false)
+    })
+
+    it("refuses an over-long value instead of matching it, and returns promptly", () => {
+      const started = Date.now()
+      // Comfortably past the 4 KiB cap, and the shape that makes ^(a+)+$ pathological.
+      expect(validateJson({ text: "a".repeat(5000) + "!" }, evil)).toBe(false)
+      expect(Date.now() - started).toBeLessThan(1000)
+    })
+
+    it("refuses an over-long pattern rather than compiling it", () => {
+      const schema = { type: "object", properties: { text: { type: "string", pattern: "^(a+)+" + "b".repeat(300) + "$" } } }
+      expect(validateJson({ text: "aaaa" }, schema)).toBe(false)
+    })
+
+    it("bounds the worst case that remains: a short evil pattern over a capped value", () => {
+      const started = Date.now()
+      expect(validateJson({ text: "a".repeat(4096) + "!" }, evil)).toBe(false)
+      // Not a latency budget for the engine, a ceiling on the blocked event loop. A single
+      // unpaid request must not be able to take the hub away for minutes.
+      expect(Date.now() - started).toBeLessThan(5000)
+    })
+  })
 })

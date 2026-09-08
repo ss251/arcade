@@ -9,6 +9,11 @@
  * the seller a settlement, never the buyer money.
  */
 
+
+/** Longest listing-supplied `pattern` this validator will run. See the note at its use. */
+const PATTERN_MAX = 200
+/** Longest caller-supplied string this validator will match a pattern against. */
+const PATTERN_VALUE_MAX = 4096
 type Json = unknown
 
 const typeOf = (v: Json): string => {
@@ -66,8 +71,26 @@ export const validateJson = (value: Json, schema: Json): boolean => {
     if (typeof s["minLength"] === "number" && value.length < (s["minLength"] as number)) return false
     if (typeof s["maxLength"] === "number" && value.length > (s["maxLength"] as number)) return false
     if (typeof s["pattern"] === "string") {
+      /*
+       * Both sides of this match are untrusted, and it runs BEFORE payment.
+       *
+       * The pattern comes from a seller's listing manifest — anyone who controls an address
+       * can publish one — and the value comes from an unpaid request body. JavaScript's
+       * regex engine backtracks, so a pattern like `^(a+)+$` against a few dozen characters
+       * is minutes of blocked event loop, and the hub is single-threaded. Measured in Bun:
+       * 40 characters is 430ms and each further character roughly doubles it.
+       *
+       * Bounding the inputs is what makes the match affordable without replacing the
+       * engine. A pattern longer than PATTERN_MAX cannot be honoured, and a value longer
+       * than PATTERN_VALUE_MAX is rejected rather than matched — refusing is safe here
+       * because this gate exists to reject malformed input, so failing closed on input
+       * nobody can afford to check keeps the meaning it already had. A short pattern can
+       * still backtrack, but over a bounded value the worst case is bounded too.
+       */
+      const pattern = s["pattern"] as string
+      if (pattern.length > PATTERN_MAX || value.length > PATTERN_VALUE_MAX) return false
       try {
-        if (!new RegExp(s["pattern"] as string).test(value)) return false
+        if (!new RegExp(pattern).test(value)) return false
       } catch {
         return false
       }

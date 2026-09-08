@@ -208,4 +208,35 @@ describe("delisting at the actual paid HTTP endpoint", () => {
     expect(counts().receipts).toBe(before.receipts + 1)
     expect(dispatched).toBe(dispatchedBefore + 1)
   })
+  it.each([["not json"], ["{"], ["[1,2"], ["\u0000"]])("answers a malformed ratings body with 400, never a source-bearing 500", async (body) => {
+    /*
+     * `await req.json()` throws on any non-JSON body and this is the route's first
+     * statement — no payment, signature or token needed to reach it. Bun's fallback 500
+     * page embeds the error, the offending source lines and absolute filesystem paths,
+     * and serves them to whoever asked. This was reproduced against the live deployment.
+     */
+    const response = await fetch(`${base}/ratings`, { method: "POST", body })
+    expect(response.status).toBe(400)
+    const text = await response.text()
+    expect(JSON.parse(text).error).toBe("invalid_body")
+    expect(text).not.toContain("__bunfallback")
+    expect(text).not.toContain(ROOT)
+  })
+  it("treats an empty ratings body as a missing rating, not a parse crash", async () => {
+    // "" is not malformed, it is empty. It reaches the receipt gate and is refused there,
+    // which is the same answer any well-formed body naming no settled receipt would get.
+    const response = await fetch(`${base}/ratings`, { method: "POST", body: "" })
+    expect(response.status).toBe(403)
+    expect(await response.text()).not.toContain("__bunfallback")
+  })
+  it("answers an unhandled route throw with a bare 500 that carries no source", async () => {
+    // Defence in depth for the class rather than the instance: whatever throws, the caller
+    // gets a bare 500 and the detail goes to the log.
+    const response = await fetch(`${base}/ratings`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jobId: "nope", stars: 5 })
+    })
+    const text = await response.text()
+    expect(text).not.toContain("__bunfallback")
+    expect(text).not.toContain(ROOT)
+  })
 })

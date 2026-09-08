@@ -522,6 +522,19 @@ const main = Effect.gen(function* () {
     port: PORT,
     idleTimeout: 120,
 
+    /*
+     * An error boundary, so no future throw in any route can answer with Bun's fallback
+     * page. That page embeds the error, the offending source lines and absolute filesystem
+     * paths, and it is served to whoever made the request — which for an unauthenticated
+     * route is anyone. One uncaught SyntaxError on /ratings was enough to publish hub
+     * source from the live deployment. The detail goes to the log, where it belongs; the
+     * caller gets a bare 500.
+     */
+    error(cause) {
+      console.error("[hub] unhandled request error", cause)
+      return json({ error: "internal" }, 500)
+    },
+
     websocket: {
       open() {},
       async message(ws, raw) {
@@ -1138,11 +1151,15 @@ const main = Effect.gen(function* () {
       }
 
       if (path === "/ratings" && req.method === "POST") {
-        const body = (await req.json()) as {
-          jobId?: string
-          stars?: number
-          comment?: string
-          signature?: string
+        // `await req.json()` throws on any non-JSON body, and this is the route's first
+        // statement — no payment, signature or token needed to reach it. The `/x/` route
+        // above already has the right shape; this one never got it.
+        const raw = await req.text()
+        let body: { jobId?: string; stars?: number; comment?: string; signature?: string }
+        try {
+          body = raw === "" ? {} : JSON.parse(raw) as typeof body
+        } catch {
+          return json({ error: "invalid_body" }, 400)
         }
         const receipts = await run(store.allReceipts)
         const receipt = receipts.find((r) => r.jobId === body.jobId)
