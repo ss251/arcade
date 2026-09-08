@@ -1,5 +1,16 @@
 # Plan G — execution records
 
+## September 8 — G15 bounded operator replay checkpoint
+
+The [replay-command brief](task-15-replay-command-brief.md) and
+[replay-command report](task-15-replay-command-report.md) add fixed-root --replay
+with a canonical public projection and one bounded read-only child.14 focused
+Bun/107 assertions and exact strict pass. An actual trapped child replays two
+synthetic queries without changing retained bytes; timeout/overflow children
+are stopped and confirmed gone. No live consumer, operational creation, keys,
+network or payment. Sole full gate passed5371Vitest/1821Bun, strict and both
+builds; local commit follows.
+
 ## September 8 — G15 controlled consumer checkpoint
 
 The [consumer-integration brief](task-15-consumer-integration-brief.md) and

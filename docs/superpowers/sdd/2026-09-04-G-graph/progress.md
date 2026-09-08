@@ -1,5 +1,19 @@
 # SDD ledger — Plan G
 
+2026-09-08 11:04 IST — G15V sole31875fullgate PASS5371Vitest242/69.92s;
+1821Bun98/14184assert307.24s;root/webstrict/clientSSR332/164ms. Nine paths,
+6links/privacy0 and six source/brief/public-doc pins frozen. Original harness
+mechanically restores exactly; shell only adds --replay. Atomic local commit/
+exact-one mainFF next; no full repeat, live release, operational state or push.
+
+2026-09-08 10:56 IST — G15V read-only operator replay implemented after missing-
+entry Red.14focusedBun107assert18.15s/2rootsstrict0 PASS. Actual trapped child
+replays synthetic two-query artifact with retained bytes unchanged; actual
+timeout SIGKILL/ETIMEDOUT and output overflow ENOBUFS acknowledged with child
+gone. Strict public projection, no key/network/consumer/materialization; original
+payment/budget rules unchanged. Scope audit/freeze and sole sequential four-worker
+gate next. No operational root, real key/RPC/paid call/approval replay/push.
+
 2026-09-08 10:43 IST — G15U sole84737fullgate PASS5371Vitest242/69.82s;
 1807Bun98/14075assert293.98s;root/webstrict/clientSSR390/198ms. Six paths,
 3links/privacy0 and three source/brief pins frozen; original harness restoration

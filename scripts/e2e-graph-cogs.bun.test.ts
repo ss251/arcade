@@ -10,8 +10,144 @@ import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObs
 import { encodeAbiParameters, encodeEventTopics, parseAbi } from "viem"
 import { graphReadResult } from "../skills/counterparty-graph/run.ts"
 import { synthesize } from "../skills/counterparty-graph/synthesize.ts"
-import { graphCogsOwnerRoot, readGraphOwnerPayerKey, GRAPH_COGS_KEYCHAIN } from "./e2e-graph-cogs.ts"
+import { graphCogsOwnerRoot, readGraphOwnerPayerKey, GRAPH_COGS_KEYCHAIN, validateGraphReplayOutput } from "./e2e-graph-cogs.ts"
 import { privateKeyToAccount } from "viem/accounts"
+
+function replayProtocolFixture() {
+  return { format: "arcade-graph-replay-v1", liveEvidence: "NOT_RUN", liveEnabled: false,
+    proof: "local-retained-consistency", newPaidQueries: 0, freshConsumerRun: false, cacheHits: 1,
+    storedAt: 2, artifactHash: "a".repeat(64), sourceHash: "b".repeat(64), ledgerHash: "c".repeat(64),
+    payer: GRAPH_COGS_POLICY.payer, token: GRAPH_COGS_POLICY.token, subject: GRAPH_COGS_POLICY.subject,
+    budget: { reservations: 1, evidence: 1, video: 0, reservedAtomic: "10000" },
+    verdict: "manual-review", attesterSettledCount: 0,
+    queries: [{ queryHash: "d".repeat(64), cacheHash: "e".repeat(64), proofHash: "f".repeat(64),
+      capturedAt: 1, storedAt: 1, completedAt: 2, chain: GRAPH_COGS_POLICY.chain,
+      block: 19, blockHash: "0x" + "c".repeat(64), costAtomic: "10000", paymentTx: "0x" + "a".repeat(64) }] }
+}
+test("operator replay public protocol excludes private or overclaimed fields and noncanonical output", () => {
+  const value = replayProtocolFixture(), encode = (input: unknown) => JSON.stringify(input) + "\n", text = encode(value)
+  expect(validateGraphReplayOutput(text)).toBe(text)
+  const invalid: unknown[] = [
+    { ...value, privatePath: "/private/fixture" }, { ...value, liveEvidence: "PASS" }, { ...value, liveEnabled: true },
+    { ...value, proof: "authenticated-payment" }, { ...value, newPaidQueries: 1 }, { ...value, freshConsumerRun: true },
+    { ...value, cacheHits: 2 }, { ...value, storedAt: 0 }, { ...value, storedAt: 1 }, { ...value, artifactHash: "bad" },
+    { ...value, payer: GRAPH_COGS_POLICY.subject }, { ...value, token: GRAPH_COGS_POLICY.subject },
+    { ...value, subject: GRAPH_COGS_POLICY.payer }, { ...value, verdict: "allow" }, { ...value, attesterSettledCount: 1 },
+    { ...value, budget: { ...value.budget, evidence: 6 } }, { ...value, budget: { ...value.budget, video: 1 } },
+    { ...value, budget: { ...value.budget, reservedAtomic: "0" } }, { ...value, budget: { ...value.budget, reservations: 11 } },
+    ...[{ signature: "fixture diagnostic" }, { paymentTx: null }, { paymentTx: "0x" + "0".repeat(64) },
+      { costAtomic: "10001" }, { block: null }, { blockHash: null }, { chain: "eip155:1" },
+      { capturedAt: 3 }, { completedAt: 0 }, { queryHash: "not-a-hash" }]
+      .map(patch => ({ ...value, queries: [{ ...value.queries[0], ...patch }] })),
+    { ...value, cacheHits: 2, budget: { reservations: 2, evidence: 2, video: 0, reservedAtomic: "20000" },
+      queries: [value.queries[0], value.queries[0]] },
+  ]
+  for (const item of invalid) expect(() => validateGraphReplayOutput(encode(item))).toThrow(/^graph_cogs_replay_refused$/)
+  for (const item of [text.trimEnd(), text + "\n", text + text, " " + text,
+    text.replace('"format":', '"format":"duplicate","format":'), "{", "x".repeat(8193)])
+    expect(() => validateGraphReplayOutput(item)).toThrow(/^graph_cogs_replay_refused$/)
+  const unknownBlock = encode({ ...value, queries: [{ ...value.queries[0], block: null, blockHash: null }] })
+  expect(validateGraphReplayOutput(unknownBlock)).toBe(unknownBlock)
+})
+function replayChildOverride(script: string) {
+  return `const subprocess=await import("node:child_process"),realSpawn=subprocess.spawnSync;
+    let launches=0,exactArguments=false,workerPid=0,workerClosed=false,workerSignal=null,workerError=null;
+    mock.module("node:child_process",()=>({...subprocess,spawnSync:(executable,args,options)=>{
+      launches++;
+      exactArguments=executable===process.execPath&&JSON.stringify(args)===JSON.stringify(["--no-env-file","--no-install",${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))},"--replay-worker"])&&
+        JSON.stringify(options.env)==="{}"&&options.cwd===${JSON.stringify(resolve(import.meta.dir, ".."))}&&
+        JSON.stringify(options.stdio)===JSON.stringify(["ignore","pipe","ignore"])&&options.timeout===6000&&options.killSignal==="SIGKILL"&&options.maxBuffer===8192;
+      if(!exactArguments)throw Error("unsafe fixture spawn");
+      const result=realSpawn(executable,["--no-env-file","--no-install","-e",${JSON.stringify(script)}],options);
+      workerPid=result.pid;workerSignal=result.signal;workerError=result.error?.code??null;
+      try{process.kill(workerPid,0)}catch(e){workerClosed=e.code==="ESRCH"}
+      return result;
+    }}));`
+}
+function replayWorkerFixture(parent: string) {
+  return `import{mock}from"bun:test";const os=await import("node:os"),accountInfo=os.userInfo();
+    mock.module("node:os",()=>({...os,userInfo:()=>({...accountInfo,homedir:${JSON.stringify(parent)}})}));
+    const forbidden=()=>{throw Error("replay capability forbidden")};globalThis.fetch=forbidden;
+    const clientPath=${JSON.stringify(resolve(import.meta.dir, "../skills/counterparty-graph/graph-client.ts"))},
+      runPath=${JSON.stringify(resolve(import.meta.dir, "../skills/counterparty-graph/run.ts"))};
+    const client=await import(clientPath),run=await import(runPath);
+    mock.module(clientPath,()=>({...client,readPayerKey:forbidden,runKeyCommand:forbidden,makePaidQuery:forbidden,paidQuery:forbidden}));
+    mock.module(runPath,()=>({...run,assess:forbidden,runGraphJob:forbidden}));
+    const h=await import(${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))});
+    process.exitCode=h.graphCogsMain(["--replay-worker"]);`
+}
+test("operator replay reads an actual two-query artifact in an owned trapped child with unchanged retained bytes", () => owned(parent => {
+  const action = `const crypto=await import("node:crypto");
+    const tree=directory=>readdirSync(directory,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)).map(entry=>{
+      const path=join(directory,entry.name);return entry.isDirectory()?[entry.name,tree(path)]:[entry.name,crypto.createHash("sha256").update(readFileSync(path)).digest("hex")];
+    });
+    const retained=JSON.stringify(tree(state)),publicOutput=h.runGraphReplayProcess();
+    console.log(JSON.stringify({simulation:true,public:JSON.parse(publicOutput),launches,exactArguments,workerClosed,
+      unchanged:retained===JSON.stringify(tree(state)),countsUnchanged:JSON.stringify(countBefore)===JSON.stringify({commands,requests,unsigned,paid,signatures,factories})}));
+    process.exit(0);`
+  const script = ownerConsumerScenario(parent, "two-queries", action, replayChildOverride(replayWorkerFixture(parent)))
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", script], { env: { PATH: "" }, encoding: "utf8", timeout: 15000, maxBuffer: 8192 })
+  expect(child.status).toBe(0); expect(child.stderr).toBe("")
+  const value = JSON.parse(child.stdout)
+  expect(value).toMatchObject({ simulation: true, launches: 1, exactArguments: true, workerClosed: true, unchanged: true, countsUnchanged: true,
+    public: { liveEvidence: "NOT_RUN", proof: "local-retained-consistency", newPaidQueries: 0, freshConsumerRun: false,
+      cacheHits: 2, attesterSettledCount: 0, budget: { reservations: 2, reservedAtomic: "20000" } } })
+  expect(value.public.queries).toHaveLength(2)
+  expect(value.public.queries.map((row: { costAtomic: string }) => row.costAtomic)).toEqual(["10000", "10000"])
+  expect(child.stdout).not.toContain(parent); expect(child.stdout).not.toContain("identities"); expect(child.stdout).not.toContain("signature")
+}), 20000)
+for (const fault of ["missing", "corrupt", "global-claim"] as const) test(`operator replay refuses ${fault} artifact without materializing or removing retained state`, () => owned(parent => {
+  const action = `const directory=join(state,readdirSync(state).find(name=>name.startsWith("assessment-")));
+    if(${JSON.stringify(fault)}==="missing")renameSync(directory,join(state,"retained-assessment"));
+    if(${JSON.stringify(fault)}==="corrupt")writeFileSync(join(directory,"result.json"),"{}\\n");
+    if(${JSON.stringify(fault)}==="global-claim")h.openGraphQualifiedReservationWriter(state,h.readGraphSourceManifest());
+    const crypto=await import("node:crypto"),tree=directory=>readdirSync(directory,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)).map(entry=>{
+      const path=join(directory,entry.name);return entry.isDirectory()?[entry.name,tree(path)]:[entry.name,crypto.createHash("sha256").update(readFileSync(path)).digest("hex")];
+    });
+    const before=JSON.stringify(tree(state));let error="";try{h.runGraphReplayProcess()}catch(e){error=e.message}
+    console.log(JSON.stringify({error,unchanged:before===JSON.stringify(tree(state)),launches,exactArguments,workerClosed}));process.exit(0);`
+  const script = ownerConsumerScenario(parent, "empty", action, replayChildOverride(replayWorkerFixture(parent)))
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", script], { env: { PATH: "" }, encoding: "utf8", timeout: 15000, maxBuffer: 8192 })
+  expect(child.status).toBe(0); expect(child.stderr).toBe("")
+  expect(JSON.parse(child.stdout)).toEqual({ error: "graph_cogs_replay_refused", unchanged: true, launches: 1, exactArguments: true, workerClosed: true })
+}), 20000)
+for (const fault of ["success", "nonzero", "malformed", "duplicate", "utf8", "overflow", "timeout"] as const)
+  test(`operator replay owns actual ${fault} child completion and emits only validated output or fixed refusal`, () => owned(parent => {
+    const good = JSON.stringify(replayProtocolFixture()) + "\n"
+    const scripts = {
+      success: `process.stdout.write(${JSON.stringify(good)})`,
+      nonzero: `process.stdout.write(${JSON.stringify(good)});process.stderr.write("private-worker-diagnostic");process.exit(4)`,
+      malformed: 'process.stdout.write("private-worker-diagnostic")',
+      duplicate: `process.stdout.write(${JSON.stringify(good + good)})`,
+      utf8: 'process.stdout.write(Buffer.from([0xff,0xfe]))',
+      overflow: 'process.stdout.write("x".repeat(32768));setInterval(()=>{},1000)',
+      timeout: 'process.on("SIGTERM",()=>{});while(true){}',
+    }
+    const action = `const out=process.stdout.write.bind(process.stdout),err=process.stderr.write.bind(process.stderr);let output="",errors="";
+      process.stdout.write=value=>{output+=value;return true};process.stderr.write=value=>{errors+=value;return true};
+      const started=performance.now(),code=h.graphCogsMain(["--replay"]),durationMs=performance.now()-started;
+      process.stdout.write=out;process.stderr.write=err;
+      console.log(JSON.stringify({code,output,errors,durationMs,launches,exactArguments,workerClosed,workerSignal,workerError,files:readdirSync(state)}));`
+    const child = spawnSync(process.execPath, ["--no-env-file", "-e", ownerConsumerChild(parent, action, replayChildOverride(scripts[fault]))],
+      { env: { PATH: "" }, encoding: "utf8", timeout: 10000, maxBuffer: 16384 })
+    expect(child.status).toBe(0); expect(child.stderr).toBe("")
+    const result = JSON.parse(child.stdout)
+    expect(result).toMatchObject({ code: fault === "success" ? 0 : 1, output: fault === "success" ? good : "",
+      errors: fault === "success" ? "" : "graph_cogs_replay_refused\n", launches: 1, exactArguments: true, workerClosed: true, files: [] })
+    expect(child.stdout).not.toContain("private-worker-diagnostic")
+    if (fault === "timeout") {
+      expect(result.workerSignal).toBe("SIGKILL"); expect(result.workerError).toBe("ETIMEDOUT")
+      expect(result.durationMs).toBeGreaterThanOrEqual(5900); expect(result.durationMs).toBeLessThan(8500)
+    }
+    if (fault === "overflow") expect(result.workerError).toBe("ENOBUFS")
+  }), 15000)
+test("operator replay shell still rejects live, worker and path override flags before tool resolution", () => {
+  for (const args of [["--live"], ["--replay-worker"], ["--replay", "/private/fixture"], ["--replay", "--live"], ["--root", "/private/fixture"]]) {
+    const result = spawnSync("/bin/sh", [resolve(import.meta.dir, "e2e-graph-cogs.sh"), ...args], { env: { PATH: "" }, encoding: "utf8", timeout: 2000 })
+    expect(result.status).toBe(2); expect(result.stdout).toBe(""); expect(result.stderr.trim()).toBe("graph_cogs_arguments_invalid")
+  }
+})
+
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 const header = () => JSON.stringify({ format: "arcade-graph-reservations-v1", policyHash: GRAPH_COGS_POLICY_HASH })
@@ -1467,6 +1603,13 @@ function ownerConsumerChild(parent: string, action: string, beforeImport = "") {
     const h=await import(${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))});
     const state=h.graphCogsOwnerRoot();mkdirSync(state,{recursive:true,mode:0o700});${action}`
 }
+test("operator replay refuses missing retained assessment without creating state or invoking a payer", () => owned(parent => {
+  const script = ownerConsumerChild(parent, `let error="";try{h.readGraphOwnerReplay()}catch(e){error=e.message}
+    console.log(JSON.stringify({error,files:readdirSync(state)}));`)
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", script], { env: { PATH: "" }, encoding: "utf8", timeout: 5000, maxBuffer: 4096 })
+  expect(child.status).toBe(0); expect(child.stderr).toBe("")
+  expect(JSON.parse(child.stdout)).toEqual({ error: "graph_cogs_replay_refused", files: [] })
+}))
 test("controlled owner consumer refuses missing known state before any command or transport", () => owned(parent => {
   const script = ownerConsumerChild(parent, `let commands=0,requests=0;
     const result=await h.runGraphCogsOwner({allocation:"evidence",keyCommand:async()=>{commands++;throw Error("command forbidden")},transport:async()=>{requests++;throw Error("request forbidden")}});
@@ -1476,7 +1619,7 @@ test("controlled owner consumer refuses missing known state before any command o
   expect(JSON.parse(child.stdout)).toMatchObject({ result: { stopReason: "refusal", error: "graph_cogs_consumer_refused" }, commands: 0, requests: 0, files: [] })
 }))
 
-function ownerConsumerScenario(parent: string, scenario: string) {
+function ownerConsumerScenario(parent: string, scenario: string, extraAction = "", extraBefore = "") {
   const before = `const scenario=${JSON.stringify(scenario)},P=${JSON.stringify(GRAPH_COGS_POLICY)};
     const{encodeAbiParameters,encodeEventTopics,parseAbi}=await import("viem");
     const accountsPath="viem/accounts",accounts=await import(accountsPath),dummy="0x"+"11".repeat(32),actualAccount=accounts.privateKeyToAccount(dummy);
@@ -1572,12 +1715,13 @@ function ownerConsumerScenario(parent: string, scenario: string) {
     const ledger=h.readGraphReservations(join(state,P.namespace,"reservations.jsonl")),names=readdirSync(state);
     const journalNames=names.filter(n=>n.startsWith("balance-"));
     const secondRpcStart=outcome.stopReason==="end_turn"&&outcome.artifact.history.queries.length===2?JSON.parse(readFileSync(join(state,"cache-"+outcome.artifact.history.queries[1].queryHash,"result.json"),"utf8")).evidence.firstRpcId:null;
+    ${extraAction}
     console.log(JSON.stringify({simulation:true,identity:scenario==="wrong-key"?"real-mismatch":"mocked-owner",outcome,replay,baseline,durationMs,secondRpcStart,
       firstCachePreserved:firstCachePath===null?null:readFileSync(firstCachePath,"utf8")===firstCacheBytes,
       countBefore,countAfter:{commands,requests,unsigned,paid,signatures,factories},balanceReads,admissionBeforeKey,paidAdmission,
       ledger,globalClaim:existsSync(join(state,P.namespace,".claim")),queryCaches:names.filter(n=>n.startsWith("cache-")).length,
       afterFiles:journalNames.filter(n=>existsSync(join(state,n,"after.json"))).length,
-      artifacts:names.filter(n=>n.startsWith("assessment-")).length}));`, before)
+      artifacts:names.filter(n=>n.startsWith("assessment-")).length}));`, before + extraBefore)
 }
 function runConsumerScenario(parent: string, scenario: string) {
   const child = spawnSync(process.execPath, ["--no-env-file", "-e", ownerConsumerScenario(parent, scenario)],

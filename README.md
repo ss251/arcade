@@ -80,6 +80,10 @@ implementation and live-evidence states at this checkpoint:
 | Network/packaging · M9/A+I | Chain configuration, boot checks, mainnet runbook and this continuity generator | Circle CLI live capture/pay paused; video, submission and mainnet flip incomplete |
 | Arc-native extension · J | Ordered accepts, discovery metadata, delegate funding and root escrow SDK/hub/runner; index/web evidence projections | Funding/escrow tested offline; live CLI paused; escrow oversized and not deployed |
 
+The Graph harness also provides [read-only retained replay](docs/runbook.md#graph-cost-of-goods-replay)
+with zero new queries. Its tests use synthetic evidence; no paid Base run or
+cross-chain G15 settlement is claimed.
+
 The [public execution records](docs/superpowers/sdd/README.md) link the measured
 proofs and remaining gates. Later vendor-neutrality work adds an
 [OpenAI-compatible engine](docs/evidence/B13-openai-api.md) and

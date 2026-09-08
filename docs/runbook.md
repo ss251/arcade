@@ -1594,6 +1594,54 @@ fallback/absence, not a populated dashboard. This hub implementation does not
 by itself add Graph fields to the web presentation. No deployment or paid query
 is part of enabling these local code paths.
 
+### Graph cost-of-goods replay
+
+The paid Base evidence sequence and Arc-settled G15 proof remain **NOT_RUN**.
+The harness has a controlled, offline-tested consumer integration and an explicit
+read-only operator command for a complete already-retained assessment:
+
+```sh
+./scripts/e2e-graph-cogs.sh --replay
+```
+
+This reads the fixed `.local/state/arcade/graph-cogs` parent beneath the OS
+account's home. HOME/XDG, argv, run IDs and endpoint variables cannot choose
+another authority path. The command does not initialize a budget, materialize
+a missing assessment, claim a writer, read Keychain, run the consumer, sign,
+query a network or refresh a result. No operational budget was initialized
+for the recorded offline checks. Do not create one merely to satisfy this command.
+
+Exit0 means only complete historical readback. Output explicitly says
+liveEvidence=NOT_RUN, proof=local-retained-consistency, newPaidQueries=0 and
+freshConsumerRun=false. It preserves source/ledger/artifact/query hashes,
+original acquisition/completion times, Graph block, transaction/cost facts,
+quota counts and the conservative verdict. It excludes raw responses, identity
+names, private locations, signatures and provider diagnostics. Indexed claims
+are not authenticated service settlements; attesterSettledCount remains zero.
+
+The original verifier runs in one owned child with empty environment, ignored
+stdin/stderr, an8192-byte stdout limit and a6000ms SIGKILL timeout. The parent
+waits for child completion and accepts only the canonical public projection.
+This read-only worker has no child/key/network path; its termination checks do
+not establish the lifecycle of a future live consuming process. Output-pipe or
+OS failures are not magically recoverable from retained hashes.
+
+Missing, corrupt, active-claim, partial or current-source-mismatched history
+returns1 with graph_cogs_replay_refused. Invalid arguments return2. Preserve the
+original private files after refusal; do not reset, rehash, relocate, silently
+refresh or infer a refund. A source change can intentionally prevent replay
+under the new source manifest. --live, root overrides and reset are unavailable.
+No-argument status remains1/NOT_RUN and does not inspect operational state.
+
+The [controlled consumer record](superpowers/sdd/2026-09-04-G-graph/task-15-consumer-integration-report.md)
+and [replay command record](superpowers/sdd/2026-09-04-G-graph/task-15-replay-command-report.md)
+separate synthetic native-child checks from live authority. Future Base-only
+release, fixed budget initialization and a bounded evidence run need scope
+review; a new Arc purchase is separate. Existing10global/5evidence reservations,
+10000-atomic cost,900000 floor, payment validity and replay rules are unchanged.
+Never replay a consumed approval, retry a paid request in a loop, or treat
+historical replay as a fresh paid runner execution.
+
 ### Read-only web screenshots — H14
 
 Build the web once with the current dependencies and no secret environment

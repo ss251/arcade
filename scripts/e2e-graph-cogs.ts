@@ -8,6 +8,7 @@ import { constants, openSync, closeSync, lstatSync, fstatSync, readSync, realpat
   mkdirSync, opendirSync, writeSync, fsyncSync, unlinkSync, type Stats } from "node:fs"
 import { dirname, isAbsolute, normalize, join, resolve } from "node:path"
 import { userInfo } from "node:os"
+import { spawnSync } from "node:child_process"
 import { privateKeyToAccount } from "viem/accounts"
 import { runKeyCommand, document, makePaidQuery, type Runner } from "../skills/counterparty-graph/graph-client.ts"
 import { encodeGraphQuery, GATEWAY_BASE, validateGraphChallengeHeader, readGraphSettlementHeader, readGraphPaidBody, readGraphRpcBody, verifyGraphReceiptEvidence, type QueryArgs, type GraphResponseObservation, type GraphPaymentIntent, type PaidResult } from "../skills/counterparty-graph/graph-client.ts"
@@ -2084,15 +2085,96 @@ export async function runGraphCogsOwner(options: {
     if (timer !== undefined) clearTimeout(timer)
   }
 }
+const REPLAY_FAIL = "graph_cogs_replay_refused"
+const REPLAY_BYTES = 8192
+/** Exact public projection only. Never forward raw worker output or diagnostics. */
+export function validateGraphReplayOutput(text: string): string {
+  try {
+    insist(typeof text === "string" && Buffer.byteLength(text) <= REPLAY_BYTES && text.endsWith("\n"))
+    const value: unknown = JSON.parse(text)
+    shape(value, ["format", "liveEvidence", "liveEnabled", "proof", "newPaidQueries", "freshConsumerRun", "cacheHits",
+      "storedAt", "artifactHash", "sourceHash", "ledgerHash", "payer", "token", "subject", "budget", "verdict", "attesterSettledCount", "queries"])
+    insist(text === JSON.stringify(value) + "\n" && value.format === "arcade-graph-replay-v1" &&
+      value.liveEvidence === "NOT_RUN" && value.liveEnabled === false && value.proof === "local-retained-consistency" &&
+      value.newPaidQueries === 0 && value.freshConsumerRun === false && (value.cacheHits === 1 || value.cacheHits === 2) &&
+      value.payer === GRAPH_COGS_POLICY.payer && value.token === GRAPH_COGS_POLICY.token && value.subject === GRAPH_COGS_POLICY.subject &&
+      (value.verdict === "refuse" || value.verdict === "manual-review") && value.attesterSettledCount === 0)
+    const integer = (input: unknown): input is number => typeof input === "number" && Number.isSafeInteger(input) && input >= 0
+    const digest = (input: unknown) => typeof input === "string" && HASH.test(input)
+    const chainHash = (input: unknown) => typeof input === "string" && /^0x[a-f0-9]{64}$/.test(input) && !/^0x0{64}$/.test(input)
+    insist(integer(value.storedAt) && value.storedAt > 0 && digest(value.artifactHash) && digest(value.sourceHash) && digest(value.ledgerHash))
+    shape(value.budget, ["reservations", "evidence", "video", "reservedAtomic"])
+    const budget = value.budget
+    insist(integer(budget.reservations) && budget.reservations >= value.cacheHits && budget.reservations <= GRAPH_COGS_POLICY.totalLimit &&
+      integer(budget.evidence) && budget.evidence <= GRAPH_COGS_POLICY.evidenceLimit && integer(budget.video) &&
+      budget.evidence + budget.video === budget.reservations && budget.reservedAtomic === String(budget.reservations * 10000))
+    insist(Array.isArray(value.queries) && value.queries.length === value.cacheHits)
+    const queries = new Set<string>(), transactions = new Set<string>()
+    for (const row of value.queries) {
+      shape(row, ["queryHash", "cacheHash", "proofHash", "capturedAt", "storedAt", "completedAt", "chain", "block", "blockHash", "costAtomic", "paymentTx"])
+      insist(typeof row.queryHash === "string" && digest(row.queryHash) && !queries.has(row.queryHash) &&
+        digest(row.cacheHash) && digest(row.proofHash) && integer(row.capturedAt) && row.capturedAt > 0 &&
+        integer(row.storedAt) && row.storedAt >= row.capturedAt && row.storedAt <= value.storedAt &&
+        integer(row.completedAt) && row.completedAt >= row.capturedAt && row.completedAt <= value.storedAt &&
+        row.chain === GRAPH_COGS_POLICY.chain && row.costAtomic === "10000" &&
+        typeof row.paymentTx === "string" && chainHash(row.paymentTx) && !transactions.has(row.paymentTx) &&
+        (row.block === null && row.blockHash === null || integer(row.block) && chainHash(row.blockHash)))
+      queries.add(row.queryHash); transactions.add(row.paymentTx)
+    }
+    return text
+  } catch { throw new Error(REPLAY_FAIL) }
+}
+/** Fixed owner state, complete artifact only: no initialization or materialization. */
+export function readGraphOwnerReplay(): string {
+  try {
+    const artifact = readGraphAssessmentCache(graphCogsOwnerRoot(), readGraphSourceManifest())
+    const history = artifact.history, output = history.output
+    return validateGraphReplayOutput(JSON.stringify({
+      format: "arcade-graph-replay-v1", liveEvidence: "NOT_RUN", liveEnabled: false, proof: "local-retained-consistency",
+      newPaidQueries: 0, freshConsumerRun: false, cacheHits: artifact.cacheHits, storedAt: artifact.storedAt,
+      artifactHash: artifact.artifactHash, sourceHash: history.sourceHash, ledgerHash: history.ledgerHash,
+      payer: GRAPH_COGS_POLICY.payer, token: GRAPH_COGS_POLICY.token, subject: GRAPH_COGS_POLICY.subject,
+      budget: { reservations: history.budget.reservations, evidence: history.budget.evidence,
+        video: history.budget.video, reservedAtomic: history.budget.reservedAtomic },
+      verdict: output.verdict, attesterSettledCount: output.attesterSettledCount,
+      queries: history.queries.map((row, i) => {
+        const source = output.sources[i]; insist(source !== undefined)
+        return { queryHash: row.queryHash, cacheHash: row.cacheHash, proofHash: row.proofHash,
+          capturedAt: row.capturedAt, storedAt: row.storedAt, completedAt: row.completedAt,
+          chain: source.chain, block: source.block, blockHash: source.blockHash,
+          costAtomic: source.costAtomic, paymentTx: source.paymentTx }
+      }),
+    }) + "\n")
+  } catch { throw new Error(REPLAY_FAIL) }
+}
+/** One owned read-only child. SIGKILL bounds synchronous verifier work as well
+ * as pipe reads; this worker has no signing/key/network/descendant path.
+ * Return only after exit/pipe completion, never on a partial child acknowledgement. */
+export function runGraphReplayProcess(): string {
+  try {
+    const child = spawnSync(process.execPath,
+      ["--no-env-file", "--no-install", resolve(import.meta.dir, "e2e-graph-cogs.ts"), "--replay-worker"],
+      { env: {}, cwd: resolve(import.meta.dir, ".."), stdio: ["ignore", "pipe", "ignore"],
+        timeout: 6000, killSignal: "SIGKILL", maxBuffer: REPLAY_BYTES })
+    insist(child.error === undefined && child.status === 0 && child.signal === null && Buffer.isBuffer(child.stdout) &&
+      child.stdout.length <= REPLAY_BYTES)
+    return validateGraphReplayOutput(new TextDecoder("utf-8", { fatal: true }).decode(child.stdout))
+  } catch { throw new Error(REPLAY_FAIL) }
+}
+
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {
-    process.stdout.write("Read-only Graph reservation audit. No live calls, keys, writes or nested gates.\nUsage: e2e-graph-cogs.sh [--audit-reservations /absolute/private/reservations.jsonl]\n")
+    process.stdout.write("Read-only Graph reservation audit and retained assessment replay. No live calls, keys, writes or nested gates.\nUsage: e2e-graph-cogs.sh [--replay | --audit-reservations /absolute/private/reservations.jsonl]\nReplay exit 0 means historical readback only, never live G15 acceptance.\n")
     return 0
   }
   if (args.length === 0) {
     process.stdout.write(JSON.stringify({ liveEvidence: "NOT_RUN", liveEnabled: false, state: "not_checked",
-      remaining: ["fixed-owner-root", "receipt-reconciler", "balance-rpc-integration", "response-recorder-integration", "validated-cache", "live-authority-review"] }) + "\n")
+      remaining: ["owned-live-process", "operational-budget-initialization", "live-authority-review", "arc-settled-evidence"] }) + "\n")
     return 1
+  }
+  if (args.length === 1 && (args[0] === "--replay" || args[0] === "--replay-worker")) {
+    try { process.stdout.write(args[0] === "--replay" ? runGraphReplayProcess() : readGraphOwnerReplay()); return 0 }
+    catch { process.stderr.write(REPLAY_FAIL + "\n"); return 1 }
   }
   if (args.length !== 2 || args[0] !== "--audit-reservations" || !args[1]?.startsWith("/")) {
     process.stderr.write("graph_cogs_arguments_invalid\n"); return 2
