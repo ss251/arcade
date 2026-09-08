@@ -61,6 +61,23 @@ export class Receipt extends Schema.Class<Receipt>("Receipt")({
 
   /** Rail settlement reference; consult settleRefKind. A Gateway UUID is not a mined transaction. */
   settleTx: Schema.optional(Schema.String),
+
+  /**
+   * A settlement this hub BROADCAST but could not confirm.
+   *
+   * `settled: false` used to mean one thing — the authorization was never broadcast, so the
+   * buyer's balance is untouched — and the receipt says so to the buyer in those words. But
+   * the eip3009 rail gives up reading the receipt after a bounded number of polls, and Arc's
+   * public RPC rate-limits, so a transaction that IS on the wire can produce a settle
+   * failure. Telling that buyer "you were not charged" is a claim about the chain this hub
+   * has not checked and may be wrong about one block later.
+   *
+   * When this is present, `settled: false` means UNKNOWN, not "not charged": the reference
+   * is the transaction to reconcile against before treating the job as unpaid. It is never
+   * set together with `settleTx`, which is only written once settlement is confirmed, so it
+   * cannot be mistaken for proof of payment and does not release paid output.
+   */
+  unresolvedSettleTx: Schema.optional(Schema.String),
   /** Accrual bucket this receipt's fee belongs to. */
   feeAccrualId: Schema.optional(Schema.String),
   /** Backfilled once the accrual bucket is swept on-chain. */

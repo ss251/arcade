@@ -76,7 +76,13 @@ export const runJob = (args: RunJobArgs) => {
       outcome: JobOutcome,
       settled: boolean,
       reason: string,
-      settleTx?: string
+      settleTx?: string,
+      /*
+       * A transaction this hub broadcast but could not confirm. Never passed together with
+       * `settleTx`: that one is proof of settlement and releases paid output, this one is
+       * the opposite — an admission that the outcome is unknown and has to be reconciled.
+       */
+      unresolvedSettleTx?: string
     ) =>
       Effect.gen(function* () {
         // Ledger: a child's outcome commits or releases its reservation against the root's
@@ -125,6 +131,7 @@ export const runJob = (args: RunJobArgs) => {
           feeAtomic,
           feeBps,
           ...(settleTx === undefined ? {} : { settleTx }),
+          ...(unresolvedSettleTx === undefined ? {} : { unresolvedSettleTx }),
           ...(args.accrualId === undefined || !settled ? {} : { feeAccrualId: args.accrualId }),
           ...(args.canary === true ? { canary: true } : {}),
           rail: rail.name,
@@ -259,13 +266,46 @@ export const runJob = (args: RunJobArgs) => {
         ? { treeHash: tree.treeHash, childCount: tree.children.length, childTotalAtomic: tree.committed }
         : undefined
 
+    /*
+     * Keep the failure's transaction hash rather than collapsing the error to its tag.
+     *
+     * `SettlementFailed` carries an optional txHash precisely because the transaction may
+     * already be on the wire: the eip3009 rail broadcasts, then polls for the receipt a
+     * bounded number of times, and Arc's public RPC rate-limits often enough that the poll
+     * can run out while the transaction confirms a block later. Discarding that hash made
+     * every settle failure look like the never-broadcast case.
+     */
     const settled = yield* rail.settle(args.verified, settleTree).pipe(
       Effect.map((s) => ({ ok: true as const, txHash: s.txHash })),
-      Effect.catchAll((e) => Effect.succeed({ ok: false as const, reason: e._tag }))
+      Effect.catchAll((e) => Effect.succeed({
+        ok: false as const,
+        reason: e._tag,
+        txHash: "txHash" in e && typeof e.txHash === "string" ? e.txHash : undefined
+      }))
     )
 
     if (!settled.ok) {
-      return yield* finish(outcome, false, `settlement failed (${settled.reason})`)
+      /*
+       * Two different facts wear the same `settled: false`, and only one of them entitles
+       * this hub to tell a buyer they were not charged.
+       *
+       * With no hash, nothing was broadcast: the authorization is untouched, the buyer's
+       * balance is untouched, and the existing wording is true. With a hash, this hub does
+       * not know — the transaction exists and may well have moved the buyer's USDC. Saying
+       * "you were not charged" there is a claim about the chain nobody checked. Say what is
+       * actually known, and hand over the reference to reconcile against.
+       */
+      return settled.txHash === undefined
+        ? yield* finish(outcome, false, `settlement failed (${settled.reason})`)
+        : yield* finish(
+            outcome,
+            false,
+            `settlement unconfirmed (${settled.reason}): transaction ${settled.txHash} was broadcast ` +
+              "and this hub could not read its receipt, so whether the buyer was charged is unknown. " +
+              "Reconcile against that transaction before treating this job as unpaid.",
+            undefined,
+            settled.txHash
+          )
     }
 
     return yield* finish(outcome, true, "ok", settled.txHash)

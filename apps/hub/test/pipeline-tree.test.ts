@@ -99,6 +99,44 @@ describe("receipt tree", () => {
     }), layer))
     expect(out.c.receipt.settled).toBe(false)
     expect(out.c.receipt.settleTx).toBeUndefined()
+    // Nothing was broadcast, so the buyer really was not charged and the receipt may say so.
+    expect(out.c.receipt.unresolvedSettleTx).toBeUndefined()
+    expect(out.c.receipt.reason).not.toMatch(/unconfirmed/)
+    expect(out.st.reservedAtomic).toBe(0n)
+    expect(out.st.committedAtomic).toBe(0n)
+  })
+
+  it("records a broadcast-but-unreadable settlement as unknown rather than as 'not charged'", async () => {
+    /*
+     * The live eip3009 rail gives up reading the receipt after a bounded number of polls
+     * and fails with the transaction hash attached, because the transaction IS on the wire.
+     * That receipt must not carry the same "you were not charged" meaning as a settle that
+     * never broadcast: the buyer's USDC may already have moved.
+     */
+    const txHash = `0x${"ab".repeat(32)}`
+    const stateRef = Effect.runSync(
+      Ref.make({ ...makeTestState({ [buyer.address]: 10_000_000n }), failSettlement: true, failSettlementTxHash: txHash })
+    )
+    const rail = makeTestRail(stateRef)
+    const layer = Layer.mergeAll(StoreLive, Layer.succeed(RailTag, rail), Layer.succeed(BrokerTag, stub(ok)))
+    const out = await Effect.runPromise(Effect.provide(Effect.gen(function* () {
+      const store = yield* StoreTag
+      const rootId = "job_rootunconfirmed0a", childId = "job_childunconfirmed0"
+      const rootLineage = ROOT_LINEAGE(rootId)
+      yield* store.reserveTree(rootId, childId, parsePrice("$0.01"), parsePrice("$0.05"))
+      const c = yield* runJob({ jobId: childId, listing: child, seller: SELLER, input: {}, verified: yield* Effect.promise(() => verifiedFor(rail, parsePrice("$0.01"))), lineage: childLineage({ ...rootLineage, skillId: "parent" }, rootId) })
+      const st = yield* store.treeState(rootId)
+      return { c, st }
+    }), layer))
+    expect(out.c.receipt.settled).toBe(false)
+    // Never presented as proof of payment: settleTx stays absent, so nothing downstream
+    // that gates on it will release the paid output.
+    expect(out.c.receipt.settleTx).toBeUndefined()
+    expect(out.c.receipt.unresolvedSettleTx).toBe(txHash)
+    expect(out.c.receipt.reason).toContain("unconfirmed")
+    expect(out.c.receipt.reason).toContain(txHash)
+    expect(out.c.receipt.reason).not.toContain("you were not charged")
+    // The reservation still releases: an unconfirmed settlement must not hold budget.
     expect(out.st.reservedAtomic).toBe(0n)
     expect(out.st.committedAtomic).toBe(0n)
   })

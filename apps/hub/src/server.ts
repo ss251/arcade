@@ -1431,8 +1431,20 @@ const main = Effect.gen(function* () {
               ...(delivered
                 ? {}
                 : {
+                    /*
+                     * "You were not charged" is a claim about the chain, so only make it when
+                     * this hub actually knows. A receipt carrying `unresolvedSettleTx` is one
+                     * where settlement was broadcast and its outcome could not be read; the
+                     * buyer may well have paid. Withholding the output is still right — an
+                     * unconfirmed payment is not a confirmed one — but the buyer is owed the
+                     * reference rather than a false reassurance.
+                     */
                     detail: escrowResult?.kind === "withheld" ? escrowResult.detail : job?.outcome?.error ??
-                      "not settled — you were not charged, and no result is released"
+                      (receipt.unresolvedSettleTx === undefined
+                        ? "not settled — you were not charged, and no result is released"
+                        : `settlement unconfirmed — transaction ${receipt.unresolvedSettleTx} was broadcast and ` +
+                          "this hub could not read its receipt, so whether you were charged is unknown. " +
+                          "No result is released until it is confirmed. Check that transaction on the chain.")
                   }),
               receipt: {
                 ...receipt,

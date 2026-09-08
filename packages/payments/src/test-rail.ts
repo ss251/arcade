@@ -34,6 +34,14 @@ export interface TestRailState {
   readonly settlements: Array<SettledPayment>
   /** when true, settle() fails — exercises the SettlementFailed path */
   failSettlement: boolean
+  /**
+   * When set together with `failSettlement`, the failure carries this transaction hash —
+   * the "broadcast, outcome unknown" case the live eip3009 rail produces when its receipt
+   * poll runs out. Without it the failure means nothing was ever put on the wire, and the
+   * two must not be conflated: only the second entitles the hub to tell a buyer they were
+   * not charged.
+   */
+  failSettlementTxHash?: string
 }
 
 export const makeTestRail = (
@@ -115,7 +123,10 @@ export const makeTestRail = (
     Effect.gen(function* () {
       const state = yield* Ref.get(stateRef)
       if (state.failSettlement) {
-        return yield* new SettlementFailed({ reason: "test: forced settlement failure" })
+        return yield* new SettlementFailed({
+          reason: "test: forced settlement failure",
+          ...(state.failSettlementTxHash === undefined ? {} : { txHash: state.failSettlementTxHash })
+        })
       }
 
       const nonce = verified.payload.payload.authorization.nonce
