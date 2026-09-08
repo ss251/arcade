@@ -75,9 +75,14 @@ test-timeout fix. ETHGlobal check-in #1 was submitted on September 8 and is reco
 both verified live: `https://arcade-hub-production.up.railway.app` (`/healthz`,
 `/openapi.json`, `/listings`, a real HTTP 402 challenge) and
 `https://arcade-web-production-8dc4.up.railway.app` (marketplace, buyer, chat, publish,
-seller and listing routes). The production ENS re-point remains **pending**: the deployed
-hub advertises the seller as payee, while the retained ENS record is bound to FeeSplitterV2
-`0x9e304ec1…`, and the documented re-point preflight refuses on that mismatch by design.
+seller and listing routes). The production seller runner was restarted on current `main`,
+which raised the live catalogue from four listings to nine across five adapter types, and
+the **ENS production re-point executed**: Sepolia tx
+[`0x95536ac0…`](https://sepolia.etherscan.io/tx/0x95536ac0df37ec691aee6a82e3465ad76e2abe021983ac0c42bfa196c9e50b54),
+block 11662373. `usdc-flow-check.scf821769ed.arcade.eth` now names the production hub and
+web hosts, with payee, chain and price untouched. Guarded resolution of that name remains
+absent because the leaf is expired; reviving it is a separate owner RENEW that has not been
+requested.
 
 No mainnet operation, no new live payment approval and no video are claimed by this
 follow-up.
