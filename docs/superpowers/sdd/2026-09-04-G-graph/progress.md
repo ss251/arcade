@@ -1,5 +1,20 @@
 # SDD ledger — Plan G
 
+2026-09-08 07:38 IST — G15M sole17414 gate:5370Vitest242/69.85s PASS;
+1616Bun PASS/1fixture FAIL98files13026assert208.49s. Clock-crossing fixture
+failure reproduced deterministically; test-only correction then195Bun1025assert
+13.98s/2rootsstrict0. Skipped remainder20832 passedroot/webstrict/clientSSR
+348/171ms. No full repeat/all-green claim. Six paths/3links/privacy0; runtime
+and brief pins frozen, test pin intentionally corrected. Commit/mainFF next;
+no owner key/live/spend/policy change or push.
+
+2026-09-08 07:29 IST — G15M retained balance/query binding implemented after
+missing-export Red.194Bun1021assert14.49s; tightened receipt-time case1/5assert
+283ms;2rootsstrict0. Existing reader used with injected synthetic observations;
+exact floor/delta/event/block checks pass and a real fixture reservation stays
+unresolved with unchanged bytes. Original harness/client/consumer unchanged.
+Sole gate next; no live/key/spend, reconciliation, policy change or push.
+
 2026-09-08 07:17 IST — G15L sole98921 gate PASS:5370Vitest242/69.47s;
 1581Bun98/12839assert204.49s;root/webstrict/clientSSR333/166ms. Six paths,
 3links/privacy0;3source/briefpins unchanged after result annotations. Existing

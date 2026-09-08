@@ -1064,6 +1064,88 @@ export function writeGraphQueryCache(parent: string, binding: GraphQueryBinding,
   } catch { throw new Error(CACHE_FAIL) }
 }
 
+
+const BALANCE_BIND_FAIL = "graph_cogs_balance_evidence_refused"
+export interface GraphQueryBalanceEvidence {
+  readonly evidence: "retained-balance-consistency"
+  readonly queryHash: string
+  readonly sourceHash: string
+  readonly queryEvidenceHash: string
+  readonly cacheHash: string
+  readonly paymentTx: string
+  readonly spentAtomic: string
+  readonly before: GraphBalanceObservation
+  readonly preForward: GraphBalanceObservation
+  readonly after: GraphBalanceObservation
+  readonly hash: string
+}
+function retainedBalance(input: unknown): GraphBalanceObservation {
+  shape(input, ["chain", "payer", "token", "balanceAtomic", "blockNumber", "blockHash", "blockTimestamp", "observedAt", "responseHashes"])
+  const uint = (v: unknown): v is string => typeof v === "string" && /^(0|[1-9][0-9]{0,77})$/.test(v) && BigInt(v) < (1n << 256n)
+  insist(input.chain === GRAPH_COGS_POLICY.chain && input.payer === GRAPH_COGS_POLICY.payer && input.token === GRAPH_COGS_POLICY.token &&
+    uint(input.balanceAtomic) && uint(input.blockNumber) && BigInt(input.blockNumber) > 0n &&
+    typeof input.blockHash === "string" && /^0x[a-f0-9]{64}$/.test(input.blockHash) && !/^0x0{64}$/.test(input.blockHash) &&
+    Number.isSafeInteger(input.blockTimestamp) && Number(input.blockTimestamp) >= 0 &&
+    Number.isSafeInteger(input.observedAt) && Number(input.observedAt) > 0 &&
+    Math.abs(Math.floor(Number(input.observedAt) / 1000) - Number(input.blockTimestamp)) <= 30)
+  const values = input.responseHashes
+  insist(Array.isArray(values) && Object.getPrototypeOf(values) === Array.prototype &&
+    values.length === 4 && Reflect.ownKeys(values).length === 5)
+  const responseHashes = Array.from({ length: 4 }, (_, i) => {
+    const descriptor = Object.getOwnPropertyDescriptor(values, String(i))
+    insist(descriptor !== undefined && "value" in descriptor && typeof descriptor.value === "string" &&
+      HASH.test(descriptor.value) && descriptor.value !== "0".repeat(64))
+    return descriptor.value as string
+  })
+  return Object.freeze({ chain: GRAPH_COGS_POLICY.chain, payer: GRAPH_COGS_POLICY.payer, token: GRAPH_COGS_POLICY.token,
+    balanceAtomic: input.balanceAtomic, blockNumber: input.blockNumber, blockHash: input.blockHash,
+    blockTimestamp: Number(input.blockTimestamp), observedAt: Number(input.observedAt), responseHashes: Object.freeze(responseHashes) })
+}
+/** Supplied retained balance/query consistency only. No actual RPC, reservation
+ * mutation, cache refresh, fresh authority or claim of independent ancestry.
+ * External wallet activity and unknown observations stop reconciliation. */
+export function bindGraphQueryBalances(parent: string, binding: GraphQueryBinding, input: unknown, options: GraphCacheOptions = {}): GraphQueryBalanceEvidence {
+  try {
+    shape(input, ["before", "preForward", "after"])
+    const before = retainedBalance(input.before), preForward = retainedBalance(input.preForward), after = retainedBalance(input.after)
+    const now = cacheClock(options); now()
+    const parentOptions = { ...(options.parent === undefined ? {} : { parent: options.parent }), now }
+    const cached = readGraphQueryCache(parent, binding, { ...parentOptions, ...(options.signal === undefined ? {} : { signal: options.signal }) })
+    const capture = readGraphResponseCapture(parent, binding, { now }), query = cached.evidence
+    insist(capture.summary.lastHash === query.captureHash && capture.forwardIntent !== null && capture.forwardIntent.hash === query.forwardHash)
+    const forwardAt = capture.forwardIntent.observedAt
+    insist(before.observedAt <= capture.createdAt && capture.createdAt - before.observedAt <= 5000 &&
+      preForward.observedAt >= before.observedAt && preForward.observedAt >= capture.records[2]!.capturedAt &&
+      preForward.observedAt <= forwardAt && forwardAt - preForward.observedAt <= 5000 &&
+      after.observedAt >= query.capturedAt && after.observedAt - query.capturedAt <= 5000 && after.observedAt <= now())
+    checkGraphBalance(before.balanceAtomic); checkGraphBalance(preForward.balanceAtomic)
+    insist(before.balanceAtomic === preForward.balanceAtomic &&
+      BigInt(preForward.balanceAtomic) - BigInt(after.balanceAtomic) === BigInt(GRAPH_COGS_POLICY.queryCostAtomic) &&
+      BigInt(after.balanceAtomic) >= BigInt(GRAPH_COGS_POLICY.floorAtomic))
+    const ordered = (a: GraphBalanceObservation, b: GraphBalanceObservation) => {
+      insist(BigInt(a.blockNumber) <= BigInt(b.blockNumber) && a.blockTimestamp <= b.blockTimestamp)
+      if (a.blockNumber === b.blockNumber) insist(a.blockHash === b.blockHash && a.blockTimestamp === b.blockTimestamp)
+      else insist(a.blockHash !== b.blockHash)
+    }
+    ordered(before, preForward); ordered(preForward, after); ordered(before, after)
+    const receiptNumber = BigInt(query.receiptBlockNumber)
+    insist(BigInt(preForward.blockNumber) < receiptNumber && BigInt(after.blockNumber) >= receiptNumber)
+    insist(before.blockHash !== query.receiptBlockHash && preForward.blockHash !== query.receiptBlockHash)
+    if (BigInt(after.blockNumber) === receiptNumber) insist(after.blockHash === query.receiptBlockHash)
+    else insist(after.blockHash !== query.receiptBlockHash)
+    const last = capture.records.at(-1)!
+    const receiptBlock = readGraphRpcBody(Buffer.from(last.observation.bodyBase64, "base64"), query.lastRpcId)
+    insist(plainObject(receiptBlock) && typeof receiptBlock.timestamp === "string")
+    const receiptTime = BigInt(receiptBlock.timestamp)
+    insist(BigInt(preForward.blockTimestamp) <= receiptTime && receiptTime <= BigInt(after.blockTimestamp))
+    const body = { evidence: "retained-balance-consistency" as const, queryHash: query.queryHash, sourceHash: query.sourceHash,
+      queryEvidenceHash: query.hash, cacheHash: cached.cacheHash, paymentTx: query.result.paymentTx!, spentAtomic: GRAPH_COGS_POLICY.queryCostAtomic,
+      before, preForward, after }
+    insist(hash(JSON.stringify(sourceFiles(bindings.get(binding)!))) === binding.sourceHash)
+    now(); return Object.freeze({ ...body, hash: hash(JSON.stringify(body)) })
+  } catch { throw new Error(BALANCE_BIND_FAIL) }
+}
+
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {
     process.stdout.write("Read-only Graph reservation audit. No live calls, keys, writes or nested gates.\nUsage: e2e-graph-cogs.sh [--audit-reservations /absolute/private/reservations.jsonl]\n")

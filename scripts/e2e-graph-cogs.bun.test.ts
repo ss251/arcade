@@ -4,7 +4,7 @@ import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSyn
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
-import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, verifyGraphCapturedQuery, writeGraphQueryCache, readGraphQueryCache, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
+import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, verifyGraphCapturedQuery, writeGraphQueryCache, readGraphQueryCache, bindGraphQueryBalances, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
 import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObservation, type GraphPaymentIntent } from "../skills/counterparty-graph/graph-client.ts"
 import { encodeAbiParameters, encodeEventTopics, parseAbi } from "viem"
 
@@ -649,6 +649,113 @@ test("a lost post-release acknowledgement is not a fresh payment and valid commi
 function cacheChild(f: { parent: string; source: string }, action: string) {
   return `import{readGraphSourceManifest,bindGraphQuery,verifyGraphCapturedQuery,writeGraphQueryCache,readGraphQueryCache}from${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))};import{document}from${JSON.stringify(resolve(import.meta.dir, "../skills/counterparty-graph/graph-client.ts"))};globalThis.fetch=()=>{throw Error("network forbidden")};const parent=${JSON.stringify(f.parent)},binding=bindGraphQuery({subgraphId:${JSON.stringify(GRAPH_COGS_POLICY.subgraph)},document:document("identities"),variables:{address:${JSON.stringify(GRAPH_COGS_POLICY.subject)}}},readGraphSourceManifest(${JSON.stringify(f.source)}));${action}`
 }
+// The reader is real; responses and historical times are declared synthetic data.
+async function declaredQueryBalances(f: { parent: string; binding: GraphQueryBinding }, beforeAtomic = "1000000") {
+  const capture = readGraphResponseCapture(f.parent, f.binding), cached = readGraphQueryCache(f.parent, f.binding)
+  const receiptTime = Number(BigInt(JSON.parse(Buffer.from(capture.records.at(-1)!.observation.bodyBase64, "base64").toString()).result.timestamp))
+  const observations = []
+  const points = [capture.createdAt - 1, capture.forwardIntent!.observedAt, cached.evidence.capturedAt + 1]
+  for (let i = 0; i < 3; i++) {
+    const time = points[i]!, balance = i === 2 ? BigInt(beforeAtomic) - 10000n : BigInt(beforeAtomic)
+    const blockTime = i < 2 ? Math.min(Math.floor(time / 1000), receiptTime) : Math.floor(time / 1000)
+    const data = { number: `0x${(39 + i).toString(16)}`, hash: `0x${["d", "e", "b"][i]!.repeat(64)}`, timestamp: `0x${blockTime.toString(16)}` }
+    let calls = 0
+    const observation = await readGraphBalance(async (_url, init) => {
+      const request = JSON.parse(String(init.body)); calls++
+      const result = request.method === "eth_chainId" ? "0x2105" : request.method === "eth_call" ? `0x${balance.toString(16).padStart(64, "0")}` : data
+      return Response.json({ jsonrpc: "2.0", id: request.id, result })
+    }, { now: () => time })
+    expect(calls).toBe(4); observations.push(observation)
+  }
+  return { before: observations[0]!, preForward: observations[1]!, after: observations[2]! }
+}
+test("retained balance binding joins three synthetic observations without clearing a reservation", () => captureOwned(async f => {
+  await declaredProtocolCapture(f); writeGraphQueryCache(f.parent, f.binding, verifyGraphCapturedQuery(f.parent, f.binding))
+  const balances = await declaredQueryBalances(f)
+  const directory = initializeGraphReservationState(f.parent), writer = openGraphReservationWriter(f.parent)
+  writer.reserve({ allocation: "evidence", queryHash: f.binding.queryHash, balanceAtomic: balances.before.balanceAtomic }); writer.close()
+  const ledger = readFileSync(join(directory, "reservations.jsonl"), "utf8")
+  const result = bindGraphQueryBalances(f.parent, f.binding, balances)
+  expect(result.evidence).toBe("retained-balance-consistency"); expect(result.spentAtomic).toBe("10000")
+  expect(result.before.balanceAtomic).toBe("1000000"); expect(result.after.balanceAtomic).toBe("990000")
+  expect(result.queryHash).toBe(f.binding.queryHash); expect(Object.isFrozen(result.after.responseHashes)).toBe(true)
+  expect(readFileSync(join(directory, "reservations.jsonl"), "utf8")).toBe(ledger)
+  expect(readGraphReservations(join(directory, "reservations.jsonl")).unresolved).toBe(1)
+}))
+test("retained balance binding accepts exactly0.91 before and0.90 after without widening the floor", () => captureOwned(async f => {
+  await declaredProtocolCapture(f); writeGraphQueryCache(f.parent, f.binding, verifyGraphCapturedQuery(f.parent, f.binding))
+  const balances = await declaredQueryBalances(f, "910000"), result = bindGraphQueryBalances(f.parent, f.binding, balances)
+  expect(result.before.balanceAtomic).toBe("910000"); expect(result.after.balanceAtomic).toBe("900000")
+  expect(result.spentAtomic).toBe(GRAPH_COGS_POLICY.queryCostAtomic)
+}))
+test("synthetic balance block times remain coherent when the query crosses a wall-clock second", () => captureOwned(async f => {
+  const stamp = `0x${(Math.floor(Date.now() / 1000) - 1).toString(16)}`
+  await declaredProtocolCapture(f, { change(rows) {
+    for (const i of [2, 6]) rows[i] = changeProtocolBody(rows[i]!, value => { (value.result as Record<string, unknown>).timestamp = stamp })
+  } })
+  writeGraphQueryCache(f.parent, f.binding, verifyGraphCapturedQuery(f.parent, f.binding))
+  const balances = await declaredQueryBalances(f)
+  expect(bindGraphQueryBalances(f.parent, f.binding, balances).spentAtomic).toBe("10000")
+}))
+for (const fault of ["chain", "payer", "token", "noncanonical", "overflow", "before-low", "pre-low", "changed-before", "no-delta", "double-delta", "after-floor", "after-increase", "hash-zero", "hash-case", "zero-block", "hash-count", "hash-value", "extra-field", "before-stale", "before-late", "pre-early", "pre-late", "after-early", "after-late", "block-stale", "height-backwards", "same-height-fork", "receipt-height", "receipt-fork", "reused-block-hash", "receipt-time", "cache-corrupt", "source-change"]) test(`retained balance binding refuses ${fault} without new reads or writes to a network`, () => captureOwned(async f => {
+  await declaredProtocolCapture(f); writeGraphQueryCache(f.parent, f.binding, verifyGraphCapturedQuery(f.parent, f.binding))
+  const balances = JSON.parse(JSON.stringify(await declaredQueryBalances(f))) as Record<string, unknown>
+  const before = balances.before as Record<string, unknown>, pre = balances.preForward as Record<string, unknown>, after = balances.after as Record<string, unknown>
+  if (fault === "chain") before.chain = "eip155:1"
+  if (fault === "payer") before.payer = f.binding.merchant
+  if (fault === "token") before.token = f.binding.merchant
+  if (fault === "noncanonical") before.balanceAtomic = "01000000"
+  if (fault === "overflow") before.balanceAtomic = (1n << 256n).toString()
+  if (fault === "before-low") before.balanceAtomic = "909999"
+  if (fault === "pre-low") pre.balanceAtomic = "909999"
+  if (fault === "changed-before") before.balanceAtomic = "1000001"
+  if (fault === "no-delta") after.balanceAtomic = "1000000"
+  if (fault === "double-delta") after.balanceAtomic = "980000"
+  if (fault === "after-floor") { before.balanceAtomic = "909999"; pre.balanceAtomic = "909999"; after.balanceAtomic = "899999" }
+  if (fault === "after-increase") after.balanceAtomic = "1010000"
+  if (fault === "hash-zero") before.blockHash = `0x${"0".repeat(64)}`
+  if (fault === "hash-case") before.blockHash = `0x${"D".repeat(64)}`
+  if (fault === "zero-block") before.blockNumber = "0"
+  if (fault === "hash-count") (before.responseHashes as string[]).pop()
+  if (fault === "hash-value") (before.responseHashes as string[])[1] = "0".repeat(64)
+  if (fault === "extra-field") before.extra = true
+  if (fault === "before-stale") before.observedAt = Number(before.observedAt) - 5001
+  if (fault === "before-late") before.observedAt = Number(pre.observedAt) + 1
+  if (fault === "pre-early") pre.observedAt = before.observedAt
+  if (fault === "pre-late") pre.observedAt = Number(pre.observedAt) + 1
+  if (fault === "after-early") after.observedAt = Number(after.observedAt) - 2
+  if (fault === "after-late") after.observedAt = Number(after.observedAt) + 5001
+  if (fault === "block-stale") before.blockTimestamp = Number(before.blockTimestamp) - 31
+  if (fault === "height-backwards") before.blockNumber = "41"
+  if (fault === "same-height-fork") pre.blockNumber = before.blockNumber
+  if (fault === "receipt-height") pre.blockNumber = "41"
+  if (fault === "receipt-fork") after.blockHash = `0x${"f".repeat(64)}`
+  if (fault === "reused-block-hash") { pre.blockHash = after.blockHash; after.blockNumber = "42"; after.blockHash = `0x${"f".repeat(64)}` }
+  if (fault === "receipt-time") {
+    const last = readGraphResponseCapture(f.parent, f.binding).records.at(-1)!
+    const receiptTime = Number(BigInt(JSON.parse(Buffer.from(last.observation.bodyBase64, "base64").toString()).result.timestamp))
+    before.blockTimestamp = receiptTime - 1; pre.blockTimestamp = receiptTime - 1; after.blockTimestamp = receiptTime - 1
+  }
+  if (fault === "cache-corrupt") writeFileSync(join(f.parent, "cache-" + f.binding.queryHash, "commit.json"), "{}\n")
+  if (fault === "source-change") writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed")
+  const files = readdirSync(f.parent).sort()
+  expect(() => bindGraphQueryBalances(f.parent, f.binding, balances)).toThrow(/^graph_cogs_balance_evidence_refused$/)
+  expect(readdirSync(f.parent).sort()).toEqual(files)
+}))
+test("retained balance binding rejects getters and caller copies stay isolated", () => captureOwned(async f => {
+  await declaredProtocolCapture(f); writeGraphQueryCache(f.parent, f.binding, verifyGraphCapturedQuery(f.parent, f.binding))
+  const balances = await declaredQueryBalances(f), result = bindGraphQueryBalances(f.parent, f.binding, balances)
+  let invoked = false
+  const bad = { ...balances, before: { ...balances.before } }
+  Object.defineProperty(bad.before, "balanceAtomic", { enumerable: true, get() { invoked = true; return "1000000" } })
+  expect(() => bindGraphQueryBalances(f.parent, f.binding, bad)).toThrow(); expect(invoked).toBe(false)
+  const copied = JSON.parse(JSON.stringify(balances)); copied.after.balanceAtomic = "0"
+  expect(result.after.balanceAtomic).toBe("990000")
+  const controller = new AbortController(); controller.abort()
+  expect(() => bindGraphQueryBalances(f.parent, f.binding, balances, { signal: controller.signal })).toThrow()
+  let time = Date.now()
+  expect(() => bindGraphQueryBalances(f.parent, f.binding, balances, { now: () => { const value = time; time += 5000; return value } })).toThrow()
+}))
 for (const phase of ["afterResultSync", "afterCommitSync"]) test(`actual child death at ${phase} preserves cache claim and refuses reuse`, () => captureOwned(async f => {
   await declaredProtocolCapture(f)
   const child = spawnSync(process.execPath, ["--no-env-file", "-e", cacheChild(f, `writeGraphQueryCache(parent,binding,verifyGraphCapturedQuery(parent,binding),{${phase}:()=>process.exit(33)});process.exit(99)`)], { env: { PATH: "" }, encoding: "utf8", timeout: 5000, maxBuffer: 4096 })

@@ -1,5 +1,16 @@
 # Plan G — execution records
 
+## September 8 — G15 retained balance binding checkpoint
+
+The [balance-bind brief](task-15-balance-bind-brief.md) and
+[balance-bind report](task-15-balance-bind-report.md) join supplied admission/
+pre-forward/after observations to retained query/cache evidence. The sole full
+gate passed5370Vitest but found one clock-crossing fixture error among1617Bun.
+A deterministic reproduction and fixture-only correction passed195 focused Bun/
+strict; the skipped root/webstrict and builds passed separately. No full repeat
+or relabeling as all-green. This is supplied consistency, not live acquisition
+or budget reconciliation. Runtime source stayed frozen; local commit follows.
+
 ## September 8 — G15 per-query cache checkpoint
 
 The [cache-store brief](task-15-cache-store-brief.md) and
