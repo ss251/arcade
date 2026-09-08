@@ -87,6 +87,31 @@ requested.
 No mainnet operation, no new live payment approval and no video are claimed by this
 follow-up.
 
+**Settlement correctness, September 8–9.** Two defects were found by adversarial review of
+the money paths and fixed, both with tests.
+
+A settlement that was BROADCAST but whose receipt could not be read was recorded exactly
+like one that never reached the wire, and the receipt told the buyer, in those words, that
+they were not charged. The eip3009 rail polls for its receipt a bounded number of times and
+Arc's public RPC rate-limits, so a confirmed transaction can produce a settle failure.
+Receipts now carry `unresolvedSettleTx` and say the outcome is unknown, handing over the
+transaction to reconcile against. Output is still withheld, because an unconfirmed payment
+is not a confirmed one, and `settleTx` is still written only on confirmed settlement, so
+nothing downstream can mistake the two. Automatic reconciliation is not implemented and is
+named as follow-up work rather than claimed.
+
+A captured `PAYMENT-SIGNATURE` header could be replayed to dispatch any number of jobs. USDC
+makes each authorization single use, so a replay can only settle once, but settlement is the
+last thing that happens and until then the nonce is genuinely unspent — so the rail's
+on-chain check answered "unused" for every copy, and the seller's agent ran for each while
+being paid once. The hub now claims the authorization at acceptance, keyed on network, payer
+and nonce, and the claim is persisted so a restart does not reopen the window.
+
+Also fixed: the browser buy flow required the payment challenge to carry exactly one accept
+and so refused every production listing once the hub began advertising two rails. It now
+selects the route by its EIP-712 domain, which is the property that decides what a browser
+purchase can sign.
+
 ## Evidence and limits
 
 The [runbook](runbook.md) records the actual hashes, amounts, refusal observations, cleanup and deviations: [lineage](runbook.md#plan-a--evidence-lineage), [adapter evidence](runbook.md#plan-b--evidence-publish-adapters), [pay-tests](runbook.md#plan-c--evidence-automatic-delisting-and-recovery), [ERC-8004](runbook.md#plan-d--erc-8004-identity-and-settlement-evidence) and [ENS](runbook.md#ens-namespaces-sepolia). Use those measured amounts rather than the plan's earlier demo estimates.
