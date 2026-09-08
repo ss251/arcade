@@ -1,5 +1,17 @@
 # Plan G — execution records
 
+## September 8 — G15 readonly qualified-budget checkpoint
+
+The [qualified-budget brief](task-15-qualified-budget-brief.md) and
+[qualified-budget report](task-15-qualified-budget-report.md) derive a global
+retained-evidence view without changing the ledger or its writer.308 focused
+Bun/1581 assertions and exact strict passed. All quota counts remain; partial
+evidence blocks later rows and individually valid queries with discontinuous
+balances/times/blocks refuse globally. The two-query history is explicitly
+synthetic construction, not a newly admitted second reserve. Sole full gate
+passed5370Vitest/1731Bun, root/web strict and both builds; local commit follows.
+No live authority, operational state, key/RPC/payment or push.
+
 ## September 8 — G15 readonly journal/query proof checkpoint
 
 The [journal-proof brief](task-15-journal-proof-brief.md) and

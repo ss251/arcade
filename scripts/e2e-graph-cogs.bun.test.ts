@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { createGraphBalanceRecorder, readGraphBalanceJournal, verifyGraphJournaledQuery, type GraphBalanceObservation } from "./e2e-graph-cogs.ts"
+import { createGraphBalanceRecorder, readGraphBalanceJournal, verifyGraphJournaledQuery, readGraphQualifiedReservations, type GraphBalanceObservation } from "./e2e-graph-cogs.ts"
 import { createHash } from "node:crypto"
 import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSync, linkSync, mkdirSync, realpathSync, existsSync, readdirSync, copyFileSync, unlinkSync, renameSync, lstatSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -834,9 +834,10 @@ test("a concurrent file change detected on the second read cannot become accepte
   } })).toThrow(/^graph_cogs_journal_evidence_refused$/)
   expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
 }))
-async function declaredJournaledQuery(parent: string, afterAtomic = "990000") {
+async function declaredJournaledQuery(parent: string, afterAtomic = "990000", data?: Record<string, unknown>) {
   const f = journalFixture(parent), recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)
   const protocol = await declaredProtocolCapture({ parent, binding: f.binding }, {
+    ...(data === undefined ? {} : { data }),
     beforeForward(intent, receiptTimestamp) {
       const pre = { ...journalBalance(Date.now()), blockNumber: "40", blockHash: "0x" + "e".repeat(64), blockTimestamp: receiptTimestamp }
       recorder.recordPreForward(pre, intent, captureSignal())
@@ -889,6 +890,169 @@ for (const fault of ["header", "nonce", "balance-delta", "floor", "missing-cache
     } finally { rmSync(parent, { recursive: true, force: true }) }
   })
 }
+
+test("qualified reservation readback keeps all quota counts while recognizing complete retained evidence", async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-budget-")))
+  try {
+    const f = await declaredJournaledQuery(parent), before = readFileSync(join(f.directory, "reservations.jsonl"))
+    const result = readGraphQualifiedReservations(parent, readGraphSourceManifest(f.source))
+    expect(result).toMatchObject({ reservations: 1, evidence: 1, video: 0, reservedAtomic: "10000", qualifiedPaid: 1, unresolved: 0, liveEnabled: false })
+    expect(result.entries[0]).toMatchObject({ sequence: 1, queryHash: f.binding.queryHash, state: "retained-consistency" })
+    expect(Object.isFrozen(result.entries[0])).toBe(true)
+    expect(readFileSync(join(f.directory, "reservations.jsonl"))).toEqual(before)
+    expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
+    const writer = openGraphReservationWriter(parent)
+    expect(() => writer.reserve({ allocation: "video", queryHash: hash("new query"), balanceAtomic: "990000" })).toThrow()
+    writer.close()
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
+
+
+test("empty and pending qualified budget views never initialize, reset or invent paid evidence", () => owned(parent => {
+  const sources = readGraphSourceManifest(sourceCopy(parent))
+  expect(() => readGraphQualifiedReservations(parent, sources)).toThrow(/^graph_cogs_qualified_budget_refused$/)
+  const directory = initializeGraphReservationState(parent)
+  expect(readGraphQualifiedReservations(parent, sources)).toMatchObject({ reservations: 0, qualifiedPaid: 0, unresolved: 0 })
+  const writer = openGraphReservationWriter(parent); writer.reserve(reservation())
+  expect(readGraphQualifiedReservations(parent, sources)).toMatchObject({ reservations: 1, qualifiedPaid: 0, unresolved: 1, reservedAtomic: "10000" })
+  expect(existsSync(join(directory, ".claim"))).toBe(true); writer.close()
+  expect(readGraphQualifiedReservations(parent, sources).unresolved).toBe(1)
+}))
+for (const fault of ["missing-journal", "journal-claim", "cache-claim", "missing-result", "missing-marker"] as const) {
+  test(`qualified budget leaves ${fault} unresolved without consuming another slot`, async () => {
+    const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-budget-")))
+    try {
+      const f = await declaredJournaledQuery(parent), sources = readGraphSourceManifest(f.source)
+      if (fault === "missing-journal") renameSync(f.journal, join(parent, "retained-journal"))
+      if (fault === "journal-claim") writeFileSync(join(f.journal, ".claim"), "retained", { mode: 0o600 })
+      if (fault === "cache-claim") writeFileSync(join(parent, "cache-" + f.binding.queryHash, ".claim"), "retained", { mode: 0o600 })
+      if (fault === "missing-result") unlinkSync(join(parent, "cache-" + f.binding.queryHash, "result.json"))
+      if (fault === "missing-marker") unlinkSync(join(f.journal, "complete.json"))
+      expect(readGraphQualifiedReservations(parent, sources)).toMatchObject({ reservations: 1, qualifiedPaid: 0, unresolved: 1 })
+      expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
+    } finally { rmSync(parent, { recursive: true, force: true }) }
+  })
+}
+for (const fault of ["source-copy", "source-change", "global-extra", "global-head", "global-claim", "journal-extra", "cache-extra", "cache-corrupt", "journal-corrupt", "alias"] as const) {
+  test(`qualified budget refuses ${fault} rather than hiding corrupted complete evidence`, async () => {
+    const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-budget-")))
+    try {
+      const f = await declaredJournaledQuery(parent); let sources = readGraphSourceManifest(f.source)
+      if (fault === "source-copy") sources = structuredClone(sources)
+      if (fault === "source-change") writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed")
+      if (fault === "global-extra") writeFileSync(join(f.directory, "refund.json"), "{}", { mode: 0o600 })
+      if (fault === "global-head") writeFileSync(join(f.directory, "head-00.json"), "{}\n")
+      if (fault === "global-claim") writeFileSync(join(f.directory, ".claim"), "{}", { mode: 0o600 })
+      if (fault === "journal-extra") writeFileSync(join(f.journal, "refund.json"), "{}", { mode: 0o600 })
+      if (fault === "cache-extra") writeFileSync(join(parent, "cache-" + f.binding.queryHash, "refund.json"), "{}", { mode: 0o600 })
+      if (fault === "cache-corrupt") writeFileSync(join(parent, "cache-" + f.binding.queryHash, "result.json"), "{}\n")
+      if (fault === "journal-corrupt") writeFileSync(join(f.journal, "after.json"), "{}\n")
+      if (fault === "alias") { renameSync(f.journal, f.journal + "-saved"); symlinkSync(f.journal + "-saved", f.journal) }
+      expect(() => readGraphQualifiedReservations(parent, sources)).toThrow(/^graph_cogs_qualified_budget_refused$/)
+      expect(readGraphReservations(join(f.directory, "reservations.jsonl")).reservations).toBe(1)
+    } finally { rmSync(parent, { recursive: true, force: true }) }
+  })
+}
+// Assemble declared two-query history from two owned offline writers. Moving and
+// rehashing the second reservation is synthetic fixture construction, NOT a
+// successfully admitted second reservation in the global budget.
+async function declaredTwoQueryBudget(parent: string, secondBefore = "990000") {
+  const first = await declaredJournaledQuery(parent, "990000", declaredIdentityData())
+  const staging = join(parent, "second"); mkdirSync(staging, { mode: 0o700 })
+  const sources = readGraphSourceManifest(first.source), binding = bindGraphQuery({
+    subgraphId: GRAPH_COGS_POLICY.subgraph, document: document("attestations"),
+    variables: { agentIds: ["8453:7"], block: { hash: "0x" + "c".repeat(64) } },
+  }, sources, { binding: first.binding, blockHash: "0x" + "c".repeat(64) })
+  initializeGraphReservationState(staging); const writer = openGraphReservationWriter(staging)
+  const before = { ...journalBalance(Date.now(), secondBefore), blockNumber: "41", blockHash: "0x" + "b".repeat(64),
+    blockTimestamp: first.protocol.receiptTimestamp }
+  const summary = writer.reserve({ allocation: "evidence", queryHash: binding.queryHash, balanceAtomic: before.balanceAtomic })
+  const handoff = claimGraphReservation(staging, binding, summary), recorder = createGraphBalanceRecorder(staging, binding, handoff, before)
+  const protocol = await declaredProtocolCapture({ parent: staging, binding }, {
+    firstId: 6, tx: "0x" + "e".repeat(64), nonce: "0x" + "f".repeat(64), receiptBlockNumber: 43, receiptBlockHash: "0x" + "9".repeat(64),
+    data: { _meta: declaredIdentityData()._meta, feedbacks: [] },
+    beforeForward(intent, receiptTimestamp) {
+      recorder.recordPreForward({ ...journalBalance(Date.now(), secondBefore), blockNumber: "42", blockHash: "0x" + "e".repeat(64),
+        blockTimestamp: receiptTimestamp }, intent, captureSignal())
+    },
+  })
+  const evidence = verifyGraphCapturedQuery(staging, binding, { parent: first.evidence })
+  writeGraphQueryCache(staging, binding, evidence, { parent: first.evidence })
+  recorder.recordAfter({ ...journalBalance(Date.now(), (BigInt(secondBefore) - 10000n).toString()), blockNumber: "43",
+    blockHash: "0x" + "9".repeat(64), blockTimestamp: protocol.receiptTimestamp }, captureSignal())
+  recorder.close(); writer.close()
+  for (const prefix of ["query-", "cache-", "balance-"]) renameSync(join(staging, prefix + binding.queryHash), join(parent, prefix + binding.queryHash))
+  const path = join(first.directory, "reservations.jsonl"), prior = readFileSync(path, "utf8")
+  const body = { sequence: 2, previousHash: first.handoff.reservationHash, allocation: "evidence", queryHash: binding.queryHash, amountAtomic: "10000" }
+  const digest = hash(JSON.stringify(body)), text = prior + JSON.stringify({ ...body, hash: digest }) + "\n"
+  writeFileSync(path, text)
+  writeFileSync(join(first.directory, "head-02.json"), JSON.stringify({ format: "arcade-graph-head-v1", policyHash: GRAPH_COGS_POLICY_HASH,
+    reservations: 2, journalHash: hash(text) }) + "\n", { mode: 0o600 })
+  rewriteJournal(join(parent, "balance-" + binding.queryHash), files => {
+    const value = files.intent!.handoff as Record<string, unknown>; value.sequence = 2; value.reservationHash = digest
+    for (const name of ["admission", "pre-forward", "after", "complete"]) files[name]!.reservationHash = digest
+  })
+  return { first, binding, sources }
+}
+test("qualified global view binds the second query to the earlier identity result and continuous balances", async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-budget-")))
+  try {
+    const f = await declaredTwoQueryBudget(parent), result = readGraphQualifiedReservations(parent, f.sources)
+    expect(result).toMatchObject({ reservations: 2, evidence: 2, reservedAtomic: "20000", qualifiedPaid: 2, unresolved: 0 })
+    expect(result.entries.map(entry => entry.proof?.paymentTx)).toEqual(["0x" + "a".repeat(64), "0x" + "e".repeat(64)])
+    expect(readGraphReservations(join(f.first.directory, "reservations.jsonl")).unresolved).toBe(2)
+    const child = spawnSync(process.execPath, ["--no-env-file", "-e", cacheChild({ parent, source: f.first.source },
+      `const{readGraphQualifiedReservations}=await import(${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))});console.log(JSON.stringify(readGraphQualifiedReservations(parent,readGraphSourceManifest(${JSON.stringify(f.first.source)}))))`)], {
+      env: { PATH: "" }, encoding: "utf8", timeout: 4000, maxBuffer: 8192,
+    })
+    expect(child.status).toBe(0); expect(child.stderr).toBe(""); expect(JSON.parse(child.stdout)).toEqual(result)
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
+test("individually consistent queries with a balance discontinuity cannot qualify globally", async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-budget-")))
+  try {
+    const f = await declaredTwoQueryBudget(parent, "995000")
+    expect(verifyGraphJournaledQuery(parent, f.binding, { parent: f.first.evidence }).spentAtomic).toBe("10000")
+    expect(() => readGraphQualifiedReservations(parent, f.sources)).toThrow(/^graph_cogs_qualified_budget_refused$/)
+    expect(readGraphReservations(join(f.first.directory, "reservations.jsonl")).reservations).toBe(2)
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
+test("an unresolved first row stops qualification of all later rows without dropping quota counts", async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-budget-")))
+  try {
+    const f = await declaredTwoQueryBudget(parent)
+    unlinkSync(join(f.first.journal, "complete.json"))
+    const result = readGraphQualifiedReservations(parent, f.sources)
+    expect(result).toMatchObject({ reservations: 2, evidence: 2, qualifiedPaid: 0, unresolved: 2, reservedAtomic: "20000" })
+    expect(result.entries.every(entry => entry.state === "unresolved" && entry.proof === null)).toBe(true)
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
+test("qualified budget clock/cancellation checks cannot acknowledge a stale global view", () => owned(parent => {
+  const sources = readGraphSourceManifest(sourceCopy(parent)); initializeGraphReservationState(parent)
+  for (const fault of ["abort", "backwards", "deadline"]) {
+    const time = Date.now(), controller = new AbortController(); let calls = 0
+    if (fault === "abort") controller.abort()
+    expect(() => readGraphQualifiedReservations(parent, sources, { signal: controller.signal, now: () => {
+      calls++; return calls === 1 ? time : fault === "backwards" ? time - 1 : time + 5000
+    } })).toThrow(/^graph_cogs_qualified_budget_refused$/)
+  }
+}))
+
+
+for (const fault of ["time", "block"] as const) test(`individually valid journals cannot hide cross-query ${fault} discontinuity`, async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-budget-")))
+  try {
+    const f = await declaredTwoQueryBudget(parent), first = readGraphBalanceJournal(parent, f.first.binding)
+    rewriteJournal(join(parent, "balance-" + f.binding.queryHash), files => {
+      const before = files.admission!.observation as Record<string, unknown>
+      if (fault === "time") before.observedAt = first.closedAt - 1
+      else before.blockHash = "0x" + "8".repeat(64)
+    })
+    expect(verifyGraphJournaledQuery(parent, f.binding, { parent: f.first.evidence }).spentAtomic).toBe("10000")
+    expect(() => readGraphQualifiedReservations(parent, f.sources)).toThrow(/^graph_cogs_qualified_budget_refused$/)
+    expect(readGraphReservations(join(f.first.directory, "reservations.jsonl")).unresolved).toBe(2)
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
 
 function sourceCopy(parent: string) {
   const dir = join(parent, "source"); mkdirSync(dir, { mode: 0o700 })
@@ -1019,17 +1183,19 @@ const captureSignal = () => new AbortController().signal
 // Declared fixed-owner protocol data only: no owner key/signature or real RPC.
 async function declaredProtocolCapture(f: { parent: string; binding: GraphQueryBinding }, options: {
   firstId?: number; nullReceipts?: number; tx?: string; nonce?: string; data?: Record<string, unknown>;
+  receiptBlockNumber?: number; receiptBlockHash?: string;
   change?: (rows: GraphResponseObservation[]) => void
   beforeForward?: (intent: GraphPaymentIntent, receiptTimestamp: number) => void
 } = {}) {
   const enc = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64")
   const binding = f.binding, stamp = Math.floor(Date.now() / 1000), tx = options.tx ?? `0x${"a".repeat(64)}`
-  const blockHash = `0x${"b".repeat(64)}`, graphHash = `0x${"c".repeat(64)}`
+  const blockHash = options.receiptBlockHash ?? `0x${"b".repeat(64)}`, graphHash = `0x${"c".repeat(64)}`
+  const blockNumber = `0x${(options.receiptBlockNumber ?? 41).toString(16)}`
   let intent = declaredIntent(binding)
   if (options.nonce) intent = changeDeclaredIntent(intent, value => { (value.authorization as Record<string, unknown>).nonce = options.nonce })
   const abi = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)", "event AuthorizationUsed(address indexed authorizer, bytes32 indexed nonce)"])
-  const base = { address: binding.token, transactionHash: tx, blockHash, blockNumber: "0x29", transactionIndex: "0x0", removed: false }
-  const receipt = { transactionHash: tx, blockHash, blockNumber: "0x29", transactionIndex: "0x0", status: "0x1", logs: [
+  const base = { address: binding.token, transactionHash: tx, blockHash, blockNumber, transactionIndex: "0x0", removed: false }
+  const receipt = { transactionHash: tx, blockHash, blockNumber, transactionIndex: "0x0", status: "0x1", logs: [
     { ...base, logIndex: "0x0", topics: encodeEventTopics({ abi, eventName: "Transfer", args: { from: binding.payer as `0x${string}`, to: binding.merchant as `0x${string}` } }), data: encodeAbiParameters([{ type: "uint256" }], [10000n]) },
     { ...base, logIndex: "0x1", topics: encodeEventTopics({ abi, eventName: "AuthorizationUsed", args: { authorizer: binding.payer as `0x${string}`, nonce: intent.authorization.nonce as `0x${string}` } }), data: "0x" },
   ] }
@@ -1049,7 +1215,7 @@ async function declaredProtocolCapture(f: { parent: string; binding: GraphQueryB
   const paid = { ...paidBase, headers: { ...paidBase.headers, "payment-response": enc({ success: true, network: GRAPH_COGS_POLICY.chain, payer: binding.payer, transaction: tx }) } }
   const rows = [initial, rpc("eth_chainId", [], "0x2105"), rpc("eth_getBlockByNumber", ["latest", false], { timestamp: `0x${stamp.toString(16)}` }), paid,
     rpc("eth_chainId", [], "0x2105"), ...Array.from({ length: options.nullReceipts ?? 0 }, () => rpc("eth_getTransactionReceipt", [tx], null)),
-    rpc("eth_getTransactionReceipt", [tx], receipt), rpc("eth_getBlockByNumber", ["0x29", false], { number: "0x29", hash: blockHash, timestamp: `0x${stamp.toString(16)}` })]
+    rpc("eth_getTransactionReceipt", [tx], receipt), rpc("eth_getBlockByNumber", [blockNumber, false], { number: blockNumber, hash: blockHash, timestamp: `0x${stamp.toString(16)}` })]
   options.change?.(rows)
   const recorder = createGraphResponseRecorder(f.parent, binding)
   for (let i = 0; i < rows.length; i++) {

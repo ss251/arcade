@@ -1,5 +1,20 @@
 # SDD ledger — Plan G
 
+2026-09-08 08:58 IST — G15Q sole10798 full gate PASS:5370Vitest242/71.81s;
+1731Bun98/13591assert219.28s;root/webstrict/clientSSR350/164ms. Six paths,
+3links/privacy0;three source/brief pins frozen. Original harness restoration
+exact; client/consumer unchanged. This passing H8 teardown does not erase
+G15P's prior recorded concern. Atomic commit/mainFF next; no full repeat,
+real key/live/RPC/spend, payment-policy change or push.
+
+2026-09-08 08:52 IST — G15Q readonly qualified global-budget view implemented
+after missing-export Red.21selectedBun55assert3.24s/2rootsstrict0; then308
+focusedBun1581assert21.79s/strict0 including cross-query time/block tests.
+All quota counts remain; partial/unknown prefix blocks later qualification.
+Actual no-key/no-network child agrees on declared two-query history; this is
+not a newly admitted second reserve. Existing harness/writer/client unchanged.
+Sole gate next; no operational root, real key/live/RPC/spend or push.
+
 2026-09-08 08:38 IST — G15P sole39734 gate:5370Vitest tests PASS,
 241suites PASS/1H8 teardown FAIL72.25s. After child exit0, skill-route.test.ts:77
 observed still_listening, not ECONNREFUSED. Listener identity unavailable; cause

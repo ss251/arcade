@@ -1521,6 +1521,125 @@ export function verifyGraphJournaledQuery(parent: string, binding: GraphQueryBin
   } catch { throw new Error(JOURNAL_PROOF_FAIL) }
 }
 
+
+const QUALIFIED_BUDGET_FAIL = "graph_cogs_qualified_budget_refused"
+export interface GraphQualifiedReservation {
+  readonly sequence: number
+  readonly queryHash: string
+  readonly state: "unresolved" | "retained-consistency"
+  readonly proof: GraphJournaledQueryEvidence | null
+}
+export interface GraphQualifiedReservations extends GraphReservationSummary {
+  readonly sourceHash: string
+  readonly ledgerHash: string
+  readonly qualifiedPaid: number
+  readonly entries: readonly GraphQualifiedReservation[]
+}
+/** Read-only evidence qualification, not live admission. All original quota
+ * counts remain spent/reserved; a missing or partial row blocks later rows.
+ * The original writer still refuses every unresolved raw-ledger reservation. */
+export function readGraphQualifiedReservations(parent: string, sources: GraphSourceManifest, options: {
+  readonly now?: () => number; readonly signal?: AbortSignal
+} = {}): GraphQualifiedReservations {
+  try {
+    const now = cacheClock(options), root = sourceRoots.get(sources); insist(root !== undefined)
+    const sourceCurrent = () => insist(hash(JSON.stringify(sourceFiles(root))) === sources.sourceHash)
+    sourceCurrent(); now()
+    const parentIdentity = privateDirectory(parent), directory = join(parent, GRAPH_COGS_POLICY.namespace), identity = privateDirectory(directory)
+    const pins: { path: string; text: string }[] = []
+    const read = (path: string) => { now(); const text = readBudgetText(path); pins.push({ path, text }); now(); return text }
+    const text = read(join(directory, "reservations.jsonl")), summary = decodeGraphReservations(text), lines = text.trimEnd().split("\n")
+    const inventory = () => {
+      now(); sameDirectory(parent, parentIdentity); sameDirectory(directory, identity)
+      const handle = opendirSync(directory, { bufferSize: 16 }), names: string[] = []
+      try {
+        for (;;) {
+          const entry = handle.readSync(); if (entry === null) break
+          insist(names.length < 13 && entry.isFile()); names.push(entry.name)
+        }
+      } finally { handle.closeSync() }
+      const expected = ["reservations.jsonl", ...Array.from({ length: summary.reservations + 1 }, (_, i) => headName(i)),
+        ...(names.includes(".claim") ? [".claim"] : [])].sort()
+      insist(JSON.stringify(names.sort()) === JSON.stringify(expected)); return names
+    }
+    const names = inventory()
+    if (names.includes(".claim")) {
+      const bytes = read(join(directory, ".claim")), claim: unknown = JSON.parse(bytes)
+      shape(claim, ["policyHash", "claimId"])
+      insist(claim.policyHash === GRAPH_COGS_POLICY_HASH && typeof claim.claimId === "string" &&
+        HASH.test(claim.claimId) && JSON.stringify(claim) + "\n" === bytes)
+    }
+    for (let i = 0; i <= summary.reservations; i++) {
+      insist(read(join(directory, headName(i))) === headText(lines.slice(0, i + 1).join("\n") + "\n", i))
+    }
+    const complete = (path: string, expected: readonly string[]) => {
+      now()
+      try { lstatSync(path) } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return false; throw error }
+      const pinned = privateDirectory(path), handle = opendirSync(path, { bufferSize: 8 }), found: string[] = []
+      try {
+        for (;;) {
+          const entry = handle.readSync(); if (entry === null) break
+          insist(found.length < expected.length + 1 && entry.isFile() && (entry.name === ".claim" || expected.includes(entry.name)))
+          found.push(entry.name)
+        }
+      } finally { handle.closeSync() }
+      sameDirectory(path, pinned); now()
+      return JSON.stringify(found.sort()) === JSON.stringify([...expected].sort())
+    }
+    const entries: GraphQualifiedReservation[] = [], transactions = new Set<string>(), nonces = new Set<string>()
+    const qualified = new Map<string, { binding: GraphQueryBinding; cache: GraphCachedQuery; journal: GraphBalanceJournalReadback; proof: GraphJournaledQueryEvidence; parent?: GraphQueryEvidence }>()
+    let blocked = false, previous: GraphBalanceJournalReadback | undefined
+    for (let sequence = 1; sequence <= summary.reservations; sequence++) {
+      now(); const row = JSON.parse(lines[sequence]!) as { queryHash: string }
+      const queryHash = row.queryHash, journalPath = join(parent, "balance-" + queryHash), cachePath = join(parent, "cache-" + queryHash)
+      if (blocked || !complete(journalPath, ["intent.json", "admission.json", "pre-forward.json", "after.json", "complete.json"]) ||
+        !complete(cachePath, ["result.json", "commit.json"])) {
+        blocked = true; entries.push(Object.freeze({ sequence, queryHash, state: "unresolved", proof: null })); continue
+      }
+      const manifest: unknown = JSON.parse(read(join(journalPath, "intent.json")))
+      insist(plainObject(manifest) && plainObject(manifest.binding))
+      const stored = manifest.binding
+      insist(typeof stored.body === "string" && (stored.kind === "identities" || stored.kind === "attestations"))
+      const body: unknown = JSON.parse(stored.body); shape(body, ["query", "variables"])
+      insist(typeof body.query === "string" && plainObject(body.variables))
+      const args: QueryArgs = { subgraphId: GRAPH_COGS_POLICY.subgraph, document: body.query, variables: body.variables }
+      let binding: GraphQueryBinding, prior: GraphQueryEvidence | undefined
+      if (stored.kind === "identities") binding = bindGraphQuery(args, sources)
+      else {
+        insist(typeof stored.parentQueryHash === "string")
+        const first = qualified.get(stored.parentQueryHash); insist(first !== undefined && first.binding.kind === "identities")
+        const meta = first.cache.evidence.result.data._meta
+        insist(plainObject(meta) && plainObject(meta.block) && typeof meta.block.hash === "string")
+        binding = bindGraphQuery(args, sources, { binding: first.binding, blockHash: meta.block.hash }); prior = first.cache.evidence
+      }
+      insist(binding.queryHash === queryHash && JSON.stringify(binding) === JSON.stringify(stored))
+      const scoped = { now, ...(prior === undefined ? {} : { parent: prior }) }
+      const proof = verifyGraphJournaledQuery(parent, binding, scoped), cache = readGraphQueryCache(parent, binding, scoped),
+        journal = readGraphBalanceJournal(parent, binding, { now })
+      insist(proof.reservationSequence === sequence && proof.cacheHash === cache.cacheHash && proof.journalHash === journal.journalHash &&
+        proof.queryEvidenceHash === cache.evidence.hash && !transactions.has(proof.paymentTx) && !nonces.has(journal.intent.authorization.nonce))
+      if (previous) {
+        const a = previous.after, b = journal.before
+        insist(a.balanceAtomic === b.balanceAtomic && b.observedAt >= previous.closedAt &&
+          BigInt(a.blockNumber) <= BigInt(b.blockNumber) && a.blockTimestamp <= b.blockTimestamp)
+        if (a.blockNumber === b.blockNumber) insist(a.blockHash === b.blockHash && a.blockTimestamp === b.blockTimestamp)
+        else insist(a.blockHash !== b.blockHash)
+      }
+      transactions.add(proof.paymentTx); nonces.add(journal.intent.authorization.nonce)
+      qualified.set(queryHash, { binding, cache, journal, proof, ...(prior === undefined ? {} : { parent: prior }) }); previous = journal
+      entries.push(Object.freeze({ sequence, queryHash, state: "retained-consistency", proof }))
+    }
+    for (const entry of qualified.values()) {
+      const proof = verifyGraphJournaledQuery(parent, entry.binding, { now, ...(entry.parent === undefined ? {} : { parent: entry.parent }) })
+      insist(proof.hash === entry.proof.hash)
+    }
+    for (const pin of pins) { now(); insist(readBudgetText(pin.path) === pin.text); now() }
+    insist(JSON.stringify(inventory()) === JSON.stringify(names)); sourceCurrent(); now()
+    return Object.freeze({ ...summary, sourceHash: sources.sourceHash, ledgerHash: hash(text), qualifiedPaid: qualified.size,
+      unresolved: summary.reservations - qualified.size, entries: Object.freeze(entries) })
+  } catch { throw new Error(QUALIFIED_BUDGET_FAIL) }
+}
+
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {
     process.stdout.write("Read-only Graph reservation audit. No live calls, keys, writes or nested gates.\nUsage: e2e-graph-cogs.sh [--audit-reservations /absolute/private/reservations.jsonl]\n")
