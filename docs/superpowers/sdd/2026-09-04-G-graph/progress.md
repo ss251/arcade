@@ -1,5 +1,18 @@
 # SDD ledger — Plan G
 
+2026-09-08 07:17 IST — G15L sole98921 gate PASS:5370Vitest242/69.47s;
+1581Bun98/12839assert204.49s;root/webstrict/clientSSR333/166ms. Six paths,
+3links/privacy0;3source/briefpins unchanged after result annotations. Existing
+harness restoration exact; client/consumer unchanged. Atomic commit/mainFF
+next; no full repeat, owner key, live/spend, reservation-policy change or push.
+
+2026-09-08 07:11 IST — G15L exclusive per-query result/commit storage and
+readback implemented after missing-export Red.158Bun831assert10.38s;
+2rootsstrict0 after four optional-property construction fixes. Actual child
+exit33/competition34/no-key read, lost acknowledgement and first-query retention
+tested. Original client/consumer/harness logic unchanged. Sole gate next;
+no real key/endpoint/spend, budget reconciliation, new live authority or push.
+
 2026-09-08 07:02 IST — G15K sole47534 gate PASS:5370Vitest242/69.44s;
 1551Bun98/12723assert202.68s;root/webstrict/clientSSR342/171ms. Nine paths,
 3links/privacy0;6source/briefpins unchanged after result annotations. Original

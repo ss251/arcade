@@ -957,6 +957,113 @@ export function verifyGraphCapturedQuery(directory: string, binding: GraphQueryB
   } catch { throw new Error(QUERY_PROOF_FAIL) }
 }
 
+
+const CACHE_FAIL = "graph_cogs_cache_refused"
+const CACHE_RESULT_BYTES = 2 * 1024 * 1024
+interface GraphCacheOptions {
+  readonly parent?: GraphQueryEvidence
+  readonly now?: () => number
+  readonly signal?: AbortSignal
+}
+export interface GraphCachedQuery {
+  readonly mode: "retained-query-cache"
+  readonly newPaidQueries: 0
+  readonly storedAt: number
+  readonly cacheHash: string
+  readonly evidence: GraphQueryEvidence
+}
+function cacheClock(options: GraphCacheOptions) {
+  const clock = options.now ?? Date.now; insist(typeof clock === "function")
+  const started = clock(); let previous = started
+  insist(Number.isSafeInteger(started) && started > 0 && Number.isSafeInteger(started + 5000))
+  return () => {
+    const value = clock()
+    insist(!options.signal?.aborted && Number.isSafeInteger(value) && value >= previous && value < started + 5000)
+    previous = value; return value
+  }
+}
+function cacheState(directory: string, identity: DirectoryIdentity, evidence: GraphQueryEvidence, now: () => number, claimed: boolean): GraphCachedQuery {
+  const inventory = () => {
+    now(); sameDirectory(directory, identity)
+    const handle = opendirSync(directory, { bufferSize: 4 }), names: string[] = []
+    try {
+      for (;;) {
+        const entry = handle.readSync(); if (entry === null) break
+        insist(names.length < 3 && entry.isFile()); names.push(entry.name)
+      }
+    } finally { handle.closeSync() }
+    insist(JSON.stringify(names.sort()) === JSON.stringify([...(claimed ? [".claim"] : []), "commit.json", "result.json"]))
+  }
+  inventory()
+  const text = readBudgetText(join(directory, "result.json"), true, CACHE_RESULT_BYTES), value: unknown = JSON.parse(text)
+  now(); shape(value, ["format", "policyHash", "queryHash", "sourceHash", "storedAt", "evidence", "hash"])
+  insist(value.format === "arcade-graph-query-cache-v1" && value.policyHash === GRAPH_COGS_POLICY_HASH &&
+    value.queryHash === evidence.queryHash && value.sourceHash === evidence.sourceHash &&
+    Number.isSafeInteger(value.storedAt) && Number(value.storedAt) >= evidence.capturedAt && Number(value.storedAt) <= now() &&
+    JSON.stringify(value.evidence) === JSON.stringify(evidence) && JSON.stringify(value) + "\n" === text)
+  const body = { format: value.format, policyHash: value.policyHash, queryHash: value.queryHash, sourceHash: value.sourceHash,
+    storedAt: value.storedAt, evidence }
+  insist(value.hash === hash(JSON.stringify(body)))
+  const marker = readBudgetText(join(directory, "commit.json")), commit: unknown = JSON.parse(marker)
+  shape(commit, ["format", "policyHash", "queryHash", "resultHash"])
+  insist(commit.format === "arcade-graph-query-cache-commit-v1" && commit.policyHash === GRAPH_COGS_POLICY_HASH &&
+    commit.queryHash === evidence.queryHash && commit.resultHash === hash(text) && JSON.stringify(commit) + "\n" === marker)
+  now()
+  insist(readBudgetText(join(directory, "result.json"), true, CACHE_RESULT_BYTES) === text && readBudgetText(join(directory, "commit.json")) === marker)
+  inventory(); now()
+  return Object.freeze({ mode: "retained-query-cache", newPaidQueries: 0, storedAt: Number(value.storedAt), cacheHash: hash(marker), evidence })
+}
+/** No-key read of one committed retained result. Missing, corrupt or interrupted
+ * entries refuse; no refresh or recovery is hidden here. Absence of a claim is
+ * NOT proof that a previous caller received a clean-close acknowledgement. */
+export function readGraphQueryCache(parent: string, binding: GraphQueryBinding, options: GraphCacheOptions = {}): GraphCachedQuery {
+  try {
+    const now = cacheClock(options); now()
+    const evidence = verifyGraphCapturedQuery(parent, binding, { ...(options.parent === undefined ? {} : { parent: options.parent }), now })
+    privateDirectory(parent)
+    const directory = join(parent, "cache-" + binding.queryHash), identity = privateDirectory(directory)
+    const state = cacheState(directory, identity, evidence, now, false)
+    insist(hash(JSON.stringify(sourceFiles(bindings.get(binding)!))) === binding.sourceHash)
+    now(); return state
+  } catch { throw new Error(CACHE_FAIL) }
+}
+/** Exclusive one-result commit; no payer/network/budget operation. Never remove
+ * partial directories/files/claims on failure. Valid committed bytes can later
+ * be independently read even if the original acknowledgement was lost. */
+export function writeGraphQueryCache(parent: string, binding: GraphQueryBinding, evidence: GraphQueryEvidence, options: GraphCacheOptions & {
+  readonly afterResultSync?: () => void
+  readonly afterCommitSync?: () => void
+} = {}): GraphCachedQuery {
+  try {
+    const now = cacheClock(options); now()
+    const origin = queryEvidenceOrigins.get(evidence)
+    insist(origin !== undefined && origin.binding === binding && origin.directory === parent &&
+      (options.afterResultSync === undefined || typeof options.afterResultSync === "function") &&
+      (options.afterCommitSync === undefined || typeof options.afterCommitSync === "function"))
+    const fresh = verifyGraphCapturedQuery(parent, binding, { ...(options.parent === undefined ? {} : { parent: options.parent }), now })
+    insist(fresh.hash === evidence.hash)
+    const parentIdentity = privateDirectory(parent), directory = join(parent, "cache-" + binding.queryHash)
+    mkdirSync(directory, { mode: 0o700 }); const identity = privateDirectory(directory)
+    syncDirectory(parent, parentIdentity)
+    const claim = ownClaim(directory, identity), storedAt = now()
+    const body = { format: "arcade-graph-query-cache-v1", policyHash: GRAPH_COGS_POLICY_HASH,
+      queryHash: binding.queryHash, sourceHash: binding.sourceHash, storedAt, evidence }
+    const text = JSON.stringify({ ...body, hash: hash(JSON.stringify(body)) }) + "\n"
+    insist(Buffer.byteLength(text) <= CACHE_RESULT_BYTES)
+    freshBudgetFile(join(directory, "result.json"), text, CACHE_RESULT_BYTES)
+    syncDirectory(directory, identity); options.afterResultSync?.(); now(); claim.check()
+    const marker = JSON.stringify({ format: "arcade-graph-query-cache-commit-v1", policyHash: GRAPH_COGS_POLICY_HASH,
+      queryHash: binding.queryHash, resultHash: hash(text) }) + "\n"
+    freshBudgetFile(join(directory, "commit.json"), marker); syncDirectory(directory, identity)
+    options.afterCommitSync?.(); now(); claim.check()
+    cacheState(directory, identity, evidence, now, true)
+    const checked = verifyGraphCapturedQuery(parent, binding, { ...(options.parent === undefined ? {} : { parent: options.parent }), now })
+    insist(checked.hash === evidence.hash); now(); claim.check(); claim.release()
+    return readGraphQueryCache(parent, binding, { ...(options.parent === undefined ? {} : { parent: options.parent }), now,
+      ...(options.signal === undefined ? {} : { signal: options.signal }) })
+  } catch { throw new Error(CACHE_FAIL) }
+}
+
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {
     process.stdout.write("Read-only Graph reservation audit. No live calls, keys, writes or nested gates.\nUsage: e2e-graph-cogs.sh [--audit-reservations /absolute/private/reservations.jsonl]\n")

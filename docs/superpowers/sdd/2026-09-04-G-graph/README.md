@@ -1,5 +1,17 @@
 # Plan G — execution records
 
+## September 8 — G15 per-query cache checkpoint
+
+The [cache-store brief](task-15-cache-store-brief.md) and
+[cache-store report](task-15-cache-store-report.md) add exclusive private
+result/commit files with fresh retained-evidence revalidation.158 focused Bun/
+831 assertions and strict passed, including actual interruption/competition/
+no-key child checks and first-query survival after later failure. Lost release
+acknowledgement is not fabricated success; valid bytes can be independently read.
+Existing client/consumer/budget/capture logic is unchanged. Sole full gate
+passed5370Vitest/1581Bun,root/webstrict and both builds; local commit follows.
+No live consumer, budget reconciliation or paid execution.
+
 ## September 8 — G15 retained correlation checkpoint
 
 The [correlation brief](task-15-correlation-brief.md) and

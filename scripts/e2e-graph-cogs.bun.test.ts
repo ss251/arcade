@@ -4,7 +4,7 @@ import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSyn
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
-import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, verifyGraphCapturedQuery, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
+import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, verifyGraphCapturedQuery, writeGraphQueryCache, readGraphQueryCache, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
 import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObservation, type GraphPaymentIntent } from "../skills/counterparty-graph/graph-client.ts"
 import { encodeAbiParameters, encodeEventTopics, parseAbi } from "viem"
 
@@ -561,6 +561,135 @@ function changeProtocolBody(row: GraphResponseObservation, change: (value: Recor
   const body = JSON.stringify(value)
   return { ...row, headers: { ...row.headers, "content-length": String(Buffer.byteLength(body)) }, bodyBase64: Buffer.from(body).toString("base64"), bodySha256: hash(body) }
 }
+test("exclusive per-query cache preserves the correlated result without a new paid call", () => captureOwned(async f => {
+  await declaredProtocolCapture(f)
+  const evidence = verifyGraphCapturedQuery(f.parent, f.binding)
+  const stored = writeGraphQueryCache(f.parent, f.binding, evidence)
+  expect(stored.evidence).toEqual(evidence); expect(stored.newPaidQueries).toBe(0)
+  const dir = join(f.parent, "cache-" + f.binding.queryHash)
+  expect(readdirSync(dir).sort()).toEqual(["commit.json", "result.json"])
+  expect(lstatSync(dir).mode & 0o777).toBe(0o700)
+  for (const file of readdirSync(dir)) expect(lstatSync(join(dir, file)).mode & 0o777).toBe(0o600)
+  const before = readdirSync(dir).map(name => [name, hash(readFileSync(join(dir, name), "utf8"))])
+  expect(readGraphQueryCache(f.parent, f.binding)).toEqual(stored)
+  expect(() => writeGraphQueryCache(f.parent, f.binding, evidence)).toThrow(/^graph_cogs_cache_refused$/)
+  expect(readdirSync(dir).map(name => [name, hash(readFileSync(join(dir, name), "utf8"))])).toEqual(before)
+  expect(Object.isFrozen(stored.evidence.result.data._meta)).toBe(true)
+}))
+test("missing cache and forged evidence cannot initialize or silently refresh state", () => captureOwned(async f => {
+  await declaredProtocolCapture(f); const evidence = verifyGraphCapturedQuery(f.parent, f.binding)
+  expect(() => readGraphQueryCache(f.parent, f.binding)).toThrow(/^graph_cogs_cache_refused$/)
+  expect(() => writeGraphQueryCache(f.parent, f.binding, structuredClone(evidence))).toThrow()
+  expect(existsSync(join(f.parent, "cache-" + f.binding.queryHash))).toBe(false)
+}))
+test("pre-aborted cache operations cannot create files and source changes invalidate a completed cache", () => captureOwned(async f => {
+  await declaredProtocolCapture(f); const evidence = verifyGraphCapturedQuery(f.parent, f.binding)
+  const controller = new AbortController(); controller.abort()
+  expect(() => writeGraphQueryCache(f.parent, f.binding, evidence, { signal: controller.signal })).toThrow()
+  expect(() => readGraphQueryCache(f.parent, f.binding, { signal: controller.signal })).toThrow()
+  expect(existsSync(join(f.parent, "cache-" + f.binding.queryHash))).toBe(false)
+  writeGraphQueryCache(f.parent, f.binding, evidence)
+  writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed")
+  expect(() => readGraphQueryCache(f.parent, f.binding)).toThrow(/^graph_cogs_cache_refused$/)
+}))
+for (const fault of ["result-json", "result-hash", "rehashed-result", "commit-json", "commit-hash", "missing-result", "missing-commit", "extra-file", "claim-present", "public-file", "hard-link", "symlink", "public-directory", "oversized-result"]) test(`committed query cache refuses ${fault} without overwriting`, () => captureOwned(async f => {
+  await declaredProtocolCapture(f); const evidence = verifyGraphCapturedQuery(f.parent, f.binding)
+  writeGraphQueryCache(f.parent, f.binding, evidence)
+  const dir = join(f.parent, "cache-" + f.binding.queryHash), result = join(dir, "result.json"), marker = join(dir, "commit.json")
+  if (fault === "result-json") writeFileSync(result, "{}\n")
+  if (fault === "result-hash") writeFileSync(result, readFileSync(result, "utf8").replace(evidence.hash, "0".repeat(64)))
+  if (fault === "rehashed-result") {
+    const value = JSON.parse(readFileSync(result, "utf8")); value.evidence.result.costAtomic = "0"
+    const { hash: _hash, ...body } = value; value.hash = hash(JSON.stringify(body))
+    const text = JSON.stringify(value) + "\n"; writeFileSync(result, text)
+    const commit = JSON.parse(readFileSync(marker, "utf8")); commit.resultHash = hash(text); writeFileSync(marker, JSON.stringify(commit) + "\n")
+  }
+  if (fault === "commit-json") writeFileSync(marker, "{}\n")
+  if (fault === "commit-hash") { const commit = JSON.parse(readFileSync(marker, "utf8")); commit.resultHash = "0".repeat(64); writeFileSync(marker, JSON.stringify(commit) + "\n") }
+  if (fault === "missing-result") unlinkSync(result)
+  if (fault === "missing-commit") unlinkSync(marker)
+  if (fault === "extra-file") writeFileSync(join(dir, "extra"), "no", { mode: 0o600 })
+  if (fault === "claim-present") writeFileSync(join(dir, ".claim"), "held", { mode: 0o600 })
+  if (fault === "public-file") chmodSync(result, 0o644)
+  if (fault === "hard-link") linkSync(result, join(f.parent, "cache-alias"))
+  if (fault === "symlink") { renameSync(result, join(f.parent, "cache-target")); symlinkSync(join(f.parent, "cache-target"), result) }
+  if (fault === "public-directory") chmodSync(dir, 0o755)
+  if (fault === "oversized-result") writeFileSync(result, " ".repeat(2097153))
+  const names = readdirSync(dir).sort()
+  expect(() => readGraphQueryCache(f.parent, f.binding)).toThrow(/^graph_cogs_cache_refused$/)
+  expect(() => writeGraphQueryCache(f.parent, f.binding, evidence)).toThrow(/^graph_cogs_cache_refused$/)
+  expect(readdirSync(dir).sort()).toEqual(names)
+}))
+for (const fault of ["result-error", "commit-error", "result-abort", "commit-abort", "deadline", "source-change", "capture-change"]) test(`query cache retains uncertainty after ${fault}`, () => captureOwned(async f => {
+  await declaredProtocolCapture(f); const evidence = verifyGraphCapturedQuery(f.parent, f.binding)
+  const controller = new AbortController(); let time = Date.now()
+  const hook = () => {
+    if (fault.endsWith("error")) throw Error("synthetic IO failure")
+    if (fault.endsWith("abort")) controller.abort()
+    if (fault === "deadline") time += 5000
+    if (fault === "source-change") writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed")
+    if (fault === "capture-change") writeFileSync(join(f.dir, "response-01.json"), "{}\n")
+  }
+  expect(() => writeGraphQueryCache(f.parent, f.binding, evidence, { signal: controller.signal, now: () => time,
+    ...(fault.startsWith("commit") ? { afterCommitSync: hook } : { afterResultSync: hook }) })).toThrow(/^graph_cogs_cache_refused$/)
+  const dir = join(f.parent, "cache-" + f.binding.queryHash)
+  expect(existsSync(join(dir, ".claim"))).toBe(true); expect(existsSync(join(dir, "result.json"))).toBe(true)
+  expect(() => readGraphQueryCache(f.parent, f.binding)).toThrow()
+}))
+test("a lost post-release acknowledgement is not a fresh payment and valid committed bytes remain readable", () => captureOwned(async f => {
+  await declaredProtocolCapture(f); const evidence = verifyGraphCapturedQuery(f.parent, f.binding)
+  const dir = join(f.parent, "cache-" + f.binding.queryHash)
+  expect(() => writeGraphQueryCache(f.parent, f.binding, evidence, { now: () => {
+    return Date.now() + (existsSync(join(dir, "commit.json")) && !existsSync(join(dir, ".claim")) ? 5000 : 0)
+  } })).toThrow(/^graph_cogs_cache_refused$/)
+  expect(existsSync(join(dir, ".claim"))).toBe(false)
+  const cached = readGraphQueryCache(f.parent, f.binding)
+  expect(cached.evidence).toEqual(evidence); expect(cached.newPaidQueries).toBe(0)
+}))
+function cacheChild(f: { parent: string; source: string }, action: string) {
+  return `import{readGraphSourceManifest,bindGraphQuery,verifyGraphCapturedQuery,writeGraphQueryCache,readGraphQueryCache}from${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))};import{document}from${JSON.stringify(resolve(import.meta.dir, "../skills/counterparty-graph/graph-client.ts"))};globalThis.fetch=()=>{throw Error("network forbidden")};const parent=${JSON.stringify(f.parent)},binding=bindGraphQuery({subgraphId:${JSON.stringify(GRAPH_COGS_POLICY.subgraph)},document:document("identities"),variables:{address:${JSON.stringify(GRAPH_COGS_POLICY.subject)}}},readGraphSourceManifest(${JSON.stringify(f.source)}));${action}`
+}
+for (const phase of ["afterResultSync", "afterCommitSync"]) test(`actual child death at ${phase} preserves cache claim and refuses reuse`, () => captureOwned(async f => {
+  await declaredProtocolCapture(f)
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", cacheChild(f, `writeGraphQueryCache(parent,binding,verifyGraphCapturedQuery(parent,binding),{${phase}:()=>process.exit(33)});process.exit(99)`)], { env: { PATH: "" }, encoding: "utf8", timeout: 5000, maxBuffer: 4096 })
+  expect(child.status).toBe(33); expect(child.stdout).toBe(""); expect(child.stderr).toBe("")
+  const dir = join(f.parent, "cache-" + f.binding.queryHash)
+  expect(existsSync(join(dir, ".claim"))).toBe(true)
+  expect(existsSync(join(dir, "commit.json"))).toBe(phase === "afterCommitSync")
+  expect(() => readGraphQueryCache(f.parent, f.binding)).toThrow()
+  expect(() => writeGraphQueryCache(f.parent, f.binding, verifyGraphCapturedQuery(f.parent, f.binding))).toThrow()
+}))
+test("a competing child cannot overwrite an in-progress cache and a no-key child can read the later commit", () => captureOwned(async f => {
+  await declaredProtocolCapture(f); const evidence = verifyGraphCapturedQuery(f.parent, f.binding)
+  writeGraphQueryCache(f.parent, f.binding, evidence, { afterResultSync() {
+    const child = spawnSync(process.execPath, ["--no-env-file", "-e", cacheChild(f, `try{writeGraphQueryCache(parent,binding,verifyGraphCapturedQuery(parent,binding));process.exit(99)}catch{process.exit(34)}`)], { env: { PATH: "" }, encoding: "utf8", timeout: 5000, maxBuffer: 4096 })
+    expect(child.status).toBe(34); expect(child.stderr).toBe("")
+  } })
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", cacheChild(f, `const c=readGraphQueryCache(parent,binding);console.log(JSON.stringify({mode:c.mode,newPaidQueries:c.newPaidQueries,cost:c.evidence.result.costAtomic}));`)], { env: { PATH: "" }, encoding: "utf8", timeout: 5000, maxBuffer: 4096 })
+  expect(child.status).toBe(0); expect(child.stderr).toBe("")
+  expect(JSON.parse(child.stdout)).toEqual({ mode: "retained-query-cache", newPaidQueries: 0, cost: "10000" })
+  expect(readGraphQueryCache(f.parent, f.binding).evidence).toEqual(evidence)
+}))
+test("the first committed query survives a later paid-error capture without refreshing either query", () => captureOwned(async f => {
+  await declaredProtocolCapture(f, { data: declaredIdentityData() })
+  const first = writeGraphQueryCache(f.parent, f.binding, verifyGraphCapturedQuery(f.parent, f.binding))
+  const binding = bindGraphQuery({ subgraphId: GRAPH_COGS_POLICY.subgraph, document: document("attestations"), variables: { agentIds: ["8453:7"], block: { hash: `0x${"c".repeat(64)}` } } }, readGraphSourceManifest(f.source), { binding: f.binding, blockHash: `0x${"c".repeat(64)}` })
+  await declaredProtocolCapture({ parent: f.parent, binding }, { firstId: 6, tx: `0x${"e".repeat(64)}`, nonce: `0x${"f".repeat(64)}`, change(rows) { rows[3] = { ...rows[3]!, status: 500 } } })
+  expect(() => readGraphQueryCache(f.parent, binding, { parent: first.evidence })).toThrow()
+  expect(readGraphQueryCache(f.parent, f.binding)).toEqual(first)
+  expect(existsSync(join(f.parent, "cache-" + binding.queryHash))).toBe(false)
+}))
+test("a second committed query requires its retained first-query evidence and both original costs survive", () => captureOwned(async f => {
+  await declaredProtocolCapture(f, { data: declaredIdentityData() })
+  const first = writeGraphQueryCache(f.parent, f.binding, verifyGraphCapturedQuery(f.parent, f.binding))
+  const binding = bindGraphQuery({ subgraphId: GRAPH_COGS_POLICY.subgraph, document: document("attestations"), variables: { agentIds: ["8453:7"], block: { hash: `0x${"c".repeat(64)}` } } }, readGraphSourceManifest(f.source), { binding: f.binding, blockHash: `0x${"c".repeat(64)}` })
+  await declaredProtocolCapture({ parent: f.parent, binding }, { firstId: 6, tx: `0x${"e".repeat(64)}`, nonce: `0x${"f".repeat(64)}` })
+  const evidence = verifyGraphCapturedQuery(f.parent, binding, { parent: first.evidence })
+  const second = writeGraphQueryCache(f.parent, binding, evidence, { parent: first.evidence })
+  expect(readGraphQueryCache(f.parent, binding, { parent: first.evidence })).toEqual(second)
+  expect(() => readGraphQueryCache(f.parent, binding)).toThrow()
+  expect(first.evidence.result.costAtomic).toBe("10000"); expect(second.evidence.result.costAtomic).toBe("10000")
+}))
 function changeProtocolHeader(row: GraphResponseObservation, header: "payment-required" | "payment-response", change: (value: Record<string, unknown>) => void): GraphResponseObservation {
   const value = JSON.parse(Buffer.from(row.headers[header]!, "base64").toString()) as Record<string, unknown>; change(value)
   return { ...row, headers: { ...row.headers, [header]: Buffer.from(JSON.stringify(value)).toString("base64") } }
