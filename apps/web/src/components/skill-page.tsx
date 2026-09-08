@@ -13,7 +13,9 @@ const nameMessages: Record<NonNullable<SkillPageData["nameError"]>, string> = {
   name_unavailable: "Name resolution unavailable. No listing is confirmed for this name.",
   name_mismatch: "Name and listing evidence do not match. No listing is confirmed for this name."
 }
-const status = (settled: boolean) => settled ? "recorded settled" : "not recorded settled"
+// A glyph as well as a colour: the verdict must survive a greyscale screenshot, a
+// projector, and a reader who does not distinguish the two hues.
+const status = (settled: boolean) => settled ? "\u2713 recorded settled" : "\u2715 not recorded settled"
 
 /** Never create a link from a reference alone or restore one withheld by H4. */
 function Reference({ receipt, root }: { readonly receipt: PublicReceiptRow | PublicReceiptChild; readonly root: PublicReceiptRow }) {

@@ -50,7 +50,7 @@ export const TreeGraph = ({ view }: { view: TreeView }) => {
               <text x={node.x + 10} y={node.y + 19} className="node-skill">{compact(node.skillId, 21)}</text>
               <text x={node.x + 10} y={node.y + 39} className="node-price">{compact(node.price, 9)}</text>
               <text x={node.x + NODE_W - 10} y={node.y + 39} className="node-state" textAnchor="end">
-                {node.settled ? "settled" : compact(node.reason, 13)}
+                {node.settled ? "\u2713 settled" : compact(node.reason, 13)}
               </text>
             </g>
             return href === null

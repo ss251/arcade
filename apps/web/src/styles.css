@@ -1421,8 +1421,13 @@ a {
 .tree a:active rect { stroke: var(--ink); }
 .tree .tree-edge { stroke: var(--line); stroke-width: 1.5; }
 .tree .node rect { fill: var(--card); stroke: var(--line); }
-.tree .node.is-settled rect { stroke: var(--stamp); }
-.tree .node.is-refused rect { stroke: var(--refuse); }
+/*
+ * A verdict is an object, not a hairline. Twenty stacked records distinguished by 1px of
+ * border colour read as twenty identical rows; a fill is legible at a glance and at a
+ * distance. The alpha stays low because --node-price sits on top of it.
+ */
+.tree .node.is-settled rect { stroke: var(--stamp); stroke-width: 1.5; fill: var(--stamp-tint); }
+.tree .node.is-refused rect { stroke: var(--refuse); stroke-width: 1.5; fill: var(--refuse-tint); }
 .tree .node-skill { font-family: var(--mono); font-size: 11px; fill: var(--ink); }
 .tree .node-price { font-family: var(--sans); font-size: 13px; font-variant-numeric: tabular-nums; fill: var(--usdc); }
 /* Small text needs stronger contrast than the semantic border colours. */
@@ -1480,8 +1485,8 @@ a {
 .skill-page .skill-record-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px 24px; }
 .skill-page .skill-record-heading h3 { margin: 0; }
 .skill-page .skill-state, .skill-page .skill-marker { display: inline-block; padding: 3px 8px; margin-right: 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); font-size: 0.75rem; }
-.skill-page .skill-state.is-settled { border-color: var(--stamp); }
-.skill-page .skill-state.is-unresolved { border-color: var(--refuse); }
+.skill-page .skill-state.is-settled { border-color: var(--stamp); background: var(--stamp-tint); }
+.skill-page .skill-state.is-unresolved { border-color: var(--refuse); background: var(--refuse-tint); }
 .skill-page .skill-paytests > li { padding: 12px 0; border-bottom: 1px solid var(--line); }
 .skill-page .skill-reference { font-size: 0.8125rem; }
 .skill-page .skill-reference .skill-code { display: block; max-width: 100%; }
