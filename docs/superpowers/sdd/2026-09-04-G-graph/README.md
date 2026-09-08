@@ -1,5 +1,16 @@
 # Plan G — execution records
 
+## September 8 — G15 durable intent checkpoint
+
+The [intent-store brief](task-15-intent-store-brief.md) and
+[intent-store report](task-15-intent-store-report.md) add an exclusive optional
+forward record with exact query/prefix/time binding and retained uncertainty.
+84 focused Bun/619 assertions and strict passed; actual synthetic-payer mismatch
+prevented any paid send, and child exit after sync preserved evidence. Declared
+positive fixtures are not owner signatures or payment proof. Sole full gate
+passed5348Vitest/1507Bun,root/webstrict and both builds. Local commit follows;
+client/payment policy unchanged and live G15 NOT_RUN.
+
 ## September 8 — G15 pre-forward observer checkpoint
 
 The [forward brief](task-15-forward-brief.md) and

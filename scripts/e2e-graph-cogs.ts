@@ -7,7 +7,7 @@ import { createHash, randomBytes } from "node:crypto"
 import { constants, openSync, closeSync, lstatSync, fstatSync, readSync, realpathSync,
   mkdirSync, opendirSync, writeSync, fsyncSync, unlinkSync, type Stats } from "node:fs"
 import { dirname, isAbsolute, normalize, join, resolve } from "node:path"
-import { encodeGraphQuery, GATEWAY_BASE, type QueryArgs, type GraphResponseObservation } from "../skills/counterparty-graph/graph-client.ts"
+import { encodeGraphQuery, GATEWAY_BASE, type QueryArgs, type GraphResponseObservation, type GraphPaymentIntent } from "../skills/counterparty-graph/graph-client.ts"
 
 export const GRAPH_COGS_POLICY = Object.freeze({
   namespace: "arcade-graph-cogs-2026-09-v1",
@@ -555,8 +555,43 @@ export interface GraphCaptureSummary {
 }
 export interface GraphResponseRecorder {
   readonly observe: (observation: GraphResponseObservation, signal: AbortSignal) => Promise<void>
+  readonly beforePaidRequest: (intent: GraphPaymentIntent, signal: AbortSignal) => Promise<void>
   readonly snapshot: () => GraphCaptureSummary
   readonly close: () => void
+}
+export interface GraphForwardCapture {
+  readonly responsesBefore: number
+  readonly responsePrefixHash: string
+  readonly observedAt: number
+  readonly intent: GraphPaymentIntent
+  readonly hash: string
+}
+/** Declared intent validation only; hashes are not an independent signature or
+ * forwarding proof. Historical validation uses the captured time, not now. */
+function captureForwardIntent(input: unknown, binding: GraphQueryBinding, observedAt: number): GraphPaymentIntent {
+  shape(input, ["endpoint", "network", "primaryType", "domain", "authorization", "authorizationSha256", "requestBodySha256", "paymentHeaderSha256"])
+  insist(input.endpoint === binding.endpoint && input.network === GRAPH_COGS_POLICY.chain && input.primaryType === "TransferWithAuthorization" &&
+    input.requestBodySha256 === binding.bodySha256 && typeof input.paymentHeaderSha256 === "string" &&
+    HASH.test(input.paymentHeaderSha256) && input.paymentHeaderSha256 !== "0".repeat(64))
+  shape(input.domain, ["name", "version", "chainId", "verifyingContract"])
+  insist(input.domain.name === "USD Coin" && input.domain.version === "2" && input.domain.chainId === 8453 && input.domain.verifyingContract === binding.token)
+  shape(input.authorization, ["from", "to", "value", "validAfter", "validBefore", "nonce"])
+  const auth = input.authorization
+  insist(auth.from === binding.payer && auth.to === binding.merchant && auth.value === binding.amountAtomic && auth.validAfter === "0" &&
+    typeof auth.validBefore === "string" && /^(0|[1-9][0-9]{0,77})$/.test(auth.validBefore) &&
+    typeof auth.nonce === "string" && /^0x[a-f0-9]{64}$/.test(auth.nonce) && !/^0x0{64}$/.test(auth.nonce) &&
+    Number.isSafeInteger(observedAt) && observedAt > 0)
+  // An original <=300s authorization may have aged since signing; this storage
+  // check does not replace the unchanged signer's295..300s admission rule.
+  const second = BigInt(Math.floor(observedAt / 1000)), until = BigInt(auth.validBefore)
+  insist(until > second && until <= second + 300n)
+  const domain = Object.freeze({ name: "USD Coin" as const, version: "2" as const, chainId: 8453 as const, verifyingContract: binding.token })
+  const authorization = Object.freeze({ from: binding.payer, to: binding.merchant, value: binding.amountAtomic,
+    validAfter: "0", validBefore: auth.validBefore, nonce: auth.nonce })
+  const primaryType = "TransferWithAuthorization" as const
+  insist(input.authorizationSha256 === hash(JSON.stringify({ domain, primaryType, authorization })))
+  return Object.freeze({ endpoint: binding.endpoint, network: GRAPH_COGS_POLICY.chain, primaryType, domain, authorization,
+    authorizationSha256: String(input.authorizationSha256), requestBodySha256: binding.bodySha256, paymentHeaderSha256: input.paymentHeaderSha256 })
 }
 /** Private offline capture only, not verified results or a live budget namespace.
  * All evidence survives close. A failed/late acknowledgement retains the claim;
@@ -566,10 +601,12 @@ export function createGraphResponseRecorder(parent: string, binding: GraphQueryB
   readonly now?: () => number
   /** Test-only crash/re-entry seam after exclusive record file sync. */
   readonly afterRecordSync?: () => void
+  readonly afterForwardSync?: () => void
 } = {}): GraphResponseRecorder {
   try {
-    const now = options.now ?? Date.now, afterSync = options.afterRecordSync
-    insist(typeof now === "function" && (afterSync === undefined || typeof afterSync === "function"))
+    const now = options.now ?? Date.now, afterSync = options.afterRecordSync, afterForward = options.afterForwardSync
+    insist(typeof now === "function" && (afterSync === undefined || typeof afterSync === "function") &&
+      (afterForward === undefined || typeof afterForward === "function"))
     const createdAt = now(); insist(Number.isSafeInteger(createdAt) && createdAt > 0)
     const root = bindings.get(binding); insist(root !== undefined)
     const sourceCurrent = () => insist(hash(JSON.stringify(sourceFiles(root))) === binding.sourceHash)
@@ -582,6 +619,7 @@ export function createGraphResponseRecorder(parent: string, binding: GraphQueryB
       queryHash: binding.queryHash, binding, createdAt }) + "\n"
     freshBudgetFile(join(directory, "intent.json"), manifest); syncDirectory(directory, identity)
     const records: { digest: string; bytes: number }[] = []
+    let forward: { text: string; value: GraphForwardCapture } | undefined
     let lastHash = hash(manifest), storedBytes = 0, paid = 0, challenge = false,
       closed = false, poisoned = false, busy = false, lastTime = createdAt
     const clock = (signal?: AbortSignal, deadline?: number) => {
@@ -593,15 +631,16 @@ export function createGraphResponseRecorder(parent: string, binding: GraphQueryB
     const disk = () => {
       claim.check(); sourceCurrent()
       insist(readBudgetText(join(directory, "intent.json")) === manifest)
-      const expected = [".claim", "intent.json", ...records.map((_, i) => captureName(i + 1))].sort()
+      const expected = [".claim", "intent.json", ...(forward ? ["forward.json"] : []), ...records.map((_, i) => captureName(i + 1))].sort()
       const handle = opendirSync(directory, { bufferSize: 16 }), names: string[] = []
       try {
         for (;;) {
           const entry = handle.readSync(); if (entry === null) break
-          insist(names.length < 34 && entry.isFile()); names.push(entry.name)
+          insist(names.length < 35 && entry.isFile()); names.push(entry.name)
         }
       } finally { handle.closeSync() }
       insist(JSON.stringify(names.sort()) === JSON.stringify(expected))
+      if (forward) insist(readBudgetText(join(directory, "forward.json")) === forward.text)
       records.forEach((record, i) => {
         const text = readBudgetText(join(directory, captureName(i + 1)), true, CAPTURE_FILE_BYTES)
         insist(Buffer.byteLength(text) === record.bytes && hash(text) === record.digest)
@@ -622,6 +661,7 @@ export function createGraphResponseRecorder(parent: string, binding: GraphQueryB
           const observation = captureObservation(input, binding)
           insist(records.length < 32 && (observation.phase === "challenge" ? !challenge && records.length === 0 : challenge) &&
             (observation.phase !== "paid" || paid === 0))
+          if (forward && paid === 0) insist(observation.phase === "paid" && records.length === forward.value.responsesBefore)
           const body = { format: "arcade-graph-response-v1", policyHash: GRAPH_COGS_POLICY_HASH,
             queryHash: binding.queryHash, sequence: records.length + 1, previousHash: lastHash,
             capturedAt: clock(signal, deadline), observation }
@@ -636,6 +676,32 @@ export function createGraphResponseRecorder(parent: string, binding: GraphQueryB
           records.push({ digest: hash(text), bytes }); lastHash = digest; storedBytes += bytes
           if (observation.phase === "challenge") challenge = true
           if (observation.phase === "paid") paid++
+          disk(); clock(signal, deadline)
+        } catch { poisoned = true; throw new Error(CAPTURE_FAIL) }
+        finally { busy = false }
+      },
+      async beforePaidRequest(input: GraphPaymentIntent, signal: AbortSignal) {
+        if (busy) { poisoned = true; throw new Error(CAPTURE_FAIL) }
+        busy = true
+        try {
+          insist(!closed && !poisoned && signal instanceof AbortSignal && !forward && challenge && paid === 0 && records.length === 3)
+          const started = clock(signal), deadline = started + 5000; insist(Number.isSafeInteger(deadline))
+          disk(); clock(signal, deadline)
+          // Exactly the initial challenge and two client RPC observations. Their
+          // actual RPC meaning remains a later evidence-verifier responsibility.
+          for (const sequence of [2, 3]) {
+            const row = JSON.parse(readBudgetText(join(directory, captureName(sequence)), true, CAPTURE_FILE_BYTES))
+            insist(row.observation.phase === "rpc")
+          }
+          const observedAt = clock(signal, deadline), intent = captureForwardIntent(input, binding, observedAt)
+          const body = { format: "arcade-graph-forward-intent-v1", policyHash: GRAPH_COGS_POLICY_HASH, queryHash: binding.queryHash,
+            responsesBefore: records.length, responsePrefixHash: lastHash, observedAt, intent }
+          const digest = hash(JSON.stringify(body)), text = JSON.stringify({ ...body, hash: digest }) + "\n"
+          clock(signal, deadline); claim.check(); freshBudgetFile(join(directory, "forward.json"), text)
+          afterForward?.()
+          insist(!closed && !poisoned && busy); clock(signal, deadline); claim.check()
+          syncDirectory(directory, identity)
+          forward = { text, value: Object.freeze({ responsesBefore: records.length, responsePrefixHash: lastHash, observedAt, intent, hash: digest }) }
           disk(); clock(signal, deadline)
         } catch { poisoned = true; throw new Error(CAPTURE_FAIL) }
         finally { busy = false }
@@ -670,6 +736,7 @@ export interface GraphCaptureReadback {
   readonly sourceHash: string
   readonly createdAt: number
   readonly claimPresent: boolean
+  readonly forwardIntent: GraphForwardCapture | null
   readonly records: readonly GraphCapturedRecord[]
   readonly summary: GraphCaptureSummary
 }
@@ -697,15 +764,15 @@ export function readGraphResponseCapture(parent: string, binding: GraphQueryBind
       try {
         for (;;) {
           const entry = handle.readSync(); if (entry === null) break
-          insist(names.length < 34 && entry.isFile()); names.push(entry.name)
+          insist(names.length < 35 && entry.isFile()); names.push(entry.name)
         }
       } finally { handle.closeSync() }
       return names.sort()
     }
-    const names = inventory(), claimPresent = names.includes(".claim")
-    const count = names.length - (claimPresent ? 2 : 1)
+    const names = inventory(), claimPresent = names.includes(".claim"), forwardPresent = names.includes("forward.json")
+    const count = names.length - (claimPresent ? 2 : 1) - (forwardPresent ? 1 : 0)
     insist(count >= 0 && count <= 32 && JSON.stringify(names) === JSON.stringify([
-      ...(claimPresent ? [".claim"] : []), "intent.json", ...Array.from({ length: count }, (_, i) => captureName(i + 1)),
+      ...(claimPresent ? [".claim"] : []), ...(forwardPresent ? ["forward.json"] : []), "intent.json", ...Array.from({ length: count }, (_, i) => captureName(i + 1)),
     ].sort()))
     const pins: { name: string; digest: string; bytes: number; maximum: number }[] = []
     const read = (name: string, maximum = MAX_BYTES) => {
@@ -744,12 +811,28 @@ export function readGraphResponseCapture(parent: string, binding: GraphQueryBind
       records.push(Object.freeze({ sequence, capturedAt, previousHash: lastHash, hash: row.hash, observation }))
       previousTime = capturedAt; lastHash = row.hash
     }
+    let forwardIntent: GraphForwardCapture | null = null
+    if (forwardPresent) {
+      const text = read("forward.json"), row: unknown = JSON.parse(text)
+      shape(row, ["format", "policyHash", "queryHash", "responsesBefore", "responsePrefixHash", "observedAt", "intent", "hash"])
+      insist(row.format === "arcade-graph-forward-intent-v1" && row.policyHash === GRAPH_COGS_POLICY_HASH && row.queryHash === binding.queryHash &&
+        row.responsesBefore === 3 && records.length >= 3 && records[1]!.observation.phase === "rpc" && records[2]!.observation.phase === "rpc" &&
+        row.responsePrefixHash === records[2]!.hash && Number.isSafeInteger(row.observedAt) &&
+        Number(row.observedAt) >= records[2]!.capturedAt && Number(row.observedAt) <= started &&
+        typeof row.hash === "string" && HASH.test(row.hash) && JSON.stringify(row) + "\n" === text)
+      if (records.length > 3) insist(records[3]!.observation.phase === "paid" && records[3]!.capturedAt >= Number(row.observedAt))
+      const observedAt = Number(row.observedAt), intent = captureForwardIntent(row.intent, binding, observedAt)
+      const body = { format: row.format, policyHash: row.policyHash, queryHash: row.queryHash,
+        responsesBefore: 3, responsePrefixHash: records[2]!.hash, observedAt, intent }
+      insist(hash(JSON.stringify(body)) === row.hash)
+      forwardIntent = Object.freeze({ responsesBefore: 3, responsePrefixHash: records[2]!.hash, observedAt, intent, hash: row.hash })
+    }
     for (const pin of pins) {
       active(); const text = readBudgetText(join(directory, pin.name), true, pin.maximum); active()
       insist(hash(text) === pin.digest && Buffer.byteLength(text) === pin.bytes)
     }
     insist(JSON.stringify(inventory()) === JSON.stringify(names)); sourceCurrent(); active()
-    return Object.freeze({ queryHash: binding.queryHash, sourceHash: binding.sourceHash, createdAt, claimPresent,
+    return Object.freeze({ queryHash: binding.queryHash, sourceHash: binding.sourceHash, createdAt, claimPresent, forwardIntent,
       records: Object.freeze(records), summary: Object.freeze({ responses: count, paidResponses: paid,
         storedBytes, lastHash, receiptProof: "not_checked" }) })
   } catch { throw new Error(CAPTURE_FAIL) }

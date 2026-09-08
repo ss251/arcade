@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
-import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObservation } from "../skills/counterparty-graph/graph-client.ts"
+import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObservation, type GraphPaymentIntent } from "../skills/counterparty-graph/graph-client.ts"
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 const header = () => JSON.stringify({ format: "arcade-graph-reservations-v1", policyHash: GRAPH_COGS_POLICY_HASH })
@@ -824,4 +824,193 @@ test("a fully rehashed but over-budget stored capture cannot bypass the16MiB rea
     if (sequence === 11) expect(readGraphResponseCapture(f.parent, f.binding).summary.responses).toBe(11)
   }
   expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+}))
+function declaredIntent(binding: GraphQueryBinding): GraphPaymentIntent {
+  const domain = { name: "USD Coin" as const, version: "2" as const, chainId: 8453 as const, verifyingContract: binding.token }
+  const primaryType = "TransferWithAuthorization" as const
+  const authorization = { from: binding.payer, to: binding.merchant, value: binding.amountAtomic, validAfter: "0",
+    validBefore: String(Math.floor(Date.now() / 1000) + 300), nonce: "0x" + "d".repeat(64) }
+  return { endpoint: binding.endpoint, network: "eip155:8453", primaryType, domain, authorization,
+    authorizationSha256: hash(JSON.stringify({ domain, primaryType, authorization })),
+    requestBodySha256: binding.bodySha256, paymentHeaderSha256: hash("declared synthetic header, not an owner signature") }
+}
+async function beforeForward(recorder: GraphResponseRecorder, binding: GraphQueryBinding) {
+  await recorder.observe(observation(binding), captureSignal())
+  await recorder.observe(observation(binding, "rpc"), captureSignal())
+  await recorder.observe(observation(binding, "rpc"), captureSignal())
+}
+test("a declared forward intent is durable before acknowledgement and remains data, not payment proof", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding)
+  await beforeForward(recorder, f.binding)
+  const intent = declaredIntent(f.binding), before = recorder.snapshot()
+  await recorder.beforePaidRequest(intent, captureSignal())
+  const text = readFileSync(join(f.dir, "forward.json"), "utf8"), stored = JSON.parse(text)
+  expect(stored.intent).toEqual(intent); expect(stored.responsePrefixHash).toBe(before.lastHash)
+  expect(stored.responsesBefore).toBe(3)
+  await recorder.observe(observation(f.binding, "paid"), captureSignal()); recorder.close()
+  const readback = readGraphResponseCapture(f.parent, f.binding)
+  expect(readback.forwardIntent?.intent).toEqual(intent)
+  expect(readback.summary).toMatchObject({ responses: 4, paidResponses: 1, receiptProof: "not_checked" })
+  expect(readFileSync(join(f.dir, "forward.json"), "utf8")).toBe(text)
+  expect(Object.isFrozen(readback.forwardIntent)).toBe(true)
+  expect(Object.isFrozen(readback.forwardIntent?.intent.authorization)).toBe(true)
+}))
+test("legacy response-only captures remain inspectable without a fabricated forward intent", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding)
+  await recorder.observe(observation(f.binding), captureSignal()); recorder.close()
+  expect(readGraphResponseCapture(f.parent, f.binding).forwardIntent).toBe(null)
+}))
+test("forward intent is exclusive and cannot be written before the exact response prefix", async () => {
+  for (const fault of ["early", "twice", "after-paid"] as const) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding), intent = declaredIntent(f.binding)
+    if (fault !== "early") await beforeForward(recorder, f.binding)
+    if (fault === "twice") await recorder.beforePaidRequest(intent, captureSignal())
+    if (fault === "after-paid") await recorder.observe(observation(f.binding, "paid"), captureSignal())
+    const before = existsSync(join(f.dir, "forward.json")) ? readFileSync(join(f.dir, "forward.json")) : null
+    await expect(recorder.beforePaidRequest(intent, captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+    expect(existsSync(join(f.dir, "forward.json"))).toBe(before !== null)
+    if (before) expect(readFileSync(join(f.dir, "forward.json"))).toEqual(before)
+    expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+  })
+})
+function changeDeclaredIntent(intent: GraphPaymentIntent, change: (value: Record<string, unknown>) => void): GraphPaymentIntent {
+  const value = JSON.parse(JSON.stringify(intent)) as Record<string, unknown>; change(value)
+  value.authorizationSha256 = hash(JSON.stringify({ domain: value.domain, primaryType: value.primaryType, authorization: value.authorization }))
+  return value as unknown as GraphPaymentIntent
+}
+test("rehashed declarations cannot change payer, domain, amount, query or authorization shape", async () => {
+  const changes: ((value: Record<string, unknown>) => void)[] = [
+    v => { v.endpoint = "https://example.invalid" }, v => { v.network = "eip155:1" },
+    v => { v.requestBodySha256 = hash("another query") }, v => { v.paymentHeaderSha256 = "0".repeat(64) },
+    v => { v.primaryType = "ReceiveWithAuthorization" }, v => { v.extra = "unrecognized" },
+    v => { (v.domain as Record<string, unknown>).chainId = 1 },
+    v => { (v.domain as Record<string, unknown>).verifyingContract = GRAPH_COGS_POLICY.merchant },
+    v => { (v.authorization as Record<string, unknown>).from = GRAPH_COGS_POLICY.merchant },
+    v => { (v.authorization as Record<string, unknown>).to = GRAPH_COGS_POLICY.payer },
+    v => { (v.authorization as Record<string, unknown>).value = "10001" },
+    v => { (v.authorization as Record<string, unknown>).validAfter = "1" },
+    v => { (v.authorization as Record<string, unknown>).validBefore = "0" },
+    v => { (v.authorization as Record<string, unknown>).validBefore = String(Math.floor(Date.now() / 1000) + 600) },
+    v => { (v.authorization as Record<string, unknown>).nonce = "0x" + "0".repeat(64) },
+  ]
+  for (const change of changes) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding); await beforeForward(recorder, f.binding)
+    await expect(recorder.beforePaidRequest(changeDeclaredIntent(declaredIntent(f.binding), change), captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+    expect(existsSync(join(f.dir, "forward.json"))).toBe(false)
+    expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("a forward intent error or post-sync deadline retains its file without acknowledgement or continuation", async () => {
+  for (const fault of ["throw", "abort", "deadline", "reentry"] as const) await captureOwned(async f => {
+    let time = Date.now(), recorder: GraphResponseRecorder
+    const controller = new AbortController()
+    recorder = createGraphResponseRecorder(f.parent, f.binding, { now: () => time, afterForwardSync() {
+      if (fault === "throw") throw Error("private storage error")
+      if (fault === "abort") controller.abort()
+      if (fault === "deadline") time += 5000
+      if (fault === "reentry") try { recorder.close() } catch { /* injected reentry */ }
+    } })
+    await beforeForward(recorder, f.binding)
+    await expect(recorder.beforePaidRequest(declaredIntent(f.binding), controller.signal)).rejects.toThrow(/^graph_cogs_capture_refused$/)
+    expect(existsSync(join(f.dir, "forward.json"))).toBe(true)
+    expect(existsSync(join(f.dir, ".claim"))).toBe(true)
+    const readback = readGraphResponseCapture(f.parent, f.binding)
+    expect(readback.forwardIntent?.responsesBefore).toBe(3); expect(readback.summary.receiptProof).toBe("not_checked")
+    await expect(recorder.observe(observation(f.binding, "paid"), captureSignal())).rejects.toThrow()
+    expect(() => recorder.close()).toThrow()
+  })
+})
+test("an unrelated post-intent RPC cannot stand in for the next paid response", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding); await beforeForward(recorder, f.binding)
+  await recorder.beforePaidRequest(declaredIntent(f.binding), captureSignal())
+  await expect(recorder.observe(observation(f.binding, "rpc"), captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+  expect(existsSync(join(f.dir, "response-04.json"))).toBe(false)
+  expect(() => recorder.close()).toThrow()
+}))
+test("altered forward bytes, prefix hashes and times refuse readback even with a recomputed envelope hash", async () => {
+  for (const fault of ["prefix", "time", "payer", "count", "hardlink"] as const) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding); await beforeForward(recorder, f.binding)
+    await recorder.beforePaidRequest(declaredIntent(f.binding), captureSignal()); recorder.close()
+    const path = join(f.dir, "forward.json")
+    if (fault === "hardlink") linkSync(path, join(f.parent, "linked-forward.json"))
+    else rewriteCapture(path, row => {
+      if (fault === "prefix") row.responsePrefixHash = hash("wrong prefix")
+      if (fault === "time") row.observedAt = Date.now() + 60000
+      if (fault === "count") row.responsesBefore = 2
+      if (fault === "payer") row.intent = changeDeclaredIntent(row.intent as GraphPaymentIntent, v => { (v.authorization as Record<string, unknown>).from = GRAPH_COGS_POLICY.merchant })
+    })
+    expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("actual synthetic-payer mismatch stops the real client before paid forwarding without relaxing the fixed owner policy", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding); let calls = 0, paid = 0
+  const requirement = { x402Version: 2, resource: { url: "http://mainnet-thegraph-arbitrum-04-asia-east1.thegraph.com/subgraphs/id/" + AGENT0_BASE_SUBGRAPH_ID },
+    accepts: [{ scheme: "exact", network: "eip155:8453", asset: f.binding.token, amount: "10000", payTo: f.binding.merchant,
+      maxTimeoutSeconds: 300, extra: { assetTransferMethod: "eip3009", name: "USD Coin", version: "2" } }] }
+  const net = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls++
+    if (String(input) === f.binding.endpoint) {
+      if (new Headers(init?.headers).has("payment-signature")) { paid++; throw Error("fixture paid forwarding forbidden") }
+      return new Response(null, { status: 402, headers: { "payment-required": Buffer.from(JSON.stringify(requirement)).toString("base64") } })
+    }
+    expect(String(input)).toBe(GRAPH_COGS_RPC)
+    const rpc = JSON.parse(String(init?.body))
+    expect(["eth_chainId", "eth_getBlockByNumber"]).toContain(rpc.method)
+    return Response.json({ jsonrpc: "2.0", id: rpc.id, result: rpc.method === "eth_chainId" ? "0x2105" :
+      { number: "0x29", hash: "0x" + "b".repeat(64), timestamp: "0x" + Math.floor(Date.now() / 1000).toString(16) } })
+  }, { preconnect() {} })
+  const query = makePaidQuery("0x" + "11".repeat(32), { fetch: net, observeResponse: recorder.observe, beforePaidRequest: recorder.beforePaidRequest })
+  await expect(query(identityQuery())).rejects.toThrow(/^graph query could not be completed$/)
+  await expect(query(identityQuery())).rejects.toThrow()
+  expect(calls).toBe(3); expect(paid).toBe(0)
+  expect(existsSync(join(f.dir, "forward.json"))).toBe(false)
+  expect(readGraphResponseCapture(f.parent, f.binding).summary.responses).toBe(3)
+  expect(() => recorder.close()).toThrow()
+}))
+test("actual child exit after forward-file sync retains the declared intent and claim without a paid response", () => captureOwned(async f => {
+  const source = resolve(import.meta.dir, "e2e-graph-cogs.ts"), responses = [observation(f.binding), observation(f.binding, "rpc"), observation(f.binding, "rpc")]
+  const code = `import {readGraphSourceManifest,bindGraphQuery,createGraphResponseRecorder} from ${JSON.stringify(source)};
+    const binding=bindGraphQuery(${JSON.stringify(identityQuery())},readGraphSourceManifest(${JSON.stringify(f.source)}));
+    const recorder=createGraphResponseRecorder(${JSON.stringify(f.parent)},binding,{afterForwardSync(){process.exit(31)}});
+    for(const value of ${JSON.stringify(responses)})await recorder.observe(value,new AbortController().signal);
+    await recorder.beforePaidRequest(${JSON.stringify(declaredIntent(f.binding))},new AbortController().signal);process.exit(99)`
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", code], { cwd: tmpdir(), env: { PATH: "" }, encoding: "utf8", timeout: 3000, maxBuffer: 32768 })
+  expect(child.status).toBe(31); expect(child.stdout).toBe(""); expect(child.stderr).toBe("")
+  const result = readGraphResponseCapture(f.parent, f.binding)
+  expect(result.claimPresent).toBe(true); expect(result.forwardIntent).not.toBeNull()
+  expect(result.summary).toMatchObject({ responses: 3, paidResponses: 0, receiptProof: "not_checked" })
+  expect(() => createGraphResponseRecorder(f.parent, f.binding)).toThrow()
+}))
+test("pre-aborted or mismatched intent digests refuse before the forward file exists", async () => {
+  for (const fault of ["abort", "digest", "getter"] as const) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding); await beforeForward(recorder, f.binding)
+    const controller = new AbortController(); let invoked = false
+    let intent = declaredIntent(f.binding)
+    if (fault === "abort") controller.abort()
+    if (fault === "digest") intent = { ...intent, authorizationSha256: hash("wrong digest") }
+    if (fault === "getter") intent = { ...intent, get authorizationSha256() { invoked = true; return hash("getter") } }
+    await expect(recorder.beforePaidRequest(intent, controller.signal)).rejects.toThrow("graph_cogs_capture_refused")
+    expect(invoked).toBe(false); expect(existsSync(join(f.dir, "forward.json"))).toBe(false)
+    expect(() => recorder.close()).toThrow()
+  })
+})
+test("expired historical intent remains inspectable at its captured time without becoming fresh authority", () => captureOwned(async f => {
+  const past = Date.now() - 3600000, recorder = createGraphResponseRecorder(f.parent, f.binding, { now: () => past })
+  await beforeForward(recorder, f.binding)
+  const intent = changeDeclaredIntent(declaredIntent(f.binding), value => {
+    (value.authorization as Record<string, unknown>).validBefore = String(Math.floor(past / 1000) + 300)
+  })
+  await recorder.beforePaidRequest(intent, captureSignal()); recorder.close()
+  const readback = readGraphResponseCapture(f.parent, f.binding)
+  expect(readback.forwardIntent?.observedAt).toBe(past)
+  expect(readback.forwardIntent?.intent.authorization.validBefore).toBe(intent.authorization.validBefore)
+  expect(readback.summary).toMatchObject({ paidResponses: 0, receiptProof: "not_checked" })
+}))
+test("active forward-file corruption cannot be followed by recording a paid response", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding); await beforeForward(recorder, f.binding)
+  await recorder.beforePaidRequest(declaredIntent(f.binding), captureSignal())
+  writeFileSync(join(f.dir, "forward.json"), "{}\n")
+  await expect(recorder.observe(observation(f.binding, "paid"), captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+  expect(existsSync(join(f.dir, "response-04.json"))).toBe(false)
+  expect(() => recorder.close()).toThrow()
 }))

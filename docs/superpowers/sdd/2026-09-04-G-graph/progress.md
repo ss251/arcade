@@ -1,5 +1,16 @@
 # SDD ledger — Plan G
 
+2026-09-08 06:19 IST — G15I sole95892 gate PASS:5348Vitest242/69.07s;
+1507Bun98/12629assert199.80s;root/webstrict/clientSSR336/188ms. Six paths,
+3links/privacy0;3source/briefpins unchanged after result annotations. Atomic
+commit/mainFF next; client unchanged, no full repeat/key/live/spend/push.
+
+2026-09-08 06:14 IST — G15I durable forward intent implemented after missing-
+method Red.84Bun619assert4.09s;2rootsstrict0. Actual synthetic-payer mismatch
+stopped the client before paid forwarding; child exit31 retained declared intent
+and claim. Prefix/hash/time/legacy/corruption/interruption guards tested. Original
+client/payment policy unchanged; sole gate next. No owner key/live/spend/push.
+
 2026-09-08 06:04 IST — G15H sole62400 gate PASS:5348Vitest242/68.61s;
 1495Bun98/12493assert198.68s;root/webstrict/clientSSR382/195ms. Seven paths,
 3links/privacy0;4source/briefpins unchanged after annotations. Four original
