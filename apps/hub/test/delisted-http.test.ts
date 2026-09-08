@@ -208,7 +208,7 @@ describe("delisting at the actual paid HTTP endpoint", () => {
     expect(counts().receipts).toBe(before.receipts + 1)
     expect(dispatched).toBe(dispatchedBefore + 1)
   })
-  it.each([["not json"], ["{"], ["[1,2"], ["\u0000"]])("answers a malformed ratings body with 400, never a source-bearing 500", async (body) => {
+  it.each([["not json"], ["{"], ["[1,2"], ["\u0000"], ["null"], ["3"], ["[]"], ['"text"']])("answers a malformed ratings body with 400, never a source-bearing 500", async (body) => {
     /*
      * `await req.json()` throws on any non-JSON body and this is the route's first
      * statement — no payment, signature or token needed to reach it. Bun's fallback 500

@@ -503,13 +503,18 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
       })),
     claimAuthorization: (key, jobId) =>
       Effect.uninterruptible(Effect.sync(() => {
-        // Memory decides, disk records. The in-memory map is the single arbiter so the
-        // verdict cannot differ between the two stores, and the write happens inside the
-        // same uninterruptible block so a claim can never be published without being
-        // durable.
-        const ok = Effect.runSync(inner.claimAuthorization(key, jobId))
-        if (ok) claimAuthorizationStmt.run(key, jobId, Date.now())
-        return ok
+        /*
+         * Disk first, then memory. A claim that is published but not durable would be
+         * forgotten by the next restart, which reopens the very window this closes — so
+         * the ordering has to be the one where a failing write means no claim at all
+         * rather than a claim only this process remembers.
+         *
+         * The INSERT is `ON CONFLICT DO NOTHING`, so it is safe to run before knowing the
+         * verdict: a repeat writes nothing, and the in-memory map remains the single
+         * arbiter of true/false so the two stores cannot disagree.
+         */
+        claimAuthorizationStmt.run(key, jobId, Date.now())
+        return Effect.runSync(inner.claimAuthorization(key, jobId))
       })),
     commitTree: child => Effect.uninterruptible(Effect.sync(() => {
       if (escrow.tree.transition(child, "committed")) return

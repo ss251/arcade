@@ -1172,7 +1172,14 @@ const main = Effect.gen(function* () {
         const raw = await req.text()
         let body: { jobId?: string; stars?: number; comment?: string; signature?: string }
         try {
-          body = raw === "" ? {} : JSON.parse(raw) as typeof body
+          const parsed: unknown = raw === "" ? {} : JSON.parse(raw)
+          // `null`, `3` and `[]` are all valid JSON and none of them has fields. Reading
+          // `.jobId` off the first two throws, which is the same 500 the malformed case
+          // used to produce — a parse that succeeds is not yet a body.
+          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+            return json({ error: "invalid_body" }, 400)
+          }
+          body = parsed as typeof body
         } catch {
           return json({ error: "invalid_body" }, 400)
         }
