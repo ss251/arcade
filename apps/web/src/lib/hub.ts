@@ -169,14 +169,49 @@ export const quote = async (targetInput: string | PurchaseTarget, input: unknown
       if (!("value" in reported) || !["eip3009", "gateway", "test"].includes(reported.value)) throw new Error()
       rail = reported.value as BrowserPurchaseRail
     }
-    if (response.status !== 402 || challenge.accepts.length !== 1) throw new Error()
-    requirement = challenge.accepts[0]!
+    /*
+     * A listing may advertise several rails; a browser purchase signs exactly one, and it
+     * has to be the SAME one the ENS leaf is locked to, because the leaf carries a single
+     * arcade.payTo. The live hub offers two accepts for every listing — Gateway first,
+     * paying the seller, then the FeeSplitterV2 exact rail — so a bare `accepts.length !== 1`
+     * refused every production listing, and naively taking accepts[0] would sign the
+     * Gateway route and then trip EnsPayToMismatch below on any ENS-locked name.
+     *
+     * Select the splitter route by its own declaration and require it to be unambiguous.
+     * The index is kept so the untouched original requirement echoed to the signer is the
+     * one that was validated, not a different element of the same array.
+     */
+    if (response.status !== 402 || challenge.accepts.length < 1 || challenge.accepts.length > 8) throw new Error()
+    /*
+     * Select the route this flow can actually sign, by its EIP-712 domain.
+     *
+     * A browser purchase signs USDC `transferWithAuthorization`, so the domain has to be
+     * the USDC contract's. The live hub offers two accepts for every listing — Gateway
+     * (domain "GatewayWalletBatched", verifying the Gateway wallet) and the exact EIP-3009
+     * rail — and the old `accepts.length !== 1` refused all of them, while taking accepts[0]
+     * would have signed a Gateway domain this path cannot honour and then tripped
+     * EnsPayToMismatch below on any ENS-locked name. Selecting on the splitter instead would
+     * refuse every honest seller who does not use one.
+     *
+     * The index is kept so the untouched original echoed to the signer is the element that
+     * was validated, not a different one from the same array.
+     */
+    const chosen = challenge.accepts.reduce<number[]>((found, accept, index) => {
+      const extra = accept.extra as Record<string, unknown> | undefined
+      return extra?.["name"] === cfg.usdc.eip712Name && extra["version"] === cfg.usdc.eip712Version
+        ? [...found, index] : found
+    }, [])
+    // One accept is unambiguous and stays exactly as it was, including for a hub that
+    // sends no domain at all. Selection only decides between routes that both exist.
+    if (challenge.accepts.length !== 1 && chosen.length !== 1) throw new Error()
+    const index = challenge.accepts.length === 1 ? 0 : chosen[0]!
+    requirement = challenge.accepts[index]!
     if (cfg.status !== "ready" || requirement.network !== cfg.caip2 || requirement.asset.toLowerCase() !== cfg.usdc.address.toLowerCase() ||
         !address(requirement.payTo) || requirement.resource !== endpoint ||
         !/^[1-9][0-9]{0,77}$/.test(requirement.amount) || BigInt(requirement.amount) >= 1n << 256n ||
         requirement.maxTimeoutSeconds < 1 || requirement.maxTimeoutSeconds > 604900) throw new Error()
     // Validate with the canonical schema, but echo the original requirements exactly.
-    original = (response.body as { accepts: Record<string, unknown>[] }).accepts[0]!
+    original = (response.body as { accepts: Record<string, unknown>[] }).accepts[index]!
   } catch { throw new Error("The payment challenge is unavailable or invalid; nothing was signed") }
 
   let ensName: string | undefined

@@ -68,11 +68,38 @@ describe("ENS skill public preflight",()=>{
       const body=await response.json() as {accepts:unknown[]}
       return Response.json({...body,accepts:[...body.accepts,...body.accepts]},{status:402})
     }
-    expect(prepareSkillRecords(args,"arcade.eth",fetcher)).rejects.toThrow()
+    await expect(prepareSkillRecords(args,"arcade.eth",fetcher)).rejects.toThrow()
   })
   it("refuses when no accept is the FeeSplitterV2 rail",async()=>{
     const f=fixture({},{extra:{name:"GatewayWalletBatched",version:"1"}})
-    expect(prepareSkillRecords(args,"arcade.eth",f.fetcher)).rejects.toThrow()
+    await expect(prepareSkillRecords(args,"arcade.eth",f.fetcher)).rejects.toThrow()
+  })
+  it("refuses a challenge with more accepts than the bound, before any chain read",async()=>{
+    const base=fixture()
+    const filler=(i:number)=>({scheme:"exact",network:"eip155:5042002",asset:"0x3600000000000000000000000000000000000000",
+      payTo:seller,amount:"10000",resource:"r"+i,extra:{name:"GatewayWalletBatched",version:"1"}})
+    const fetcher=async(req:Request)=>{
+      const response=await base.fetcher(req)
+      if(response.status!==402)return response
+      const body=await response.json() as {accepts:unknown[]}
+      return Response.json({...body,accepts:[...Array.from({length:8},(_,i)=>filler(i)),...body.accepts]},{status:402})
+    }
+    await expect(prepareSkillRecords(args,"arcade.eth",fetcher)).rejects.toThrow()
+  })
+  it("does not admit a decoy whose feeSplitterVersion is the string \"2\"",async()=>{
+    // A loose == would make two candidates and refuse; a loose selection would pick the
+    // decoy. Strict === keeps exactly one candidate, and it is the real splitter rail.
+    const decoy={scheme:"exact",network:"eip155:5042002",asset:"0x3600000000000000000000000000000000000000",
+      payTo:`0x${"44".repeat(20)}`,amount:"10000",resource:"decoy",extra:{feeSplitter:`0x${"44".repeat(20)}`,feeSplitterVersion:"2"}}
+    const base=fixture()
+    const fetcher=async(req:Request)=>{
+      const response=await base.fetcher(req)
+      if(response.status!==402)return response
+      const body=await response.json() as {accepts:unknown[]}
+      return Response.json({...body,accepts:[decoy,...body.accepts]},{status:402})
+    }
+    const plans=await prepareSkillRecords(args,"arcade.eth",fetcher)
+    expect(plans[0]!.records.find(r=>r.key==="arcade.payTo")?.value).toBe(splitter)
   })
   it("rejects a hub-asserted splitter whose public Arc contract disagrees",async()=>{
     for(const change of [{chain:"0x1"},{version:1},{seller:splitter},{usdc:splitter},{feeBps:1000}]){

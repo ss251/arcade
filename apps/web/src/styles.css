@@ -52,12 +52,17 @@
   --stamp: light-dark(#177a41, #2ca96c);
   --refuse: light-dark(#97231a, #dd6a63);
   /*
-   * The verdict is the one place the semantic budget was always meant to be spent. A tint
-   * is a fill read against its own chip, never type, so it takes no contrast duty of its
-   * own — it exists so "settled" is an object rather than a hairline.
+   * The verdict is the one place the semantic budget was always meant to be spent: a fill
+   * so "settled" is an object rather than a hairline.
+   *
+   * The tint DOES carry contrast duty, contrary to the first version of this note — the
+   * badge sets its text directly on it, so the pair has to hold together. Composited on
+   * --card in dark mode and measured at 11px: refuse #dd6a63 over .15 alpha was 4.17:1 and
+   * stamp #2ca96c over .16 was 4.48:1, both under the 4.5:1 floor the colour move in this
+   * same file was made to clear. At the alphas below they measure 4.64:1 and 4.96:1.
    */
-  --stamp-tint: light-dark(rgba(23, 122, 65, .10), rgba(44, 169, 108, .16));
-  --refuse-tint: light-dark(rgba(151, 35, 26, .09), rgba(221, 106, 99, .15));
+  --stamp-tint: light-dark(rgba(23, 122, 65, .10), rgba(44, 169, 108, .10));
+  --refuse-tint: light-dark(rgba(151, 35, 26, .09), rgba(221, 106, 99, .08));
   --line: light-dark(rgba(33, 31, 28, 0.12), rgba(232, 230, 225, 0.14));
   /*
    * A SURFACE, which the app did not have. The confirmation card was a 1px border and no
@@ -1349,7 +1354,7 @@ a {
   position: relative; min-width: 0; background: var(--card); border: 1px solid var(--line);
   border-radius: 10px; box-shadow: var(--card-shadow); padding: 20px; display: grid;
   grid-template-columns: minmax(0, 1fr) fit-content(40%); gap: 8px 12px;
-  grid-template-rows: auto auto auto 1fr auto;
+  grid-template-rows: auto auto auto 1fr;
   transition: box-shadow 150ms cubic-bezier(.23, 1, .32, 1), transform 150ms cubic-bezier(.23, 1, .32, 1), border-color 150ms cubic-bezier(.23, 1, .32, 1);
 }
 /*
@@ -1357,6 +1362,14 @@ a {
  * card. Nothing else in a card is interactive, so nothing loses a click to it.
  */
 .market .card-title a::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+/*
+ * Pin the meta row to the last line rather than inferring it from child count. A card
+ * renders three, four or five boxes depending on whether it has `replaces` and whether its
+ * hub declared a rail, and letting auto-placement decide put the free track BELOW the meta
+ * row on three-child cards — measured 53px of dead space against 29px on their neighbours,
+ * so ids in the same grid row sat at different heights.
+ */
+.market .card-meta { grid-row: -1 / auto; }
 @media (hover: hover) and (pointer: fine) {
   .market .listing-card:hover { box-shadow: var(--card-shadow-hover); border-color: color-mix(in oklab, var(--ink) 22%, transparent); transform: translateY(-1px); }
 }

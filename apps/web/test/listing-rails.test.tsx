@@ -26,7 +26,7 @@ describe("J11C public listing rail declarations", () => {
     // and the .market rules above this marker. The lock's job is to catch an ACCIDENTAL
     // rewrite of earlier CSS, so an intentional one re-pins rather than deletes it.
     expect(createHash("sha256").update(css.slice(0, css.indexOf(marker))).digest("hex"))
-      .toBe("830eb70db2493870b559778ca2db219c2bdb6d9d42b6445fd3a11c87396ebf84")
+      .toBe("f9b81c2da97804e2c5dd352e2eb4b1adc78b6cd5a9b493351dc5c4b3f9378050")
     const suffix = css.slice(css.indexOf(marker))
     expect(suffix).toContain("min-height: 44px"); expect(suffix).toContain(":focus-visible")
     expect(suffix).not.toMatch(/(?:^|\n)(?:body|:root|\.buyer|\.publish|\.tree)[\s.{]/)

@@ -12,7 +12,7 @@ const SELLER = "0x" + "1".repeat(40), PAYEE = "0x" + "a".repeat(40), OTHER = "0x
 const INPUT = { patch: "actual input" }, opts = { toolCallId: "name_call", messages: [], context: {} }
 const record = () => ({ name: NAME, skillId: ID, seller: SELLER, endpoint: HUB + "/x/" + SELLER + "/" + ID,
   payTo: PAYEE, chain: "eip155:5042002", priceAtomic: "99999", expired: false })
-type Overrides = { names?: (read: number) => Response; payTo?: string; listingName?: string | null; afterName?: () => void }
+type Overrides = { names?: (read: number) => Response; payTo?: string; listingName?: string | null; afterName?: () => void; extraAccepts?: ReadonlyArray<Record<string, unknown>> }
 const fixture = (over: Overrides = {}) => {
   let names = 0
   const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -28,7 +28,7 @@ const fixture = (over: Overrides = {}) => {
       scheme: "exact", amount: "10000", payTo: over.payTo ?? PAYEE, network: "eip155:5042002",
       asset: "0x3600000000000000000000000000000000000000", resource: HUB + path,
       maxTimeoutSeconds: 604900, extra: { name: "USDC", version: "2" }
-    }] }, { status: 402 })
+    }, ...(over.extraAccepts ?? [])] }, { status: 402 })
     throw new Error("Unexpected fixture request")
   })
   vi.stubGlobal("fetch", f)
@@ -38,6 +38,31 @@ const prepare = (target: { skillId?: string; name?: string }) =>
   deriveSigningRequest({ ...target, maxAmountUsd: "$0.02", toolCallId: opts.toolCallId, input: INPUT })
 beforeEach(() => { vi.stubEnv("ARCADE_HUB", HUB); vi.stubEnv("ARCADE_NETWORK", "arc-testnet") })
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks() })
+
+const GATEWAY_ACCEPT = {
+  scheme: "exact", amount: "10000", payTo: SELLER, network: "eip155:5042002",
+  asset: "0x3600000000000000000000000000000000000000", resource: HUB + "/x/" + SELLER + "/" + ID,
+  maxTimeoutSeconds: 604900,
+  extra: { name: "GatewayWalletBatched", version: "1", verifyingContract: "0x0077777d7EBA4688BDeF3E311b846F25870A19B9" }
+}
+
+describe("multi-rail challenges", () => {
+  it("signs the USDC EIP-712 route when the hub also offers Gateway", async () => {
+    // The live hub returns exactly this pair, Gateway first. Taking accepts[0] would sign a
+    // domain this flow cannot honour and pay the seller instead of the listing's payee.
+    fixture({ extraAccepts: [GATEWAY_ACCEPT] })
+    expect(await prepare({ skillId: ID })).toMatchObject({ skillId: ID, payTo: PAYEE })
+  })
+  it("refuses rather than guessing when two accepts share the USDC domain", async () => {
+    const twin = { ...GATEWAY_ACCEPT, payTo: OTHER, extra: { name: "USDC", version: "2" } }
+    fixture({ extraAccepts: [twin] })
+    await expect(prepare({ skillId: ID })).rejects.toThrow(/nothing was signed/)
+  })
+  it("refuses a challenge carrying more accepts than the bound", async () => {
+    fixture({ extraAccepts: Array.from({ length: 8 }, () => GATEWAY_ACCEPT) })
+    await expect(prepare({ skillId: ID })).rejects.toThrow(/nothing was signed/)
+  })
+})
 
 describe("explicit ENS keyless purchase preparation", () => {
   it("resolves and rechecks an explicit name even when the listing advertises none", async () => {

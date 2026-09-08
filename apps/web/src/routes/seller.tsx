@@ -9,6 +9,12 @@ export const summaryFor = createServerFn({ method: "GET" }).validator((input: un
   .handler(({ data }) => loadSellerPage(data, hub.sellerSummary))
 
 export const Route = createFileRoute("/seller")({
+  head: () => ({ meta: [
+    { title: "Seller dashboard — ARCADE" },
+    { name: "description", content: "What a seller earned, per listing, and whether each skill is healthy. Recorded from settled receipts." },
+    { property: "og:title", content: "Seller dashboard — ARCADE" },
+    { property: "og:description", content: "What a seller earned, per listing, and whether each skill is healthy. Recorded from settled receipts." }
+  ] }),
   validateSearch: sellerSearch,
   loaderDeps: ({ search }) => ({ address: search.address }),
   // Router cancellation stops its RPC; H4's upstream read keeps its own 10s bound.

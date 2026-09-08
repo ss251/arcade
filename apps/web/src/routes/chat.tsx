@@ -31,6 +31,12 @@ const siteFacts = createServerFn({ method: "GET" }).handler(() => ({
 }))
 
 export const Route = createFileRoute("/chat")({
+  head: () => ({ meta: [
+    { title: "Buy a skill — ARCADE" },
+    { name: "description", content: "Ask an agent to find and buy a skill for you. Every purchase is confirmed before a cent moves, and settles on Arc only on success." },
+    { property: "og:title", content: "Buy a skill — ARCADE" },
+    { property: "og:description", content: "Ask an agent to find and buy a skill for you. Every purchase is confirmed before a cent moves, and settles on Arc only on success." }
+  ] }),
   component: Home,
   loader: async () => await siteFacts()
 })

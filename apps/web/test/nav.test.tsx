@@ -31,7 +31,11 @@ describe("H5 navigation and preserved chat route", () => {
     const prefix = source.slice(0, source.indexOf('        <Nav here="chat" />'))
     const suffix = source.slice(source.indexOf('        <Chat\n'))
     const hash = (s: string) => createHash("sha256").update(s).digest("hex")
-    expect(hash(prefix)).toBe("66b76c2afa62492d128759da4d528ad8246369b733f65e8e7a1b5ff63827dfc9")
+    // Re-pinned 2026-09-08: the route gained a head() with a per-route title and description,
+    // which is a route edit of exactly the kind this lock's name exempts. The loader,
+    // history, sidebar and Chat wiring the lock exists to protect are untouched, and the
+    // suffix hash below — which covers that wiring — is unchanged.
+    expect(hash(prefix)).toBe("d0e08dc9c97f186682e0362653f60a07d57b8fb0830671abb9eb58a8b0d8ff79")
     expect(hash(suffix)).toBe("33ecbcca7ce4e49bf6aa0868402a07fe88c7f1025c8351c02a12ba407f9fb1d1")
   })
   it("gives nav links a visible neutral focus state without spending settlement or money colors", () => {
