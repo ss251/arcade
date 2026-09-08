@@ -180,4 +180,32 @@ describe("delisting at the actual paid HTTP endpoint", () => {
     expect(dispatched).toBe(1)
     expect(counts()).toEqual({ jobs: 1, reservations: 0, receipts: 1 })
   })
+  it("dispatches one job per authorization, however many times its header is replayed", async () => {
+    /*
+     * The chain cannot stop this. USDC records (authorizer, nonce) once, so a replayed
+     * header can only SETTLE once — but settlement is the last thing that happens, and
+     * until then the rail's on-chain check honestly answers "unused" for every copy. Before
+     * the hub claimed the authorization at acceptance, each copy dispatched a fresh job and
+     * the seller's agent ran for all of them while being paid for one.
+     */
+    const before = counts(), dispatchedBefore = dispatched
+    const header = await payment(canary)
+    const first = await post({ "payment-signature": header })
+    expect(first.status).toBe(202)
+    const replays = await Promise.all(Array.from({ length: 5 }, () => post({ "payment-signature": header })))
+    for (const replay of replays) {
+      expect(replay.status).toBe(402)
+      // Either refusal is correct and which one wins is a race: the hub's claim always
+      // refuses, and the test rail's in-memory nonce set also refuses once the first job
+      // has settled, which here can happen within milliseconds. Against a real chain only
+      // the claim can refuse during the window, because the nonce is genuinely unspent
+      // until settlement lands. The property under test is the count below, not the label.
+      expect(["authorization_already_used", "payment_invalid"]).toContain((await replay.json()).error)
+    }
+    await waitFor(async () => (await (await fetch((await first.json()).poll_url)).json()).receipt !== undefined, "replay result")
+    // One job, one receipt, one execution — not six.
+    expect(counts().jobs).toBe(before.jobs + 1)
+    expect(counts().receipts).toBe(before.receipts + 1)
+    expect(dispatched).toBe(dispatchedBefore + 1)
+  })
 })

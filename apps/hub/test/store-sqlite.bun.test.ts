@@ -208,3 +208,50 @@ describe("sqlite store", () => {
     expect(final.reaped).toBe(0)
   })
 })
+
+describe("authorization claims", () => {
+  const KEY = "eip155:5042002|0xbuyer|0xnonce"
+
+  it("admits the first claim and refuses every repeat", () => {
+    const opened = openSqliteStore(tmp(), "claims")
+    try {
+      expect(Effect.runSync(opened.store.claimAuthorization(KEY, "job_aaaaaaaaaaaaaaaa"))).toBe(true)
+      // A different job id must not get a second run out of the same authorization: the
+      // authorization is what is single use, not the job.
+      expect(Effect.runSync(opened.store.claimAuthorization(KEY, "job_bbbbbbbbbbbbbbbb"))).toBe(false)
+      expect(Effect.runSync(opened.store.claimAuthorization(KEY, "job_aaaaaaaaaaaaaaaa"))).toBe(false)
+    } finally {
+      opened.close()
+    }
+  })
+
+  it("keeps distinct authorizations independent", () => {
+    const opened = openSqliteStore(tmp(), "claims")
+    try {
+      for (const key of [KEY, KEY + "x", "eip155:1|0xbuyer|0xnonce"]) {
+        expect(Effect.runSync(opened.store.claimAuthorization(key, "job_cccccccccccccccc"))).toBe(true)
+      }
+    } finally {
+      opened.close()
+    }
+  })
+
+  it("survives a restart, because a forgotten claim reopens the replay window", () => {
+    // On Railway every deploy is a restart. A hub that forgot its claims would accept an
+    // already-used authorization again for as long as its nonce stayed unspent on chain,
+    // which is exactly the interval the claim exists to cover.
+    const path = tmp()
+    const first = openSqliteStore(path, "claims-1")
+    try {
+      expect(Effect.runSync(first.store.claimAuthorization(KEY, "job_dddddddddddddddd"))).toBe(true)
+    } finally {
+      first.close()
+    }
+    const second = openSqliteStore(path, "claims-2")
+    try {
+      expect(Effect.runSync(second.store.claimAuthorization(KEY, "job_eeeeeeeeeeeeeeee"))).toBe(false)
+    } finally {
+      second.close()
+    }
+  })
+})

@@ -140,6 +140,8 @@ export interface StoreState extends SessionLedgerState {
   readonly receipts: Array<Receipt>
   readonly ratings: Array<Rating>
   readonly trees: Map<string, Array<TreeRow>>
+  /** Authorization identity -> the job that claimed it first. See `claimAuthorization`. */
+  readonly authorizations: Map<string, string>
   readonly payTests: Map<string, Array<PayTestRow>>
   readonly erc8004Docs: Map<string, string>
 }
@@ -151,6 +153,7 @@ const empty = (): StoreState => ({
   receipts: [],
   ratings: [],
   trees: new Map(),
+  authorizations: new Map(),
   payTests: new Map(),
   erc8004Docs: new Map(),
   sessions: new Map(),
@@ -215,6 +218,22 @@ export interface Store extends SessionStore {
     amountAtomic: bigint,
     ceilingAtomic: bigint
   ) => Effect.Effect<boolean>
+  /**
+   * Claim a payment authorization for one job, atomically. False means it was already used.
+   *
+   * USDC records each (authorizer, nonce) pair once, so a replayed authorization can only
+   * SETTLE once — but settlement is the last thing that happens, minutes after the seller's
+   * agent has run. Until then the nonce is unspent on chain, so the rail's
+   * `authorizationState` read says "fresh" for every copy of the same header, and the hub
+   * dispatched a fresh job for each one. The seller burned N inference runs and was paid
+   * for one. The chain cannot close that window; only the hub can, by claiming the
+   * authorization the moment it is accepted rather than when it settles.
+   *
+   * A claim is never released. A nonce is single use by definition, and a buyer whose job
+   * failed signs a fresh one offline for nothing — refusing a repeat is the safe direction,
+   * because the alternative is paying for work twice.
+   */
+  readonly claimAuthorization: (key: string, jobId: string) => Effect.Effect<boolean>
   readonly commitTree: (childJobId: string) => Effect.Effect<void>
   readonly releaseTree: (childJobId: string) => Effect.Effect<void>
   readonly treeState: (rootJobId: string) => Effect.Effect<{
@@ -463,6 +482,14 @@ export const makeStore = (ref: Ref.Ref<StoreState>): Store => ({
       const trees = new Map(s.trees)
       trees.set(rootJobId, [...rows, { childJobId, amountAtomic, state: "reserved" }])
       return [true, { ...s, trees }]
+    }),
+
+  claimAuthorization: (key, jobId) =>
+    Ref.modify(ref, (s) => {
+      if (s.authorizations.has(key)) return [false, s]
+      const authorizations = new Map(s.authorizations)
+      authorizations.set(key, jobId)
+      return [true, { ...s, authorizations }]
     }),
 
   commitTree: (childJobId) => Ref.update(ref, (s) => setTreeState(s, childJobId, "committed")),

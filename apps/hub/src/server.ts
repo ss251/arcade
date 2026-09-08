@@ -1295,6 +1295,32 @@ const main = Effect.gen(function* () {
 
         const jobId = newJobId()
 
+        /*
+         * Claim the authorization before any work is dispatched.
+         *
+         * `rail.verify` asks the chain whether this nonce has been used, and until this job
+         * settles the honest answer is no — for the original request and for every copy of
+         * its PAYMENT-SIGNATURE header sent in the same window. So a captured header could
+         * be replayed to dispatch N jobs, the seller's agent would run N times, and exactly
+         * one settle would land. The seller pays for N inference runs and is paid once.
+         *
+         * The claim is keyed on the authorization's own identity — network, payer, nonce —
+         * which is what USDC itself makes single use, so it is scoped no more narrowly than
+         * the thing it protects. A replay against a DIFFERENT listing by the same seller is
+         * refused too, which is correct: one signature authorizes one payment.
+         */
+        const claimed = await run(store.claimAuthorization(
+          [verified.network, verified.payer.toLowerCase(), verified.payload.payload.authorization.nonce.toLowerCase()].join("|"),
+          jobId
+        ))
+        if (!claimed) {
+          return json({
+            error: "authorization_already_used",
+            detail: "this payment authorization has already been accepted for a job. It authorizes one " +
+              "payment, and settlement may still be in flight. Sign a fresh authorization to buy again."
+          }, 402)
+        }
+
         // The probe (no payment header) returned above and never reaches here — the tree
         // reservation happens only on the paid retry, after `rail.verify`, so a refusal
         // never broadcasts and a probe never holds budget.

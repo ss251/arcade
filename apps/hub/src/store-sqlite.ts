@@ -92,6 +92,11 @@ CREATE TABLE IF NOT EXISTS tree_reservations (
   amount_atomic TEXT NOT NULL,
   state TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS authorizations (
+  key TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL,
+  at_ms INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS pay_tests (
   skill_id TEXT NOT NULL,
   seller TEXT NOT NULL,
@@ -239,6 +244,16 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     trees.set(row.root_job_id, rows)
   }
 
+  /*
+   * Claims are hydrated because a restart must not reopen the window they close. A hub that
+   * forgot them would accept every already-used authorization again for as long as its
+   * nonce stayed unspent on chain, which is precisely the interval this guard exists for.
+   */
+  const authorizations = new Map<string, string>()
+  for (const row of db.query<{ key: string; job_id: string }, []>(`SELECT key, job_id FROM authorizations`).all()) {
+    authorizations.set(row.key, row.job_id)
+  }
+
   const payTests = new Map<string, Array<PayTestRow>>()
   for (const row of db.query<{
     skill_id: string; seller: string; at_ms: number; job_id: string;
@@ -270,6 +285,7 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
     receipts,
     ratings,
     trees,
+    authorizations,
     payTests,
     erc8004Docs,
     sessions: new Map(),
@@ -296,6 +312,9 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
      ON CONFLICT(child_job_id) DO UPDATE SET state = excluded.state`
   )
   const setTreeStateStmt = db.query(`UPDATE tree_reservations SET state = ? WHERE child_job_id = ?`)
+  const claimAuthorizationStmt = db.query(
+    `INSERT INTO authorizations (key, job_id, at_ms) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING`
+  )
   const putPayTestStmt = db.query(
     `INSERT INTO pay_tests (skill_id, seller, at_ms, job_id, settle_tx, ok, reason)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -482,6 +501,16 @@ export const openSqliteStore = (path: string, bootId: string): SqliteStore => {
         if (ok) upsertTree.run(child, root, amount.toString(), "reserved")
         return ok
       })),
+    claimAuthorization: (key, jobId) =>
+      Effect.uninterruptible(Effect.sync(() => {
+        // Memory decides, disk records. The in-memory map is the single arbiter so the
+        // verdict cannot differ between the two stores, and the write happens inside the
+        // same uninterruptible block so a claim can never be published without being
+        // durable.
+        const ok = Effect.runSync(inner.claimAuthorization(key, jobId))
+        if (ok) claimAuthorizationStmt.run(key, jobId, Date.now())
+        return ok
+      })),
     commitTree: child => Effect.uninterruptible(Effect.sync(() => {
       if (escrow.tree.transition(child, "committed")) return
       Effect.runSync(inner.commitTree(child)); setTreeStateStmt.run("committed", child)
@@ -546,6 +575,7 @@ const emptyState = (): StoreState => ({
   listings: new Map(),
   runners: new Map(),
   jobs: new Map(),
+  authorizations: new Map(),
   receipts: [],
   ratings: [],
   trees: new Map(),
