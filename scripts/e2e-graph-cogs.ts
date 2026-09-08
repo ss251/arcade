@@ -7,7 +7,9 @@ import { createHash, randomBytes } from "node:crypto"
 import { constants, openSync, closeSync, lstatSync, fstatSync, readSync, realpathSync,
   mkdirSync, opendirSync, writeSync, fsyncSync, unlinkSync, type Stats } from "node:fs"
 import { dirname, isAbsolute, normalize, join, resolve } from "node:path"
-import { encodeGraphQuery, GATEWAY_BASE, type QueryArgs, type GraphResponseObservation, type GraphPaymentIntent } from "../skills/counterparty-graph/graph-client.ts"
+import { encodeGraphQuery, GATEWAY_BASE, validateGraphChallengeHeader, readGraphSettlementHeader, readGraphPaidBody, readGraphRpcBody, verifyGraphReceiptEvidence, type QueryArgs, type GraphResponseObservation, type GraphPaymentIntent, type PaidResult } from "../skills/counterparty-graph/graph-client.ts"
+import { graphQueryIds } from "../skills/counterparty-graph/run.ts"
+import { copyPlainData, plainObject } from "../skills/counterparty-graph/validate-output.ts"
 
 export const GRAPH_COGS_POLICY = Object.freeze({
   namespace: "arcade-graph-cogs-2026-09-v1",
@@ -836,6 +838,123 @@ export function readGraphResponseCapture(parent: string, binding: GraphQueryBind
       records: Object.freeze(records), summary: Object.freeze({ responses: count, paidResponses: paid,
         storedBytes, lastHash, receiptProof: "not_checked" }) })
   } catch { throw new Error(CAPTURE_FAIL) }
+}
+
+const QUERY_PROOF_FAIL = "graph_cogs_query_evidence_refused"
+export interface GraphQueryEvidence {
+  readonly evidence: "retained-protocol-consistency"
+  readonly queryHash: string
+  readonly sourceHash: string
+  readonly captureHash: string
+  readonly forwardHash: string
+  readonly createdAt: number
+  readonly capturedAt: number
+  readonly firstRpcId: number
+  readonly lastRpcId: number
+  readonly nonce: string
+  readonly receiptBlockNumber: string
+  readonly receiptBlockHash: string
+  readonly result: PaidResult
+  readonly hash: string
+}
+const queryEvidenceOrigins = new WeakMap<GraphQueryEvidence, { binding: GraphQueryBinding; directory: string }>()
+function frozenData(input: unknown): Record<string, unknown> {
+  const copy = copyPlainData(input); insist(plainObject(copy))
+  const freeze = (value: unknown): void => {
+    if (value !== null && typeof value === "object") {
+      for (const child of Object.values(value)) freeze(child)
+      Object.freeze(value)
+    }
+  }
+  freeze(copy); return copy
+}
+/** Read-only retained protocol consistency, NOT authenticated acquisition or
+ * cache/global-budget authority. No key, RPC, write, retry or automatic repair.
+ * Current-source binding remains mandatory; historical versions need a separate
+ * qualified replay path. A supplied coherent synthetic capture can pass. */
+export function verifyGraphCapturedQuery(directory: string, binding: GraphQueryBinding, options: {
+  readonly parent?: GraphQueryEvidence
+  readonly now?: () => number
+} = {}): GraphQueryEvidence {
+  try {
+    const clock = options.now ?? Date.now, started = clock(); let previous = started
+    insist(typeof clock === "function" && Number.isSafeInteger(started) && started > 0 && Number.isSafeInteger(started + 5000))
+    const now = () => {
+      const time = clock(); insist(Number.isSafeInteger(time) && time >= previous && time < started + 5000)
+      previous = time; return time
+    }
+    const capture = readGraphResponseCapture(directory, binding, { now })
+    const forward = capture.forwardIntent, rows = capture.records
+    insist(forward !== null && rows.length >= 7 && capture.summary.paidResponses === 1)
+    let prior: GraphQueryEvidence | undefined
+    if (binding.kind === "identities") insist(options.parent === undefined && binding.parentQueryHash === null)
+    else {
+      const origin = options.parent === undefined ? undefined : queryEvidenceOrigins.get(options.parent)
+      insist(origin !== undefined && origin.binding.kind === "identities" && origin.binding.queryHash === binding.parentQueryHash &&
+        origin.binding.sourceHash === binding.sourceHash && bindings.get(origin.binding) === bindings.get(binding))
+      prior = verifyGraphCapturedQuery(origin.directory, origin.binding, { now })
+      insist(prior.hash === options.parent!.hash && prior.capturedAt <= capture.createdAt)
+      const ids = graphQueryIds(prior.result.data, GRAPH_COGS_POLICY.subject), request: unknown = JSON.parse(binding.body)
+      insist(ids !== null && ids.length > 0 && plainObject(request) && plainObject(request.variables))
+      const meta = prior.result.data._meta
+      insist(plainObject(meta) && plainObject(meta.block) && typeof meta.block.hash === "string" &&
+        meta.block.hash.toLowerCase() === binding.blockHash &&
+        JSON.stringify(request.variables.agentIds) === JSON.stringify(ids))
+      insist(forward.intent.authorization.nonce !== prior.nonce)
+    }
+    const bytes = (row: GraphCapturedRecord, phase: GraphResponseObservation["phase"], status: number, maximum = 1048576) => {
+      now(); const obs = row.observation
+      insist(obs.phase === phase && obs.status === status && !obs.redirected &&
+        (obs.responseUrl === "" || obs.responseUrl === obs.requestUrl))
+      const body = Buffer.from(obs.bodyBase64, "base64"), encoding = obs.headers["content-encoding"], length = obs.headers["content-length"]
+      insist(body.length <= maximum && (encoding === null || encoding.toLowerCase() === "identity") &&
+        (length === null || /^(0|[1-9][0-9]*)$/.test(length) && Number(length) === body.length))
+      return body
+    }
+    bytes(rows[0]!, "challenge", 402, 65536)
+    validateGraphChallengeHeader(rows[0]!.observation.headers["payment-required"])
+    const initialRpcBytes = bytes(rows[1]!, "rpc", 200)
+    const initialRpc: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(initialRpcBytes))
+    insist(plainObject(initialRpc) && Number.isSafeInteger(initialRpc.id))
+    const firstRpcId = Number(initialRpc.id)
+    insist(firstRpcId === 1 || prior !== undefined && firstRpcId === prior.lastRpcId + 1)
+    // Continuation uses the same factory deadline; partial-cache/new factory starts at1.
+    const factoryStart = firstRpcId === 1 ? capture.createdAt : prior!.createdAt
+    insist(rows.at(-1)!.capturedAt - factoryStart < 80000)
+    let id = firstRpcId, index = 1
+    const rpc = (method: string, params: unknown[]) => {
+      insist(index < rows.length)
+      const row = rows[index++]!, body = bytes(row, "rpc", 200)
+      const request = JSON.stringify({ jsonrpc: "2.0", id, method, params })
+      insist(row.observation.requestBodySha256 === hash(request))
+      return readGraphRpcBody(body, id++)
+    }
+    insist(rpc("eth_chainId", []) === "0x2105")
+    const block = rpc("eth_getBlockByNumber", ["latest", false])
+    insist(plainObject(block) && typeof block.timestamp === "string" && /^0x(?:0|[1-9a-f][\da-f]{0,63})$/.test(block.timestamp) &&
+      BigInt(block.timestamp) <= BigInt(Number.MAX_SAFE_INTEGER) &&
+      Math.abs(Number(BigInt(block.timestamp)) - Math.floor(forward.observedAt / 1000)) <= 30)
+    insist(index === 3)
+    const paid = rows[index++]!, paidBytes = bytes(paid, "paid", 200)
+    const tx = readGraphSettlementHeader(paid.observation.headers["payment-response"], binding.payer)
+    insist(prior === undefined || tx !== prior.result.paymentTx)
+    insist(rpc("eth_chainId", []) === "0x2105")
+    let receipt: unknown = null
+    do { receipt = rpc("eth_getTransactionReceipt", [tx]) } while (receipt === null)
+    insist(plainObject(receipt))
+    const receiptBlock = rpc("eth_getBlockByNumber", [receipt.blockNumber, false])
+    const proof = verifyGraphReceiptEvidence({ payer: binding.payer, transaction: tx, nonce: forward.intent.authorization.nonce, receipt, block: receiptBlock })
+    insist(index === rows.length) // No hidden trailing calls or second paid response.
+    const data = frozenData(readGraphPaidBody(paidBytes))
+    const result = Object.freeze({ data, paymentTx: tx, costAtomic: GRAPH_COGS_POLICY.queryCostAtomic })
+    const body = { evidence: "retained-protocol-consistency" as const, queryHash: binding.queryHash, sourceHash: binding.sourceHash,
+      captureHash: capture.summary.lastHash, forwardHash: forward.hash, createdAt: capture.createdAt, capturedAt: rows.at(-1)!.capturedAt,
+      firstRpcId, lastRpcId: id - 1, nonce: proof.nonce, receiptBlockNumber: proof.blockNumber, receiptBlockHash: proof.blockHash, result }
+    insist(hash(JSON.stringify(sourceFiles(bindings.get(binding)!))) === binding.sourceHash)
+    now()
+    const evidence = Object.freeze({ ...body, hash: hash(JSON.stringify(body)) })
+    queryEvidenceOrigins.set(evidence, { binding, directory }); return evidence
+  } catch { throw new Error(QUERY_PROOF_FAIL) }
 }
 
 export function graphCogsMain(args: readonly string[]): number {

@@ -56,6 +56,8 @@ const queryIds = (data: Record<string, unknown>, address: string): string[] | nu
   }
   return [...ids].sort()
 }
+/** Inert alias for retained-result correlation; no key, query or consumer run. */
+export { queryIds as graphQueryIds }
 export const assess = async (input: { readonly address: string }, deps: {
   readonly payerKey: string; readonly query: PaidQuery
 }): Promise<Assessment> => {

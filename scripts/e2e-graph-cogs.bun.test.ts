@@ -4,8 +4,9 @@ import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSyn
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
-import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
+import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, verifyGraphCapturedQuery, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
 import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObservation, type GraphPaymentIntent } from "../skills/counterparty-graph/graph-client.ts"
+import { encodeAbiParameters, encodeEventTopics, parseAbi } from "viem"
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 const header = () => JSON.stringify({ format: "arcade-graph-reservations-v1", policyHash: GRAPH_COGS_POLICY_HASH })
@@ -501,6 +502,163 @@ function observation(binding: GraphQueryBinding, phase: GraphResponseObservation
     bodyBase64: Buffer.from(body).toString("base64"), bodySha256: hash(body) }
 }
 const captureSignal = () => new AbortController().signal
+// Declared fixed-owner protocol data only: no owner key/signature or real RPC.
+async function declaredProtocolCapture(f: { parent: string; binding: GraphQueryBinding }, options: {
+  firstId?: number; nullReceipts?: number; tx?: string; nonce?: string; data?: Record<string, unknown>;
+  change?: (rows: GraphResponseObservation[]) => void
+} = {}) {
+  const enc = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64")
+  const binding = f.binding, stamp = Math.floor(Date.now() / 1000), tx = options.tx ?? `0x${"a".repeat(64)}`
+  const blockHash = `0x${"b".repeat(64)}`, graphHash = `0x${"c".repeat(64)}`
+  let intent = declaredIntent(binding)
+  if (options.nonce) intent = changeDeclaredIntent(intent, value => { (value.authorization as Record<string, unknown>).nonce = options.nonce })
+  const abi = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)", "event AuthorizationUsed(address indexed authorizer, bytes32 indexed nonce)"])
+  const base = { address: binding.token, transactionHash: tx, blockHash, blockNumber: "0x29", transactionIndex: "0x0", removed: false }
+  const receipt = { transactionHash: tx, blockHash, blockNumber: "0x29", transactionIndex: "0x0", status: "0x1", logs: [
+    { ...base, logIndex: "0x0", topics: encodeEventTopics({ abi, eventName: "Transfer", args: { from: binding.payer as `0x${string}`, to: binding.merchant as `0x${string}` } }), data: encodeAbiParameters([{ type: "uint256" }], [10000n]) },
+    { ...base, logIndex: "0x1", topics: encodeEventTopics({ abi, eventName: "AuthorizationUsed", args: { authorizer: binding.payer as `0x${string}`, nonce: intent.authorization.nonce as `0x${string}` } }), data: "0x" },
+  ] }
+  const initialBase = observation(binding, "challenge", "{}")
+  const initial = { ...initialBase, headers: { ...initialBase.headers, "payment-required": enc({ x402Version: 2,
+    resource: { url: `http://mainnet-thegraph-arbitrum-04-asia-east1.thegraph.com/subgraphs/id/${GRAPH_COGS_POLICY.subgraph}` },
+    accepts: [{ scheme: "exact", network: GRAPH_COGS_POLICY.chain, asset: binding.token, amount: binding.amountAtomic,
+      payTo: binding.merchant, maxTimeoutSeconds: 300, extra: { assetTransferMethod: "eip3009", name: "USD Coin", version: "2" } }] }) } }
+  let id = options.firstId ?? 1
+  const rpc = (method: string, params: unknown[], result: unknown) => {
+    const next = observation(binding, "rpc", JSON.stringify({ jsonrpc: "2.0", id, result }))
+    const request = JSON.stringify({ jsonrpc: "2.0", id, method, params }); id++
+    return { ...next, requestBodySha256: hash(request) }
+  }
+  const data = options.data ?? { _meta: { block: { number: 19, hash: graphHash }, hasIndexingErrors: false }, asWallet: [], asOwner: [] }
+  const paidBase = observation(binding, "paid", JSON.stringify({ data }))
+  const paid = { ...paidBase, headers: { ...paidBase.headers, "payment-response": enc({ success: true, network: GRAPH_COGS_POLICY.chain, payer: binding.payer, transaction: tx }) } }
+  const rows = [initial, rpc("eth_chainId", [], "0x2105"), rpc("eth_getBlockByNumber", ["latest", false], { timestamp: `0x${stamp.toString(16)}` }), paid,
+    rpc("eth_chainId", [], "0x2105"), ...Array.from({ length: options.nullReceipts ?? 0 }, () => rpc("eth_getTransactionReceipt", [tx], null)),
+    rpc("eth_getTransactionReceipt", [tx], receipt), rpc("eth_getBlockByNumber", ["0x29", false], { number: "0x29", hash: blockHash, timestamp: `0x${stamp.toString(16)}` })]
+  options.change?.(rows)
+  const recorder = createGraphResponseRecorder(f.parent, binding)
+  for (let i = 0; i < rows.length; i++) {
+    if (i === 3) await recorder.beforePaidRequest(intent, captureSignal())
+    await recorder.observe(rows[i]!, captureSignal())
+  }
+  recorder.close()
+  return { tx, intent, data, lastRpcId: id - 1 }
+}
+test("retained protocol correlation joins declared challenge/intent/receipt without any new transport", () => captureOwned(async f => {
+  const declared = await declaredProtocolCapture(f)
+  const before = readdirSync(f.dir).map(name => [name, hash(readFileSync(join(f.dir, name), "utf8"))])
+  const evidence = verifyGraphCapturedQuery(f.parent, f.binding)
+  expect(evidence.evidence).toBe("retained-protocol-consistency")
+  expect(evidence.result).toEqual({ data: declared.data, paymentTx: declared.tx, costAtomic: "10000" })
+  expect(evidence.receiptBlockHash).not.toBe((declared.data._meta as { block: { hash: string } }).block.hash)
+  expect(evidence).toMatchObject({ firstRpcId: 1, lastRpcId: 5, nonce: declared.intent.authorization.nonce })
+  expect(Object.isFrozen(evidence)).toBe(true); expect(Object.isFrozen(evidence.result.data._meta)).toBe(true)
+  expect(verifyGraphCapturedQuery(f.parent, f.binding)).toEqual(evidence)
+  expect(readdirSync(f.dir).map(name => [name, hash(readFileSync(join(f.dir, name), "utf8"))])).toEqual(before)
+}))
+function changeProtocolBody(row: GraphResponseObservation, change: (value: Record<string, unknown>) => void): GraphResponseObservation {
+  const value = JSON.parse(Buffer.from(row.bodyBase64, "base64").toString()) as Record<string, unknown>; change(value)
+  const body = JSON.stringify(value)
+  return { ...row, headers: { ...row.headers, "content-length": String(Buffer.byteLength(body)) }, bodyBase64: Buffer.from(body).toString("base64"), bodySha256: hash(body) }
+}
+function changeProtocolHeader(row: GraphResponseObservation, header: "payment-required" | "payment-response", change: (value: Record<string, unknown>) => void): GraphResponseObservation {
+  const value = JSON.parse(Buffer.from(row.headers[header]!, "base64").toString()) as Record<string, unknown>; change(value)
+  return { ...row, headers: { ...row.headers, [header]: Buffer.from(JSON.stringify(value)).toString("base64") } }
+}
+for (const fault of ["challenge-status", "challenge-amount", "challenge-window", "challenge-network", "challenge-extra", "paid-status", "settle-amount", "settle-error", "settle-network", "settle-payer", "settle-zero", "data-errors", "index-errors", "rpc-id", "rpc-request", "first-chain", "post-chain", "old-time", "future-time", "time-encoding", "receipt-status", "receipt-nonce", "receipt-transfer", "receipt-block", "wrong-length", "wrong-encoding", "redirected", "trailing-rpc", "missing-block", "all-null"]) {
+  test(`retained protocol consistency refuses durably rehashed ${fault}`, () => captureOwned(async f => {
+    await declaredProtocolCapture(f, { change(rows) {
+      const body = (i: number, change: (value: Record<string, unknown>) => void) => { rows[i] = changeProtocolBody(rows[i]!, change) }
+      if (fault === "challenge-status") rows[0] = { ...rows[0]!, status: 200 }
+      if (["challenge-amount", "challenge-window", "challenge-network", "challenge-extra"].includes(fault)) rows[0] = changeProtocolHeader(rows[0]!, "payment-required", v => {
+        const accept = (v.accepts as Record<string, unknown>[])[0]!
+        if (fault === "challenge-amount") accept.amount = "10001"
+        if (fault === "challenge-window") accept.maxTimeoutSeconds = 301
+        if (fault === "challenge-network") accept.network = "eip155:1"
+        if (fault === "challenge-extra") v.extra = true
+      })
+      if (fault === "paid-status") rows[3] = { ...rows[3]!, status: 500 }
+      if (fault.startsWith("settle-")) rows[3] = changeProtocolHeader(rows[3]!, "payment-response", v => {
+        if (fault === "settle-amount") v.amount = "9999"
+        if (fault === "settle-error") v.errorReason = "uncertain"
+        if (fault === "settle-network") v.network = "eip155:1"
+        if (fault === "settle-payer") v.payer = f.binding.merchant
+        if (fault === "settle-zero") v.transaction = `0x${"0".repeat(64)}`
+      })
+      if (fault === "data-errors") body(3, v => { v.errors = [] })
+      if (fault === "index-errors") body(3, v => { ((v.data as Record<string, unknown>)._meta as Record<string, unknown>).hasIndexingErrors = true })
+      if (fault === "rpc-id") body(1, v => { v.id = 2 })
+      if (fault === "rpc-request") rows[1] = { ...rows[1]!, requestBodySha256: hash("different method/params") }
+      if (fault === "first-chain") body(1, v => { v.result = "0x1" })
+      if (fault === "post-chain") body(4, v => { v.result = "0x1" })
+      if (["old-time", "future-time", "time-encoding"].includes(fault)) body(2, v => {
+        (v.result as Record<string, unknown>).timestamp = fault === "time-encoding" ? "0x01" : `0x${(Math.floor(Date.now() / 1000) + (fault === "old-time" ? -40 : 40)).toString(16)}`
+      })
+      if (["receipt-status", "receipt-nonce", "receipt-transfer"].includes(fault)) body(5, v => {
+        const receipt = v.result as Record<string, unknown>, logs = receipt.logs as Record<string, unknown>[]
+        if (fault === "receipt-status") receipt.status = "0x0"
+        if (fault === "receipt-nonce") (logs[1]!.topics as string[])[2] = `0x${"e".repeat(64)}`
+        if (fault === "receipt-transfer") logs[0]!.data = encodeAbiParameters([{ type: "uint256" }], [9999n])
+      })
+      if (fault === "receipt-block") body(6, v => { (v.result as Record<string, unknown>).hash = `0x${"e".repeat(64)}` })
+      if (fault === "wrong-length") rows[3] = { ...rows[3]!, headers: { ...rows[3]!.headers, "content-length": "1" } }
+      if (fault === "wrong-encoding") rows[3] = { ...rows[3]!, headers: { ...rows[3]!.headers, "content-encoding": "gzip" } }
+      if (fault === "redirected") rows[3] = { ...rows[3]!, redirected: true }
+      if (fault === "trailing-rpc") rows.push(rows[6]!)
+      if (fault === "missing-block") rows.pop()
+      if (fault === "all-null") { body(5, v => { v.result = null }); body(6, v => { v.result = null }) }
+    } })
+    expect(readGraphResponseCapture(f.parent, f.binding).records.length).toBeGreaterThanOrEqual(6)
+    expect(() => verifyGraphCapturedQuery(f.parent, f.binding)).toThrow(/^graph_cogs_query_evidence_refused$/)
+  }))
+}
+test("retained null-receipt polling is finite and keeps exact RPC IDs", () => captureOwned(async f => {
+  await declaredProtocolCapture(f, { nullReceipts: 2 })
+  expect(verifyGraphCapturedQuery(f.parent, f.binding).lastRpcId).toBe(7)
+}))
+const declaredIdentityData = () => ({ _meta: { block: { number: 19, hash: `0x${"c".repeat(64)}` }, hasIndexingErrors: false },
+  asWallet: [{ id: "8453:7", agentId: "7", chainId: "8453", owner: String(GRAPH_COGS_POLICY.subject), agentWallet: String(GRAPH_COGS_POLICY.subject) }], asOwner: [] })
+for (const firstId of [1, 6]) test(`second retained query uses exact first result with RPC start${firstId}`, () => captureOwned(async f => {
+  const first = await declaredProtocolCapture(f, { data: declaredIdentityData() }), prior = verifyGraphCapturedQuery(f.parent, f.binding)
+  const binding = bindGraphQuery({ subgraphId: GRAPH_COGS_POLICY.subgraph, document: document("attestations"), variables: { agentIds: ["8453:7"], block: { hash: `0x${"c".repeat(64)}` } } }, readGraphSourceManifest(f.source), { binding: f.binding, blockHash: `0x${"c".repeat(64)}` })
+  await declaredProtocolCapture({ parent: f.parent, binding }, { firstId, tx: `0x${"e".repeat(64)}`, nonce: `0x${"f".repeat(64)}`, data: { _meta: declaredIdentityData()._meta, feedbacks: [] } })
+  const evidence = verifyGraphCapturedQuery(f.parent, binding, { parent: prior })
+  expect(evidence.firstRpcId).toBe(firstId); expect(evidence.lastRpcId).toBe(firstId + 4)
+  expect(evidence.result.paymentTx).not.toBe(first.tx)
+  expect(() => verifyGraphCapturedQuery(f.parent, binding)).toThrow()
+  expect(() => verifyGraphCapturedQuery(f.parent, binding, { parent: structuredClone(prior) })).toThrow()
+}))
+for (const fault of ["ids", "block", "reused-nonce", "reused-tx", "rpc-start", "parent-mutated", "parent-empty", "parent-foreign"]) test(`second retained query refuses ${fault}`, () => captureOwned(async f => {
+  const data = declaredIdentityData()
+  if (fault === "parent-empty") data.asWallet = []
+  if (fault === "parent-foreign") data.asWallet[0]!.agentWallet = f.binding.payer
+  await declaredProtocolCapture(f, { data }); const prior = verifyGraphCapturedQuery(f.parent, f.binding)
+  const binding = bindGraphQuery({ subgraphId: GRAPH_COGS_POLICY.subgraph, document: document("attestations"), variables: {
+    agentIds: [fault === "ids" ? "8453:8" : "8453:7"], block: { hash: `0x${(fault === "block" ? "b" : "c").repeat(64)}` } } }, readGraphSourceManifest(f.source), { binding: f.binding, blockHash: `0x${(fault === "block" ? "b" : "c").repeat(64)}` })
+  await declaredProtocolCapture({ parent: f.parent, binding }, { firstId: fault === "rpc-start" ? 2 : 6,
+    tx: `0x${(fault === "reused-tx" ? "a" : "e").repeat(64)}`, nonce: `0x${(fault === "reused-nonce" ? "d" : "f").repeat(64)}` })
+  if (fault === "parent-mutated") writeFileSync(join(f.dir, "response-01.json"), "{}\n")
+  expect(() => verifyGraphCapturedQuery(f.parent, binding, { parent: prior })).toThrow(/^graph_cogs_query_evidence_refused$/)
+}))
+test("retained evidence with absent intent, changed source or expired read budget stays refused", () => captureOwned(async f => {
+  await declaredProtocolCapture(f)
+  let time = Date.now()
+  expect(() => verifyGraphCapturedQuery(f.parent, f.binding, { now: () => { const value = time; time += 5000; return value } })).toThrow()
+  const path = join(f.dir, "forward.json"), text = readFileSync(path)
+  unlinkSync(path); expect(() => verifyGraphCapturedQuery(f.parent, f.binding)).toThrow(); writeFileSync(path, text, { mode: 0o600 })
+  writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed source")
+  expect(() => verifyGraphCapturedQuery(f.parent, f.binding)).toThrow()
+}))
+test("actual no-key child reads retained protocol consistency without changing evidence bytes", () => captureOwned(async f => {
+  await declaredProtocolCapture(f)
+  const before = readdirSync(f.dir).map(name => [name, hash(readFileSync(join(f.dir, name), "utf8"))])
+  const module = resolve(import.meta.dir, "e2e-graph-cogs.ts"), client = resolve(import.meta.dir, "../skills/counterparty-graph/graph-client.ts")
+  const script = `import{readGraphSourceManifest,bindGraphQuery,verifyGraphCapturedQuery}from${JSON.stringify(module)};import{document}from${JSON.stringify(client)};globalThis.fetch=()=>{throw Error("network forbidden")};const binding=bindGraphQuery({subgraphId:${JSON.stringify(GRAPH_COGS_POLICY.subgraph)},document:document("identities"),variables:{address:${JSON.stringify(GRAPH_COGS_POLICY.subject)}}},readGraphSourceManifest(${JSON.stringify(f.source)}));const e=verifyGraphCapturedQuery(${JSON.stringify(f.parent)},binding);console.log(JSON.stringify({evidence:e.evidence,cost:e.result.costAtomic,lastRpcId:e.lastRpcId}));`
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", script], { env: { PATH: "" }, encoding: "utf8", timeout: 5000, maxBuffer: 4096 })
+  expect(child.status).toBe(0); expect(child.stderr).toBe("")
+  expect(JSON.parse(child.stdout)).toEqual({ evidence: "retained-protocol-consistency", cost: "10000", lastRpcId: 5 })
+  expect(readdirSync(f.dir).map(name => [name, hash(readFileSync(join(f.dir, name), "utf8"))])).toEqual(before)
+}))
 test("exclusive private capture retains its evidence after clean close and cannot be reset by creation", () => captureOwned(async f => {
   const recorder = createGraphResponseRecorder(f.parent, f.binding)
   expect(() => createGraphResponseRecorder(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")

@@ -21,6 +21,17 @@ const fixture = (first = firstData(), second = secondData()) => {
 }
 const module = () => import("../run.ts")
 
+describe("inert original identity selector alias", () => {
+  it("derives the same sorted unique follow-up IDs without running a consumer", async () => {
+    const { graphQueryIds } = await module(), input = firstData()
+    input.asOwner = [agent(), { ...agent(), id: "8453:3", agentId: "3" }]
+    expect(graphQueryIds(input, ADDRESS)).toEqual(["8453:3", "8453:7"])
+    expect(graphQueryIds({ _meta: meta(), asWallet: [], asOwner: [] }, ADDRESS)).toEqual([])
+    expect(graphQueryIds({ ...input, asWallet: [{ ...agent(), agentWallet: null }] }, ADDRESS)).toBeNull()
+    expect(graphQueryIds({ ...input, _meta: { ...meta(), hasIndexingErrors: true } }, ADDRESS)).toBeNull()
+  })
+})
+
 describe("G12 bounded paid-fact orchestration, injected queries only", () => {
   it("makes at most two sequential queries, pinning the second to the first exact block hash", async () => {
     const f = fixture(), { assess } = await module()

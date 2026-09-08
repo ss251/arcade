@@ -1,5 +1,17 @@
 # Plan G — execution records
 
+## September 8 — G15 retained correlation checkpoint
+
+The [correlation brief](task-15-correlation-brief.md) and
+[correlation report](task-15-correlation-report.md) join bounded retained
+challenge, intent, settlement, RPC sequence, receipt and result data. Parent
+revalidation binds the second query to the first result's exact IDs/Graph block.
+128 focused Bun/123 client-consumer Vitest and exact strict passed; mechanical
+reversal preserves all original client/consumer/budget logic. This remains
+synthetic retained consistency, not authenticated acquisition or cache/spending
+authority. Sole full gate passed5370Vitest/1551Bun,root/webstrict and both
+builds; local commit follows. No live call or policy change.
+
 ## September 8 — G15 shared receipt-check checkpoint
 
 The [receipt-reuse brief](task-15-receipt-reuse-brief.md) and

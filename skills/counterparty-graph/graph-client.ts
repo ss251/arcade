@@ -199,6 +199,44 @@ function paymentRequired(v: unknown): PaymentRequired {
     amount: QUERY_COST_ATOMIC, payTo: MERCHANT, maxTimeoutSeconds: 300, extra: { assetTransferMethod: "eip3009", name: "USD Coin", version: "2" } }] }
 }
 
+function rpcData(bytes: Uint8Array, id: number): unknown {
+  const result: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
+  keys(result, ["jsonrpc", "id", "result"])
+  if (own(result, "jsonrpc") !== "2.0" || own(result, "id") !== id) fail()
+  return own(result, "result")
+}
+export function readGraphRpcBody(bytes: Uint8Array, id: number): unknown {
+  try { if (!(bytes instanceof Uint8Array) || bytes.byteLength > 1048576 || !Number.isSafeInteger(id) || id < 1) fail(); return rpcData(bytes, id) } catch { fail() }
+}
+function settlementTransaction(header: string | null, payer: string): Hex {
+  const settlement = decodeHeader(header)
+  // Core2.25 SettleResponse: known optional diagnostics must not contradict
+  // success; extensions/extra/unreviewed authority are not supported here.
+  keys(settlement, ["success", "network", "payer", "transaction", "amount", "errorReason", "errorMessage"], ["success", "network", "payer", "transaction"])
+  if ((own(settlement, "amount") !== undefined && own(settlement, "amount") !== QUERY_COST_ATOMIC) ||
+    ["errorReason", "errorMessage"].some((field) => own(settlement, field) !== undefined && own(settlement, field) !== "")) fail()
+  if (own(settlement, "success") !== true || own(settlement, "network") !== PAYMENT_CHAIN || addr(own(settlement, "payer")) !== payer || !hash(own(settlement, "transaction"))) fail()
+  const tx = String(own(settlement, "transaction")).toLowerCase() as Hex
+  return tx
+}
+function paidData(bytes: Uint8Array): Record<string, unknown> {
+  const result: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
+  keys(result, ["data"], ["data"]); const data = own(result, "data")
+  if (!plain(data) || own(own(data, "_meta"), "hasIndexingErrors") !== false) fail()
+  return data
+}
+/** Inert adapters around the same protocol checks used by the client. Supplied
+ * headers/body do not prove network acquisition, signature or paid authority. */
+export function validateGraphChallengeHeader(header: string | null): void {
+  try { paymentRequired(decodeHeader(header)) } catch { fail() }
+}
+export function readGraphSettlementHeader(header: string | null, payer: string): string {
+  try { if (typeof payer !== "string" || addr(payer) !== payer) fail(); return settlementTransaction(header, payer) } catch { fail() }
+}
+export function readGraphPaidBody(bytes: Uint8Array): Record<string, unknown> {
+  try { if (!(bytes instanceof Uint8Array) || bytes.byteLength > 1048576) fail(); return paidData(bytes) } catch { fail() }
+}
+
 function verifyReceiptBody(tx: Hex, nonce: Hex, payer: string, receipt: unknown): void {
   if (!plain(receipt) || own(receipt, "status") !== "0x1" || own(receipt, "transactionHash") !== tx ||
     !hash(own(receipt, "blockHash")) || !safeIndex(own(receipt, "blockNumber")) || !safeIndex(own(receipt, "transactionIndex"))) fail()
@@ -347,10 +385,7 @@ export function makePaidQuery(privateKey: string, options: QueryOptions = {}): P
     const id = ++rpcId
     const { response, bytes } = await fetchBytes(RPC, JSON.stringify({ jsonrpc: "2.0", id, method, params }), { "content-type": "application/json" })
     if (response.status !== 200) fail()
-    const result: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
-    keys(result, ["jsonrpc", "id", "result"])
-    if (own(result, "jsonrpc") !== "2.0" || own(result, "id") !== id) fail()
-    return own(result, "result")
+    return rpcData(bytes, id)
   }
   async function proveReceipt(tx: Hex, nonce: Hex): Promise<void> {
     if (await rpc("eth_chainId", []) !== "0x2105") fail()
@@ -415,18 +450,9 @@ export function makePaidQuery(privateKey: string, options: QueryOptions = {}): P
       }
       const paid = await fetchBytes(ENDPOINT, body, { "content-type": "application/json", "PAYMENT-SIGNATURE": headers["PAYMENT-SIGNATURE"] })
       if (paid.response.status !== 200) fail()
-      const settlement = decodeHeader(paid.response.headers.get("payment-response"))
-      // Core2.25 SettleResponse: known optional diagnostics must not contradict
-      // success; extensions/extra/unreviewed authority are not supported here.
-      keys(settlement, ["success", "network", "payer", "transaction", "amount", "errorReason", "errorMessage"], ["success", "network", "payer", "transaction"])
-      if ((own(settlement, "amount") !== undefined && own(settlement, "amount") !== QUERY_COST_ATOMIC) ||
-        ["errorReason", "errorMessage"].some((field) => own(settlement, field) !== undefined && own(settlement, field) !== "")) fail()
-      if (own(settlement, "success") !== true || own(settlement, "network") !== PAYMENT_CHAIN || addr(own(settlement, "payer")) !== payer || !hash(own(settlement, "transaction"))) fail()
-      const tx = String(own(settlement, "transaction")).toLowerCase() as Hex
+      const tx = settlementTransaction(paid.response.headers.get("payment-response"), payer)
       await proveReceipt(tx, nonce); active()
-      const result: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(paid.bytes))
-      keys(result, ["data"], ["data"]); const data = own(result, "data")
-      if (!plain(data) || own(own(data, "_meta"), "hasIndexingErrors") !== false) fail()
+      const data = paidData(paid.bytes)
       return { data, paymentTx: tx, costAtomic: QUERY_COST_ATOMIC }
     } catch { if (signed) uncertain = true; throw new Error(FAIL) }
     finally { queryOpen = false; busy = false }

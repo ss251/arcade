@@ -1,5 +1,18 @@
 # SDD ledger — Plan G
 
+2026-09-08 07:02 IST — G15K sole47534 gate PASS:5370Vitest242/69.44s;
+1551Bun98/12723assert202.68s;root/webstrict/clientSSR342/171ms. Nine paths,
+3links/privacy0;6source/briefpins unchanged after result annotations. Original
+client/consumer/harness restoration exact; atomic commit/mainFF next. No full
+repeat, owner key, live call/spend, payment-policy change or push.
+
+2026-09-08 06:56 IST — G15K offline protocol correlation implemented after
+missing-export Red and corrected fixture-only mistakes.128Bun713assert7.74s;
+123Vitest2files752ms;6rootsstrict0. Rehashed protocol/receipt/parent mismatches
+refuse; actual no-key child preserves bytes. Reversing narrow helper extractions
+restores original client/consumer/harness. Sole gate next; no live/keys/spend,
+cache/global-budget authority, original payment policy change or push.
+
 2026-09-08 06:42 IST — G15J sole47023 gate PASS:5369Vitest242/69.14s;
 1507Bun98/12629assert199.73s;root/webstrict/clientSSR455/185ms. Six paths,
 3links/privacy0;3source/briefpins unchanged after result annotations. Mechanical
