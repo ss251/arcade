@@ -199,6 +199,63 @@ function paymentRequired(v: unknown): PaymentRequired {
     amount: QUERY_COST_ATOMIC, payTo: MERCHANT, maxTimeoutSeconds: 300, extra: { assetTransferMethod: "eip3009", name: "USD Coin", version: "2" } }] }
 }
 
+function verifyReceiptBody(tx: Hex, nonce: Hex, payer: string, receipt: unknown): void {
+  if (!plain(receipt) || own(receipt, "status") !== "0x1" || own(receipt, "transactionHash") !== tx ||
+    !hash(own(receipt, "blockHash")) || !safeIndex(own(receipt, "blockNumber")) || !safeIndex(own(receipt, "transactionIndex"))) fail()
+  const logs = own(receipt, "logs")
+  if (!Array.isArray(logs) || logs.length > 128) fail()
+  const indexes = new Set<string>(); let transfers = 0, authorizations = 0
+  for (const log of logs) {
+    if (!plain(log) || own(log, "transactionHash") !== tx || own(log, "blockHash") !== own(receipt, "blockHash") ||
+      own(log, "blockNumber") !== own(receipt, "blockNumber") || own(log, "transactionIndex") !== own(receipt, "transactionIndex") ||
+      !safeIndex(own(log, "logIndex")) || !(own(log, "removed") === false || own(log, "removed") === undefined)) fail()
+    const index = String(own(log, "logIndex")); if (indexes.has(index)) fail(); indexes.add(index)
+    if (addr(own(log, "address")) !== USDC) continue
+    const topics = own(log, "topics"), data = own(log, "data")
+    if (!Array.isArray(topics) || topics.length > 4 || !topics.every((t) => typeof t === "string" && /^0x[\da-fA-F]{64}$/.test(t)) || typeof data !== "string" || !/^0x(?:[\da-fA-F]{2})*$/.test(data)) fail()
+    const topic = typeof topics[0] === "string" ? topics[0].toLowerCase() : ""
+    if (topic !== TRANSFER && topic !== AUTH_USED) continue
+    if (topics.length !== 3 || (topic === TRANSFER ? data.length !== 66 : data !== "0x")) fail()
+    const decoded = decodeEventLog({ abi: ABI, topics: topics as [Hex, ...Hex[]], data: data as Hex, strict: true })
+    if (decoded.eventName === "Transfer") {
+      if (decoded.args.from.toLowerCase() === payer || decoded.args.to.toLowerCase() === MERCHANT) {
+        if (decoded.args.from.toLowerCase() !== payer || decoded.args.to.toLowerCase() !== MERCHANT || decoded.args.value !== 10000n) fail()
+        transfers++
+      }
+    } else if (decoded.eventName === "AuthorizationUsed" && decoded.args.authorizer.toLowerCase() === payer) {
+      if (decoded.args.nonce.toLowerCase() !== nonce.toLowerCase()) fail()
+      authorizations++
+    }
+  }
+  if (transfers !== 1 || authorizations !== 1) fail()
+}
+function verifyReceiptBlock(receipt: unknown, block: unknown): void {
+  if (own(block, "number") !== own(receipt, "blockNumber") || own(block, "hash") !== own(receipt, "blockHash") || !safeIndex(own(block, "timestamp"))) fail()
+}
+export interface GraphReceiptConsistency {
+  readonly evidence: "supplied-receipt-and-block"
+  readonly payer: string
+  readonly transaction: string
+  readonly nonce: string
+  readonly blockNumber: string
+  readonly blockHash: string
+}
+/** Pure consistency check using the client's original receipt rules. It does
+ * not fetch/authenticate RPC data, prove chain acquisition or grant cache/payment
+ * authority. The caller must bind bounded capture/network/intent provenance. */
+export function verifyGraphReceiptEvidence(input: unknown): GraphReceiptConsistency {
+  try {
+    keys(input, ["payer", "transaction", "nonce", "receipt", "block"])
+    const payer = own(input, "payer"), tx = own(input, "transaction"), nonce = own(input, "nonce")
+    if (typeof payer !== "string" || addr(payer) !== payer || !hash(tx) || tx !== tx.toLowerCase() ||
+      !hash(nonce) || nonce !== nonce.toLowerCase()) fail()
+    const receipt = own(input, "receipt"), block = own(input, "block")
+    verifyReceiptBody(tx, nonce, payer, receipt); verifyReceiptBlock(receipt, block)
+    return Object.freeze({ evidence: "supplied-receipt-and-block", payer, transaction: tx, nonce,
+      blockNumber: String(own(receipt, "blockNumber")), blockHash: String(own(receipt, "blockHash")).toLowerCase() })
+  } catch { fail() }
+}
+
 /** One factory owns one finite run. No wrapper recovery, broadcast retries or ambient mutation. */
 export function makePaidQuery(privateKey: string, options: QueryOptions = {}): PaidQuery {
   const now = options.now ?? Date.now, transport = options.fetch ?? globalThis.fetch
@@ -305,36 +362,9 @@ export function makePaidQuery(privateKey: string, options: QueryOptions = {}): P
       if (receipt !== null) break
       await bounded(new Promise<void>((resolve) => setTimeout(resolve, 1000)), Math.min(1100, until - now()))
     }
-    if (!plain(receipt) || own(receipt, "status") !== "0x1" || own(receipt, "transactionHash") !== tx ||
-      !hash(own(receipt, "blockHash")) || !safeIndex(own(receipt, "blockNumber")) || !safeIndex(own(receipt, "transactionIndex"))) fail()
-    const logs = own(receipt, "logs")
-    if (!Array.isArray(logs) || logs.length > 128) fail()
-    const indexes = new Set<string>(); let transfers = 0, authorizations = 0
-    for (const log of logs) {
-      if (!plain(log) || own(log, "transactionHash") !== tx || own(log, "blockHash") !== own(receipt, "blockHash") ||
-        own(log, "blockNumber") !== own(receipt, "blockNumber") || own(log, "transactionIndex") !== own(receipt, "transactionIndex") ||
-        !safeIndex(own(log, "logIndex")) || !(own(log, "removed") === false || own(log, "removed") === undefined)) fail()
-      const index = String(own(log, "logIndex")); if (indexes.has(index)) fail(); indexes.add(index)
-      if (addr(own(log, "address")) !== USDC) continue
-      const topics = own(log, "topics"), data = own(log, "data")
-      if (!Array.isArray(topics) || topics.length > 4 || !topics.every((t) => typeof t === "string" && /^0x[\da-fA-F]{64}$/.test(t)) || typeof data !== "string" || !/^0x(?:[\da-fA-F]{2})*$/.test(data)) fail()
-      const topic = typeof topics[0] === "string" ? topics[0].toLowerCase() : ""
-      if (topic !== TRANSFER && topic !== AUTH_USED) continue
-      if (topics.length !== 3 || (topic === TRANSFER ? data.length !== 66 : data !== "0x")) fail()
-      const decoded = decodeEventLog({ abi: ABI, topics: topics as [Hex, ...Hex[]], data: data as Hex, strict: true })
-      if (decoded.eventName === "Transfer") {
-        if (decoded.args.from.toLowerCase() === payer || decoded.args.to.toLowerCase() === MERCHANT) {
-          if (decoded.args.from.toLowerCase() !== payer || decoded.args.to.toLowerCase() !== MERCHANT || decoded.args.value !== 10000n) fail()
-          transfers++
-        }
-      } else if (decoded.eventName === "AuthorizationUsed" && decoded.args.authorizer.toLowerCase() === payer) {
-        if (decoded.args.nonce.toLowerCase() !== nonce.toLowerCase()) fail()
-        authorizations++
-      }
-    }
-    if (transfers !== 1 || authorizations !== 1) fail()
+    verifyReceiptBody(tx, nonce, payer, receipt)
     const block = await rpc("eth_getBlockByNumber", [own(receipt, "blockNumber"), false])
-    if (own(block, "number") !== own(receipt, "blockNumber") || own(block, "hash") !== own(receipt, "blockHash") || !safeIndex(own(block, "timestamp"))) fail()
+    verifyReceiptBlock(receipt, block)
   }
   return async (args) => {
     let signed = false, queryOpen = true

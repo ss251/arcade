@@ -1,5 +1,16 @@
 # Plan G — execution records
 
+## September 8 — G15 shared receipt-check checkpoint
+
+The [receipt-reuse brief](task-15-receipt-reuse-brief.md) and
+[receipt-reuse report](task-15-receipt-reuse-report.md) extract the original
+receipt checks for both the client and an inert supplied-evidence wrapper.
+Reversing the mechanical extraction restores the original client byte-for-byte.
+100 focused Vitest/seven native Bun and exact strict passed. Supplied-data
+consistency is not RPC authenticity or payment/cache authority. Sole full gate
+passed5369Vitest/1507Bun,root/webstrict and both builds; local commit follows.
+No actual key, endpoint, payment or policy change.
+
 ## September 8 — G15 durable intent checkpoint
 
 The [intent-store brief](task-15-intent-store-brief.md) and

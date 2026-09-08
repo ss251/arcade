@@ -1,5 +1,17 @@
 # SDD ledger — Plan G
 
+2026-09-08 06:42 IST — G15J sole47023 gate PASS:5369Vitest242/69.14s;
+1507Bun98/12629assert199.73s;root/webstrict/clientSSR455/185ms. Six paths,
+3links/privacy0;3source/briefpins unchanged after result annotations. Mechanical
+original-client restoration still exact; atomic commit/mainFF next. No full
+repeat, owner key, live endpoint/spend, validity/cap/replay change or push.
+
+2026-09-08 06:35 IST — G15J shared receipt checks implemented after missing-
+export Red.100Vitest596ms;7nativeBun108assert2.97s;3rootsstrict0. Reversing
+the extraction restores the entire original client byte-for-byte; moved bodies
+only reindented. Supplied synthetic consistency is not chain/payment/cache proof.
+Sole gate next; no real key/endpoint/spend/policy change, new authority or push.
+
 2026-09-08 06:19 IST — G15I sole95892 gate PASS:5348Vitest242/69.07s;
 1507Bun98/12629assert199.80s;root/webstrict/clientSSR336/188ms. Six paths,
 3links/privacy0;3source/briefpins unchanged after result annotations. Atomic

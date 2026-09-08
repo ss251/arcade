@@ -7,7 +7,7 @@ import { PassThrough } from "node:stream"
 import { createHash } from "node:crypto"
 vi.mock("node:child_process", { spy: true })
 import { AGENT0_BASE_SUBGRAPH_ID, GATEWAY_BASE, PAYMENT_CHAIN, QUERY_COST_ATOMIC,
-  document, encodeGraphQuery, makePaidQuery, readPayerKey, runKeyCommand, type GraphResponseObservation, type GraphPaymentIntent } from "../graph-client.ts"
+  document, encodeGraphQuery, makePaidQuery, readPayerKey, runKeyCommand, verifyGraphReceiptEvidence, type GraphResponseObservation, type GraphPaymentIntent } from "../graph-client.ts"
 
 // Actual installed x402 signer with simulated gateway/RPC; never live payment evidence.
 const KEY = `0x${"11".repeat(32)}` as const
@@ -78,6 +78,74 @@ describe("inert request encoding", () => {
         { ...request(), variables: { address: PAYER, extra: true } }]) expect(() => encodeGraphQuery(args)).toThrow()
       expect(net).not.toHaveBeenCalled(); expect(keychain).not.toHaveBeenCalled()
     } finally { vi.unstubAllGlobals() }
+  })
+})
+
+describe("supplied receipt consistency", () => {
+  it("reuses the client's successful receipt without fetching or signing again", async () => {
+    let receipt: Record<string, unknown> | undefined
+    const f = fixture({ receipt: value => { receipt = value; return value } })
+    await makePaidQuery(KEY, { fetch: f.net })(request())
+    const count = f.calls.length, nonce = f.payloads[0]!.payload.authorization.nonce
+    const result = verifyGraphReceiptEvidence({ payer: PAYER, transaction: TX, nonce, receipt,
+      block: { number: "0x29", hash: BLOCK, timestamp: "0x1" } })
+    expect(result).toMatchObject({ payer: PAYER, transaction: TX, nonce, blockNumber: "0x29", blockHash: BLOCK })
+    expect(Object.isFrozen(result)).toBe(true); expect(f.calls).toHaveLength(count)
+  })
+  it.each(["payer", "transaction", "nonce", "status", "token", "amount", "recipient", "removed", "duplicate-transfer", "duplicate-authorization", "log-transaction", "log-index", "zero-transaction", "zero-nonce", "uppercase-transaction", "block-number", "block-hash", "block-time"])("refuses mismatched supplied %s using the shared checks", async fault => {
+    let receipt: Record<string, unknown> | undefined
+    const f = fixture({ receipt: value => { receipt = value; return value } })
+    await makePaidQuery(KEY, { fetch: f.net })(request())
+    const input = { payer: PAYER, transaction: TX, nonce: f.payloads[0]!.payload.authorization.nonce, receipt: structuredClone(receipt!),
+      block: { number: "0x29", hash: BLOCK, timestamp: "0x1" } }
+    const logs = input.receipt.logs as Record<string, unknown>[]
+    if (fault === "payer") input.payer = MERCHANT
+    if (fault === "transaction") input.transaction = BLOCK
+    if (fault === "nonce") input.nonce = BLOCK as `0x${string}`
+    if (fault === "status") input.receipt.status = "0x0"
+    if (fault === "token") logs[0]!.address = MERCHANT
+    if (fault === "amount") logs[0]!.data = encodeAbiParameters([{ type: "uint256" }], [9999n])
+    if (fault === "recipient") logs[0]!.topics = encodeEventTopics({ abi: ABI, eventName: "Transfer", args: { from: PAYER as `0x${string}`, to: PAYER as `0x${string}` } })
+    if (fault === "removed") logs[0]!.removed = true
+    if (fault === "duplicate-transfer") logs.push({ ...logs[0], logIndex: "0x2" })
+    if (fault === "duplicate-authorization") logs.push({ ...logs[1], logIndex: "0x2" })
+    if (fault === "log-transaction") logs[0]!.transactionHash = BLOCK
+    if (fault === "log-index") logs[1]!.logIndex = "0x0"
+    if (fault === "zero-transaction" || fault === "uppercase-transaction") {
+      input.transaction = fault === "zero-transaction" ? `0x${"0".repeat(64)}` : `0x${"A".repeat(64)}`
+      input.receipt.transactionHash = input.transaction
+      for (const log of logs) log.transactionHash = input.transaction
+    }
+    if (fault === "zero-nonce") {
+      input.nonce = `0x${"0".repeat(64)}`
+      logs[1]!.topics = encodeEventTopics({ abi: ABI, eventName: "AuthorizationUsed", args: { authorizer: PAYER as `0x${string}`, nonce: input.nonce } })
+    }
+    if (fault === "block-number") input.block.number = "0x30"
+    if (fault === "block-hash") input.block.hash = TX
+    if (fault === "block-time") input.block.timestamp = "0x01"
+    const calls = f.calls.length
+    expect(() => verifyGraphReceiptEvidence(input)).toThrow(/^graph query could not be completed$/)
+    expect(f.calls).toHaveLength(calls); expect(f.payloads).toHaveLength(1)
+  })
+  it("preserves acceptance of unrelated well-formed logs without treating them as another payment", async () => {
+    let receipt: Record<string, unknown> | undefined
+    const f = fixture({ receipt: value => { receipt = value; return value } })
+    await makePaidQuery(KEY, { fetch: f.net })(request())
+    const logs = receipt!.logs as Record<string, unknown>[]
+    logs.push({ ...logs[0], address: MERCHANT, logIndex: "0x2" })
+    const result = verifyGraphReceiptEvidence({ payer: PAYER, transaction: TX, nonce: f.payloads[0]!.payload.authorization.nonce,
+      receipt, block: { number: "0x29", hash: BLOCK, timestamp: "0x1" } })
+    expect(result.evidence).toBe("supplied-receipt-and-block")
+    expect(result.blockHash).toBe(BLOCK)
+  })
+  it("refuses malformed expected references and getters without consulting any key or transport", () => {
+    let invoked = false
+    for (const input of [null, {}, { payer: PAYER, transaction: TX, nonce: BLOCK, receipt: {}, block: {}, extra: true },
+      { payer: PAYER.toUpperCase(), transaction: TX, nonce: BLOCK, receipt: {}, block: {} },
+      { payer: PAYER, get transaction() { invoked = true; return TX }, nonce: BLOCK, receipt: {}, block: {} }]) {
+      expect(() => verifyGraphReceiptEvidence(input)).toThrow(/^graph query could not be completed$/)
+    }
+    expect(invoked).toBe(false)
   })
 })
 
