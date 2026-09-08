@@ -4,7 +4,7 @@ import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSyn
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
-import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, verifyGraphCapturedQuery, writeGraphQueryCache, readGraphQueryCache, bindGraphQueryBalances, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
+import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, verifyGraphCapturedQuery, writeGraphQueryCache, readGraphQueryCache, bindGraphQueryBalances, claimGraphReservation, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
 import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObservation, type GraphPaymentIntent } from "../skills/counterparty-graph/graph-client.ts"
 import { encodeAbiParameters, encodeEventTopics, parseAbi } from "viem"
 
@@ -154,6 +154,78 @@ test("explicit initialization is exclusive; reopen retains an unresolved reserva
   expect(() => reopened.reserve({ ...reservation(), queryHash: hash("another-query") })).toThrow("graph_cogs_writer_refused")
   reopened.close()
   expect(readFileSync(join(dir, "reservations.jsonl"))).toEqual(bytes)
+}))
+test("only a fresh acknowledged reservation can supply a one-use local journal handoff", () => owned(parent => {
+  const source = sourceCopy(parent), binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(source))
+  const directory = initializeGraphReservationState(parent), writer = openGraphReservationWriter(parent)
+  const summary = writer.reserve({ allocation: "evidence", queryHash: binding.queryHash, balanceAtomic: "1000000" })
+  const before = readFileSync(join(directory, "reservations.jsonl"), "utf8")
+  const handoff = claimGraphReservation(parent, binding, summary)
+  expect(handoff.queryHash).toBe(binding.queryHash); expect(handoff.balanceAtomic).toBe("1000000")
+  expect(() => claimGraphReservation(parent, binding, summary)).toThrow()
+  expect(readFileSync(join(directory, "reservations.jsonl"), "utf8")).toBe(before)
+  expect(writer.snapshot().unresolved).toBe(1); writer.close()
+  expect(Object.isFrozen(handoff)).toBe(true); expect(handoff.amountAtomic).toBe("10000")
+  expect(JSON.stringify(handoff)).not.toContain(parent)
+}))
+test("snapshot, decoded and copied summaries cannot stand in for the fresh acknowledgement", () => owned(parent => {
+  const source = sourceCopy(parent), binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(source))
+  const directory = initializeGraphReservationState(parent), writer = openGraphReservationWriter(parent)
+  const empty = writer.snapshot(), summary = writer.reserve({ allocation: "video", queryHash: binding.queryHash, balanceAtomic: "1000000" })
+  for (const candidate of [empty, writer.snapshot(), structuredClone(summary), JSON.parse(JSON.stringify(summary)),
+    readGraphReservations(join(directory, "reservations.jsonl")), null, {}]) {
+    expect(() => claimGraphReservation(parent, binding, candidate)).toThrow(/^graph_cogs_reservation_handoff_refused$/)
+  }
+  expect(claimGraphReservation(parent, binding, summary).allocation).toBe("video")
+  writer.close()
+}))
+for (const fault of ["closed", "source", "query", "parent", "alias", "stale", "backwards", "head", "claim"]) test(`fresh reservation handoff refuses ${fault} and never refunds a slot`, () => owned(parent => {
+  const source = sourceCopy(parent), binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(source))
+  const directory = initializeGraphReservationState(parent), writer = openGraphReservationWriter(parent)
+  const summary = writer.reserve({ allocation: "evidence", queryHash: fault === "query" ? hash("other query") : binding.queryHash, balanceAtomic: "1000000" })
+  const before = readFileSync(join(directory, "reservations.jsonl"), "utf8")
+  let target = parent
+  if (fault === "closed") writer.close()
+  if (fault === "source") writeFileSync(join(source, "skills/counterparty-graph/run.ts"), "changed")
+  if (fault === "parent") { target = join(parent, "other"); mkdirSync(target, { mode: 0o700 }) }
+  if (fault === "alias") { target = parent + "/." }
+  if (fault === "head") writeFileSync(join(directory, "head-01.json"), "{}\n")
+  if (fault === "claim") writeFileSync(join(directory, ".claim"), "changed\n")
+  const options = fault === "stale" ? { now: () => Date.now() + 5000 } : fault === "backwards" ? { now: () => Date.now() - 5000 } : {}
+  expect(() => claimGraphReservation(target, binding, summary, options)).toThrow(/^graph_cogs_reservation_handoff_refused$/)
+  expect(() => claimGraphReservation(parent, binding, summary)).toThrow()
+  expect(readFileSync(join(directory, "reservations.jsonl"), "utf8")).toBe(before)
+  expect(readGraphReservations(join(directory, "reservations.jsonl")).unresolved).toBe(1)
+  try { writer.close() } catch { /* A deliberately corrupted owned fixture remains poisoned. */ }
+}))
+test("reopening the same unresolved ledger cannot mint a new reservation handoff", () => owned(parent => {
+  const source = sourceCopy(parent), binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(source))
+  initializeGraphReservationState(parent); const writer = openGraphReservationWriter(parent)
+  const summary = writer.reserve({ allocation: "evidence", queryHash: binding.queryHash, balanceAtomic: "1000000" }); writer.close()
+  const reopened = openGraphReservationWriter(parent)
+  expect(() => claimGraphReservation(parent, binding, summary)).toThrow()
+  expect(() => claimGraphReservation(parent, binding, reopened.snapshot())).toThrow()
+  expect(() => reopened.reserve({ allocation: "evidence", queryHash: hash("retry"), balanceAtomic: "1000000" })).toThrow()
+  reopened.close()
+}))
+test("the fresh handoff captures the originally validated balance before a test hook mutates caller input", () => owned(parent => {
+  const source = sourceCopy(parent), binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(source))
+  initializeGraphReservationState(parent)
+  const input = { allocation: "evidence", queryHash: binding.queryHash, balanceAtomic: "1000000" }
+  const writer = openGraphReservationWriter(parent, { afterJournalSync() { input.balanceAtomic = "0" } })
+  const summary = writer.reserve(input)
+  expect(claimGraphReservation(parent, binding, summary).balanceAtomic).toBe("1000000")
+  expect(input.balanceAtomic).toBe("0"); writer.close()
+}))
+test("a separate no-key process cannot consume the parent's serialized reservation acknowledgement", () => owned(parent => {
+  const source = sourceCopy(parent), binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(source))
+  initializeGraphReservationState(parent); const writer = openGraphReservationWriter(parent)
+  const summary = writer.reserve({ allocation: "evidence", queryHash: binding.queryHash, balanceAtomic: "1000000" })
+  const script = `import{claimGraphReservation,bindGraphQuery,readGraphSourceManifest}from${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))};import{document}from${JSON.stringify(resolve(import.meta.dir, "../skills/counterparty-graph/graph-client.ts"))};const b=bindGraphQuery({subgraphId:${JSON.stringify(GRAPH_COGS_POLICY.subgraph)},document:document("identities"),variables:{address:${JSON.stringify(GRAPH_COGS_POLICY.subject)}}},readGraphSourceManifest(${JSON.stringify(source)}));try{claimGraphReservation(${JSON.stringify(parent)},b,${JSON.stringify(summary)});process.exit(99)}catch{process.exit(35)}`
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", script], { env: { PATH: "" }, encoding: "utf8", timeout: 3000, maxBuffer: 4096 })
+  expect(child.status).toBe(35); expect(child.stdout).toBe(""); expect(child.stderr).toBe("")
+  expect(claimGraphReservation(parent, binding, summary).reservationHash).toBe(summary.lastHash)
+  writer.close()
 }))
 test("missing state is not initialized by opening and an active claim is never stolen", () => owned(parent => {
   expect(() => openGraphReservationWriter(parent)).toThrow("graph_cogs_writer_refused")

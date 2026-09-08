@@ -480,7 +480,7 @@ export function openGraphReservationWriter(parent: string, hooks?: GraphWriterHo
           insist(input.allocation === "evidence" || input.allocation === "video")
           insist(typeof input.queryHash === "string" && HASH.test(input.queryHash))
           insist(typeof input.balanceAtomic === "string"); checkGraphBalance(input.balanceAtomic)
-          const allocation = input.allocation, queryHash = input.queryHash, observed = current()
+          const allocation = input.allocation, queryHash = input.queryHash, balanceAtomic = input.balanceAtomic, observed = current()
           insist(observed.summary.unresolved === 0 && observed.summary.reservations < GRAPH_COGS_POLICY.totalLimit &&
             (allocation !== "evidence" || observed.summary.evidence < GRAPH_COGS_POLICY.evidenceLimit))
           const body = { sequence: observed.summary.reservations + 1, previousHash: observed.summary.lastHash,
@@ -503,6 +503,8 @@ export function openGraphReservationWriter(parent: string, hooks?: GraphWriterHo
           syncDirectory(directory, identity)
           const persisted = writerState(directory); insist(persisted.text === nextText); claim.check()
           state = persisted
+          freshReservationAcks.set(persisted.summary, { directory, queryHash, allocation, balanceAtomic,
+            issuedAt: Date.now(), used: false, active: () => { insist(current().text === nextText) } })
           return persisted.summary
         } catch { if (mutation) poisoned = true; throw new Error(WRITER_FAIL) }
         finally { if (ownsBusy) busy = false }
@@ -1144,6 +1146,65 @@ export function bindGraphQueryBalances(parent: string, binding: GraphQueryBindin
     insist(hash(JSON.stringify(sourceFiles(bindings.get(binding)!))) === binding.sourceHash)
     now(); return Object.freeze({ ...body, hash: hash(JSON.stringify(body)) })
   } catch { throw new Error(BALANCE_BIND_FAIL) }
+}
+
+
+const RESERVATION_HANDOFF_FAIL = "graph_cogs_reservation_handoff_refused"
+interface FreshReservationAck {
+  readonly directory: string
+  readonly queryHash: string
+  readonly allocation: "evidence" | "video"
+  readonly balanceAtomic: string
+  readonly issuedAt: number
+  readonly active: () => void
+  used: boolean
+}
+const freshReservationAcks = new WeakMap<GraphReservationSummary, FreshReservationAck>()
+export interface GraphReservationHandoff {
+  readonly namespace: typeof GRAPH_COGS_POLICY.namespace
+  readonly policyHash: string
+  readonly sourceHash: string
+  readonly queryHash: string
+  readonly sequence: number
+  readonly reservationHash: string
+  readonly allocation: "evidence" | "video"
+  readonly amountAtomic: string
+  readonly balanceAtomic: string
+  readonly issuedAt: number
+  readonly claimedAt: number
+}
+const reservationHandoffOrigins = new WeakMap<GraphReservationHandoff, {
+  readonly parent: string
+  readonly binding: GraphQueryBinding
+  readonly active: () => void
+  readonly issuedAt: number
+  used: boolean
+}>()
+/** One-use in-process provenance, not signing/spending authority. Only a real
+ * fresh reserve acknowledgement qualifies; reopened/copied/decoded snapshots
+ * cannot retry an old unresolved slot. Failure never refunds that reservation. */
+export function claimGraphReservation(parent: string, binding: GraphQueryBinding, summary: unknown, options: { readonly now?: () => number } = {}): GraphReservationHandoff {
+  try {
+    insist(summary !== null && typeof summary === "object")
+    const acknowledgement = summary as GraphReservationSummary, fresh = freshReservationAcks.get(acknowledgement)
+    insist(fresh !== undefined && !fresh.used); fresh.used = true // Burn this local attempt, including refusal.
+    const clock = options.now ?? Date.now; insist(typeof clock === "function")
+    const first = clock()
+    const inWindow = (time: number) => insist(Number.isSafeInteger(fresh.issuedAt) && fresh.issuedAt > 0 &&
+      Number.isSafeInteger(fresh.issuedAt + 5000) && Number.isSafeInteger(time) && time >= fresh.issuedAt && time < fresh.issuedAt + 5000)
+    inWindow(first); fresh.active(); privateDirectory(parent)
+    const root = bindings.get(binding)
+    insist(root !== undefined && fresh.directory === join(parent, GRAPH_COGS_POLICY.namespace) && fresh.queryHash === binding.queryHash &&
+      hash(JSON.stringify(sourceFiles(root))) === binding.sourceHash)
+    fresh.active()
+    const claimedAt = clock(); insist(claimedAt >= first); inWindow(claimedAt)
+    const handoff = Object.freeze({ namespace: GRAPH_COGS_POLICY.namespace, policyHash: GRAPH_COGS_POLICY_HASH,
+      sourceHash: binding.sourceHash, queryHash: binding.queryHash, sequence: acknowledgement.reservations,
+      reservationHash: acknowledgement.lastHash, allocation: fresh.allocation, amountAtomic: GRAPH_COGS_POLICY.queryCostAtomic,
+      balanceAtomic: fresh.balanceAtomic, issuedAt: fresh.issuedAt, claimedAt })
+    reservationHandoffOrigins.set(handoff, { parent, binding, active: fresh.active, issuedAt: fresh.issuedAt, used: false })
+    return handoff
+  } catch { throw new Error(RESERVATION_HANDOFF_FAIL) }
 }
 
 export function graphCogsMain(args: readonly string[]): number {

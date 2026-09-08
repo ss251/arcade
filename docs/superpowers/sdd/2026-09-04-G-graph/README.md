@@ -1,5 +1,16 @@
 # Plan G — execution records
 
+## September 8 — G15 fresh reservation handoff checkpoint
+
+The [reservation-handoff brief](task-15-reservation-handoff-brief.md) and
+[reservation-handoff report](task-15-reservation-handoff-report.md) distinguish
+one real fresh reserve acknowledgement from copies, snapshots and reopened
+unresolved history.209 focused Bun/1086 assertions and strict passed, including
+an actual child refusing a serialized acknowledgement. This local one-use
+reference grants no signing/spending authority and never refunds exposure.
+Existing ledger/caps/client/consumer remain unchanged. Sole full gate passed
+5370Vitest/1632Bun, root/web strict and both builds; local commit follows.
+
 ## September 8 — G15 retained balance binding checkpoint
 
 The [balance-bind brief](task-15-balance-bind-brief.md) and

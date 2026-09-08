@@ -1,5 +1,18 @@
 # SDD ledger — Plan G
 
+2026-09-08 08:02 IST — G15N sole29087 gate PASS:5370Vitest242/69.22s;
+1632Bun98/13094assert209.11s;root/webstrict/clientSSR350/187ms. Six paths,
+3links/privacy0;3source/briefpins unchanged after result annotations. Existing
+harness restoration exact; client/consumer unchanged. Atomic commit/mainFF
+next; no full repeat, owner key/live/spend, payment-policy change or push.
+
+2026-09-08 07:51 IST — G15N one-use fresh reservation handoff implemented
+after missing-export Red.209Bun1086assert14.36s;2rootsstrict0. Original reserve
+ack only, with active claim/source/query/head and local5s checks; copies/reopen/
+wrong scope/stale handles refuse. Actual child35 cannot use serialized return.
+Ledger/caps/unresolved/client unchanged; original harness mechanically restored
+without narrow bookkeeping/new block. Sole gate next; no key/live/spend/push.
+
 2026-09-08 07:38 IST — G15M sole17414 gate:5370Vitest242/69.85s PASS;
 1616Bun PASS/1fixture FAIL98files13026assert208.49s. Clock-crossing fixture
 failure reproduced deterministically; test-only correction then195Bun1025assert
