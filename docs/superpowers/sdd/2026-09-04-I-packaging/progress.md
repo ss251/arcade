@@ -1,5 +1,21 @@
 # Plan I progress
 
+2026-09-08 12:20 IST — I2C sole55094fullgate PASS5371Vitest242/68.94s,
+1877Bun100/14597assert313.68s,root/webstrict/clientSSR339/171ms. Six paths,
+3links/privacy0, three frozen source/brief pins; existing storage/sanitizer/
+payment bytes unchanged. Native HTTP/closed-port/incomplete-TCP/lost-ack
+checks pass; no real client or settlement claim. Final atomic commit/mainFF
+next; actual capture workflow/fixture stays paused with J4. No live/push.
+
+2026-09-08 12:11 IST — I2C explicit synthetic loopback listener implemented.
+Missing-module Red, then actual null-timeout binding and graceful-stop/open-TCP
+regressions reproduced/fixed with unchanged assertions.56combinedBun413assert
+5.81s/two-root strict0 PASS. Forced owned closure, independent port/connection
+checks, withheld-ack conservative result; one challenge/header, no raw writes.
+Existing storage/sanitizer/payment bytes unchanged; CLI/live remain inactive.
+Six-path audit/freeze and sole sequential four-worker gate next; no keys,
+Circle client/network payment, approval replay, validity/cap change or push.
+
 2026-09-08 12:00 IST — I2B sole81518fullgate PASS5371Vitest242/69.20s,
 1862Bun99/14475assert313.23s,root/webstrict/clientSSR364/192ms. Six paths,
 3links/privacy0; three source/brief pins and original sanitizer/native-test
