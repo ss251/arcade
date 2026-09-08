@@ -102,6 +102,20 @@ describe("shared public receipt boundary", () => {
       expect(row.reason).toBe("not settled")
       expect(JSON.stringify(row)).not.toContain("PRIVATE")
     })
+  it("publishes an unconfirmed settlement as its own verdict, and never its free-form reason", () => {
+    // The private reason carries a transaction hash, so it is free-form by construction and
+    // must not escape the allowlist. But collapsing it to "not settled" would republish the
+    // one claim the hub cannot make about that receipt.
+    const tx = `0x${"ab".repeat(32)}`
+    const row = feed.publicReceipt(receipt({
+      settled: false,
+      reason: `settlement unconfirmed (SettlementFailed): transaction ${tx} was broadcast`,
+      unresolvedSettleTx: tx
+    }))
+    expect(row.reason).toBe("settlement unconfirmed")
+    expect(JSON.stringify(row)).not.toContain(tx)
+    expect(JSON.stringify(row)).not.toContain("unresolvedSettleTx")
+  })
   it("keeps only fixed canonical verdicts", () => {
     for (const reason of ["ok", "refused", "session_released", "job status is failed", "job status is runner_lost", "job status is invalid",
       "job status is timeout", "job status is bounds_exceeded", "job status is rejected",

@@ -98,7 +98,15 @@ export const scrubReceipt = (r: Receipt): PublicReceiptRow => {
     sellerShare: formatPrice(r.sellerAtomic),
     fee: formatPrice(r.feeAtomic),
     settled,
-    reason: escrow === undefined ? reasons.has(r.reason) ? r.reason : r.settled ? "settled" : "not settled" : escrowReceiptReason(escrow),
+    /*
+     * The unconfirmed case gets its own fixed phrase, keyed off the FIELD rather than the
+     * reason text — that text carries a transaction hash and is therefore free-form, and
+     * free-form strings do not escape this allowlist. Without this it collapsed to "not
+     * settled", which is the one thing the hub does not know in that case.
+     */
+    reason: escrow !== undefined ? escrowReceiptReason(escrow)
+      : r.unresolvedSettleTx !== undefined ? "settlement unconfirmed"
+      : reasons.has(r.reason) ? r.reason : r.settled ? "settled" : "not settled",
     latencyMs: r.latencyMs,
     createdAtMs: r.createdAtMs,
     ...(settled && reference(r.rail, r.settleTx) ? { settleTx: r.settleTx } : {}),
