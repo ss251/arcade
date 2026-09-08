@@ -2,7 +2,7 @@ import { expect, test, spyOn } from "bun:test"
 import { createGraphBalanceRecorder, readGraphBalanceJournal, verifyGraphJournaledQuery, readGraphQualifiedReservations, openGraphQualifiedReservationWriter, writeGraphAssessmentCache, readGraphAssessmentCache, type GraphBalanceObservation } from "./e2e-graph-cogs.ts"
 import { createHash } from "node:crypto"
 import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSync, linkSync, mkdirSync, realpathSync, existsSync, readdirSync, copyFileSync, unlinkSync, renameSync, lstatSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { tmpdir, userInfo } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, verifyGraphCapturedQuery, writeGraphQueryCache, readGraphQueryCache, bindGraphQueryBalances, claimGraphReservation, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
@@ -10,6 +10,8 @@ import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObs
 import { encodeAbiParameters, encodeEventTopics, parseAbi } from "viem"
 import { graphReadResult } from "../skills/counterparty-graph/run.ts"
 import { synthesize } from "../skills/counterparty-graph/synthesize.ts"
+import { graphCogsOwnerRoot, readGraphOwnerPayerKey, GRAPH_COGS_KEYCHAIN } from "./e2e-graph-cogs.ts"
+import { privateKeyToAccount } from "viem/accounts"
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 const header = () => JSON.stringify({ format: "arcade-graph-reservations-v1", policyHash: GRAPH_COGS_POLICY_HASH })
@@ -1371,6 +1373,91 @@ test("assessment bytes changed during final history verification cannot pass rea
   } })).toThrow(/^graph_cogs_assessment_cache_refused$/)
   expect(readFileSync(path, "utf8")).toBe("{changed")
 }))
+
+test("the fixed owner payer boundary refuses an absent item with exact service and account and no fallback", async () => {
+  const calls: string[][] = []
+  await expect(readGraphOwnerPayerKey({ run: async command => {
+    calls.push([...command]); return { code: 44, stdout: "" }
+  } })).rejects.toThrow(/^graph_cogs_owner_key_unavailable$/)
+  expect(calls).toEqual([["/usr/bin/security", "find-generic-password", "-s", "graph-x402-payer", "-a", "GRAPH_X402_PAYER_KEY", "-w"]])
+  expect(GRAPH_COGS_KEYCHAIN).toEqual({ service: "graph-x402-payer", account: "GRAPH_X402_PAYER_KEY" })
+  expect(typeof graphCogsOwnerRoot).toBe("function")
+})
+
+test("owner state path selection is fixed to OS account metadata without operational filesystem access", () => {
+  const text = readFileSync(resolve(import.meta.dir, "e2e-graph-cogs.ts"), "utf8")
+  const start = text.indexOf("export function graphCogsOwnerRoot"), end = text.indexOf("/** Inert until explicitly", start)
+  const body = text.slice(start, end)
+  expect(body).toContain("userInfo().homedir")
+  expect(body).not.toMatch(/process\.env|readFile|lstat|mkdir|openSync|realpathSync/)
+  expect(graphCogsOwnerRoot()).toBe(join(userInfo().homedir, ".local", "state", "arcade", "graph-cogs"))
+  expect(Object.isFrozen(GRAPH_COGS_KEYCHAIN)).toBe(true)
+})
+test("owner key admission rejects a valid public synthetic key with real cryptographic account derivation", async () => {
+  const dummy = "0x" + "11".repeat(32), address = privateKeyToAccount(dummy as `0x${string}`).address.toLowerCase()
+  expect(address).not.toBe(GRAPH_COGS_POLICY.payer); let calls = 0
+  await expect(readGraphOwnerPayerKey({ run: async () => { calls++; return { code: 0, stdout: dummy + "\n" } } })).rejects.toThrow(/^graph_cogs_owner_key_unavailable$/)
+  expect(calls).toBe(1)
+})
+for (const value of ["", "0x" + "00".repeat(32), "0x" + "ff".repeat(32), "0x11", "x".repeat(1025)])
+  test(`owner key admission refuses malformed command output length${value.length}`, async () => {
+    let calls = 0
+    await expect(readGraphOwnerPayerKey({ run: async () => { calls++; return { code: 0, stdout: value } } })).rejects.toThrow(/^graph_cogs_owner_key_unavailable$/)
+    expect(calls).toBe(1)
+  })
+test("owner key command diagnostics and accessor fields never reach the caller or get evaluated", async () => {
+  const sentinel = "synthetic-provider-diagnostic"
+  await expect(readGraphOwnerPayerKey({ run: async () => { throw Error(sentinel) } })).rejects.toThrow(/^graph_cogs_owner_key_unavailable$/)
+  let getters = 0
+  const value = Object.defineProperty({ code: 0 }, "stdout", { enumerable: true, get() { getters++; throw Error(sentinel) } })
+  await expect(readGraphOwnerPayerKey({ run: async () => value as { code: number; stdout: string } })).rejects.toThrow(/^graph_cogs_owner_key_unavailable$/)
+  expect(getters).toBe(0)
+})
+test("already aborted or invalid local clocks refuse owner-key lookup before command dispatch", async () => {
+  const abort = new AbortController(); abort.abort(); let calls = 0
+  const run = async () => { calls++; return { code: 1, stdout: "" } }
+  await expect(readGraphOwnerPayerKey({ run, signal: abort.signal })).rejects.toThrow(/^graph_cogs_owner_key_unavailable$/)
+  for (const value of [0, -1, Number.NaN, Number.MAX_SAFE_INTEGER])
+    await expect(readGraphOwnerPayerKey({ run, now: () => value })).rejects.toThrow(/^graph_cogs_owner_key_unavailable$/)
+  expect(calls).toBe(0)
+})
+for (const fault of ["abort", "backwards", "deadline"] as const)
+  test(`owner-key ${fault} while command resolves refuses without a returned key or fallback`, async () => {
+    const controller = new AbortController(); let time = Date.now(), calls = 0
+    await expect(readGraphOwnerPayerKey({ now: () => time, signal: controller.signal, run: async () => {
+      calls++; if (fault === "abort") controller.abort(); else if (fault === "backwards") time--; else time += 3000
+      return { code: 0, stdout: "0x" + "11".repeat(32) }
+    } })).rejects.toThrow(/^graph_cogs_owner_key_unavailable$/)
+    expect(calls).toBe(1)
+  })
+test("a never-resolving injected owner-key fixture is bounded and cannot produce late key admission", async () => {
+  let resolveResult: ((value: { code: number; stdout: string }) => void) | undefined, calls = 0
+  const started = performance.now(), pending = readGraphOwnerPayerKey({ run: () => { calls++; return new Promise(resolve => { resolveResult = resolve }) } })
+  await expect(pending).rejects.toThrow(/^graph_cogs_owner_key_unavailable$/)
+  expect(performance.now() - started).toBeLessThan(4500); expect(calls).toBe(1)
+  resolveResult?.({ code: 0, stdout: "0x" + "11".repeat(32) })
+  await expect(pending).rejects.toThrow(/^graph_cogs_owner_key_unavailable$/)
+}, 5000)
+for (const cancel of [false, true]) test(`simulated owner derivation with owned-child close acknowledgement cancel=${cancel}`, () => {
+  const script = `import{mock}from"bun:test";
+    const accountsPath="viem/accounts",clientPath=${JSON.stringify(resolve(import.meta.dir, "../skills/counterparty-graph/graph-client.ts"))};
+    const accounts=await import(accountsPath),client=await import(clientPath);const controller=new AbortController();
+    const fixtureKey="0x"+"11".repeat(32);let closed=false,calls=0,derived=0,argsOk=false;
+    const runner=async command=>{calls++;argsOk=JSON.stringify(command)===JSON.stringify(["/usr/bin/security","find-generic-password","-s","graph-x402-payer","-a","GRAPH_X402_PAYER_KEY","-w"])&&Object.isFrozen(command);
+      const child=Bun.spawn([process.execPath,"--no-env-file","-e","process.stdout.write('0x'+'11'.repeat(32));setTimeout(()=>process.exit(0),50)"],{env:{PATH:""},stdout:"pipe",stderr:"pipe"});
+      if(${cancel})setTimeout(()=>controller.abort(),5);
+      const stdout=await new Response(child.stdout).text(),code=await child.exited;closed=true;return{code,stdout};};
+    mock.module(clientPath,()=>({...client,runKeyCommand:runner}));
+    mock.module(accountsPath,()=>({...accounts,privateKeyToAccount:key=>{derived++;if(key!==fixtureKey)throw Error("fixture mismatch");return{address:${JSON.stringify(GRAPH_COGS_POLICY.payer)}}}}));
+    globalThis.fetch=()=>{throw Error("network forbidden")};
+    const h=await import(${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))});
+    let accepted=false,error=null;try{accepted=(await h.readGraphOwnerPayerKey({signal:controller.signal}))===fixtureKey}catch(e){error=e.message}
+    if(!closed)process.exit(98);console.log(JSON.stringify({accepted,error,closed,calls,derived,argsOk,simulation:true}));`
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", script], { env: { PATH: "" }, cwd: resolve(import.meta.dir, ".."), encoding: "utf8", timeout: 5000, maxBuffer: 4096 })
+  expect(child.status).toBe(0); expect(child.stderr).toBe("")
+  expect(JSON.parse(child.stdout)).toEqual({ accepted: !cancel, error: cancel ? "graph_cogs_owner_key_unavailable" : null,
+    closed: true, calls: 1, derived: cancel ? 0 : 1, argsOk: true, simulation: true })
+})
 
 function sourceCopy(parent: string) {
   const dir = join(parent, "source"); mkdirSync(dir, { mode: 0o700 })

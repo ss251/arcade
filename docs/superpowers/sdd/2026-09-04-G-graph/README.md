@@ -1,5 +1,16 @@
 # Plan G — execution records
 
+## September 8 — G15 fixed owner-boundary checkpoint
+
+The [owner-boundary brief](task-15-owner-boundary-brief.md) and
+[owner-boundary report](task-15-owner-boundary-report.md) add fixed OS-account
+path selection and an inert account-qualified payer-key reader. Real crypto
+rejects a public wrong-account key; positive command/close fixtures explicitly
+simulate owner derivation.360 focused Bun/1810 assertions and exact strict pass.
+Original client/consumer and payment rules remain unchanged. Sole full gate
+passed5371Vitest/1783Bun, strict and both builds; local commit follows.
+No operational state, real Keychain/key/RPC/payment or push.
+
 ## September 8 — G15 full historical assessment replay checkpoint
 
 The [assessment-replay brief](task-15-assessment-replay-brief.md) and

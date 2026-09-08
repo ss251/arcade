@@ -1,5 +1,20 @@
 # SDD ledger — Plan G
 
+2026-09-08 09:56 IST — G15T sole56334 full gate PASS:5371Vitest242/68.97s;
+1783Bun98/13818assert240.90s;root/webstrict/clientSSR347/186ms. Six paths,
+3links/privacy0;three source/brief pins frozen. Original harness restoration
+passes, client/consumer/policy unchanged. Atomic local commit/mainFF next;
+no full repeat, operational state, real Keychain/key/live/spend or push.
+
+2026-09-08 09:49 IST — G15T fixed OS-account state path and exact service/
+account key boundary implemented after missing-export Red.18selectedBun65assert
+3.61s/2rootsstrict0; final360Bun1810assert53.98s/strict0. Real crypto rejects
+a valid public wrong-account key; positive derivation expressly mocked. Actual
+owned fixture children close before acknowledgement, including cancellation.
+No real Keychain/key or operational state read/creation. Original harness
+mechanically restored, client/consumer unchanged. Six-path audit/freeze and
+sole sequential gate next; no live/spend/validity change/approval replay/push.
+
 2026-09-08 09:42 IST — G15S sole14774 full gate PASS:5371Vitest242/69.01s;
 1767Bun98/13774assert238.07s;root/webstrict/clientSSR354/169ms. Eight paths,
 3links/privacy0;five source/brief pins frozen. Original harness/consumer

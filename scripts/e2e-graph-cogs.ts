@@ -1,12 +1,15 @@
 /**
  * G15 offline budget boundary. CLI is read-only; writer is an offline library.
- * No payer import, transport, recovery switch or live mode.
+ * No ambient key lookup, transport, recovery switch or live mode.
  * Reservations are potential exposure, never proof of a signature or payment.
  */
 import { createHash, randomBytes } from "node:crypto"
 import { constants, openSync, closeSync, lstatSync, fstatSync, readSync, realpathSync,
   mkdirSync, opendirSync, writeSync, fsyncSync, unlinkSync, type Stats } from "node:fs"
 import { dirname, isAbsolute, normalize, join, resolve } from "node:path"
+import { userInfo } from "node:os"
+import { privateKeyToAccount } from "viem/accounts"
+import { runKeyCommand, type Runner } from "../skills/counterparty-graph/graph-client.ts"
 import { encodeGraphQuery, GATEWAY_BASE, validateGraphChallengeHeader, readGraphSettlementHeader, readGraphPaidBody, readGraphRpcBody, verifyGraphReceiptEvidence, type QueryArgs, type GraphResponseObservation, type GraphPaymentIntent, type PaidResult } from "../skills/counterparty-graph/graph-client.ts"
 import { graphQueryIds, graphReadResult } from "../skills/counterparty-graph/run.ts"
 import { synthesize, type Assessment, type Source } from "../skills/counterparty-graph/synthesize.ts"
@@ -1819,6 +1822,52 @@ export function writeGraphAssessmentCache(parent: string, sources: GraphSourceMa
     now(); claim.check(); claim.release()
     return readGraphAssessmentCache(parent, sources, { now, ...(options.signal === undefined ? {} : { signal: options.signal }) })
   } catch { throw new Error(ASSESSMENT_CACHE_FAIL) }
+}
+
+export const GRAPH_COGS_KEYCHAIN = Object.freeze({ service: "graph-x402-payer", account: "GRAPH_X402_PAYER_KEY" } as const)
+/** Fixed account-owned parent, not a run directory or environment override.
+ * Pure path selection: no budget read/creation, ownership claim or live release. */
+export function graphCogsOwnerRoot(): string {
+  try {
+    const ownerHome = userInfo().homedir
+    insist(typeof ownerHome === "string" && isAbsolute(ownerHome) && normalize(ownerHome) === ownerHome &&
+      ownerHome.length <= 1800 && !/[\u0000-\u001f\u007f]/.test(ownerHome))
+    return join(ownerHome, ".local", "state", "arcade", "graph-cogs")
+  } catch { throw new Error("graph_cogs_owner_root_unavailable") }
+}
+/** Inert until explicitly called by a reviewed consuming process. No env/direct
+ * key fallback, log or persistence; exact account identity is required. The
+ * production command owner resolves only after its bounded child has closed. */
+export async function readGraphOwnerPayerKey(options: {
+  readonly run?: Runner; readonly signal?: AbortSignal; readonly now?: () => number
+} = {}): Promise<string> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const run = options.run ?? runKeyCommand, clock = options.now ?? Date.now
+    insist(typeof run === "function" && typeof clock === "function")
+    if (run === runKeyCommand) insist(process.platform === "darwin")
+    const started = clock(); let previous = started
+    insist(Number.isSafeInteger(started) && started > 0 && Number.isSafeInteger(started + 3000))
+    const active = () => {
+      const now = clock()
+      insist(!options.signal?.aborted && Number.isSafeInteger(now) && now >= previous && now < started + 3000)
+      previous = now
+    }
+    active()
+    const command = Object.freeze(["/usr/bin/security", "find-generic-password", "-s", GRAPH_COGS_KEYCHAIN.service,
+      "-a", GRAPH_COGS_KEYCHAIN.account, "-w"])
+    const pending = Promise.resolve().then(() => { active(); return run(command) })
+    // An injected fixture has no owned-child contract. Bound only that seam;
+    // never race the actual command owner's close/TERM/KILL acknowledgement.
+    const result: unknown = run === runKeyCommand ? await pending : await Promise.race([pending,
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("key unavailable")), 3000) })])
+    active(); shape(result, ["code", "stdout"])
+    insist(result.code === 0 && typeof result.stdout === "string" && Buffer.byteLength(result.stdout) <= 1024)
+    const value = result.stdout.trim()
+    insist(/^0x[0-9a-fA-F]{64}$/.test(value) && privateKeyToAccount(value as `0x${string}`).address.toLowerCase() === GRAPH_COGS_POLICY.payer)
+    active(); return value
+  } catch { throw new Error("graph_cogs_owner_key_unavailable") }
+  finally { if (timer !== undefined) clearTimeout(timer) }
 }
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {
