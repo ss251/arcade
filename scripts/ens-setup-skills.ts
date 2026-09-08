@@ -73,8 +73,18 @@ export const prepareSkillRecords=async(a:SetupArgs,root:string,fetcher:Fetcher=f
       insist(input.ok)
       const priceAtomic=parsePrice(listing.price),endpoint=`${a.hubUrl}/x/${a.seller}/${skillId}`
       const challenge=await publicSetupJson(new Request(endpoint,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(input.value)}),fetcher)
-      insist(challenge.status===402&&object(challenge.value)&&challenge.value.x402Version===2&&Array.isArray(challenge.value.accepts)&&challenge.value.accepts.length===1)
-      const req=challenge.value.accepts[0]
+      insist(challenge.status===402&&object(challenge.value)&&challenge.value.x402Version===2&&Array.isArray(challenge.value.accepts)&&challenge.value.accepts.length>=1&&challenge.value.accepts.length<=8)
+      /*
+       * A listing may advertise several rails; an ENS leaf describes exactly one route,
+       * because it carries one `arcade.payTo` and one `arcade.priceAtomic`. So SELECT the
+       * validated FeeSplitterV2 Arc rail rather than assuming the listing offers nothing
+       * else — a hub that also offers Gateway is a richer listing, not a malformed one.
+       * Selecting is still not guessing: exactly one candidate must match, and it is then
+       * held to every check the single-rail form applied.
+       */
+      const candidates=challenge.value.accepts.filter(a=>object(a)&&object(a.extra)&&a.extra.feeSplitterVersion===2)
+      insist(candidates.length===1)
+      const req=candidates[0]
       insist(object(req)&&req.scheme==="exact"&&req.network==="eip155:5042002"&&same(req.asset,"0x3600000000000000000000000000000000000000")&&req.amount===priceAtomic.toString()&&req.resource===endpoint&&address(req.payTo))
       // Setup explicitly targets the validated FeeSplitterV2 Arc rail, not a guessed seller payout.
       insist(object(req.extra)&&req.extra.feeSplitterVersion===2&&same(req.extra.feeSplitter,req.payTo))

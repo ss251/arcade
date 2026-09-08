@@ -41,6 +41,39 @@ describe("ENS skill public preflight",()=>{
     expect(f.requests.every(r=>!["payment-signature","authorization","cookie"].some(h=>r.headers.has(h))&&r.redirect==="error")).toBe(true)
     expect(await f.requests[1]!.json()).toEqual(listing.canaryInput)
   })
+  it("selects the FeeSplitterV2 rail when the listing also advertises Gateway",async()=>{
+    // The live hub offers eip3009 and gateway for the same listing. An ENS leaf carries one
+    // payTo, so the preflight must pick the splitter route rather than refuse the listing.
+    const gateway={scheme:"exact",network:"eip155:5042002",asset:"0x3600000000000000000000000000000000000000",
+      payTo:seller,amount:"10000",resource:"https://hub.example/x/"+seller+"/flow",
+      extra:{name:"GatewayWalletBatched",version:"1",verifyingContract:`0x${"33".repeat(20)}`}}
+    const requests:Request[]=[]
+    const base=fixture()
+    const fetcher=async(req:Request)=>{
+      const response=await base.fetcher(req)
+      requests.push(req)
+      if(response.status!==402)return response
+      const body=await response.json() as {accepts:unknown[]}
+      return Response.json({...body,accepts:[gateway,...body.accepts]},{status:402})
+    }
+    const plans=await prepareSkillRecords(args,"arcade.eth",fetcher)
+    expect(plans[0]!.records.find(r=>r.key==="arcade.payTo")?.value).toBe(splitter)
+    expect(requests.length).toBeGreaterThan(0)
+  })
+  it("refuses when two accepts both claim to be the FeeSplitterV2 rail",async()=>{
+    const base=fixture()
+    const fetcher=async(req:Request)=>{
+      const response=await base.fetcher(req)
+      if(response.status!==402)return response
+      const body=await response.json() as {accepts:unknown[]}
+      return Response.json({...body,accepts:[...body.accepts,...body.accepts]},{status:402})
+    }
+    expect(prepareSkillRecords(args,"arcade.eth",fetcher)).rejects.toThrow()
+  })
+  it("refuses when no accept is the FeeSplitterV2 rail",async()=>{
+    const f=fixture({},{extra:{name:"GatewayWalletBatched",version:"1"}})
+    expect(prepareSkillRecords(args,"arcade.eth",f.fetcher)).rejects.toThrow()
+  })
   it("rejects a hub-asserted splitter whose public Arc contract disagrees",async()=>{
     for(const change of [{chain:"0x1"},{version:1},{seller:splitter},{usdc:splitter},{feeBps:1000}]){
       const f=fixture({},{},change)
