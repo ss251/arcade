@@ -451,6 +451,20 @@ export interface GraphReservationWriter {
  * No key or transport can be invoked by this writer. One unresolved reservation
  * blocks all later writes; receipt reconciliation is deliberately absent. */
 export function openGraphReservationWriter(parent: string, hooks?: GraphWriterHooks): GraphReservationWriter {
+  return openReservationWriter(parent, hooks)
+}
+/** Opt-in offline qualification only. Reopen refuses unknown exposure before
+ * acquiring a new claim. Original quotas/query uniqueness never reset; no
+ * operational root, signing/payment authority or process-claim takeover. */
+export function openGraphQualifiedReservationWriter(parent: string, sources: GraphSourceManifest, hooks?: GraphWriterHooks): GraphReservationWriter {
+  try {
+    const now = cacheClock({})
+    insist(readGraphQualifiedReservations(parent, sources, { now }).unresolved === 0)
+    now(); return openReservationWriter(parent, hooks, sources, now)
+  } catch { throw new Error(WRITER_FAIL) }
+}
+function openReservationWriter(parent: string, hooks?: GraphWriterHooks, qualifiedSources?: GraphSourceManifest,
+  openingClock?: () => number): GraphReservationWriter {
   try {
     privateDirectory(parent)
     const directory = join(parent, GRAPH_COGS_POLICY.namespace), identity = privateDirectory(directory)
@@ -459,12 +473,24 @@ export function openGraphReservationWriter(parent: string, hooks?: GraphWriterHo
       shape(hooks, ["afterJournalSync"]); insist(typeof hooks.afterJournalSync === "function")
       afterJournalSync = hooks.afterJournalSync as () => void
     }
+    let opening = true
+    const readState = () => {
+      const raw = writerState(directory)
+      if (qualifiedSources === undefined) return { ...raw, lastAfter: null }
+      const qualified = readGraphQualifiedReservations(parent, qualifiedSources,
+        opening && openingClock !== undefined ? { now: openingClock } : {})
+      insist(qualified.ledgerHash === hash(raw.text) && qualified.lastHash === raw.summary.lastHash)
+      return { text: raw.text, summary: Object.freeze({ ...raw.summary, unresolved: qualified.unresolved }), lastAfter: qualified.lastAfter }
+    }
+    openingClock?.()
     const claim = ownClaim(directory, identity)
-    let state = writerState(directory), closed = false, poisoned = false, busy = false
+    let state = readState(), closed = false, poisoned = false, busy = false
+    if (qualifiedSources !== undefined) insist(state.summary.unresolved === 0)
+    openingClock?.(); opening = false
     const current = () => {
       try {
         insist(!closed && !poisoned && !busy); claim.check()
-        const disk = writerState(directory); insist(disk.text === state.text); return disk
+        const disk = readState(); insist(disk.text === state.text); return disk
       } catch { poisoned = true; throw new Error(WRITER_FAIL) }
     }
     return Object.freeze({
@@ -483,6 +509,15 @@ export function openGraphReservationWriter(parent: string, hooks?: GraphWriterHo
           const allocation = input.allocation, queryHash = input.queryHash, balanceAtomic = input.balanceAtomic, observed = current()
           insist(observed.summary.unresolved === 0 && observed.summary.reservations < GRAPH_COGS_POLICY.totalLimit &&
             (allocation !== "evidence" || observed.summary.evidence < GRAPH_COGS_POLICY.evidenceLimit))
+          if (qualifiedSources !== undefined) {
+            if (observed.lastAfter !== null) insist(balanceAtomic === observed.lastAfter.balanceAtomic)
+            for (const prefix of ["query-", "balance-", "cache-"]) {
+              let exists = true
+              try { lstatSync(join(parent, prefix + queryHash)) }
+              catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") exists = false; else throw error }
+              insist(!exists)
+            }
+          }
           const body = { sequence: observed.summary.reservations + 1, previousHash: observed.summary.lastHash,
             allocation, queryHash, amountAtomic: GRAPH_COGS_POLICY.queryCostAtomic }
           const line = JSON.stringify({ ...body, hash: hash(JSON.stringify(body)) }) + "\n", nextText = observed.text + line
@@ -501,7 +536,7 @@ export function openGraphReservationWriter(parent: string, hooks?: GraphWriterHo
           insist(!poisoned && !closed && busy); claim.check()
           freshBudgetFile(join(directory, headName(next.reservations)), headText(nextText, next.reservations))
           syncDirectory(directory, identity)
-          const persisted = writerState(directory); insist(persisted.text === nextText); claim.check()
+          const persisted = readState(); insist(persisted.text === nextText); claim.check()
           state = persisted
           freshReservationAcks.set(persisted.summary, { directory, queryHash, allocation, balanceAtomic,
             issuedAt: Date.now(), used: false, active: () => { insist(current().text === nextText) } })
@@ -1533,6 +1568,7 @@ export interface GraphQualifiedReservations extends GraphReservationSummary {
   readonly sourceHash: string
   readonly ledgerHash: string
   readonly qualifiedPaid: number
+  readonly lastAfter: GraphBalanceObservation | null
   readonly entries: readonly GraphQualifiedReservation[]
 }
 /** Read-only evidence qualification, not live admission. All original quota
@@ -1636,7 +1672,7 @@ export function readGraphQualifiedReservations(parent: string, sources: GraphSou
     for (const pin of pins) { now(); insist(readBudgetText(pin.path) === pin.text); now() }
     insist(JSON.stringify(inventory()) === JSON.stringify(names)); sourceCurrent(); now()
     return Object.freeze({ ...summary, sourceHash: sources.sourceHash, ledgerHash: hash(text), qualifiedPaid: qualified.size,
-      unresolved: summary.reservations - qualified.size, entries: Object.freeze(entries) })
+      unresolved: summary.reservations - qualified.size, entries: Object.freeze(entries), lastAfter: previous?.after ?? null })
   } catch { throw new Error(QUALIFIED_BUDGET_FAIL) }
 }
 

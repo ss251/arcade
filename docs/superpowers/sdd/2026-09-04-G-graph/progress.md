@@ -1,5 +1,21 @@
 # SDD ledger — Plan G
 
+2026-09-08 09:25 IST — G15R sole44108 full gate PASS:5370Vitest242/69.12s;
+1743Bun98/13646assert218.43s;root/webstrict/clientSSR354/169ms. Six paths,
+3links/privacy0 and three frozen source/brief pins; original harness restoration
+exact/client-consumer unchanged. Atomic local commit/mainFF follows. No full
+repeat, operational root, real key/RPC/spend, approval replay or push.
+
+2026-09-08 09:19 IST — G15R opt-in qualified writer implemented after missing-
+export and two admission Reds (orphan artifacts and balance discontinuity).
+Two actual same-namespace offline reservations pass without relocation/reset;
+real competing/interrupted children retain claims/exposure. Initial focused
+318PASS/1 older fixture FAIL reproduced deterministically: a frozen recorder
+clock and real-clock intent crossed a second boundary. Fixture-only aligned
+clock correction; final320Bun1636assert26.03s/2rootsstrict0. No production
+validity change. Six-path audit/freeze and sole sequential gate next; no live,
+operational root, real key/RPC/spend, approval replay or push.
+
 2026-09-08 08:58 IST — G15Q sole10798 full gate PASS:5370Vitest242/71.81s;
 1731Bun98/13591assert219.28s;root/webstrict/clientSSR350/164ms. Six paths,
 3links/privacy0;three source/brief pins frozen. Original harness restoration

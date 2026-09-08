@@ -1,5 +1,17 @@
 # Plan G — execution records
 
+## September 8 — G15 opt-in qualified-writer checkpoint
+
+The [qualified-writer brief](task-15-qualified-writer-brief.md) and
+[qualified-writer report](task-15-qualified-writer-report.md) add a separate
+writer that rechecks complete retained evidence under its exclusive claim.
+Two actual offline reservations in the same namespace survive reopen with all
+quota charges retained; the original raw writer still refuses unresolved rows.
+320 focused Bun/1636 assertions and strict passed after a reproduced fixture-
+clock correction. No payment validity or other original policy changed.
+Sole full gate passed5370Vitest/1743Bun, strict and both builds; local commit
+follows. No operational root, key/RPC/payment or push.
+
 ## September 8 — G15 readonly qualified-budget checkpoint
 
 The [qualified-budget brief](task-15-qualified-budget-brief.md) and

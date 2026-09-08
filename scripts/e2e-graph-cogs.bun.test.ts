@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test"
-import { createGraphBalanceRecorder, readGraphBalanceJournal, verifyGraphJournaledQuery, readGraphQualifiedReservations, type GraphBalanceObservation } from "./e2e-graph-cogs.ts"
+import { expect, test, spyOn } from "bun:test"
+import { createGraphBalanceRecorder, readGraphBalanceJournal, verifyGraphJournaledQuery, readGraphQualifiedReservations, openGraphQualifiedReservationWriter, type GraphBalanceObservation } from "./e2e-graph-cogs.ts"
 import { createHash } from "node:crypto"
 import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSync, linkSync, mkdirSync, realpathSync, existsSync, readdirSync, copyFileSync, unlinkSync, renameSync, lstatSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -614,7 +614,7 @@ test("interrupted, late and reentrant file-sync acknowledgements retain partial 
         if (fault === "abort") controller.abort()
       },
     })
-    expect(() => recorder!.recordPreForward(journalBalance(time), declaredIntent(f.binding), controller.signal)).toThrow(/^graph_cogs_balance_journal_refused$/)
+    expect(() => recorder!.recordPreForward(journalBalance(time), declaredIntent(f.binding, time), controller.signal)).toThrow(/^graph_cogs_balance_journal_refused$/)
     expect(existsSync(join(f.journal, "pre-forward.json"))).toBe(true)
     expect(existsSync(join(f.journal, ".claim"))).toBe(true)
     expect(() => recorder!.close()).toThrow(); expect(f.writer.snapshot().unresolved).toBe(1); f.writer.close()
@@ -698,7 +698,7 @@ test("balance freshness is rechecked at the final acknowledgement, not only befo
     now: () => time, afterRecordSync(phase) { if (phase === "pre-forward" && ageOnSync) time += 1001 },
   })
   const pre = journalBalance(time); time += 4000; ageOnSync = true
-  expect(() => recorder.recordPreForward(pre, declaredIntent(f.binding), captureSignal())).toThrow(/^graph_cogs_balance_journal_refused$/)
+  expect(() => recorder.recordPreForward(pre, declaredIntent(f.binding, time), captureSignal())).toThrow(/^graph_cogs_balance_journal_refused$/)
   expect(existsSync(join(f.journal, "pre-forward.json"))).toBe(true)
   expect(existsSync(join(f.journal, ".claim"))).toBe(true)
   expect(() => recorder.close()).toThrow(); f.writer.close()
@@ -1053,6 +1053,155 @@ for (const fault of ["time", "block"] as const) test(`individually valid journal
     expect(readGraphReservations(join(f.first.directory, "reservations.jsonl")).unresolved).toBe(2)
   } finally { rmSync(parent, { recursive: true, force: true }) }
 })
+
+test("the opt-in qualified writer opens only known state and retains an unfinished reservation", () => owned(parent => {
+  const source = sourceCopy(parent), sources = readGraphSourceManifest(source)
+  expect(() => openGraphQualifiedReservationWriter(parent, sources)).toThrow(/^graph_cogs_writer_refused$/)
+  const directory = initializeGraphReservationState(parent), binding = bindGraphQuery(identityQuery(), sources)
+  const writer = openGraphQualifiedReservationWriter(parent, sources)
+  expect(writer.snapshot().unresolved).toBe(0)
+  writer.reserve({ allocation: "evidence", queryHash: binding.queryHash, balanceAtomic: "1000000" })
+  expect(writer.snapshot().unresolved).toBe(1); writer.close()
+  const before = readFileSync(join(directory, "reservations.jsonl"))
+  expect(() => openGraphQualifiedReservationWriter(parent, sources)).toThrow()
+  expect(existsSync(join(directory, ".claim"))).toBe(false)
+  expect(readFileSync(join(directory, "reservations.jsonl"))).toEqual(before)
+}))
+
+
+test("the qualified writer rejects orphan query artifacts before adding a reservation", () => owned(parent => {
+  const sources = readGraphSourceManifest(sourceCopy(parent)), directory = initializeGraphReservationState(parent)
+  const queryHash = hash("orphan query"), orphan = join(parent, "cache-" + queryHash); mkdirSync(orphan, { mode: 0o700 })
+  const writer = openGraphQualifiedReservationWriter(parent, sources), before = readFileSync(join(directory, "reservations.jsonl"))
+  expect(() => writer.reserve({ allocation: "evidence", queryHash, balanceAtomic: "1000000" })).toThrow(/^graph_cogs_writer_refused$/)
+  expect(readFileSync(join(directory, "reservations.jsonl"))).toEqual(before); writer.close()
+}))
+test("the qualified writer rejects an admission balance discontinuity before reserving the next query", async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-writer-")))
+  try {
+    const f = await declaredJournaledQuery(parent), sources = readGraphSourceManifest(f.source)
+    const writer = openGraphQualifiedReservationWriter(parent, sources), before = readFileSync(join(f.directory, "reservations.jsonl"))
+    expect(() => writer.reserve({ allocation: "evidence", queryHash: hash("new query"), balanceAtomic: "1000000" })).toThrow(/^graph_cogs_writer_refused$/)
+    expect(readFileSync(join(f.directory, "reservations.jsonl"))).toEqual(before); writer.close()
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
+
+
+async function recordQualifiedDeclaredQuery(parent: string, sources: ReturnType<typeof readGraphSourceManifest>, writer: GraphReservationWriter,
+  prior?: { binding: GraphQueryBinding; evidence: ReturnType<typeof verifyGraphCapturedQuery>; after: GraphBalanceObservation; receiptTimestamp: number }) {
+  const binding = prior === undefined ? bindGraphQuery(identityQuery(), sources) : bindGraphQuery({
+    subgraphId: GRAPH_COGS_POLICY.subgraph, document: document("attestations"),
+    variables: { agentIds: ["8453:7"], block: { hash: "0x" + "c".repeat(64) } },
+  }, sources, { binding: prior.binding, blockHash: "0x" + "c".repeat(64) })
+  const before = prior === undefined ? journalBalance(Date.now()) : { ...prior.after, observedAt: Date.now() }
+  const summary = writer.reserve({ allocation: "evidence", queryHash: binding.queryHash, balanceAtomic: before.balanceAtomic })
+  const handoff = claimGraphReservation(parent, binding, summary), recorder = createGraphBalanceRecorder(parent, binding, handoff, before)
+  const receiptBlockNumber = prior === undefined ? 41 : 43, receiptBlockHash = "0x" + (prior === undefined ? "b" : "9").repeat(64)
+  const protocol = await declaredProtocolCapture({ parent, binding }, {
+    firstId: prior === undefined ? 1 : 6, receiptBlockNumber, receiptBlockHash,
+    tx: "0x" + (prior === undefined ? "a" : "e").repeat(64), nonce: "0x" + (prior === undefined ? "d" : "f").repeat(64),
+    data: prior === undefined ? declaredIdentityData() : { _meta: declaredIdentityData()._meta, feedbacks: [] },
+    beforeForward(intent, receiptTimestamp) {
+      recorder.recordPreForward({ ...journalBalance(Date.now(), before.balanceAtomic), blockNumber: String(receiptBlockNumber - 1),
+        blockHash: "0x" + "e".repeat(64), blockTimestamp: receiptTimestamp }, intent, captureSignal())
+    },
+  })
+  const scoped = prior === undefined ? {} : { parent: prior.evidence }
+  const evidence = verifyGraphCapturedQuery(parent, binding, scoped); writeGraphQueryCache(parent, binding, evidence, scoped)
+  const after = { ...journalBalance(Date.now(), (BigInt(before.balanceAtomic) - 10000n).toString()),
+    blockNumber: String(receiptBlockNumber), blockHash: receiptBlockHash, blockTimestamp: protocol.receiptTimestamp }
+  recorder.recordAfter(after, captureSignal()); recorder.close()
+  return { binding, evidence, after, receiptTimestamp: protocol.receiptTimestamp }
+}
+test("the qualified writer admits two actual offline reservations in one namespace without relocation or quota reset", async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-writer-")))
+  try {
+    const source = sourceCopy(parent), sources = readGraphSourceManifest(source), directory = initializeGraphReservationState(parent)
+    const writer = openGraphQualifiedReservationWriter(parent, sources), first = await recordQualifiedDeclaredQuery(parent, sources, writer)
+    expect(writer.snapshot()).toMatchObject({ reservations: 1, evidence: 1, reservedAtomic: "10000", unresolved: 0 })
+    const prefix = readFileSync(join(directory, "reservations.jsonl"), "utf8"); writer.close()
+    const raw = openGraphReservationWriter(parent); expect(raw.snapshot().unresolved).toBe(1)
+    expect(() => raw.reserve({ allocation: "evidence", queryHash: hash("new raw query"), balanceAtomic: "990000" })).toThrow(); raw.close()
+    const reopened = openGraphQualifiedReservationWriter(parent, sources)
+    await recordQualifiedDeclaredQuery(parent, sources, reopened, first)
+    expect(reopened.snapshot()).toMatchObject({ reservations: 2, evidence: 2, reservedAtomic: "20000", unresolved: 0 })
+    const bytes = readFileSync(join(directory, "reservations.jsonl"), "utf8")
+    expect(bytes.startsWith(prefix)).toBe(true)
+    expect(() => reopened.reserve({ allocation: "video", queryHash: first.binding.queryHash, balanceAtomic: "980000" })).toThrow()
+    expect(readFileSync(join(directory, "reservations.jsonl"), "utf8")).toBe(bytes)
+    reopened.close()
+    const final = openGraphQualifiedReservationWriter(parent, sources)
+    expect(final.snapshot()).toMatchObject({ reservations: 2, reservedAtomic: "20000", unresolved: 0 }); final.close()
+    expect(readGraphReservations(join(directory, "reservations.jsonl"))).toMatchObject({ reservations: 2, unresolved: 2 })
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+}, 15000)
+for (const fault of ["source", "cache", "head"] as const) test(`an active qualified writer retains its claim when ${fault} changes`, async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-writer-")))
+  try {
+    const f = await declaredJournaledQuery(parent), writer = openGraphQualifiedReservationWriter(parent, readGraphSourceManifest(f.source))
+    const before = readFileSync(join(f.directory, "reservations.jsonl"))
+    if (fault === "source") writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed")
+    if (fault === "cache") writeFileSync(join(parent, "cache-" + f.binding.queryHash, "result.json"), "{}\n")
+    if (fault === "head") writeFileSync(join(f.directory, "head-01.json"), "{}\n")
+    expect(() => writer.snapshot()).toThrow(/^graph_cogs_writer_refused$/)
+    expect(() => writer.reserve({ allocation: "evidence", queryHash: hash("new"), balanceAtomic: "990000" })).toThrow()
+    expect(() => writer.close()).toThrow()
+    expect(existsSync(join(f.directory, ".claim"))).toBe(true)
+    expect(readFileSync(join(f.directory, "reservations.jsonl"))).toEqual(before)
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
+test("qualified preflight refuses a copied source or corrupt completed cache before creating a claim", async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-writer-")))
+  try {
+    const f = await declaredJournaledQuery(parent), sources = readGraphSourceManifest(f.source)
+    expect(() => openGraphQualifiedReservationWriter(parent, structuredClone(sources))).toThrow(/^graph_cogs_writer_refused$/)
+    expect(existsSync(join(f.directory, ".claim"))).toBe(false)
+    writeFileSync(join(parent, "cache-" + f.binding.queryHash, "result.json"), "{}\n")
+    expect(() => openGraphQualifiedReservationWriter(parent, sources)).toThrow(/^graph_cogs_writer_refused$/)
+    expect(existsSync(join(f.directory, ".claim"))).toBe(false)
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
+test("a competing no-key process cannot steal an active qualified writer claim", () => owned(parent => {
+  const source = sourceCopy(parent), sources = readGraphSourceManifest(source), directory = initializeGraphReservationState(parent)
+  const writer = openGraphQualifiedReservationWriter(parent, sources), before = readFileSync(join(directory, ".claim"))
+  const script = cacheChild({ parent, source }, `const{openGraphQualifiedReservationWriter}=await import(${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))});try{openGraphQualifiedReservationWriter(parent,readGraphSourceManifest(${JSON.stringify(source)}));process.exit(99)}catch{process.exit(38)}`)
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", script], { env: { PATH: "" }, encoding: "utf8", timeout: 4000, maxBuffer: 4096 })
+  expect(child.status).toBe(38); expect(child.stdout).toBe(""); expect(child.stderr).toBe("")
+  expect(readFileSync(join(directory, ".claim"))).toEqual(before); expect(writer.snapshot().reservations).toBe(0); writer.close()
+}))
+test("actual child death after a second qualified reservation journal sync retains unknown exposure", async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-qualified-writer-")))
+  try {
+    const f = await declaredJournaledQuery(parent)
+    const script = cacheChild({ parent, source: f.source }, `const{openGraphQualifiedReservationWriter}=await import(${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))});const writer=openGraphQualifiedReservationWriter(parent,readGraphSourceManifest(${JSON.stringify(f.source)}),{afterJournalSync(){process.exit(39)}});writer.reserve({allocation:"evidence",queryHash:${JSON.stringify(hash("new unfinished query"))},balanceAtomic:"990000"});process.exit(99)`)
+    const child = spawnSync(process.execPath, ["--no-env-file", "-e", script], { env: { PATH: "" }, encoding: "utf8", timeout: 4000, maxBuffer: 4096 })
+    expect(child.status).toBe(39); expect(child.stdout).toBe(""); expect(child.stderr).toBe("")
+    expect(readGraphReservations(join(f.directory, "reservations.jsonl"))).toMatchObject({ reservations: 2, unresolved: 2, reservedAtomic: "20000" })
+    expect(existsSync(join(f.directory, ".claim"))).toBe(true)
+    expect(existsSync(join(f.directory, "head-02.json"))).toBe(false)
+    expect(() => openGraphQualifiedReservationWriter(parent, readGraphSourceManifest(f.source))).toThrow()
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
+test("a late qualified-open acknowledgement retains its newly acquired claim without returning authority", () => owned(parent => {
+  const sources = readGraphSourceManifest(sourceCopy(parent)), directory = initializeGraphReservationState(parent), actual = Date.now
+  const clock = spyOn(Date, "now").mockImplementation(() => actual() + (existsSync(join(directory, ".claim")) ? 5000 : 0))
+  try { expect(() => openGraphQualifiedReservationWriter(parent, sources)).toThrow(/^graph_cogs_writer_refused$/) }
+  finally { clock.mockRestore() }
+  expect(existsSync(join(directory, ".claim"))).toBe(true)
+  expect(readGraphReservations(join(directory, "reservations.jsonl")).reservations).toBe(0)
+}))
+
+
+test("frozen journal fixture time supplies the intent deadline even when the wall clock advances", () => owned(parent => {
+  const f = journalFixture(parent), time = Date.now()
+  const recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before, { now: () => time })
+  const actual = Date.now, moved = spyOn(Date, "now").mockImplementation(() => actual() + 1000)
+  let intent: GraphPaymentIntent
+  try { intent = declaredIntent(f.binding, time) } finally { moved.mockRestore() }
+  recorder.recordPreForward(journalBalance(time), intent, captureSignal())
+  expect(existsSync(join(f.journal, "pre-forward.json"))).toBe(true)
+  expect(() => recorder.close()).toThrow(); f.writer.close()
+}))
 
 function sourceCopy(parent: string) {
   const dir = join(parent, "source"); mkdirSync(dir, { mode: 0o700 })
@@ -1900,11 +2049,11 @@ test("a fully rehashed but over-budget stored capture cannot bypass the16MiB rea
   }
   expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
 }))
-function declaredIntent(binding: GraphQueryBinding): GraphPaymentIntent {
+function declaredIntent(binding: GraphQueryBinding, atMs = Date.now()): GraphPaymentIntent {
   const domain = { name: "USD Coin" as const, version: "2" as const, chainId: 8453 as const, verifyingContract: binding.token }
   const primaryType = "TransferWithAuthorization" as const
   const authorization = { from: binding.payer, to: binding.merchant, value: binding.amountAtomic, validAfter: "0",
-    validBefore: String(Math.floor(Date.now() / 1000) + 300), nonce: "0x" + "d".repeat(64) }
+    validBefore: String(Math.floor(atMs / 1000) + 300), nonce: "0x" + "d".repeat(64) }
   return { endpoint: binding.endpoint, network: "eip155:8453", primaryType, domain, authorization,
     authorizationSha256: hash(JSON.stringify({ domain, primaryType, authorization })),
     requestBodySha256: binding.bodySha256, paymentHeaderSha256: hash("declared synthetic header, not an owner signature") }
@@ -1986,7 +2135,7 @@ test("a forward intent error or post-sync deadline retains its file without ackn
       if (fault === "reentry") try { recorder.close() } catch { /* injected reentry */ }
     } })
     await beforeForward(recorder, f.binding)
-    await expect(recorder.beforePaidRequest(declaredIntent(f.binding), controller.signal)).rejects.toThrow(/^graph_cogs_capture_refused$/)
+    await expect(recorder.beforePaidRequest(declaredIntent(f.binding, time), controller.signal)).rejects.toThrow(/^graph_cogs_capture_refused$/)
     expect(existsSync(join(f.dir, "forward.json"))).toBe(true)
     expect(existsSync(join(f.dir, ".claim"))).toBe(true)
     const readback = readGraphResponseCapture(f.parent, f.binding)
