@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { createGraphBalanceRecorder, type GraphBalanceObservation } from "./e2e-graph-cogs.ts"
 import { createHash } from "node:crypto"
 import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSync, linkSync, mkdirSync, realpathSync, existsSync, readdirSync, copyFileSync, unlinkSync, renameSync, lstatSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -447,6 +448,274 @@ test("bounded empty response chunks cannot starve the deadline or trigger anothe
   }, { now: () => observedAt })).rejects.toThrow("graph_cogs_balance_unavailable")
   expect(calls).toBe(1); expect(cancelled).toBe(true)
 })
+
+// Declared observations only: no RPC or signer runs in journal fixtures.
+function journalBalance(observedAt: number, balanceAtomic = "1000000"): GraphBalanceObservation {
+  return { chain: GRAPH_COGS_POLICY.chain, payer: GRAPH_COGS_POLICY.payer, token: GRAPH_COGS_POLICY.token,
+    balanceAtomic, blockNumber: "10", blockHash: "0x" + "a".repeat(64),
+    blockTimestamp: Math.floor(observedAt / 1000), observedAt,
+    responseHashes: [1, 2, 3, 4].map(n => hash("declared balance response " + n)) }
+}
+function journalFixture(parent: string) {
+  const source = sourceCopy(parent), binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(source))
+  const directory = initializeGraphReservationState(parent), writer = openGraphReservationWriter(parent)
+  const before = journalBalance(Date.now())
+  const summary = writer.reserve({ allocation: "evidence", queryHash: binding.queryHash, balanceAtomic: before.balanceAtomic })
+  const handoff = claimGraphReservation(parent, binding, summary)
+  return { source, binding, directory, writer, before, handoff, journal: join(parent, "balance-" + binding.queryHash) }
+}
+test("a balance journal durably binds fresh admission, pre-forward intent and low after balance without clearing exposure", () => owned(parent => {
+  const f = journalFixture(parent), ledger = readFileSync(join(f.directory, "reservations.jsonl"))
+  const recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)
+  expect(recorder.snapshot()).toMatchObject({ observations: 1, phase: "admission", paymentProof: "not_checked", belowFloor: null })
+  recorder.recordPreForward(journalBalance(Date.now()), declaredIntent(f.binding), captureSignal())
+  recorder.recordAfter(journalBalance(Date.now(), "899999"), captureSignal())
+  expect(recorder.snapshot()).toMatchObject({ observations: 3, phase: "after", belowFloor: true, reservationUnresolved: true })
+  recorder.close(); recorder.close()
+  expect(existsSync(join(f.journal, ".claim"))).toBe(false)
+  expect(JSON.parse(readFileSync(join(f.journal, "after.json"), "utf8")).observation.balanceAtomic).toBe("899999")
+  expect(JSON.parse(readFileSync(join(f.journal, "complete.json"), "utf8")).observations).toBe(3)
+  expect(readFileSync(join(f.directory, "reservations.jsonl"))).toEqual(ledger)
+  expect(f.writer.snapshot().unresolved).toBe(1); f.writer.close()
+}))
+
+
+test("balance journals use private immutable hash-chain records and preserve original caller values", () => owned(parent => {
+  const f = journalFixture(parent), before = structuredClone(f.before), pre = journalBalance(Date.now()), intent = declaredIntent(f.binding)
+  const recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, before, {
+    afterRecordSync(phase) {
+      if (phase === "admission") Object.assign(before, { balanceAtomic: "0" })
+      if (phase === "pre-forward") { Object.assign(pre, { balanceAtomic: "0" }); Object.assign(intent.authorization, { value: "0" }) }
+    },
+  })
+  Object.assign(pre, { observedAt: Date.now() })
+  recorder.recordPreForward(pre, intent, captureSignal())
+  recorder.recordAfter(journalBalance(Date.now(), "990000"), captureSignal())
+  recorder.close()
+  expect(lstatSync(f.journal).mode & 0o777).toBe(0o700)
+  expect(readdirSync(f.journal).sort()).toEqual(["admission.json", "after.json", "complete.json", "intent.json", "pre-forward.json"])
+  let previous = hash(readFileSync(join(f.journal, "intent.json"), "utf8"))
+  for (const [i, phase] of ["admission", "pre-forward", "after"].entries()) {
+    const path = join(f.journal, phase + ".json"), bytes = readFileSync(path, "utf8"), row = JSON.parse(bytes)
+    expect(lstatSync(path).mode & 0o777).toBe(0o600); expect(lstatSync(path).nlink).toBe(1)
+    expect(bytes).toBe(JSON.stringify(row) + "\n")
+    expect(row.previousHash).toBe(previous); expect(row.sequence).toBe(i + 1)
+    const { hash: digest, ...body } = row
+    expect(digest).toBe(hash(JSON.stringify(body))); previous = digest
+    expect(bytes).not.toContain(parent); expect(row.reservationHash).toBe(f.handoff.reservationHash)
+  }
+  expect(JSON.parse(readFileSync(join(f.journal, "admission.json"), "utf8")).observation.balanceAtomic).toBe("1000000")
+  const stored = JSON.parse(readFileSync(join(f.journal, "pre-forward.json"), "utf8"))
+  expect(stored.observation.balanceAtomic).toBe("1000000"); expect(stored.intent.authorization.value).toBe("10000")
+  f.writer.close()
+}))
+test("a copied balance handoff cannot consume the original but duplicate original creation always refuses", () => owned(parent => {
+  const f = journalFixture(parent)
+  expect(() => createGraphBalanceRecorder(parent, f.binding, structuredClone(f.handoff), f.before)).toThrow(/^graph_cogs_balance_journal_refused$/)
+  expect(existsSync(f.journal)).toBe(false)
+  const recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)
+  const bytes = readFileSync(join(f.journal, "admission.json"))
+  expect(() => createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)).toThrow()
+  expect(readFileSync(join(f.journal, "admission.json"))).toEqual(bytes)
+  expect(() => recorder.close()).toThrow()
+  expect(existsSync(join(f.journal, ".claim"))).toBe(true); f.writer.close()
+}))
+for (const fault of ["parent", "binding", "source", "closed", "expired", "backwards", "old-balance", "future-balance", "wrong-balance", "getter", "exists"] as const) {
+  test(`balance journal creation burns a fresh handoff on ${fault} refusal without refund`, () => owned(parent => {
+    const f = journalFixture(parent), ledger = readFileSync(join(f.directory, "reservations.jsonl"))
+    let target = parent, binding = f.binding, before = f.before, invoked = false
+    if (fault === "parent") { target = join(parent, "other"); mkdirSync(target, { mode: 0o700 }) }
+    if (fault === "binding") binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(f.source))
+    if (fault === "source") writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed")
+    if (fault === "closed") f.writer.close()
+    if (fault === "old-balance") before = journalBalance(f.handoff.issuedAt - 5000)
+    if (fault === "future-balance") before = journalBalance(f.handoff.issuedAt + 1)
+    if (fault === "wrong-balance") before = journalBalance(f.before.observedAt, "990000")
+    if (fault === "getter") { before = structuredClone(before); Object.defineProperty(before, "balanceAtomic", { get() { invoked = true; return "1000000" } }) }
+    if (fault === "exists") mkdirSync(f.journal, { mode: 0o700 })
+    const options = fault === "expired" ? { now: () => f.handoff.issuedAt + 5000 } :
+      fault === "backwards" ? { now: () => f.handoff.claimedAt - 1 } : {}
+    expect(() => createGraphBalanceRecorder(target, binding, f.handoff, before, options)).toThrow(/^graph_cogs_balance_journal_refused$/)
+    expect(() => createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)).toThrow()
+    expect(invoked).toBe(false)
+    expect(readFileSync(join(f.directory, "reservations.jsonl"))).toEqual(ledger)
+    expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
+    try { f.writer.close() } catch { /* Retain deliberately poisoned owned fixture. */ }
+  }))
+}
+for (const fault of ["low", "changed", "stale", "future", "intent", "aborted", "source", "global-claim", "global-head", "local-claim", "extra", "hardlink", "mode", "directory-alias"] as const) {
+  test(`pre-forward balance journaling refuses ${fault}, retains claim and cannot retry`, () => owned(parent => {
+    const f = journalFixture(parent), recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)
+    let observation = journalBalance(Date.now()), intent = declaredIntent(f.binding)
+    const controller = new AbortController(), ledger = readFileSync(join(f.directory, "reservations.jsonl"))
+    if (fault === "low") observation = journalBalance(Date.now(), "909999")
+    if (fault === "changed") observation = journalBalance(Date.now(), "990000")
+    if (fault === "stale") observation = journalBalance(f.before.observedAt - 5001)
+    if (fault === "future") observation = journalBalance(Date.now() + 10000)
+    if (fault === "intent") intent = changeDeclaredIntent(intent, value => { Object.assign(value.authorization as Record<string, unknown>, { value: "10001" }) })
+    if (fault === "aborted") controller.abort()
+    if (fault === "source") writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed")
+    if (fault === "global-claim") writeFileSync(join(f.directory, ".claim"), "changed")
+    if (fault === "global-head") writeFileSync(join(f.directory, "head-01.json"), "{}\n")
+    if (fault === "local-claim") writeFileSync(join(f.journal, ".claim"), "changed")
+    if (fault === "extra") writeFileSync(join(f.journal, "retry.json"), "{}", { mode: 0o600 })
+    if (fault === "hardlink") linkSync(join(f.journal, "admission.json"), join(parent, "linked.json"))
+    if (fault === "mode") chmodSync(join(f.journal, "admission.json"), 0o644)
+    if (fault === "directory-alias") { renameSync(f.journal, f.journal + "-saved"); symlinkSync(f.journal + "-saved", f.journal) }
+    expect(() => recorder.recordPreForward(observation, intent, controller.signal)).toThrow(/^graph_cogs_balance_journal_refused$/)
+    expect(() => recorder.recordPreForward(journalBalance(Date.now()), declaredIntent(f.binding), captureSignal())).toThrow()
+    expect(() => recorder.close()).toThrow(); expect(() => recorder.snapshot()).toThrow()
+    expect(existsSync(join(f.journal, ".claim"))).toBe(true)
+    expect(existsSync(join(f.journal, "pre-forward.json"))).toBe(false)
+    expect(readFileSync(join(f.directory, "reservations.jsonl"))).toEqual(ledger)
+    try { f.writer.close() } catch { /* Retain deliberately poisoned owned fixture. */ }
+  }))
+}
+test("out-of-order and duplicate journal operations poison without overwriting retained records", () => {
+  for (const operation of ["after-first", "duplicate-pre", "duplicate-after", "incomplete-close"] as const) owned(parent => {
+    const f = journalFixture(parent), recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)
+    if (operation === "duplicate-pre" || operation === "duplicate-after") recorder.recordPreForward(journalBalance(Date.now()), declaredIntent(f.binding), captureSignal())
+    if (operation === "duplicate-after") recorder.recordAfter(journalBalance(Date.now(), "990000"), captureSignal())
+    const files = Object.fromEntries(readdirSync(f.journal).map(name => [name, readFileSync(join(f.journal, name), "utf8")]))
+    expect(() => {
+      if (operation === "duplicate-pre") recorder.recordPreForward(journalBalance(Date.now()), declaredIntent(f.binding), captureSignal())
+      else if (operation === "incomplete-close") recorder.close()
+      else recorder.recordAfter(journalBalance(Date.now(), "990000"), captureSignal())
+    }).toThrow(/^graph_cogs_balance_journal_refused$/)
+    expect(Object.fromEntries(readdirSync(f.journal).map(name => [name, readFileSync(join(f.journal, name), "utf8")]))).toEqual(files)
+    expect(() => recorder.close()).toThrow(); f.writer.close()
+  })
+})
+test("canonical after balances including zero and unrelated increases remain recorded facts, not success", () => {
+  for (const balance of ["0", "990000", "1000000", "2000000"]) owned(parent => {
+    const f = journalFixture(parent), recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)
+    recorder.recordPreForward(journalBalance(Date.now()), declaredIntent(f.binding), captureSignal())
+    recorder.recordAfter(journalBalance(Date.now(), balance), captureSignal())
+    expect(recorder.snapshot().belowFloor).toBe(BigInt(balance) < 900000n)
+    expect(recorder.snapshot().paymentProof).toBe("not_checked"); recorder.close()
+    expect(JSON.parse(readFileSync(join(f.journal, "after.json"), "utf8")).observation.balanceAtomic).toBe(balance)
+    expect(f.writer.snapshot().unresolved).toBe(1); f.writer.close()
+  })
+})
+test("interrupted, late and reentrant file-sync acknowledgements retain partial journals", () => {
+  for (const fault of ["throw", "late", "reentry", "source", "mutation", "abort"] as const) owned(parent => {
+    const f = journalFixture(parent); let time = Date.now()
+    const controller = new AbortController()
+    let recorder: ReturnType<typeof createGraphBalanceRecorder> | undefined
+    recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before, {
+      now: () => time,
+      afterRecordSync(phase) {
+        if (phase !== "pre-forward") return
+        if (fault === "throw") throw Error("synthetic key text must not escape")
+        if (fault === "late") time += 5000
+        if (fault === "reentry") { try { recorder!.snapshot() } catch { /* Poison even if caught by callback. */ } }
+        if (fault === "source") writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed")
+        if (fault === "mutation") writeFileSync(join(f.journal, "pre-forward.json"), "{}\n")
+        if (fault === "abort") controller.abort()
+      },
+    })
+    expect(() => recorder!.recordPreForward(journalBalance(time), declaredIntent(f.binding), controller.signal)).toThrow(/^graph_cogs_balance_journal_refused$/)
+    expect(existsSync(join(f.journal, "pre-forward.json"))).toBe(true)
+    expect(existsSync(join(f.journal, ".claim"))).toBe(true)
+    expect(() => recorder!.close()).toThrow(); expect(f.writer.snapshot().unresolved).toBe(1); f.writer.close()
+  })
+})
+test("close failure after marker fsync retains the complete bytes and unresolved claim", () => owned(parent => {
+  const f = journalFixture(parent), recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before, {
+    afterRecordSync(phase) { if (phase === "complete") throw Error("synthetic marker acknowledgement loss") },
+  })
+  recorder.recordPreForward(journalBalance(Date.now()), declaredIntent(f.binding), captureSignal())
+  recorder.recordAfter(journalBalance(Date.now(), "990000"), captureSignal())
+  expect(() => recorder.close()).toThrow(/^graph_cogs_balance_journal_refused$/)
+  expect(existsSync(join(f.journal, "complete.json"))).toBe(true)
+  expect(existsSync(join(f.journal, ".claim"))).toBe(true)
+  expect(() => createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)).toThrow()
+  expect(f.writer.snapshot().unresolved).toBe(1); f.writer.close()
+}))
+test("a lost acknowledgement after claim release is failure, never a reclaimed reservation", () => owned(parent => {
+  const f = journalFixture(parent); let releasing = false
+  const recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before, {
+    now: () => Date.now() + (releasing && !existsSync(join(f.journal, ".claim")) ? 5000 : 0),
+    afterRecordSync(phase) { if (phase === "complete") releasing = true },
+  })
+  recorder.recordPreForward(journalBalance(Date.now()), declaredIntent(f.binding), captureSignal())
+  recorder.recordAfter(journalBalance(Date.now(), "990000"), captureSignal())
+  expect(() => recorder.close()).toThrow(/^graph_cogs_balance_journal_refused$/)
+  expect(existsSync(join(f.journal, "complete.json"))).toBe(true)
+  expect(existsSync(join(f.journal, ".claim"))).toBe(false)
+  expect(() => recorder.close()).toThrow(); expect(f.writer.snapshot().unresolved).toBe(1); f.writer.close()
+}))
+test("actual no-key child interruption after each balance-file sync preserves exposure and partial evidence", () => {
+  for (const phase of ["admission", "pre-forward", "after", "complete"]) owned(parent => {
+    const source = sourceCopy(parent), binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(source))
+    const script = `import{initializeGraphReservationState,openGraphReservationWriter,claimGraphReservation,createGraphBalanceRecorder,bindGraphQuery,readGraphSourceManifest}from${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))};
+      const binding=bindGraphQuery(${JSON.stringify(identityQuery())},readGraphSourceManifest(${JSON.stringify(source)}));
+      const parent=${JSON.stringify(parent)},balance=${JSON.stringify(journalBalance(Date.now()))};
+      initializeGraphReservationState(parent);const writer=openGraphReservationWriter(parent);
+      const summary=writer.reserve({allocation:"evidence",queryHash:binding.queryHash,balanceAtomic:balance.balanceAtomic});
+      const handoff=claimGraphReservation(parent,binding,summary);
+      const recorder=createGraphBalanceRecorder(parent,binding,handoff,balance,{afterRecordSync(p){if(p===${JSON.stringify(phase)})process.exit(36)}});
+      recorder.recordPreForward({...balance,observedAt:Date.now()},${JSON.stringify(declaredIntent(binding))},new AbortController().signal);
+      recorder.recordAfter({...balance,balanceAtomic:"990000",observedAt:Date.now()},new AbortController().signal);recorder.close();process.exit(99)`
+    const child = spawnSync(process.execPath, ["--no-env-file", "-e", script], { env: { PATH: "" }, encoding: "utf8", timeout: 4000, maxBuffer: 4096 })
+    expect(child.status).toBe(36); expect(child.stdout).toBe(""); expect(child.stderr).toBe("")
+    const directory = join(parent, GRAPH_COGS_POLICY.namespace), journal = join(parent, "balance-" + binding.queryHash)
+    expect(readGraphReservations(join(directory, "reservations.jsonl")).unresolved).toBe(1)
+    expect(existsSync(join(directory, ".claim"))).toBe(true)
+    expect(existsSync(join(journal, ".claim"))).toBe(true)
+    expect(existsSync(join(journal, phase + ".json"))).toBe(true)
+    expect(() => openGraphReservationWriter(parent)).toThrow()
+  })
+})
+
+
+test("malformed after observations refuse without inventing or overwriting the missing balance", () => owned(parent => {
+  const f = journalFixture(parent), recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)
+  recorder.recordPreForward(journalBalance(Date.now()), declaredIntent(f.binding), captureSignal())
+  const after = journalBalance(Date.now(), "0"); let getter = false
+  Object.defineProperty(after.responseHashes, "0", { get() { getter = true; return hash("fake") } })
+  expect(() => recorder.recordAfter(after, captureSignal())).toThrow(/^graph_cogs_balance_journal_refused$/)
+  expect(getter).toBe(false); expect(existsSync(join(f.journal, "after.json"))).toBe(false)
+  expect(existsSync(join(f.journal, "pre-forward.json"))).toBe(true)
+  expect(existsSync(join(f.journal, ".claim"))).toBe(true)
+  expect(() => recorder.close()).toThrow(); f.writer.close()
+}))
+test("admission-file acknowledgement failure consumes the handoff and retains the admission", () => owned(parent => {
+  const f = journalFixture(parent)
+  expect(() => createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before, {
+    afterRecordSync() { throw Error("synthetic failure") },
+  })).toThrow(/^graph_cogs_balance_journal_refused$/)
+  expect(existsSync(join(f.journal, "admission.json"))).toBe(true)
+  expect(existsSync(join(f.journal, ".claim"))).toBe(true)
+  expect(() => createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)).toThrow()
+  expect(f.writer.snapshot().unresolved).toBe(1); f.writer.close()
+}))
+
+
+test("balance freshness is rechecked at the final acknowledgement, not only before file IO", () => owned(parent => {
+  const f = journalFixture(parent); let time = Date.now(), ageOnSync = false
+  const recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before, {
+    now: () => time, afterRecordSync(phase) { if (phase === "pre-forward" && ageOnSync) time += 1001 },
+  })
+  const pre = journalBalance(time); time += 4000; ageOnSync = true
+  expect(() => recorder.recordPreForward(pre, declaredIntent(f.binding), captureSignal())).toThrow(/^graph_cogs_balance_journal_refused$/)
+  expect(existsSync(join(f.journal, "pre-forward.json"))).toBe(true)
+  expect(existsSync(join(f.journal, ".claim"))).toBe(true)
+  expect(() => recorder.close()).toThrow(); f.writer.close()
+}))
+test("intent expiration during pre-forward file IO cannot receive a successful acknowledgement", () => owned(parent => {
+  const f = journalFixture(parent); let time = Date.now()
+  const recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before, {
+    now: () => time, afterRecordSync(phase) { if (phase === "pre-forward") time += 1100 },
+  })
+  const intent = changeDeclaredIntent(declaredIntent(f.binding), value => {
+    Object.assign(value.authorization as Record<string, unknown>, { validBefore: String(Math.floor(time / 1000) + 1) })
+  })
+  expect(() => recorder.recordPreForward(journalBalance(time), intent, captureSignal())).toThrow(/^graph_cogs_balance_journal_refused$/)
+  expect(existsSync(join(f.journal, "pre-forward.json"))).toBe(true)
+  expect(existsSync(join(f.journal, ".claim"))).toBe(true)
+  expect(() => recorder.close()).toThrow(); f.writer.close()
+}))
 
 function sourceCopy(parent: string) {
   const dir = join(parent, "source"); mkdirSync(dir, { mode: 0o700 })

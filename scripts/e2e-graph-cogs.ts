@@ -1207,6 +1207,163 @@ export function claimGraphReservation(parent: string, binding: GraphQueryBinding
   } catch { throw new Error(RESERVATION_HANDOFF_FAIL) }
 }
 
+
+const BALANCE_JOURNAL_FAIL = "graph_cogs_balance_journal_refused"
+type GraphBalancePhase = "admission" | "pre-forward" | "after"
+export interface GraphBalanceJournalSummary {
+  readonly observations: number
+  readonly phase: GraphBalancePhase
+  readonly lastHash: string
+  readonly belowFloor: boolean | null
+  readonly reservationUnresolved: true
+  readonly paymentProof: "not_checked"
+}
+export interface GraphBalanceRecorder {
+  readonly recordPreForward: (observation: GraphBalanceObservation, intent: GraphPaymentIntent, signal: AbortSignal) => void
+  readonly recordAfter: (observation: GraphBalanceObservation, signal: AbortSignal) => void
+  readonly snapshot: () => GraphBalanceJournalSummary
+  readonly close: () => void
+}
+/** Offline observation journal, not acquisition or payment proof. Original fresh
+ * handoffs are consumed even on failure; old reservations cannot be resumed.
+ * Incomplete/failed journals retain claims and never clear budget exposure.
+ * Synchronous IO cannot be preempted: clocks/signals gate acknowledgement. */
+export function createGraphBalanceRecorder(parent: string, binding: GraphQueryBinding, handoff: GraphReservationHandoff,
+  admission: GraphBalanceObservation, options: {
+    readonly now?: () => number
+    /** Synchronous test-only interruption seam after an immutable file fsync. */
+    readonly afterRecordSync?: (phase: GraphBalancePhase | "complete") => void
+  } = {}): GraphBalanceRecorder {
+  try {
+    const origin = reservationHandoffOrigins.get(handoff)
+    insist(origin !== undefined && !origin.used); origin.used = true
+    const now = options.now ?? Date.now, afterSync = options.afterRecordSync
+    insist(typeof now === "function" && (afterSync === undefined || typeof afterSync === "function"))
+    insist(origin.parent === parent && origin.binding === binding)
+    const createdAt = now(), deadline = origin.issuedAt + 5000
+    insist(Number.isSafeInteger(createdAt) && Number.isSafeInteger(deadline) &&
+      createdAt >= handoff.claimedAt && createdAt < deadline)
+    const root = bindings.get(binding); insist(root !== undefined)
+    const parentIdentity = privateDirectory(parent)
+    const owner = () => {
+      sameDirectory(parent, parentIdentity); origin.active()
+      insist(hash(JSON.stringify(sourceFiles(root))) === binding.sourceHash)
+    }
+    let lastTime = createdAt, closed = false, poisoned = false, busy = false
+    const clock = (signal?: AbortSignal, until?: number) => {
+      const time = now()
+      insist(!signal?.aborted && Number.isSafeInteger(time) && time >= lastTime &&
+        (until === undefined || time < until))
+      lastTime = time; return time
+    }
+    owner()
+    const before = retainedBalance(admission)
+    checkGraphBalance(before.balanceAtomic)
+    insist(before.balanceAtomic === handoff.balanceAtomic && before.observedAt <= origin.issuedAt &&
+      createdAt - before.observedAt < 5000)
+    clock(undefined, deadline)
+    const directory = join(parent, "balance-" + binding.queryHash)
+    mkdirSync(directory, { mode: 0o700 }); const identity = privateDirectory(directory)
+    syncDirectory(parent, parentIdentity)
+    const claim = ownClaim(directory, identity)
+    const manifest = JSON.stringify({ format: "arcade-graph-balance-journal-v1", policyHash: GRAPH_COGS_POLICY_HASH,
+      queryHash: binding.queryHash, binding, handoff, createdAt }) + "\n"
+    freshBudgetFile(join(directory, "intent.json"), manifest); syncDirectory(directory, identity)
+    const records: { phase: GraphBalancePhase; text: string; observation: GraphBalanceObservation; capturedAt: number }[] = []
+    let lastHash = hash(manifest), completion: string | undefined
+    const disk = () => {
+      owner(); claim.check()
+      insist(readBudgetText(join(directory, "intent.json")) === manifest)
+      const expected = [".claim", "intent.json", ...records.map(row => row.phase + ".json"), ...(completion ? ["complete.json"] : [])].sort()
+      const handle = opendirSync(directory, { bufferSize: 8 }), names: string[] = []
+      try {
+        for (;;) {
+          const entry = handle.readSync(); if (entry === null) break
+          insist(names.length < 6 && entry.isFile()); names.push(entry.name)
+        }
+      } finally { handle.closeSync() }
+      insist(JSON.stringify(names.sort()) === JSON.stringify(expected))
+      for (const row of records) insist(readBudgetText(join(directory, row.phase + ".json")) === row.text)
+      if (completion) insist(readBudgetText(join(directory, "complete.json")) === completion)
+      claim.check(); owner()
+    }
+    const hook = (phase: GraphBalancePhase | "complete") => {
+      const result: unknown = afterSync?.(phase)
+      insist(result === undefined && !closed && !poisoned)
+    }
+    const append = (phase: GraphBalancePhase, observation: GraphBalanceObservation, intent: GraphPaymentIntent | null,
+      until: number, signal?: AbortSignal) => {
+      const capturedAt = clock(signal, until)
+      insist(observation.observedAt <= capturedAt && capturedAt - observation.observedAt < 5000)
+      const body = { format: "arcade-graph-balance-observation-v1", policyHash: GRAPH_COGS_POLICY_HASH,
+        queryHash: binding.queryHash, reservationHash: handoff.reservationHash, sequence: records.length + 1,
+        previousHash: lastHash, phase, capturedAt, observation, intent }
+      const digest = hash(JSON.stringify(body)), text = JSON.stringify({ ...body, hash: digest }) + "\n"
+      owner(); claim.check(); clock(signal, until)
+      freshBudgetFile(join(directory, phase + ".json"), text); hook(phase)
+      clock(signal, until); owner(); claim.check(); syncDirectory(directory, identity)
+      records.push({ phase, text, observation, capturedAt }); lastHash = digest
+      disk(); const acknowledgedAt = clock(signal, until)
+      insist(acknowledgedAt - observation.observedAt < 5000)
+      if (intent !== null) captureForwardIntent(intent, binding, acknowledgedAt)
+    }
+    disk(); append("admission", before, null, deadline)
+    const record = (phase: "pre-forward" | "after", input: GraphBalanceObservation, intent: GraphPaymentIntent | null, signal: AbortSignal) => {
+      if (busy) { poisoned = true; throw new Error(BALANCE_JOURNAL_FAIL) }
+      busy = true
+      try {
+        insist(!closed && !poisoned && signal instanceof AbortSignal && records.length === (phase === "pre-forward" ? 1 : 2))
+        const started = clock(signal), until = started + 5000; insist(Number.isSafeInteger(until))
+        disk(); clock(signal, until)
+        const observation = retainedBalance(input), previous = records.at(-1)!
+        insist(observation.observedAt >= previous.capturedAt && observation.observedAt <= clock(signal, until))
+        let capturedIntent: GraphPaymentIntent | null = null
+        if (phase === "pre-forward") {
+          checkGraphBalance(observation.balanceAtomic); insist(observation.balanceAtomic === before.balanceAtomic)
+          capturedIntent = captureForwardIntent(intent, binding, clock(signal, until))
+        }
+        // Retain a canonical low or unexpected post-query balance. Reconciliation
+        // must separately verify the exact delta/receipt; never erase bad facts.
+        append(phase, observation, capturedIntent, until, signal)
+      } catch { poisoned = true; throw new Error(BALANCE_JOURNAL_FAIL) }
+      finally { busy = false }
+    }
+    return Object.freeze({
+      recordPreForward(observation: GraphBalanceObservation, intent: GraphPaymentIntent, signal: AbortSignal) { record("pre-forward", observation, intent, signal) },
+      recordAfter(observation: GraphBalanceObservation, signal: AbortSignal) { record("after", observation, null, signal) },
+      snapshot() {
+        try {
+          insist(!closed && !poisoned && !busy); const started = clock()
+          disk(); clock(undefined, started + 5000)
+          const last = records.at(-1)!
+          return Object.freeze({ observations: records.length, phase: last.phase, lastHash,
+            belowFloor: last.phase === "after" ? BigInt(last.observation.balanceAtomic) < BigInt(GRAPH_COGS_POLICY.floorAtomic) : null,
+            reservationUnresolved: true as const, paymentProof: "not_checked" as const })
+        } catch { poisoned = true; throw new Error(BALANCE_JOURNAL_FAIL) }
+      },
+      close() {
+        if (closed) { if (poisoned) throw new Error(BALANCE_JOURNAL_FAIL); return }
+        if (busy) { poisoned = true; throw new Error(BALANCE_JOURNAL_FAIL) }
+        busy = true
+        try {
+          insist(!poisoned && records.length === 3 && !completion)
+          const started = clock(), until = started + 5000; insist(Number.isSafeInteger(until))
+          disk(); clock(undefined, until)
+          const body = { format: "arcade-graph-balance-complete-v1", policyHash: GRAPH_COGS_POLICY_HASH,
+            queryHash: binding.queryHash, reservationHash: handoff.reservationHash, observations: 3,
+            manifestHash: hash(manifest), lastHash, closedAt: clock(undefined, until) }
+          const text = JSON.stringify({ ...body, hash: hash(JSON.stringify(body)) }) + "\n"
+          freshBudgetFile(join(directory, "complete.json"), text); hook("complete")
+          clock(undefined, until); owner(); claim.check(); syncDirectory(directory, identity)
+          completion = text; disk(); clock(undefined, until)
+          claim.release(); closed = true; clock(undefined, until)
+        } catch { poisoned = true; closed = true; throw new Error(BALANCE_JOURNAL_FAIL) }
+        finally { busy = false }
+      },
+    })
+  } catch { throw new Error(BALANCE_JOURNAL_FAIL) }
+}
+
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {
     process.stdout.write("Read-only Graph reservation audit. No live calls, keys, writes or nested gates.\nUsage: e2e-graph-cogs.sh [--audit-reservations /absolute/private/reservations.jsonl]\n")

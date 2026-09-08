@@ -1,5 +1,17 @@
 # Plan G — execution records
 
+## September 8 — G15 durable balance journal checkpoint
+
+The [balance-journal brief](task-15-balance-journal-brief.md) and
+[balance-journal report](task-15-balance-journal-report.md) bind exclusive
+admission/pre-forward/after records to an original fresh reservation handoff.
+247 focused Bun/1400 assertions and exact strict passed. Actual child exits
+retain partial files/claims; low after balances remain recorded facts, not
+success. Two final-acknowledgement timing Reds led to additional refusal checks
+using unchanged existing bounds. Sole full gate passed5370Vitest/1670Bun,
+root/web strict and both builds; local commit follows. No live authority,
+budget reconciliation, owner key, actual RPC/payment or push.
+
 ## September 8 — G15 fresh reservation handoff checkpoint
 
 The [reservation-handoff brief](task-15-reservation-handoff-brief.md) and

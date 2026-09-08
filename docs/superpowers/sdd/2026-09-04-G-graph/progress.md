@@ -1,5 +1,18 @@
 # SDD ledger — Plan G
 
+2026-09-08 08:19 IST — G15O sole88949 gate PASS:5370Vitest242/71.58s;
+1670Bun98/13410assert211.00s;root/webstrict/clientSSR430/204ms. Six paths,
+3links/privacy0;three source/briefpins frozen. Original harness restoration
+exact; client/consumer unchanged. Atomic commit/mainFF next; no full repeat,
+owner key/live/RPC/spend, existing validity/cap/replay change or push.
+
+2026-09-08 08:13 IST — G15O durable balance journal implemented after missing-
+export Red; two final-ack freshness/intent-expiry Reds reproduced and fixed
+within new code using unchanged existing bounds.247focusedBun1400assert15.57s;
+2rootsstrict0 after two fixture typing corrections. Actual child36 exits at
+each file-sync stage retain exposure/claims; lost post-release acknowledgement
+is failure, not a refund. Sole full gate next. No live/key/RPC/spend or push.
+
 2026-09-08 08:02 IST — G15N sole29087 gate PASS:5370Vitest242/69.22s;
 1632Bun98/13094assert209.11s;root/webstrict/clientSSR350/187ms. Six paths,
 3links/privacy0;3source/briefpins unchanged after result annotations. Existing
