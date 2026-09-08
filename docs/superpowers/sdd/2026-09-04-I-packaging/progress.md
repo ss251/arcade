@@ -1,5 +1,21 @@
 # Plan I progress
 
+2026-09-08 11:29 IST — I2A sole48795fullgate:5371Vitest tests PASS,
+241suites PASS/1H8teardown FAIL70.34s. Original listener identity not retained;
+no residual H8 fixture found, root cause unconfirmed. Isolated95372 H8 PASS
+11tests2.07s, unchanged source/assertions. Only skipped43943stages ran:
+1835Bun99/14330assert312.52s;root/webstrict/clientSSR328/182ms PASS.
+Six paths/3links/privacy0/three source-brief pins frozen. No full repeat or
+all-green relabel; final audit/local commit/mainFF next. No live/signing/push.
+
+2026-09-08 11:17 IST — I2A offline sanitizer implemented after missing-module
+Red.14nativeBun146assert1.71s/2rootsstrict0 PASS. Strict bounded supplied header
+and public context; canonical signature replaced, unknown fields/URL/metadata
+channels refused, original authorization times preserved. Existing decoder and
+schema unchanged. Actual child traps listener/process/network; CLI inert and
+live flags refused. No real client fixture, capture, signer/key or writer.
+Scope audit/freeze and sole sequential four-worker gate next; no spend/push.
+
 2026-09-08 04:01 IST — Isolated install checkpoint: sole41596 full attempt
 passed5327Vitest but had3 missing-import Bun failures; no full repeat. Separate
 subgraph frozen/no-scripts install447packages/22.84s and clean pinned ERC8183
