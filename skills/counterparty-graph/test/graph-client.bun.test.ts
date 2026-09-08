@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { encodeAbiParameters, encodeEventTopics, parseAbi } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
-import { AGENT0_BASE_SUBGRAPH_ID, GATEWAY_BASE, document, makePaidQuery, runKeyCommand, type GraphResponseObservation } from "../graph-client.ts"
+import { AGENT0_BASE_SUBGRAPH_ID, GATEWAY_BASE, document, makePaidQuery, runKeyCommand, type GraphResponseObservation, type GraphPaymentIntent } from "../graph-client.ts"
 
 const KEY = `0x${"11".repeat(32)}` as const
 const PAYER = privateKeyToAccount(KEY).address
@@ -18,7 +18,7 @@ const requirement = { x402Version: 2, resource: { url: `http://mainnet-thegraph-
   accepts: [{ scheme: "exact", network: "eip155:8453", asset: USDC, amount: "10000", payTo: MERCHANT, maxTimeoutSeconds: 300, extra: { assetTransferMethod: "eip3009", name: "USD Coin", version: "2" } }] }
 
 describe("actual owned loopback Graph transport (simulated payments only)", () => {
-  it.each(["success", "redirect", "signed-500"] as const)("proves %s without a real endpoint, key or repeat", async (mode) => {
+  it.each(["success", "redirect", "signed-500", "intent-refusal"] as const)("proves %s without a real endpoint, key or repeat", async (mode) => {
     let unsigned = 0, signed = 0, foreign = 0, nonce: `0x${string}` | undefined
     const wire: Array<{ body: string; headers: Record<string, string> }> = []
     const other = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch() { foreign++; return Response.json({ private: "fixture" }) } })
@@ -61,15 +61,22 @@ describe("actual owned loopback Graph transport (simulated payments only)", () =
         return new Response(response.body, { status: response.status, headers: response.headers })
       }, { preconnect: () => {} })
       const observations: GraphResponseObservation[] = []
-      const query = makePaidQuery(KEY, { fetch: localFetch, timeoutMs: 3000, observeResponse: async observation => { observations.push(observation) } })
+      const intents: GraphPaymentIntent[] = []
+      const query = makePaidQuery(KEY, { fetch: localFetch, timeoutMs: 3000, observeResponse: async observation => { observations.push(observation) },
+        beforePaidRequest: async intent => {
+          intents.push(intent); expect(signed).toBe(0); expect(Object.isFrozen(intent.authorization)).toBe(true)
+          if (mode === "intent-refusal") throw Error("private intent persistence failure")
+        } })
       if (mode === "success") expect(await query(args())).toMatchObject({ costAtomic: "10000", paymentTx: TX })
-      else { await expect(query(args())).rejects.toThrow(/^graph query could not be completed$/); if (mode === "signed-500") await expect(query(args())).rejects.toThrow() }
-      expect(unsigned).toBe(1); expect(signed).toBe(mode === "redirect" ? 0 : 1); expect(foreign).toBe(0)
+      else { await expect(query(args())).rejects.toThrow(/^graph query could not be completed$/); if (mode === "signed-500" || mode === "intent-refusal") await expect(query(args())).rejects.toThrow() }
+      expect(unsigned).toBe(1); expect(signed).toBe(mode === "redirect" || mode === "intent-refusal" ? 0 : 1); expect(foreign).toBe(0)
       expect(JSON.stringify(wire)).not.toContain(KEY)
       expect(wire.every((w) => w.headers.authorization === undefined && w.headers.cookie === undefined && w.headers["x-api-key"] === undefined)).toBe(true)
       expect(observations.length).toBe(mode === "redirect" ? 0 : wire.length)
       expect(observations.every(value => value.complete && Object.isFrozen(value) && Object.isFrozen(value.headers))).toBe(true)
       expect(JSON.stringify(observations)).not.toContain(KEY)
+      expect(intents).toHaveLength(mode === "redirect" ? 0 : 1); expect(JSON.stringify(intents)).not.toContain(KEY)
+      if (signed === 1) expect(intents[0]!.authorization.nonce).toBe(nonce!)
       if (mode === "signed-500") {
         const paid = observations.filter(value => value.phase === "paid")
         expect(paid).toHaveLength(1); expect(paid[0]!.status).toBe(500)

@@ -1,5 +1,17 @@
 # SDD ledger — Plan G
 
+2026-09-08 06:04 IST — G15H sole62400 gate PASS:5348Vitest242/68.61s;
+1495Bun98/12493assert198.68s;root/webstrict/clientSSR382/195ms. Seven paths,
+3links/privacy0;4source/briefpins unchanged after annotations. Four original
+payment segments/five guards still unchanged; atomic commit/mainFF next.
+No full repeat, real key/endpoint/payment, new authority or push.
+
+2026-09-08 05:58 IST — G15H pre-forward observer implemented; actual missing-
+observer and5001ms late-forward Reds fixed.79Vitest506ms;7nativeBun108assert
+2.92s;3rootsstrict0. Sandbox listener refusal resolved with scoped permission;
+one nonce matcher annotation corrected. Four original payment segments/five
+guards unchanged. Sole gate next; no real key/endpoint/spend/authority or push.
+
 2026-09-08 05:49 IST — G15G sole66026 gate PASS:5337Vitest242/69.89s;
 1494Bun98/12457assert198.83s;root/webstrict/clientSSR353/187ms. Six paths,
 3links/privacy0;3source/briefpins unchanged after result annotations. Atomic

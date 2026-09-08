@@ -7,7 +7,7 @@ import { PassThrough } from "node:stream"
 import { createHash } from "node:crypto"
 vi.mock("node:child_process", { spy: true })
 import { AGENT0_BASE_SUBGRAPH_ID, GATEWAY_BASE, PAYMENT_CHAIN, QUERY_COST_ATOMIC,
-  document, encodeGraphQuery, makePaidQuery, readPayerKey, runKeyCommand, type GraphResponseObservation } from "../graph-client.ts"
+  document, encodeGraphQuery, makePaidQuery, readPayerKey, runKeyCommand, type GraphResponseObservation, type GraphPaymentIntent } from "../graph-client.ts"
 
 // Actual installed x402 signer with simulated gateway/RPC; never live payment evidence.
 const KEY = `0x${"11".repeat(32)}` as const
@@ -78,6 +78,97 @@ describe("inert request encoding", () => {
         { ...request(), variables: { address: PAYER, extra: true } }]) expect(() => encodeGraphQuery(args)).toThrow()
       expect(net).not.toHaveBeenCalled(); expect(keychain).not.toHaveBeenCalled()
     } finally { vi.unstubAllGlobals() }
+  })
+})
+
+describe("awaited pre-forward payment intent", () => {
+  it("observes the validated authorization and exact wire hashes before the single paid transport", async () => {
+    const f = fixture(), intents: GraphPaymentIntent[] = []
+    await makePaidQuery(KEY, { fetch: f.net, beforePaidRequest: async intent => {
+      intents.push(intent)
+      expect(f.calls).toHaveLength(3); expect(f.payloads).toHaveLength(0)
+      expect(Object.isFrozen(intent)).toBe(true); expect(Object.isFrozen(intent.domain)).toBe(true)
+      expect(Object.isFrozen(intent.authorization)).toBe(true)
+      expect(() => Object.defineProperty(intent.authorization, "validBefore", { value: "9999999999" })).toThrow()
+      expect(() => Object.defineProperty(intent.domain, "chainId", { value: 1 })).toThrow()
+    } })(request())
+    expect(intents).toHaveLength(1)
+    const intent = intents[0]!, payload = f.payloads[0]!.payload.authorization
+    expect(intent.endpoint).toBe(GATEWAY_BASE + AGENT0_BASE_SUBGRAPH_ID); expect(intent.network).toBe(PAYMENT_CHAIN)
+    expect(intent.primaryType).toBe("TransferWithAuthorization")
+    expect(intent.domain).toEqual({ name: "USD Coin", version: "2", chainId: 8453, verifyingContract: TOKEN })
+    expect(intent.authorization).toEqual({ from: payload.from.toLowerCase(), to: payload.to.toLowerCase(), value: payload.value,
+      validAfter: payload.validAfter, validBefore: payload.validBefore, nonce: payload.nonce.toLowerCase() })
+    const sha = (value: string) => createHash("sha256").update(value).digest("hex")
+    expect(intent.authorizationSha256).toBe(sha(JSON.stringify({ domain: intent.domain, primaryType: intent.primaryType, authorization: intent.authorization })))
+    const paid = f.calls.find(call => new Headers(call.init.headers).has("payment-signature"))!
+    expect(intent.paymentHeaderSha256).toBe(sha(new Headers(paid.init.headers).get("payment-signature")!))
+    expect(intent.requestBodySha256).toBe(sha(String(paid.init.body)))
+    expect(JSON.stringify(intent)).not.toContain(KEY); expect(JSON.stringify(intent)).not.toContain(f.payloads[0]!.payload.signature)
+    expect(f.payloads).toHaveLength(1)
+  })
+  it("refuses a failed durable-intent callback before forwarding and retains signed uncertainty", async () => {
+    const f = fixture(), beforePaidRequest = vi.fn(async () => { throw Error(KEY) })
+    const query = makePaidQuery(KEY, { fetch: f.net, beforePaidRequest })
+    await expect(query(request())).rejects.toThrow(/^graph query could not be completed$/)
+    await expect(query(request())).rejects.toThrow(/^graph query could not be completed$/)
+    expect(beforePaidRequest).toHaveBeenCalledTimes(1); expect(f.payloads).toHaveLength(0); expect(f.calls).toHaveLength(3)
+  })
+  it.each([80000, 1000])("a stalled observer stays within overall timeout %s and cannot forward after late resolution", async timeoutMs => {
+    vi.useFakeTimers(); const f = fixture()
+    let release: (() => void) | undefined, signal: AbortSignal | undefined
+    const beforePaidRequest = vi.fn(async (_intent: GraphPaymentIntent, activeSignal: AbortSignal) => {
+      signal = activeSignal; await new Promise<void>(resolve => { release = resolve })
+    })
+    const query = makePaidQuery(KEY, { fetch: f.net, timeoutMs, beforePaidRequest })
+    const result = query(request()).catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(Math.min(5000, timeoutMs) + 100)
+    expect(await result).toMatchObject({ message: "graph query could not be completed" })
+    expect(signal?.aborted).toBe(true); expect(f.calls).toHaveLength(3); expect(f.payloads).toHaveLength(0)
+    release?.(); await vi.advanceTimersByTimeAsync(1)
+    await expect(query(request())).rejects.toThrow()
+    expect(beforePaidRequest).toHaveBeenCalledTimes(1); expect(f.calls).toHaveLength(3)
+  })
+  it("external abort during a callback prevents forwarding and does not wait for the callback to cooperate", async () => {
+    vi.useFakeTimers(); const f = fixture(), controller = new AbortController()
+    let release: (() => void) | undefined, observedSignal: AbortSignal | undefined
+    const query = makePaidQuery(KEY, { fetch: f.net, signal: controller.signal, beforePaidRequest: async (_intent, signal) => {
+      observedSignal = signal; await new Promise<void>(resolve => { release = resolve })
+    } })
+    const result = query(request()).catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(1); controller.abort()
+    expect(await result).toMatchObject({ message: "graph query could not be completed" })
+    expect(observedSignal?.aborted).toBe(true); release?.(); await vi.advanceTimersByTimeAsync(1)
+    expect(f.calls).toHaveLength(3); expect(f.payloads).toHaveLength(0)
+  })
+  it("captures the callback once and never invokes it for an invalid unsigned challenge", async () => {
+    const f = fixture(), original = vi.fn(async (_intent: GraphPaymentIntent) => {}), replacement = vi.fn(async (_intent: GraphPaymentIntent) => {})
+    const options = { fetch: f.net, beforePaidRequest: original }
+    const query = makePaidQuery(KEY, options); options.beforePaidRequest = replacement
+    await query(request()); expect(original).toHaveBeenCalledTimes(1); expect(replacement).not.toHaveBeenCalled()
+    const bad = fixture({ change: c => ({ ...c, accepts: [{ ...c.accepts[0], amount: "1" }] }) })
+    await expect(makePaidQuery(KEY, { fetch: bad.net, beforePaidRequest: replacement })(request())).rejects.toThrow()
+    expect(replacement).not.toHaveBeenCalled(); expect(bad.calls).toHaveLength(1); expect(bad.payloads).toHaveLength(0)
+  })
+  it("does not extend the original run deadline when a callback returns after advancing its clock", async () => {
+    let time = Date.now(); const f = fixture()
+    const query = makePaidQuery(KEY, { fetch: f.net, now: () => time, timeoutMs: 1000,
+      beforePaidRequest: async () => { time += 1001 } })
+    await expect(query(request())).rejects.toThrow(/^graph query could not be completed$/)
+    expect(f.calls).toHaveLength(3); expect(f.payloads).toHaveLength(0)
+    await expect(query(request())).rejects.toThrow()
+  })
+  it.each([5000, 5001, -1])("refuses a callback clock change of %s outside its own bounded interval", async delta => {
+    let time = Date.now(); const f = fixture()
+    const query = makePaidQuery(KEY, { fetch: f.net, now: () => time,
+      beforePaidRequest: async () => { time += delta } })
+    await expect(query(request())).rejects.toThrow(/^graph query could not be completed$/)
+    expect(f.calls).toHaveLength(3); expect(f.payloads).toHaveLength(0)
+  })
+  it("rejects a non-callable observer at factory creation before transport", () => {
+    const f = fixture()
+    for (const invalid of [null, true, {}]) expect(() => makePaidQuery(KEY, { fetch: f.net, beforePaidRequest: invalid as never })).toThrow()
+    expect(f.calls).toHaveLength(0)
   })
 })
 

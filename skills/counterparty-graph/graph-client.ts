@@ -123,6 +123,17 @@ export interface GraphResponseObservation {
   readonly bodyBase64: string
   readonly bodySha256: string
 }
+export interface GraphPaymentIntent {
+  readonly endpoint: string
+  readonly network: typeof PAYMENT_CHAIN
+  readonly primaryType: "TransferWithAuthorization"
+  readonly domain: Readonly<{ name: "USD Coin"; version: "2"; chainId: 8453; verifyingContract: string }>
+  readonly authorization: Readonly<{ from: string; to: string; value: string; validAfter: string; validBefore: string; nonce: string }>
+  /** SHA256 of canonical domain/primaryType/authorization JSON, NOT EIP-712. */
+  readonly authorizationSha256: string
+  readonly requestBodySha256: string
+  readonly paymentHeaderSha256: string
+}
 export interface QueryOptions {
   readonly fetch?: typeof globalThis.fetch
   readonly signal?: AbortSignal
@@ -132,6 +143,10 @@ export interface QueryOptions {
    * sensitive. Awaited inside the existing transport deadline; never owns the
    * original Response, a key, mutable bytes or a signed request header. */
   readonly observeResponse?: (observation: GraphResponseObservation, signal: AbortSignal) => Promise<void>
+  /** Trusted private intent/balance seam after validated signing, before the
+   * original single paid send. Never a signer-entry event or forwarding proof.
+   * No key, raw signature or mutable request is exposed. Failure stays uncertain. */
+  readonly beforePaidRequest?: (intent: GraphPaymentIntent, signal: AbortSignal) => Promise<void>
 }
 
 function requestBody(args: QueryArgs): string {
@@ -188,15 +203,41 @@ function paymentRequired(v: unknown): PaymentRequired {
 export function makePaidQuery(privateKey: string, options: QueryOptions = {}): PaidQuery {
   const now = options.now ?? Date.now, transport = options.fetch ?? globalThis.fetch
   const observeResponse = options.observeResponse
+  const beforePaidRequest = options.beforePaidRequest
   const timeout = options.timeoutMs ?? 80000
   if (!key(privateKey) || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 85000 ||
-    observeResponse !== undefined && typeof observeResponse !== "function") fail()
+    observeResponse !== undefined && typeof observeResponse !== "function" ||
+    beforePaidRequest !== undefined && typeof beforePaidRequest !== "function") fail()
   const deadline = now() + timeout
   if (!Number.isSafeInteger(deadline)) fail()
   const account = privateKeyToAccount(privateKey), payer = account.address.toLowerCase()
   let busy = false, uncertain = false, signedCount = 0, attempts = 0, rpcId = 0
   const nonces = new Set<string>()
   const active = () => { if (options.signal?.aborted || now() >= deadline) fail() }
+  async function observeForward(intent: GraphPaymentIntent): Promise<void> {
+    if (beforePaidRequest === undefined) return
+    active(); const controller = new AbortController(), parent = options.signal
+    const cancel = () => controller.abort(); parent?.addEventListener("abort", cancel, { once: true })
+    try {
+      if (parent?.aborted) fail()
+      const started = now(), forwardDeadline = Math.min(deadline, started + 5000)
+      if (!Number.isSafeInteger(started) || !Number.isSafeInteger(forwardDeadline)) fail()
+      let lastTime = started
+      const withinForward = () => {
+        active(); const current = now()
+        if (controller.signal.aborted || !Number.isSafeInteger(current) || current < lastTime || current >= forwardDeadline) fail()
+        lastTime = current; return current
+      }
+      const remaining = forwardDeadline - withinForward()
+      const aborted = new Promise<never>((_, reject) => controller.signal.addEventListener("abort", () => reject(new Error(FAIL)), { once: true }))
+      const work = Promise.resolve().then(() => {
+        withinForward()
+        return beforePaidRequest(intent, controller.signal)
+      })
+      await bounded(Promise.race([work, aborted]), remaining, cancel)
+      withinForward()
+    } finally { controller.abort(); parent?.removeEventListener("abort", cancel) }
+  }
   async function fetchBytes(url: string, body: string, headers: Record<string, string>, max = 1048576): Promise<{ response: Response; bytes: Uint8Array }> {
     active(); const controller = new AbortController()
     const cancel = () => controller.abort(); options.signal?.addEventListener("abort", cancel, { once: true })
@@ -310,6 +351,7 @@ export function makePaidQuery(privateKey: string, options: QueryOptions = {}): P
       const block = await rpc("eth_getBlockByNumber", ["latest", false]), timestamp = own(block, "timestamp")
       if (!safeIndex(timestamp) || Math.abs(Number(BigInt(timestamp)) - Math.floor(now() / 1000)) > 30) fail()
       let nonce: Hex | undefined
+      let signedAuthorization: GraphPaymentIntent["authorization"] | undefined
       const signer: ConstructorParameters<typeof ExactEvmScheme>[0] = { address: account.address, async signTypedData(input) {
         active(); if (!queryOpen || signed || signedCount >= 2) fail()
         keys(input, ["domain", "types", "primaryType", "message"])
@@ -321,6 +363,8 @@ export function makePaidQuery(privateKey: string, options: QueryOptions = {}): P
           typeof m.validBefore !== "bigint" || m.validBefore < BigInt(Math.floor(now() / 1000) + 295) || m.validBefore > BigInt(Math.floor(now() / 1000) + 300) ||
           !hash(m.nonce) || nonces.has(m.nonce.toLowerCase())) fail()
         nonce = m.nonce; nonces.add(nonce.toLowerCase()); signed = true; signedCount++
+        if (beforePaidRequest !== undefined) signedAuthorization = Object.freeze({ from: payer, to: MERCHANT,
+          value: QUERY_COST_ATOMIC, validAfter: "0", validBefore: m.validBefore.toString(), nonce: nonce.toLowerCase() })
         return account.signTypedData({ domain: { name: "USD Coin", version: "2", chainId: 8453, verifyingContract: USDC }, types: AUTH_TYPES,
           primaryType: "TransferWithAuthorization", message: { from: account.address, to: MERCHANT, value: 10000n, validAfter: 0n, validBefore: m.validBefore, nonce } })
       } }
@@ -330,6 +374,15 @@ export function makePaidQuery(privateKey: string, options: QueryOptions = {}): P
       active(); if (!signed || nonce === undefined) fail()
       const headers = new x402HTTPClient(client).encodePaymentSignatureHeader(payload)
       if (Object.keys(headers).length !== 1 || typeof headers["PAYMENT-SIGNATURE"] !== "string") fail()
+      if (beforePaidRequest !== undefined) {
+        if (signedAuthorization === undefined) fail()
+        const domain = Object.freeze({ name: "USD Coin" as const, version: "2" as const, chainId: 8453 as const, verifyingContract: USDC })
+        const primaryType = "TransferWithAuthorization" as const
+        const sha = (value: string) => createHash("sha256").update(value).digest("hex")
+        await observeForward(Object.freeze({ endpoint: ENDPOINT, network: PAYMENT_CHAIN, primaryType, domain,
+          authorization: signedAuthorization, authorizationSha256: sha(JSON.stringify({ domain, primaryType, authorization: signedAuthorization })),
+          requestBodySha256: sha(body), paymentHeaderSha256: sha(headers["PAYMENT-SIGNATURE"]) }))
+      }
       const paid = await fetchBytes(ENDPOINT, body, { "content-type": "application/json", "PAYMENT-SIGNATURE": headers["PAYMENT-SIGNATURE"] })
       if (paid.response.status !== 200) fail()
       const settlement = decodeHeader(paid.response.headers.get("payment-response"))

@@ -1,5 +1,15 @@
 # Plan G — execution records
 
+## September 8 — G15 pre-forward observer checkpoint
+
+The [forward brief](task-15-forward-brief.md) and
+[forward report](task-15-forward-report.md) add a frozen awaited public intent
+before the original single paid dispatch. Missing-observer and scoped-clock
+Reds fixed;79 focused Vitest/seven native Bun and strict passed. Four protected
+segments/five guards remain unchanged. Sole full gate passed5348Vitest/1495Bun,
+root/webstrict and both builds; local commit follows.
+no owner key, live payment, operational integration or new authority.
+
 ## September 8 — G15 private readback checkpoint
 
 The [readback brief](task-15-readback-brief.md) and
