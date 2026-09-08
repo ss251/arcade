@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSync, linkSync, mkdirSync, realpathSync, existsSync, readdirSync, copyFileSync, unlinkSync, renameSync } from "node:fs"
+import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSync, linkSync, mkdirSync, realpathSync, existsSync, readdirSync, copyFileSync, unlinkSync, renameSync, lstatSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
-import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, type GraphReservationWriter, type GraphBalanceTransport } from "./e2e-graph-cogs.ts"
-import { document, AGENT0_BASE_SUBGRAPH_ID } from "../skills/counterparty-graph/graph-client.ts"
+import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
+import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObservation } from "../skills/counterparty-graph/graph-client.ts"
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 const header = () => JSON.stringify({ format: "arcade-graph-reservations-v1", policyHash: GRAPH_COGS_POLICY_HASH })
@@ -464,3 +464,208 @@ test("the default manifest reads only current allowlisted disk sources and grant
   expect(result.sourceHash).toBe(hash(JSON.stringify(sources.files)))
   expect(GRAPH_COGS_POLICY.liveEnabled).toBe(false)
 })
+
+test("a private recorder persists exact response bytes before acknowledgement without creating payment proof", async () => {
+  let work: Promise<void> | undefined
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-recorder-test-")))
+  try {
+    const binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(sourceCopy(parent)))
+    const recorder = createGraphResponseRecorder(parent, binding)
+    const body = Buffer.from([0xff, 0, 0x61]), observation = {
+      phase: "challenge" as const, requestUrl: binding.endpoint, requestBodySha256: binding.bodySha256,
+      responseUrl: binding.endpoint, redirected: false, status: 402, complete: true as const,
+      headers: { "content-type": "application/json", "content-length": "3", "content-encoding": null,
+        "payment-required": "synthetic-challenge", "payment-response": null },
+      bodyBase64: body.toString("base64"), bodySha256: createHash("sha256").update(body).digest("hex"),
+    }
+    work = recorder.observe(observation, new AbortController().signal); await work
+    const stored = JSON.parse(readFileSync(join(parent, "query-" + binding.queryHash, "response-01.json"), "utf8"))
+    expect(stored.observation).toEqual(observation)
+    expect(recorder.snapshot()).toMatchObject({ responses: 1, paidResponses: 0, receiptProof: "not_checked" })
+    recorder.close()
+  } finally { await work?.catch(() => {}); rmSync(parent, { recursive: true, force: true }) }
+})
+
+async function captureOwned(fn: (f: { parent: string; source: string; binding: GraphQueryBinding; dir: string }) => Promise<void>) {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-recorder-test-")))
+  try {
+    const source = sourceCopy(parent), binding = bindGraphQuery(identityQuery(), readGraphSourceManifest(source))
+    await fn({ parent, source, binding, dir: join(parent, "query-" + binding.queryHash) })
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+}
+function observation(binding: GraphQueryBinding, phase: GraphResponseObservation["phase"] = "challenge", body = "fixture"): GraphResponseObservation {
+  return { phase, requestUrl: phase === "rpc" ? GRAPH_COGS_RPC : binding.endpoint, requestBodySha256: binding.bodySha256,
+    responseUrl: "", redirected: false, status: phase === "challenge" ? 402 : 200, complete: true,
+    headers: { "content-type": "application/json", "content-length": String(Buffer.byteLength(body)), "content-encoding": null,
+      "payment-required": phase === "challenge" ? "fixture" : null, "payment-response": phase === "paid" ? "fixture" : null },
+    bodyBase64: Buffer.from(body).toString("base64"), bodySha256: hash(body) }
+}
+const captureSignal = () => new AbortController().signal
+test("exclusive private capture retains its evidence after clean close and cannot be reset by creation", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding)
+  expect(() => createGraphResponseRecorder(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+  await recorder.observe(observation(f.binding), captureSignal())
+  await recorder.observe(observation(f.binding, "rpc"), captureSignal())
+  const summary = recorder.snapshot(); expect(Object.isFrozen(summary)).toBe(true)
+  expect(summary.responses).toBe(2); expect(summary.paidResponses).toBe(0)
+  const first = JSON.parse(readFileSync(join(f.dir, "response-01.json"), "utf8"))
+  const second = JSON.parse(readFileSync(join(f.dir, "response-02.json"), "utf8"))
+  expect(second.previousHash).toBe(first.hash); expect(summary.lastHash).toBe(second.hash)
+  expect(lstatSync(f.dir).mode & 0o777).toBe(0o700)
+  for (const file of readdirSync(f.dir)) expect(lstatSync(join(f.dir, file)).mode & 0o777).toBe(0o600)
+  recorder.close(); recorder.close()
+  expect(existsSync(join(f.dir, ".claim"))).toBe(false)
+  expect(existsSync(join(f.dir, "response-02.json"))).toBe(true)
+  expect(() => createGraphResponseRecorder(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+}))
+test("complete paid errors are captured once without being declared receipt-proven", async () => {
+  for (const status of [402, 500]) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding)
+    await recorder.observe(observation(f.binding), captureSignal())
+    const paid = { ...observation(f.binding, "paid", "private provider diagnostic"), status }
+    await recorder.observe(paid, captureSignal())
+    expect(recorder.snapshot()).toMatchObject({ responses: 2, paidResponses: 1, receiptProof: "not_checked" })
+    expect(JSON.parse(readFileSync(join(f.dir, "response-02.json"), "utf8")).observation).toEqual(paid)
+    await expect(recorder.observe(paid, captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+    expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+    expect(existsSync(join(f.dir, ".claim"))).toBe(true)
+  })
+})
+test("the actual client observer durably records a malformed challenge before the original validator refuses", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding); let calls = 0
+  const net = Object.assign(async () => { calls++; return new Response("actual bounded body", { status: 402, headers: { "payment-required": "invalid" } }) }, { preconnect() {} })
+  await expect(makePaidQuery("0x" + "11".repeat(32), { fetch: net, observeResponse: recorder.observe })(identityQuery())).rejects.toThrow("graph query could not be completed")
+  expect(calls).toBe(1); expect(recorder.snapshot().responses).toBe(1)
+  const stored = JSON.parse(readFileSync(join(f.dir, "response-01.json"), "utf8"))
+  expect(stored.observation.bodyBase64).toBe(Buffer.from("actual bounded body").toString("base64"))
+  recorder.close()
+}))
+test("malformed, open, unrelated or incomplete snapshots poison capture without writing a response", async () => {
+  let invoked = false
+  const changes: ((v: GraphResponseObservation) => unknown)[] = [
+    v => ({ ...v, phase: "signer-entered" }), v => ({ ...v, requestUrl: "https://example.invalid" }),
+    v => ({ ...v, requestBodySha256: hash("other query") }), v => ({ ...v, responseUrl: "https://example.invalid" }),
+    v => ({ ...v, complete: false }), v => ({ ...v, status: 600 }), v => ({ ...v, redirected: "false" }),
+    v => ({ ...v, bodyBase64: v.bodyBase64 + "=" }), v => ({ ...v, bodySha256: hash("other bytes") }),
+    v => ({ ...v, headers: { ...v.headers, "payment-signature": "not a response header" } }),
+    v => ({ ...v, headers: { ...v.headers, "content-type": "a".repeat(16385) } }),
+    v => ({ ...v, headers: { ...v.headers, "content-type": "a".repeat(16384), "payment-required": "b".repeat(16384), "payment-response": "c" } }),
+    v => ({ ...v, get bodyBase64() { invoked = true; return v.bodyBase64 } }),
+  ]
+  for (const change of changes) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding)
+    await expect(recorder.observe(change(observation(f.binding)) as GraphResponseObservation, captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+    expect(existsSync(join(f.dir, "response-01.json"))).toBe(false)
+    expect(() => recorder.snapshot()).toThrow("graph_cogs_capture_refused")
+    expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+  })
+  expect(invoked).toBe(false)
+})
+test("truncation, hardlinks, public modes and unexpected files block later capture", async () => {
+  for (const fault of ["truncated", "hardlink", "public", "unexpected"] as const) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding)
+    await recorder.observe(observation(f.binding), captureSignal())
+    const path = join(f.dir, "response-01.json")
+    if (fault === "truncated") writeFileSync(path, "{}\n")
+    if (fault === "hardlink") linkSync(path, join(f.parent, "linked.json"))
+    if (fault === "public") chmodSync(path, 0o644)
+    if (fault === "unexpected") writeFileSync(join(f.dir, "unrecognized.json"), "{}\n", { mode: 0o600 })
+    await expect(recorder.observe(observation(f.binding, "rpc"), captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+    expect(existsSync(join(f.dir, "response-02.json"))).toBe(false)
+    expect(existsSync(join(f.dir, ".claim"))).toBe(true)
+    expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("source mutation invalidates a recorder before subsequent response storage", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding)
+  writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "// changed source fixture\n")
+  await expect(recorder.observe(observation(f.binding), captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+  expect(existsSync(join(f.dir, "response-01.json"))).toBe(false)
+  expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+}))
+test("copied bindings and public parents refuse before creating capture state", () => captureOwned(async f => {
+  expect(() => createGraphResponseRecorder(f.parent, { ...f.binding })).toThrow("graph_cogs_capture_refused")
+  expect(existsSync(f.dir)).toBe(false)
+  chmodSync(f.parent, 0o755)
+  expect(() => createGraphResponseRecorder(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+  expect(existsSync(f.dir)).toBe(false)
+}))
+test("pre-abort and post-sync cancellation retain uncertainty rather than acknowledging", async () => {
+  for (const afterSync of [false, true]) await captureOwned(async f => {
+    const controller = new AbortController()
+    const recorder = createGraphResponseRecorder(f.parent, f.binding, { afterRecordSync() { if (afterSync) controller.abort() } })
+    if (!afterSync) controller.abort()
+    await expect(recorder.observe(observation(f.binding), controller.signal)).rejects.toThrow("graph_cogs_capture_refused")
+    expect(existsSync(join(f.dir, "response-01.json"))).toBe(afterSync)
+    expect(existsSync(join(f.dir, ".claim"))).toBe(true)
+    expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("post-sync deadline and backwards-clock observations cannot acknowledge", async () => {
+  for (const delta of [5000, -1]) await captureOwned(async f => {
+    let time = 100000
+    const recorder = createGraphResponseRecorder(f.parent, f.binding, { now: () => time, afterRecordSync() { time += delta } })
+    await expect(recorder.observe(observation(f.binding), captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+    expect(existsSync(join(f.dir, "response-01.json"))).toBe(true)
+    expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("a caught reentrant close cannot convert a partial record into success", () => captureOwned(async f => {
+  let recorder: GraphResponseRecorder
+  recorder = createGraphResponseRecorder(f.parent, f.binding, { afterRecordSync() { try { recorder.close() } catch { /* injected misuse */ } } })
+  await expect(recorder.observe(observation(f.binding), captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+  expect(existsSync(join(f.dir, ".claim"))).toBe(true)
+  expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+}))
+test("actual child death after exclusive file sync leaves capture files and a non-reusable claim", () => captureOwned(async f => {
+  const source = resolve(import.meta.dir, "e2e-graph-cogs.ts")
+  const code = `import {readGraphSourceManifest,bindGraphQuery,createGraphResponseRecorder} from ${JSON.stringify(source)};
+    const binding=bindGraphQuery(${JSON.stringify(identityQuery())},readGraphSourceManifest(${JSON.stringify(f.source)}));
+    const recorder=createGraphResponseRecorder(${JSON.stringify(f.parent)},binding,{afterRecordSync(){process.exit(29)}});
+    await recorder.observe(${JSON.stringify(observation(f.binding))},new AbortController().signal);process.exit(99)`
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", code], { cwd: tmpdir(), env: { PATH: "" }, encoding: "utf8", timeout: 3000, maxBuffer: 32768 })
+  expect(child.status).toBe(29); expect(child.stdout).toBe(""); expect(child.stderr).toBe("")
+  expect(existsSync(join(f.dir, "response-01.json"))).toBe(true)
+  expect(existsSync(join(f.dir, ".claim"))).toBe(true)
+  expect(() => createGraphResponseRecorder(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+}))
+test("snapshot count and byte limits stop without automatic capture continuation", async () => {
+  await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding)
+    await recorder.observe(observation(f.binding), captureSignal())
+    for (let i = 1; i < 32; i++) await recorder.observe(observation(f.binding, "rpc"), captureSignal())
+    expect(recorder.snapshot().responses).toBe(32)
+    await expect(recorder.observe(observation(f.binding, "rpc"), captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+    expect(existsSync(join(f.dir, "response-33.json"))).toBe(false)
+    expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+  })
+  await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding), large = "a".repeat(1048576)
+    await recorder.observe(observation(f.binding, "challenge", large), captureSignal())
+    for (let i = 1; i < 11; i++) await recorder.observe(observation(f.binding, "rpc", large), captureSignal())
+    expect(recorder.snapshot().storedBytes).toBeLessThanOrEqual(16 * 1024 * 1024)
+    await expect(recorder.observe(observation(f.binding, "rpc", large), captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+    expect(existsSync(join(f.dir, "response-12.json"))).toBe(false)
+    expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("paid-before-challenge, repeated challenges and oversized bodies cannot create extra records", async () => {
+  for (const kind of ["paid-first", "challenge-again", "oversized"] as const) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding)
+    if (kind === "challenge-again") await recorder.observe(observation(f.binding), captureSignal())
+    const input = observation(f.binding, kind === "paid-first" ? "paid" : "challenge", kind === "oversized" ? "a".repeat(1048577) : "fixture")
+    await expect(recorder.observe(input, captureSignal())).rejects.toThrow("graph_cogs_capture_refused")
+    expect(existsSync(join(f.dir, kind === "challenge-again" ? "response-02.json" : "response-01.json"))).toBe(false)
+    expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("a failed post-sync operation cannot release its claim or overwrite the retained record", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding, { afterRecordSync() { throw Error("private filesystem diagnostic") } })
+  await expect(recorder.observe(observation(f.binding), captureSignal())).rejects.toThrow(/^graph_cogs_capture_refused$/)
+  const path = join(f.dir, "response-01.json"), before = readFileSync(path)
+  await expect(recorder.observe(observation(f.binding, "rpc"), captureSignal())).rejects.toThrow(/^graph_cogs_capture_refused$/)
+  expect(readFileSync(path)).toEqual(before)
+  expect(existsSync(join(f.dir, "response-02.json"))).toBe(false)
+  expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
+  expect(existsSync(join(f.dir, ".claim"))).toBe(true)
+}))

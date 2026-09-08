@@ -7,7 +7,7 @@ import { createHash, randomBytes } from "node:crypto"
 import { constants, openSync, closeSync, lstatSync, fstatSync, readSync, realpathSync,
   mkdirSync, opendirSync, writeSync, fsyncSync, unlinkSync, type Stats } from "node:fs"
 import { dirname, isAbsolute, normalize, join, resolve } from "node:path"
-import { encodeGraphQuery, GATEWAY_BASE, type QueryArgs } from "../skills/counterparty-graph/graph-client.ts"
+import { encodeGraphQuery, GATEWAY_BASE, type QueryArgs, type GraphResponseObservation } from "../skills/counterparty-graph/graph-client.ts"
 
 export const GRAPH_COGS_POLICY = Object.freeze({
   namespace: "arcade-graph-cogs-2026-09-v1",
@@ -284,7 +284,7 @@ export interface GraphQueryBinding {
   readonly queryHash: string
 }
 const sourceRoots = new WeakMap<GraphSourceManifest, string>()
-const bindings = new WeakSet<GraphQueryBinding>()
+const bindings = new WeakMap<GraphQueryBinding, string>()
 function sourceFiles(root: string) {
   insist(typeof root === "string" && isAbsolute(root) && normalize(root) === root &&
     root.length <= 1800 && realpathSync(root) === root && lstatSync(root).isDirectory())
@@ -333,7 +333,7 @@ export function bindGraphQuery(args: QueryArgs, sources: GraphSourceManifest, pa
       payer: GRAPH_COGS_POLICY.payer, token: GRAPH_COGS_POLICY.token, merchant: GRAPH_COGS_POLICY.merchant,
       amountAtomic: GRAPH_COGS_POLICY.queryCostAtomic, kind, body, bodySha256: hash(body), parentQueryHash, blockHash }
     const binding: GraphQueryBinding = Object.freeze({ ...value, queryHash: hash(JSON.stringify(value)) })
-    bindings.add(binding); return binding
+    bindings.set(binding, root); return binding
   } catch { throw new Error("graph_cogs_binding_refused") }
 }
 
@@ -359,9 +359,10 @@ function syncDirectory(path: string, expected: DirectoryIdentity) {
     fsyncSync(fd); sameDirectory(path, expected)
   } finally { closeSync(fd) }
 }
-function writeBytes(fd: number, text: string, position: number) {
+function writeBytes(fd: number, text: string, position: number, maximum = MAX_BYTES) {
   const bytes = Buffer.from(text)
-  insist(bytes.length > 0 && position + bytes.length <= MAX_BYTES)
+  insist(Number.isSafeInteger(maximum) && maximum > 0 && maximum <= 2 * 1024 * 1024 &&
+    bytes.length > 0 && position >= 0 && position + bytes.length <= maximum)
   let n = 0
   while (n < bytes.length) {
     const written = writeSync(fd, bytes, n, bytes.length - n, position + n)
@@ -369,16 +370,16 @@ function writeBytes(fd: number, text: string, position: number) {
   }
   fsyncSync(fd)
 }
-function freshBudgetFile(path: string, text: string) {
+function freshBudgetFile(path: string, text: string, maximum = MAX_BYTES) {
   const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
   try {
     const st = fstatSync(fd)
     insist(st.isFile() && st.nlink === 1 && st.uid === process.getuid!() && (st.mode & 0o777) === 0o600 && st.size === 0)
-    writeBytes(fd, text, 0)
+    writeBytes(fd, text, 0, maximum)
     const after = fstatSync(fd), atPath = lstatSync(path)
     insist(after.size === Buffer.byteLength(text) && atPath.ino === after.ino && atPath.dev === after.dev && !atPath.isSymbolicLink())
   } finally { closeSync(fd) }
-  insist(readBudgetText(path) === text)
+  insist(readBudgetText(path, true, maximum) === text)
 }
 function ownClaim(directory: string, identity: DirectoryIdentity) {
   sameDirectory(directory, identity)
@@ -515,6 +516,148 @@ export function openGraphReservationWriter(parent: string, hooks?: GraphWriterHo
   } catch { throw new Error(WRITER_FAIL) } // Never remove another process's claim.
 }
 
+const CAPTURE_FAIL = "graph_cogs_capture_refused"
+const CAPTURE_FILE_BYTES = 2 * 1024 * 1024, CAPTURE_TOTAL_BYTES = 16 * 1024 * 1024
+const captureName = (sequence: number) => "response-" + String(sequence).padStart(2, "0") + ".json"
+function captureObservation(input: unknown, binding: GraphQueryBinding): GraphResponseObservation {
+  shape(input, ["phase", "requestUrl", "requestBodySha256", "responseUrl", "redirected", "status", "complete", "headers", "bodyBase64", "bodySha256"])
+  insist(input.phase === "challenge" || input.phase === "paid" || input.phase === "rpc")
+  insist(input.requestUrl === (input.phase === "rpc" ? GRAPH_COGS_RPC : binding.endpoint) &&
+    typeof input.requestBodySha256 === "string" && HASH.test(input.requestBodySha256) &&
+    (input.phase === "rpc" || input.requestBodySha256 === binding.bodySha256))
+  insist(input.responseUrl === "" || input.responseUrl === input.requestUrl)
+  insist(typeof input.redirected === "boolean" && Number.isSafeInteger(input.status) &&
+    Number(input.status) >= 100 && Number(input.status) <= 599 && input.complete === true)
+  const names = ["content-type", "content-length", "content-encoding", "payment-required", "payment-response"] as const
+  shape(input.headers, names)
+  let headerBytes = 0
+  const headers = {} as Record<typeof names[number], string | null>
+  for (const name of names) {
+    const value = input.headers[name]
+    insist(value === null || typeof value === "string" && Buffer.byteLength(value) <= 16384)
+    headerBytes += value === null ? 0 : Buffer.byteLength(value)
+    headers[name] = value
+  }
+  insist(headerBytes <= 32768 && typeof input.bodyBase64 === "string" && input.bodyBase64.length <= 1398104)
+  const bytes = Buffer.from(input.bodyBase64, "base64")
+  insist(bytes.length <= 1048576 && bytes.toString("base64") === input.bodyBase64 &&
+    typeof input.bodySha256 === "string" && createHash("sha256").update(bytes).digest("hex") === input.bodySha256)
+  return Object.freeze({ phase: input.phase, requestUrl: String(input.requestUrl), requestBodySha256: input.requestBodySha256,
+    responseUrl: String(input.responseUrl), redirected: input.redirected, status: Number(input.status), complete: true,
+    headers: Object.freeze(headers), bodyBase64: input.bodyBase64, bodySha256: input.bodySha256 })
+}
+export interface GraphCaptureSummary {
+  readonly responses: number
+  readonly paidResponses: number
+  readonly storedBytes: number
+  readonly lastHash: string
+  readonly receiptProof: "not_checked"
+}
+export interface GraphResponseRecorder {
+  readonly observe: (observation: GraphResponseObservation, signal: AbortSignal) => Promise<void>
+  readonly snapshot: () => GraphCaptureSummary
+  readonly close: () => void
+}
+/** Private offline capture only, not verified results or a live budget namespace.
+ * All evidence survives close. A failed/late acknowledgement retains the claim;
+ * there is deliberately no reopen, repair, takeover or cache-hit operation.
+ * Sync IO cannot be preempted; time/signal checks gate its acknowledgement. */
+export function createGraphResponseRecorder(parent: string, binding: GraphQueryBinding, options: {
+  readonly now?: () => number
+  /** Test-only crash/re-entry seam after exclusive record file sync. */
+  readonly afterRecordSync?: () => void
+} = {}): GraphResponseRecorder {
+  try {
+    const now = options.now ?? Date.now, afterSync = options.afterRecordSync
+    insist(typeof now === "function" && (afterSync === undefined || typeof afterSync === "function"))
+    const createdAt = now(); insist(Number.isSafeInteger(createdAt) && createdAt > 0)
+    const root = bindings.get(binding); insist(root !== undefined)
+    const sourceCurrent = () => insist(hash(JSON.stringify(sourceFiles(root))) === binding.sourceHash)
+    sourceCurrent()
+    const parentIdentity = privateDirectory(parent), directory = join(parent, "query-" + binding.queryHash)
+    mkdirSync(directory, { mode: 0o700 }); const identity = privateDirectory(directory)
+    syncDirectory(parent, parentIdentity)
+    const claim = ownClaim(directory, identity)
+    const manifest = JSON.stringify({ format: "arcade-graph-capture-v1", policyHash: GRAPH_COGS_POLICY_HASH,
+      queryHash: binding.queryHash, binding, createdAt }) + "\n"
+    freshBudgetFile(join(directory, "intent.json"), manifest); syncDirectory(directory, identity)
+    const records: { digest: string; bytes: number }[] = []
+    let lastHash = hash(manifest), storedBytes = 0, paid = 0, challenge = false,
+      closed = false, poisoned = false, busy = false, lastTime = createdAt
+    const clock = (signal?: AbortSignal, deadline?: number) => {
+      const value = now()
+      insist(!signal?.aborted && Number.isSafeInteger(value) && value >= lastTime &&
+        (deadline === undefined || value < deadline))
+      lastTime = value; return value
+    }
+    const disk = () => {
+      claim.check(); sourceCurrent()
+      insist(readBudgetText(join(directory, "intent.json")) === manifest)
+      const expected = [".claim", "intent.json", ...records.map((_, i) => captureName(i + 1))].sort()
+      const handle = opendirSync(directory, { bufferSize: 16 }), names: string[] = []
+      try {
+        for (;;) {
+          const entry = handle.readSync(); if (entry === null) break
+          insist(names.length < 34 && entry.isFile()); names.push(entry.name)
+        }
+      } finally { handle.closeSync() }
+      insist(JSON.stringify(names.sort()) === JSON.stringify(expected))
+      records.forEach((record, i) => {
+        const text = readBudgetText(join(directory, captureName(i + 1)), true, CAPTURE_FILE_BYTES)
+        insist(Buffer.byteLength(text) === record.bytes && hash(text) === record.digest)
+      })
+      claim.check()
+    }
+    const summary = (): GraphCaptureSummary => Object.freeze({ responses: records.length, paidResponses: paid,
+      storedBytes, lastHash, receiptProof: "not_checked" })
+    disk(); clock(undefined, createdAt + 5000)
+    return Object.freeze({
+      async observe(input: GraphResponseObservation, signal: AbortSignal) {
+        if (busy) { poisoned = true; throw new Error(CAPTURE_FAIL) }
+        busy = true
+        try {
+          insist(!closed && !poisoned && signal instanceof AbortSignal)
+          const started = clock(signal), deadline = started + 5000; insist(Number.isSafeInteger(deadline))
+          disk(); clock(signal, deadline)
+          const observation = captureObservation(input, binding)
+          insist(records.length < 32 && (observation.phase === "challenge" ? !challenge && records.length === 0 : challenge) &&
+            (observation.phase !== "paid" || paid === 0))
+          const body = { format: "arcade-graph-response-v1", policyHash: GRAPH_COGS_POLICY_HASH,
+            queryHash: binding.queryHash, sequence: records.length + 1, previousHash: lastHash,
+            capturedAt: clock(signal, deadline), observation }
+          const digest = hash(JSON.stringify(body)), text = JSON.stringify({ ...body, hash: digest }) + "\n"
+          const bytes = Buffer.byteLength(text)
+          insist(bytes <= CAPTURE_FILE_BYTES && storedBytes + bytes <= CAPTURE_TOTAL_BYTES)
+          clock(signal, deadline); claim.check()
+          freshBudgetFile(join(directory, captureName(records.length + 1)), text, CAPTURE_FILE_BYTES)
+          afterSync?.()
+          insist(!closed && !poisoned && busy); clock(signal, deadline); claim.check()
+          syncDirectory(directory, identity)
+          records.push({ digest: hash(text), bytes }); lastHash = digest; storedBytes += bytes
+          if (observation.phase === "challenge") challenge = true
+          if (observation.phase === "paid") paid++
+          disk(); clock(signal, deadline)
+        } catch { poisoned = true; throw new Error(CAPTURE_FAIL) }
+        finally { busy = false }
+      },
+      snapshot() {
+        try {
+          insist(!closed && !poisoned && !busy); const started = clock()
+          disk(); clock(undefined, started + 5000); return summary()
+        } catch { poisoned = true; throw new Error(CAPTURE_FAIL) }
+      },
+      close() {
+        if (closed) { if (poisoned) throw new Error(CAPTURE_FAIL); return }
+        if (busy) { poisoned = true; throw new Error(CAPTURE_FAIL) }
+        try {
+          insist(!poisoned); const started = clock(); disk(); clock(undefined, started + 5000)
+          claim.release(); closed = true
+        } catch { poisoned = true; closed = true; throw new Error(CAPTURE_FAIL) }
+      },
+    })
+  } catch { throw new Error(CAPTURE_FAIL) }
+}
+
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {
     process.stdout.write("Read-only Graph reservation audit. No live calls, keys, writes or nested gates.\nUsage: e2e-graph-cogs.sh [--audit-reservations /absolute/private/reservations.jsonl]\n")
@@ -522,7 +665,7 @@ export function graphCogsMain(args: readonly string[]): number {
   }
   if (args.length === 0) {
     process.stdout.write(JSON.stringify({ liveEvidence: "NOT_RUN", liveEnabled: false, state: "not_checked",
-      remaining: ["fixed-owner-root", "receipt-reconciler", "balance-rpc", "response-recorder", "validated-cache", "live-authority-review"] }) + "\n")
+      remaining: ["fixed-owner-root", "receipt-reconciler", "balance-rpc-integration", "response-recorder-integration", "validated-cache", "live-authority-review"] }) + "\n")
     return 1
   }
   if (args.length !== 2 || args[0] !== "--audit-reservations" || !args[1]?.startsWith("/")) {

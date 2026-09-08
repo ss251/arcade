@@ -1,5 +1,16 @@
 # SDD ledger — Plan G
 
+2026-09-08 05:35 IST — G15F sole78900 gate PASS:5337Vitest242/69.64s;
+1481Bun98/12389assert199.32s;root/webstrict/clientSSR331/162ms. Six paths,
+3links/privacy0;3source/briefpins unchanged after result annotations. Atomic
+commit/mainFF next; client unchanged, no full repeat/live/key/spend or push.
+
+2026-09-08 05:31 IST — G15F private response recorder implemented after missing-
+export Red.59Bun415assert2.07s;2rootsstrict0. Actual child exit29 after file
+sync retained claim/bytes; corruption, cancellation/deadline, source, byte/count
+and ordering failures refuse. Client unchanged; only owned synthetic files.
+Sole gate next, no operational budget/key/endpoint/pay/cache authority or push.
+
 2026-09-08 05:22 IST — G15E sole39235 gate PASS:5337Vitest242/68.66s;
 1466Bun98/12237assert198.75s;root/webstrict/clientSSR332/181ms. Eight paths,
 3links/privacy0;5source/briefpins unchanged after result annotations. Atomic

@@ -1,5 +1,15 @@
 # Plan G — execution records
 
+## September 8 — G15 private recorder checkpoint
+
+The [recorder brief](task-15-recorder-brief.md) and
+[recorder report](task-15-recorder-report.md) add exclusive bounded hash-chained
+private response files, fsync/readback before acknowledgement and retained claims
+on interruption.59 focused Bun/415 assertions and exact strict passed, including
+actual child exit after file sync. No receipt/cache/payment proof or actual key/
+endpoint is claimed. Sole full gate passed5337Vitest/1481Bun,root/webstrict
+and client/SSR builds. Atomic local commit follows.
+
 ## September 8 — G15 offline request/source binding
 
 The [binding brief](task-15-binding-brief.md) and
