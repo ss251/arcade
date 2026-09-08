@@ -21,8 +21,12 @@ describe("J11C public listing rail declarations", () => {
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8")
     const marker = "\n/* J11 declared rail data"
     expect(css).toContain(marker)
+    // Re-locked 2026-09-08: the marketplace design pass deliberately rewrote the token
+    // block (two semantic stops that failed AA, plus the verdict tints and card shadows)
+    // and the .market rules above this marker. The lock's job is to catch an ACCIDENTAL
+    // rewrite of earlier CSS, so an intentional one re-pins rather than deletes it.
     expect(createHash("sha256").update(css.slice(0, css.indexOf(marker))).digest("hex"))
-      .toBe("58f11d0299c47a97e3e851c705009d25bafc678793dfb86e15c956d4b1a65576")
+      .toBe("830eb70db2493870b559778ca2db219c2bdb6d9d42b6445fd3a11c87396ebf84")
     const suffix = css.slice(css.indexOf(marker))
     expect(suffix).toContain("min-height: 44px"); expect(suffix).toContain(":focus-visible")
     expect(suffix).not.toMatch(/(?:^|\n)(?:body|:root|\.buyer|\.publish|\.tree)[\s.{]/)
