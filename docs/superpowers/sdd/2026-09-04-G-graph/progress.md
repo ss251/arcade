@@ -1,5 +1,20 @@
 # SDD ledger — Plan G
 
+2026-09-08 08:38 IST — G15P sole39734 gate:5370Vitest tests PASS,
+241suites PASS/1H8 teardown FAIL72.25s. After child exit0, skill-route.test.ts:77
+observed still_listening, not ECONNREFUSED. Listener identity unavailable; cause
+unconfirmed. Focused24492 H8 recovery11tests2.03s PASS, no source change. Only
+skipped remainder33797 ran:1708Bun98/13530assert214.75s,root/webstrict and
+clientSSR358/195ms PASS. No full repeat/all-green claim. Six paths/3links/
+privacy0;three source/brief pins unchanged; atomic commit/mainFF next.
+
+2026-09-08 08:27 IST — G15P readonly journal/query correlation implemented
+after missing-export Red.38 selectedBun120assert2.65s/2rootsstrict0, then
+285focusedBun1520assert18.12s/strict0. Actual no-key/no-network child agrees;
+rehashed contradictions, retained claims and wrong delta/intent/cache refuse.
+Original harness/client/consumer unchanged; reservations remain unresolved.
+Sole full gate next; no operational state, owner key/live/RPC/spend or push.
+
 2026-09-08 08:19 IST — G15O sole88949 gate PASS:5370Vitest242/71.58s;
 1670Bun98/13410assert211.00s;root/webstrict/clientSSR430/204ms. Six paths,
 3links/privacy0;three source/briefpins frozen. Original harness restoration

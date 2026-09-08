@@ -1364,6 +1364,163 @@ export function createGraphBalanceRecorder(parent: string, binding: GraphQueryBi
   } catch { throw new Error(BALANCE_JOURNAL_FAIL) }
 }
 
+
+const JOURNAL_PROOF_FAIL = "graph_cogs_journal_evidence_refused"
+export interface GraphBalanceJournalReadback {
+  readonly queryHash: string
+  readonly sourceHash: string
+  readonly journalHash: string
+  readonly createdAt: number
+  readonly closedAt: number
+  readonly handoff: GraphReservationHandoff
+  readonly admissionRecordedAt: number
+  readonly preForwardRecordedAt: number
+  readonly afterRecordedAt: number
+  readonly before: GraphBalanceObservation
+  readonly preForward: GraphBalanceObservation
+  readonly after: GraphBalanceObservation
+  readonly intent: GraphPaymentIntent
+  readonly paymentProof: "not_checked"
+}
+/** Read-only retained consistency. A historical handoff is not registered as a
+ * fresh process-local capability. Claim absence does not prove acknowledged
+ * close; coherent owner-rewritten bytes are not authenticated acquisition. */
+export function readGraphBalanceJournal(parent: string, binding: GraphQueryBinding, options: {
+  readonly now?: () => number; readonly signal?: AbortSignal
+} = {}): GraphBalanceJournalReadback {
+  try {
+    const now = cacheClock(options), started = now(), root = bindings.get(binding)
+    insist(root !== undefined)
+    const sourceCurrent = () => insist(hash(JSON.stringify(sourceFiles(root))) === binding.sourceHash)
+    sourceCurrent()
+    const parentIdentity = privateDirectory(parent), directory = join(parent, "balance-" + binding.queryHash),
+      identity = privateDirectory(directory), budget = join(parent, GRAPH_COGS_POLICY.namespace), budgetIdentity = privateDirectory(budget)
+    const pins: { path: string; text: string }[] = []
+    const read = (path: string) => {
+      now(); const text = readBudgetText(path); now(); pins.push({ path, text }); return text
+    }
+    const inventory = () => {
+      now(); sameDirectory(parent, parentIdentity); sameDirectory(directory, identity); sameDirectory(budget, budgetIdentity)
+      const handle = opendirSync(directory, { bufferSize: 8 }), names: string[] = []
+      try {
+        for (;;) {
+          const entry = handle.readSync(); if (entry === null) break
+          insist(names.length < 5 && entry.isFile()); names.push(entry.name)
+        }
+      } finally { handle.closeSync() }
+      insist(JSON.stringify(names.sort()) === JSON.stringify(["admission.json", "after.json", "complete.json", "intent.json", "pre-forward.json"]))
+    }
+    inventory()
+    const manifestText = read(join(directory, "intent.json")), manifest: unknown = JSON.parse(manifestText)
+    shape(manifest, ["format", "policyHash", "queryHash", "binding", "handoff", "createdAt"])
+    insist(manifest.format === "arcade-graph-balance-journal-v1" && manifest.policyHash === GRAPH_COGS_POLICY_HASH &&
+      manifest.queryHash === binding.queryHash && JSON.stringify(manifest.binding) === JSON.stringify(binding) &&
+      JSON.stringify(manifest) + "\n" === manifestText && Number.isSafeInteger(manifest.createdAt) &&
+      Number(manifest.createdAt) > 0 && Number(manifest.createdAt) <= started)
+    const createdAt = Number(manifest.createdAt), value = manifest.handoff
+    shape(value, ["namespace", "policyHash", "sourceHash", "queryHash", "sequence", "reservationHash", "allocation", "amountAtomic", "balanceAtomic", "issuedAt", "claimedAt"])
+    insist(value.namespace === GRAPH_COGS_POLICY.namespace && value.policyHash === GRAPH_COGS_POLICY_HASH &&
+      value.sourceHash === binding.sourceHash && value.queryHash === binding.queryHash &&
+      Number.isSafeInteger(value.sequence) && Number(value.sequence) >= 1 && Number(value.sequence) <= GRAPH_COGS_POLICY.totalLimit &&
+      typeof value.reservationHash === "string" && HASH.test(value.reservationHash) &&
+      (value.allocation === "evidence" || value.allocation === "video") && value.amountAtomic === binding.amountAtomic &&
+      typeof value.balanceAtomic === "string" && Number.isSafeInteger(value.issuedAt) && Number(value.issuedAt) > 0 &&
+      Number.isSafeInteger(value.claimedAt) && Number(value.claimedAt) >= Number(value.issuedAt) &&
+      Number(value.claimedAt) <= createdAt && Number.isSafeInteger(Number(value.issuedAt) + 5000) && createdAt < Number(value.issuedAt) + 5000)
+    checkGraphBalance(value.balanceAtomic)
+    const handoff: GraphReservationHandoff = Object.freeze({ namespace: GRAPH_COGS_POLICY.namespace, policyHash: GRAPH_COGS_POLICY_HASH,
+      sourceHash: binding.sourceHash, queryHash: binding.queryHash, sequence: Number(value.sequence), reservationHash: value.reservationHash,
+      allocation: value.allocation, amountAtomic: binding.amountAtomic, balanceAtomic: value.balanceAtomic,
+      issuedAt: Number(value.issuedAt), claimedAt: Number(value.claimedAt) })
+    // Bind only the selected historical reservation reference. This is not a
+    // global writer-state admission check and does not infer reconciliation.
+    const ledger = read(join(budget, "reservations.jsonl")), summary = decodeGraphReservations(ledger)
+    insist(handoff.sequence <= summary.reservations)
+    const lines = ledger.trimEnd().split("\n"), reservation = JSON.parse(lines[handoff.sequence]!)
+    insist(reservation.hash === handoff.reservationHash && reservation.queryHash === binding.queryHash &&
+      reservation.allocation === handoff.allocation && reservation.amountAtomic === handoff.amountAtomic)
+    const prefix = lines.slice(0, handoff.sequence + 1).join("\n") + "\n"
+    insist(read(join(budget, headName(handoff.sequence))) === headText(prefix, handoff.sequence))
+    const records: { phase: GraphBalancePhase; capturedAt: number; observation: GraphBalanceObservation; intent: GraphPaymentIntent | null }[] = []
+    let lastHash = hash(manifestText), previousTime = createdAt
+    for (const phase of ["admission", "pre-forward", "after"] as const) {
+      const text = read(join(directory, phase + ".json")), row: unknown = JSON.parse(text)
+      shape(row, ["format", "policyHash", "queryHash", "reservationHash", "sequence", "previousHash", "phase", "capturedAt", "observation", "intent", "hash"])
+      insist(row.format === "arcade-graph-balance-observation-v1" && row.policyHash === GRAPH_COGS_POLICY_HASH &&
+        row.queryHash === binding.queryHash && row.reservationHash === handoff.reservationHash && row.sequence === records.length + 1 &&
+        row.previousHash === lastHash && row.phase === phase && Number.isSafeInteger(row.capturedAt) &&
+        Number(row.capturedAt) >= previousTime && Number(row.capturedAt) <= started &&
+        typeof row.hash === "string" && HASH.test(row.hash) && JSON.stringify(row) + "\n" === text)
+      const capturedAt = Number(row.capturedAt), observation = retainedBalance(row.observation)
+      insist(observation.observedAt <= capturedAt && capturedAt - observation.observedAt < 5000)
+      if (phase === "admission") insist(observation.balanceAtomic === handoff.balanceAtomic &&
+        observation.observedAt <= handoff.issuedAt && capturedAt < handoff.issuedAt + 5000)
+      else insist(observation.observedAt >= previousTime)
+      let intent: GraphPaymentIntent | null = null
+      if (phase === "pre-forward") {
+        checkGraphBalance(observation.balanceAtomic); insist(observation.balanceAtomic === handoff.balanceAtomic)
+        intent = captureForwardIntent(row.intent, binding, capturedAt)
+      } else insist(row.intent === null)
+      const body = { format: row.format, policyHash: row.policyHash, queryHash: row.queryHash, reservationHash: row.reservationHash,
+        sequence: records.length + 1, previousHash: lastHash, phase, capturedAt, observation, intent }
+      insist(hash(JSON.stringify(body)) === row.hash)
+      records.push({ phase, capturedAt, observation, intent }); previousTime = capturedAt; lastHash = row.hash
+    }
+    const marker = read(join(directory, "complete.json")), complete: unknown = JSON.parse(marker)
+    shape(complete, ["format", "policyHash", "queryHash", "reservationHash", "observations", "manifestHash", "lastHash", "closedAt", "hash"])
+    insist(complete.format === "arcade-graph-balance-complete-v1" && complete.policyHash === GRAPH_COGS_POLICY_HASH &&
+      complete.queryHash === binding.queryHash && complete.reservationHash === handoff.reservationHash && complete.observations === 3 &&
+      complete.manifestHash === hash(manifestText) && complete.lastHash === lastHash &&
+      Number.isSafeInteger(complete.closedAt) && Number(complete.closedAt) >= previousTime && Number(complete.closedAt) <= started &&
+      JSON.stringify(complete) + "\n" === marker)
+    const body = { format: complete.format, policyHash: complete.policyHash, queryHash: complete.queryHash, reservationHash: complete.reservationHash,
+      observations: 3, manifestHash: hash(manifestText), lastHash, closedAt: Number(complete.closedAt) }
+    insist(complete.hash === hash(JSON.stringify(body)))
+    for (const pin of pins) { now(); insist(readBudgetText(pin.path) === pin.text); now() }
+    inventory(); sourceCurrent(); now()
+    return Object.freeze({ queryHash: binding.queryHash, sourceHash: binding.sourceHash, journalHash: hash(marker), createdAt,
+      closedAt: Number(complete.closedAt), handoff, admissionRecordedAt: records[0]!.capturedAt,
+      preForwardRecordedAt: records[1]!.capturedAt, afterRecordedAt: records[2]!.capturedAt,
+      before: records[0]!.observation, preForward: records[1]!.observation, after: records[2]!.observation,
+      intent: records[1]!.intent!, paymentProof: "not_checked" as const })
+  } catch { throw new Error(JOURNAL_PROOF_FAIL) }
+}
+export interface GraphJournaledQueryEvidence {
+  readonly evidence: "retained-reservation-query-consistency"
+  readonly queryHash: string
+  readonly sourceHash: string
+  readonly reservationSequence: number
+  readonly reservationHash: string
+  readonly journalHash: string
+  readonly balanceEvidenceHash: string
+  readonly cacheHash: string
+  readonly queryEvidenceHash: string
+  readonly paymentTx: string
+  readonly spentAtomic: string
+  readonly hash: string
+}
+/** Joins retained observations to retained protocol/cache evidence. No actual
+ * key/RPC, new payment, reservation mutation or fresh authority is produced. */
+export function verifyGraphJournaledQuery(parent: string, binding: GraphQueryBinding, options: GraphCacheOptions = {}): GraphJournaledQueryEvidence {
+  try {
+    const now = cacheClock(options), scoped = { now, ...(options.signal === undefined ? {} : { signal: options.signal }) }
+    const journal = readGraphBalanceJournal(parent, binding, scoped), capture = readGraphResponseCapture(parent, binding, { now })
+    insist(capture.forwardIntent !== null && capture.records.length >= 3 &&
+      journal.admissionRecordedAt <= capture.createdAt && journal.preForwardRecordedAt >= capture.records[2]!.capturedAt &&
+      journal.preForwardRecordedAt <= capture.forwardIntent.observedAt &&
+      JSON.stringify(journal.intent) === JSON.stringify(capture.forwardIntent.intent))
+    const balance = bindGraphQueryBalances(parent, binding, { before: journal.before, preForward: journal.preForward, after: journal.after },
+      { ...scoped, ...(options.parent === undefined ? {} : { parent: options.parent }) })
+    insist(readGraphBalanceJournal(parent, binding, scoped).journalHash === journal.journalHash)
+    now()
+    const body = { evidence: "retained-reservation-query-consistency" as const, queryHash: binding.queryHash, sourceHash: binding.sourceHash,
+      reservationSequence: journal.handoff.sequence, reservationHash: journal.handoff.reservationHash, journalHash: journal.journalHash,
+      balanceEvidenceHash: balance.hash, cacheHash: balance.cacheHash, queryEvidenceHash: balance.queryEvidenceHash,
+      paymentTx: balance.paymentTx, spentAtomic: balance.spentAtomic }
+    return Object.freeze({ ...body, hash: hash(JSON.stringify(body)) })
+  } catch { throw new Error(JOURNAL_PROOF_FAIL) }
+}
+
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {
     process.stdout.write("Read-only Graph reservation audit. No live calls, keys, writes or nested gates.\nUsage: e2e-graph-cogs.sh [--audit-reservations /absolute/private/reservations.jsonl]\n")

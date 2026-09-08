@@ -1,5 +1,18 @@
 # Plan G — execution records
 
+## September 8 — G15 readonly journal/query proof checkpoint
+
+The [journal-proof brief](task-15-journal-proof-brief.md) and
+[journal-proof report](task-15-journal-proof-report.md) join completed balance
+journals, canonical reservation prefixes/heads and retained query/cache evidence.
+285 focused Bun/1520 assertions and strict passed; a real no-key/no-network
+child returns the same retained result. Rehashed contradictions, partial claims
+and wrong deltas refuse without resetting exposure. No acquisition, global
+reconciliation or fresh authority is inferred. Sole full gate passed all5370
+tests but failed an unrelated H8 teardown assertion; one isolated H8 check
+passed11tests. Skipped stages passed1708Bun, strict and both builds. No full
+repeat, source fix or all-green relabeling; local commit follows.
+
 ## September 8 — G15 durable balance journal checkpoint
 
 The [balance-journal brief](task-15-balance-journal-brief.md) and

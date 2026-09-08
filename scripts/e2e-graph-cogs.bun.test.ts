@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { createGraphBalanceRecorder, type GraphBalanceObservation } from "./e2e-graph-cogs.ts"
+import { createGraphBalanceRecorder, readGraphBalanceJournal, verifyGraphJournaledQuery, type GraphBalanceObservation } from "./e2e-graph-cogs.ts"
 import { createHash } from "node:crypto"
 import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSync, linkSync, mkdirSync, realpathSync, existsSync, readdirSync, copyFileSync, unlinkSync, renameSync, lstatSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -717,6 +717,179 @@ test("intent expiration during pre-forward file IO cannot receive a successful a
   expect(() => recorder.close()).toThrow(); f.writer.close()
 }))
 
+test("readonly balance journal verification preserves completed files and unresolved reservation", () => owned(parent => {
+  const f = journalFixture(parent), recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)
+  recorder.recordPreForward(journalBalance(Date.now()), declaredIntent(f.binding), captureSignal())
+  recorder.recordAfter(journalBalance(Date.now(), "899999"), captureSignal()); recorder.close(); f.writer.close()
+  const before = Object.fromEntries(readdirSync(f.journal).map(name => [name, readFileSync(join(f.journal, name), "utf8")]))
+  const result = readGraphBalanceJournal(parent, f.binding)
+  expect(result.handoff).toEqual(f.handoff); expect(result.after.balanceAtomic).toBe("899999")
+  expect(result.paymentProof).toBe("not_checked"); expect(Object.isFrozen(result)).toBe(true)
+  expect(Object.isFrozen(result.after.responseHashes)).toBe(true)
+  expect(Object.fromEntries(readdirSync(f.journal).map(name => [name, readFileSync(join(f.journal, name), "utf8")]))).toEqual(before)
+  expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
+  expect(() => createGraphBalanceRecorder(parent, f.binding, result.handoff, f.before)).toThrow()
+}))
+
+
+function completedJournal(parent: string) {
+  const f = journalFixture(parent), recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)
+  recorder.recordPreForward(journalBalance(Date.now()), declaredIntent(f.binding), captureSignal())
+  recorder.recordAfter(journalBalance(Date.now(), "990000"), captureSignal()); recorder.close(); f.writer.close()
+  return f
+}
+function rewriteJournal(directory: string, change: (files: Record<string, Record<string, unknown>>) => void) {
+  const names = ["intent", "admission", "pre-forward", "after", "complete"]
+  const files = Object.fromEntries(names.map(name => [name, JSON.parse(readFileSync(join(directory, name + ".json"), "utf8"))])) as Record<string, Record<string, unknown>>
+  change(files)
+  const manifest = JSON.stringify(files.intent) + "\n"; writeFileSync(join(directory, "intent.json"), manifest)
+  let previous = hash(manifest)
+  for (const name of ["admission", "pre-forward", "after"]) {
+    const row = files[name]!; row.previousHash = previous
+    const { hash: _ignored, ...body } = row; row.hash = hash(JSON.stringify(body)); previous = String(row.hash)
+    writeFileSync(join(directory, name + ".json"), JSON.stringify(row) + "\n")
+  }
+  const complete = files.complete!; complete.manifestHash = hash(manifest); complete.lastHash = previous
+  const { hash: _ignored, ...body } = complete; complete.hash = hash(JSON.stringify(body))
+  writeFileSync(join(directory, "complete.json"), JSON.stringify(complete) + "\n")
+}
+for (const fault of ["claim", "missing", "extra", "mode", "hardlink", "alias", "bytes", "bom", "oversized", "source", "ledger", "head"] as const) {
+  test(`readonly balance journal refuses ${fault} without repairing files or resetting exposure`, () => owned(parent => {
+    const f = completedJournal(parent), path = join(f.journal, "after.json")
+    if (fault === "claim") writeFileSync(join(f.journal, ".claim"), "retained", { mode: 0o600 })
+    if (fault === "missing") unlinkSync(path)
+    if (fault === "extra") writeFileSync(join(f.journal, "extra.json"), "{}", { mode: 0o600 })
+    if (fault === "mode") chmodSync(path, 0o644)
+    if (fault === "hardlink") linkSync(path, join(parent, "linked.json"))
+    if (fault === "alias") { renameSync(path, join(parent, "after.json")); symlinkSync(join(parent, "after.json"), path) }
+    if (fault === "bytes") writeFileSync(path, "{}\n")
+    if (fault === "bom") writeFileSync(path, "\ufeff" + readFileSync(path, "utf8"))
+    if (fault === "oversized") writeFileSync(path, "x".repeat(32769))
+    if (fault === "source") writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed")
+    if (fault === "ledger") writeFileSync(join(f.directory, "reservations.jsonl"), fixtureLedger(["video"]))
+    if (fault === "head") writeFileSync(join(f.directory, "head-01.json"), "{}\n")
+    const before = Object.fromEntries(readdirSync(f.journal).map(name => [name, readFileSync(join(f.journal, name), "utf8")]))
+    expect(() => readGraphBalanceJournal(parent, f.binding)).toThrow(/^graph_cogs_journal_evidence_refused$/)
+    expect(Object.fromEntries(readdirSync(f.journal).map(name => [name, readFileSync(join(f.journal, name), "utf8")]))).toEqual(before)
+    expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
+  }))
+}
+for (const fault of ["sequence", "allocation", "amount", "namespace", "claimed-time", "created-time", "admission-balance", "admission-freshness",
+  "pre-balance", "pre-order", "pre-intent", "after-order", "complete-time", "complete-count"] as const) {
+  test(`coherently rehashed journal still refuses inconsistent ${fault}`, () => owned(parent => {
+    const f = completedJournal(parent)
+    rewriteJournal(f.journal, files => {
+      const handoff = files.intent!.handoff as Record<string, unknown>
+      const before = files.admission!.observation as Record<string, unknown>, pre = files["pre-forward"]!.observation as Record<string, unknown>
+      if (fault === "sequence") handoff.sequence = 2
+      if (fault === "allocation") handoff.allocation = "video"
+      if (fault === "amount") handoff.amountAtomic = "10001"
+      if (fault === "namespace") handoff.namespace = "new-budget"
+      if (fault === "claimed-time") handoff.claimedAt = Number(files.intent!.createdAt) + 1
+      if (fault === "created-time") files.intent!.createdAt = Number(handoff.issuedAt) + 5000
+      if (fault === "admission-balance") before.balanceAtomic = "990000"
+      if (fault === "admission-freshness") { before.observedAt = Number(handoff.issuedAt) - 5000; before.blockTimestamp = Math.floor(Number(before.observedAt) / 1000) }
+      if (fault === "pre-balance") pre.balanceAtomic = "990000"
+      if (fault === "pre-order") pre.observedAt = Number(files.admission!.capturedAt) - 1
+      if (fault === "pre-intent") files["pre-forward"]!.intent = null
+      if (fault === "after-order") (files.after!.observation as Record<string, unknown>).observedAt = Number(files["pre-forward"]!.capturedAt) - 1
+      if (fault === "complete-time") files.complete!.closedAt = Number(files.after!.capturedAt) - 1
+      if (fault === "complete-count") files.complete!.observations = 2
+    })
+    expect(() => readGraphBalanceJournal(parent, f.binding)).toThrow(/^graph_cogs_journal_evidence_refused$/)
+    expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
+  }))
+}
+test("a historical journal remains readable after a declared later ledger row, never a fresh handoff", () => owned(parent => {
+  const f = completedJournal(parent), original = readGraphBalanceJournal(parent, f.binding)
+  const path = join(f.directory, "reservations.jsonl"), prior = readFileSync(path, "utf8")
+  // Explicit synthetic future ledger, not a successfully authorized second reserve.
+  const body = { sequence: 2, previousHash: f.handoff.reservationHash, allocation: "video", queryHash: hash("later declared query"), amountAtomic: "10000" }
+  const text = prior + JSON.stringify({ ...body, hash: hash(JSON.stringify(body)) }) + "\n"
+  writeFileSync(path, text)
+  writeFileSync(join(f.directory, "head-02.json"), JSON.stringify({ format: "arcade-graph-head-v1", policyHash: GRAPH_COGS_POLICY_HASH, reservations: 2, journalHash: hash(text) }) + "\n", { mode: 0o600 })
+  expect(readGraphBalanceJournal(parent, f.binding)).toEqual(original)
+  expect(readGraphReservations(path).unresolved).toBe(2)
+  expect(() => createGraphBalanceRecorder(parent, f.binding, original.handoff, f.before)).toThrow()
+}))
+test("readonly journal abort, backwards clock and deadline refuse with byte preservation", () => {
+  for (const fault of ["abort", "backwards", "deadline"] as const) owned(parent => {
+    const f = completedJournal(parent), controller = new AbortController(), time = Date.now()
+    if (fault === "abort") controller.abort()
+    let calls = 0
+    expect(() => readGraphBalanceJournal(parent, f.binding, { signal: controller.signal, now: () => {
+      calls++; return calls === 1 ? time : fault === "backwards" ? time - 1 : time + 5000
+    } })).toThrow(/^graph_cogs_journal_evidence_refused$/)
+    expect(existsSync(join(f.journal, "complete.json"))).toBe(true)
+    expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
+  })
+})
+test("a concurrent file change detected on the second read cannot become accepted journal evidence", () => owned(parent => {
+  const f = completedJournal(parent); let reads = 0
+  readGraphBalanceJournal(parent, f.binding, { now: () => { reads++; return Date.now() } })
+  let calls = 0
+  expect(() => readGraphBalanceJournal(parent, f.binding, { now: () => {
+    calls++; if (calls === Math.floor(reads / 2)) writeFileSync(join(f.journal, "admission.json"), "{}\n")
+    return Date.now()
+  } })).toThrow(/^graph_cogs_journal_evidence_refused$/)
+  expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
+}))
+async function declaredJournaledQuery(parent: string, afterAtomic = "990000") {
+  const f = journalFixture(parent), recorder = createGraphBalanceRecorder(parent, f.binding, f.handoff, f.before)
+  const protocol = await declaredProtocolCapture({ parent, binding: f.binding }, {
+    beforeForward(intent, receiptTimestamp) {
+      const pre = { ...journalBalance(Date.now()), blockNumber: "40", blockHash: "0x" + "e".repeat(64), blockTimestamp: receiptTimestamp }
+      recorder.recordPreForward(pre, intent, captureSignal())
+    },
+  })
+  const evidence = verifyGraphCapturedQuery(parent, f.binding)
+  writeGraphQueryCache(parent, f.binding, evidence)
+  recorder.recordAfter({ ...journalBalance(Date.now(), afterAtomic), blockNumber: "41", blockHash: "0x" + "b".repeat(64),
+    blockTimestamp: protocol.receiptTimestamp }, captureSignal())
+  recorder.close(); f.writer.close()
+  return { ...f, protocol, evidence }
+}
+test("journaled query verification joins original intent, exact retained receipt/cache and balance delta without clearing exposure", async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-journal-proof-")))
+  try {
+    const f = await declaredJournaledQuery(parent), result = verifyGraphJournaledQuery(parent, f.binding)
+    expect(result.evidence).toBe("retained-reservation-query-consistency")
+    expect(result.reservationHash).toBe(f.handoff.reservationHash); expect(result.queryEvidenceHash).toBe(f.evidence.hash)
+    expect(result.paymentTx).toBe(f.protocol.tx); expect(result.spentAtomic).toBe("10000")
+    expect(result.journalHash).toBe(readGraphBalanceJournal(parent, f.binding).journalHash)
+    expect(result.cacheHash).toBe(readGraphQueryCache(parent, f.binding).cacheHash)
+    expect(Object.isFrozen(result)).toBe(true); expect(JSON.stringify(result)).not.toContain(parent)
+    expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
+    const child = spawnSync(process.execPath, ["--no-env-file", "-e", cacheChild({ parent, source: f.source },
+      `const {readGraphBalanceJournal,verifyGraphJournaledQuery}=await import(${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))});console.log(JSON.stringify(verifyGraphJournaledQuery(parent,binding)))`)], {
+      env: { PATH: "" }, encoding: "utf8", timeout: 4000, maxBuffer: 8192,
+    })
+    expect(child.status).toBe(0); expect(child.stderr).toBe("")
+    expect(JSON.parse(child.stdout)).toEqual(result)
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
+for (const fault of ["header", "nonce", "balance-delta", "floor", "missing-cache", "changed-cache", "retained-claim"] as const) {
+  test(`journaled query refuses ${fault} without erasing the retained observations`, async () => {
+    const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-journal-proof-")))
+    try {
+      const f = await declaredJournaledQuery(parent, fault === "floor" ? "899999" : fault === "balance-delta" ? "1000000" : "990000")
+      if (fault === "header" || fault === "nonce") rewriteJournal(f.journal, files => {
+        files["pre-forward"]!.intent = changeDeclaredIntent(files["pre-forward"]!.intent as GraphPaymentIntent, value => {
+          if (fault === "header") value.paymentHeaderSha256 = hash("different declared header")
+          else (value.authorization as Record<string, unknown>).nonce = "0x" + "f".repeat(64)
+        })
+      })
+      if (fault === "missing-cache") unlinkSync(join(parent, "cache-" + f.binding.queryHash, "commit.json"))
+      if (fault === "changed-cache") writeFileSync(join(parent, "cache-" + f.binding.queryHash, "result.json"), "{}\n")
+      if (fault === "retained-claim") writeFileSync(join(f.journal, ".claim"), "retained", { mode: 0o600 })
+      const bytes = readFileSync(join(f.journal, "after.json"))
+      expect(() => verifyGraphJournaledQuery(parent, f.binding)).toThrow(/^graph_cogs_journal_evidence_refused$/)
+      expect(readFileSync(join(f.journal, "after.json"))).toEqual(bytes)
+      expect(readGraphReservations(join(f.directory, "reservations.jsonl")).unresolved).toBe(1)
+    } finally { rmSync(parent, { recursive: true, force: true }) }
+  })
+}
+
 function sourceCopy(parent: string) {
   const dir = join(parent, "source"); mkdirSync(dir, { mode: 0o700 })
   for (const path of GRAPH_COGS_SOURCE_FILES) {
@@ -847,6 +1020,7 @@ const captureSignal = () => new AbortController().signal
 async function declaredProtocolCapture(f: { parent: string; binding: GraphQueryBinding }, options: {
   firstId?: number; nullReceipts?: number; tx?: string; nonce?: string; data?: Record<string, unknown>;
   change?: (rows: GraphResponseObservation[]) => void
+  beforeForward?: (intent: GraphPaymentIntent, receiptTimestamp: number) => void
 } = {}) {
   const enc = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64")
   const binding = f.binding, stamp = Math.floor(Date.now() / 1000), tx = options.tx ?? `0x${"a".repeat(64)}`
@@ -879,11 +1053,11 @@ async function declaredProtocolCapture(f: { parent: string; binding: GraphQueryB
   options.change?.(rows)
   const recorder = createGraphResponseRecorder(f.parent, binding)
   for (let i = 0; i < rows.length; i++) {
-    if (i === 3) await recorder.beforePaidRequest(intent, captureSignal())
+    if (i === 3) { options.beforeForward?.(intent, stamp); await recorder.beforePaidRequest(intent, captureSignal()) }
     await recorder.observe(rows[i]!, captureSignal())
   }
   recorder.close()
-  return { tx, intent, data, lastRpcId: id - 1 }
+  return { tx, intent, data, lastRpcId: id - 1, receiptTimestamp: stamp }
 }
 test("retained protocol correlation joins declared challenge/intent/receipt without any new transport", () => captureOwned(async f => {
   const declared = await declaredProtocolCapture(f)
