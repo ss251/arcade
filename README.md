@@ -146,6 +146,23 @@ not the upstream branch tip. Lifecycle scripts stay disabled. The
 separates the initial root-only failure from targeted recovery and does not
 claim a new-host, Forge, Matchstick, public-repository or deployment proof.
 
+The later [complete fresh-clone check](docs/superpowers/sdd/2026-09-04-I-packaging/task-14-restart-report.md)
+passed the JS/TypeScript/web gates and31Forge tests. Unified Balance Kit resolved
+from the existing locked dependency after installation; no source or lock repair
+was needed. For the local contract tests, also initialize only the recorded
+nested libraries (never force-update a dirty submodule):
+
+```bash
+git -C lib/erc8183 submodule update --init --checkout --jobs 1 --depth 1 -- \
+  lib/forge-std lib/openzeppelin-contracts lib/openzeppelin-contracts-upgradeable
+forge test --threads 4
+```
+
+This is same-host/local-clone verification, not public deployment. The owner
+confirmed [check-in1](docs/superpowers/checkins/2026-09-08.md) was submitted;
+[receipt and current qualifications](docs/superpowers/sdd/2026-09-04-I-packaging/task-11-report.md)
+are kept separately from its historical snapshot.
+
 ```bash
 bun --no-env-file x --no-install vitest run --maxWorkers=4 --minWorkers=1 --maxConcurrency=4
 bun --no-env-file test --max-concurrency=4 .bun.test

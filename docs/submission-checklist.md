@@ -105,9 +105,11 @@ superseded by current documentation; they were not copied as factual feedback.
 
 ## Final owner and mechanical checks
 
-- [ ] Confirm the September8 and September11 check-ins in the dashboard; the
-  retained09:29 IST schedule has not been freshly re-established. First posting
-  is unconfirmed. Do not publish a check-in as completed before confirmation.
+- [x] September8 check-in: owner confirmed submission at07:47IST;
+  [receipt](superpowers/sdd/2026-09-04-I-packaging/task-11-report.md).
+  This is owner-reported, not an independent dashboard inspection.
+- [ ] September11 check-in remains pending; freshly verify its dashboard window.
+  Do not report it as posted before owner confirmation.
 - [ ] Review the final narrative against actual proof, including each live,
   retained, offline, unavailable and paused label. No inflated test-count,
   production-readiness, completion or partner-eligibility claims.
@@ -116,6 +118,8 @@ superseded by current documentation; they were not copied as factual feedback.
   targeted recovery and the remaining strict/build stages passed. Public GitHub
   access and a new-host setup are separate checks. Do not call the initial
   full-gate attempt all-green.
+- [ ] Review the later [complete cold-clone gate](superpowers/sdd/2026-09-04-I-packaging/task-14-restart-report.md),
+  including the exact nested contract prerequisites and same-host limitations.
 - [ ] Deliberately refresh/review the continuity snapshot at the submission
   revision; verify specs, plans, briefs, prompts and ledgers are public without
   private handoffs/research, credentials, authorization headers or wallet material.

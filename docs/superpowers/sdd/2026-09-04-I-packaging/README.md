@@ -21,6 +21,9 @@ are merged; unresolved live gates are not prerequisites we can invent.
   [checker contract](../../../packaging-evidence.md).
 - [Isolated install brief](task-14-install-brief.md),
   [same-host reproduction record](task-14-install-report.md).
+- [Restart brief](task-14-restart-brief.md),
+  [complete fresh-clone verification](task-14-restart-report.md).
+- [Task11 owner-confirmed submission receipt](task-11-report.md).
 - [CLI interop status](../../../interop/circle-cli.md).
 - [Task2 offline sanitizer brief](task-2-sanitizer-brief.md),
   [shape-only implementation record](task-2-sanitizer-report.md).
@@ -52,10 +55,10 @@ research. Secrets/bearer material/private journals never enter these records.
 | I8 shot list | Eight native content blocks/timeline audit and sole full gate passed; exact privacy-safe recorder/capture still pending; no replay of consumed approvals |
 | I9 capture/voice | Owner voice and appropriate live/demo readiness required |
 | I10 cut | Requires actual takes, measured in-points and owner voice; no invented footage |
-| I11 Sept8 check-in | Corrected owner draft prepared privately; posting unconfirmed, so no public check-in commit |
+| I11 Sept8 check-in | Owner confirmed07:47IST submission; exact submitted document merged as21c641b, with separate receipt/current qualifications |
 | I12 Sept11 check-in | Future integration record; no premature live evidence reruns |
 | I13 submission | Source-backed checklist/three feedback drafts and mechanical/sole full gate passed; actual dashboard/media/submission remain owner checkpoints |
-| I14 packaging evidence | Local checker9focused/strict/sole full gate passed; eight local rows pass, media absent and CLI/manual verification unchecked; deliberately incomplete |
+| I14 packaging evidence | Local checker remains deliberately incomplete for media/live/manual rows; later reinstalled-main and fresh-clone full gates pass including31Forge tests |
 | I15 mainnet | Owner-only, no execution or configuration flip now |
 
 The source plan contains stale weekday labels and forward-looking templates.
