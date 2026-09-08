@@ -1315,6 +1315,48 @@ SH
 
 The command atomically updates only the endpoint, web and context text keys. It refreshes the context JSON's routing and embedded price to match the current raw price. It preserves that raw price (including a deliberately bumped demo price), payee, chain, optional identity records, ownership and grants. A current MCP record refuses this narrow command rather than leaving a stale local MCP claim. An existing ERC-8004 registration URI is a separate registry field and is not rewritten by this ENS operation. A production web URL must be independently verified to serve before invocation; setup preflight validates its shape, not its HTML.
 
+### Production re-point — executed September 8, 2026
+
+The pending owner action above ran. The preceding "pending" framing is now historical for
+this one name; nothing else in that section changed.
+
+| | |
+|---|---|
+| name | `usdc-flow-check.scf821769ed.arcade.eth` |
+| transaction | [`0x95536ac0…`](https://sepolia.etherscan.io/tx/0x95536ac0df37ec691aee6a82e3465ad76e2abe021983ac0c42bfa196c9e50b54) · Sepolia block 11662373 · 219,030 gas |
+| changed keys | `arcade.endpoint`, `agent-endpoint[web]`, `agent-context` |
+| endpoint now | `https://arcade-hub-production.up.railway.app/x/0xcf821769ed3c0e55e152745377bb833d7155a78a/usdc-flow-check` |
+| web now | `https://arcade-web-production-8dc4.up.railway.app/skill/usdc-flow-check` |
+| preserved | `arcade.payTo` `0x9e304ec1…` (FeeSplitterV2), `arcade.chain` `eip155:5042002`, `arcade.priceAtomic` `11000`, empty `agent-endpoint[mcp]` |
+| `resolutionExpectedAbsent` | **true** |
+
+Two prerequisites had to be established first and are recorded because they are the
+reproducible part.
+
+**The production hub had to actually offer the V2 splitter rail.** The seller runner that
+serves production is a launchd job, `com.arcade.runner`, and it had been running since
+August 29 on that day's source with `ARCADE_FEE_SPLITTER` pointing at the **V1** splitter
+`0x10079b0b…`. The hub therefore advertised the seller as payee with no splitter extra,
+while the retained ENS record was bound to FeeSplitterV2 `0x9e304ec1…`. Restarting the job
+against current `main` with the V2 address fixed the mismatch and also raised the live
+catalogue from four listings to nine, because the older process predated five of them. Both
+splitters were read on chain first and both pay the announcing seller, so neither was ever
+a payee hazard: V1 has no `version()` and V2 returns `2`, `seller` `0xcf821769…`, `usdc`
+`0x3600…`, `feeBps` `500`.
+
+**The preflight had to stop assuming a single-rail listing.** `prepareSkillRecords` required
+the unsigned 402 to carry exactly one accept. The hub now offers two for the same listing,
+eip3009 and Gateway, so every production listing was refused. It now selects the accept
+carrying `feeSplitterVersion: 2`, requires exactly one such candidate out of at most eight,
+and applies every check the single-rail form applied (`ced7385`).
+
+**Resolution is still absent, by design.** `resolutionExpectedAbsent: true` means the leaf
+is expired, so guarded ENS resolution correctly returns nothing even though the raw records
+now point at production. Text re-pointing never revives a name. Making
+`usdc-flow-check.scf821769ed.arcade.eth` resolvable for a demo requires the separate
+owner/root RENEW described below, which is a different transaction under different
+authority and is **not** authorized by this re-point.
+
 ### Expiry and recovery are separate operations
 
 Re-pointing text is not renewal. An expired leaf's resolver records remain owner-editable via root SET_TEXT, but guarded ENS resolution remains absent. The runnable command verifies the changed raw records and owner/root authority, checks the unchanged token/latestOwner and returns `resolutionExpectedAbsent:true` only when chain state and typed guarded-name absence both agree. It does not call that a live endpoint. For the same retained registration, an explicitly approved owner/root-RENEW call would be `skillRegistry.renew(labelId(skill.label), <fixed-approved-future-expiry>)`, using the existing driver with a **different recovery journal and binding** and the intent→send→confirmed→readback discipline above. This is a separate future operation, not part of the executable re-point command. Verify owner root RENEW, retained token/latestOwner against the demo proof, live parents, and a fixed future expiry on actual Sepolia time. Do not unregister/register/transfer or grant daemon root RENEW. Recheck per-name daemon roles after revival; restore only the exact scoped grant if absent and separately approved.
