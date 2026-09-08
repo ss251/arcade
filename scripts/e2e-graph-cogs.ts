@@ -8,8 +8,9 @@ import { constants, openSync, closeSync, lstatSync, fstatSync, readSync, realpat
   mkdirSync, opendirSync, writeSync, fsyncSync, unlinkSync, type Stats } from "node:fs"
 import { dirname, isAbsolute, normalize, join, resolve } from "node:path"
 import { encodeGraphQuery, GATEWAY_BASE, validateGraphChallengeHeader, readGraphSettlementHeader, readGraphPaidBody, readGraphRpcBody, verifyGraphReceiptEvidence, type QueryArgs, type GraphResponseObservation, type GraphPaymentIntent, type PaidResult } from "../skills/counterparty-graph/graph-client.ts"
-import { graphQueryIds } from "../skills/counterparty-graph/run.ts"
-import { copyPlainData, plainObject } from "../skills/counterparty-graph/validate-output.ts"
+import { graphQueryIds, graphReadResult } from "../skills/counterparty-graph/run.ts"
+import { synthesize, type Assessment, type Source } from "../skills/counterparty-graph/synthesize.ts"
+import { copyPlainData, plainObject, assessAddressSchemaOk } from "../skills/counterparty-graph/validate-output.ts"
 
 export const GRAPH_COGS_POLICY = Object.freeze({
   namespace: "arcade-graph-cogs-2026-09-v1",
@@ -1676,6 +1677,149 @@ export function readGraphQualifiedReservations(parent: string, sources: GraphSou
   } catch { throw new Error(QUALIFIED_BUDGET_FAIL) }
 }
 
+
+const ASSESSMENT_CACHE_FAIL = "graph_cogs_assessment_cache_refused"
+interface GraphAssessmentOptions { readonly now?: () => number; readonly signal?: AbortSignal }
+export interface GraphAssessmentHistory {
+  readonly sourceHash: string
+  readonly ledgerHash: string
+  readonly budget: Readonly<{ reservations: number; evidence: number; video: number; reservedAtomic: string; lastHash: string }>
+  readonly queries: readonly Readonly<{ queryHash: string; cacheHash: string; proofHash: string; capturedAt: number; storedAt: number; completedAt: number }>[]
+  readonly output: Assessment
+}
+export interface GraphAssessmentReplay {
+  readonly mode: "historical-assessment-replay"
+  readonly newPaidQueries: 0
+  readonly cacheHits: number
+  readonly freshConsumerRun: false
+  readonly storedAt: number
+  readonly artifactHash: string
+  readonly history: GraphAssessmentHistory
+}
+function assessmentDirectory(parent: string, sources: GraphSourceManifest) {
+  return join(parent, "assessment-" + hash(JSON.stringify({ policyHash: GRAPH_COGS_POLICY_HASH,
+    sourceHash: sources.sourceHash, subject: GRAPH_COGS_POLICY.subject })))
+}
+function graphAssessmentHistory(parent: string, sources: GraphSourceManifest, now: () => number): GraphAssessmentHistory {
+  const root = sourceRoots.get(sources); insist(root !== undefined)
+  const unclaimed = () => {
+    now(); privateDirectory(parent)
+    try { lstatSync(join(parent, GRAPH_COGS_POLICY.namespace, ".claim")) }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return; throw error }
+    insist(false)
+  }
+  unclaimed()
+  const budget = readGraphQualifiedReservations(parent, sources, { now }); insist(budget.unresolved === 0)
+  const rows: GraphAssessmentHistory["queries"][number][] = []
+  const retained = (binding: GraphQueryBinding, prior?: GraphQueryEvidence) => {
+    const entry = budget.entries.find(row => row.queryHash === binding.queryHash)
+    insist(entry?.state === "retained-consistency" && entry.proof !== null)
+    const cache = readGraphQueryCache(parent, binding, { now, ...(prior === undefined ? {} : { parent: prior }) })
+    insist(cache.cacheHash === entry.proof.cacheHash && cache.evidence.hash === entry.proof.queryEvidenceHash)
+    const journal = readGraphBalanceJournal(parent, binding, { now }); insist(journal.journalHash === entry.proof.journalHash)
+    rows.push(Object.freeze({ queryHash: binding.queryHash, cacheHash: cache.cacheHash,
+      proofHash: entry.proof.hash, capturedAt: cache.evidence.capturedAt, storedAt: cache.storedAt, completedAt: journal.closedAt }))
+    return cache
+  }
+  const query = (kind: "identities" | "attestations") =>
+    readBudgetText(join(root, "skills/counterparty-graph/queries/" + kind + ".graphql"), false, 8192)
+  const firstBinding = bindGraphQuery({ subgraphId: GRAPH_COGS_POLICY.subgraph, document: query("identities"),
+    variables: { address: GRAPH_COGS_POLICY.subject } }, sources)
+  const firstCache = retained(firstBinding), first = graphReadResult(firstCache.evidence.result, "agent0-identities")
+  const records: Source[] = [first.source], ids = graphQueryIds(first.data, GRAPH_COGS_POLICY.subject)
+  let attestations: Record<string, unknown> = {}
+  if (ids !== null && ids.length > 0) {
+    const binding = bindGraphQuery({ subgraphId: GRAPH_COGS_POLICY.subgraph, document: query("attestations"),
+      variables: { agentIds: ids, block: { hash: first.source.blockHash } } }, sources,
+      { binding: firstBinding, blockHash: first.source.blockHash })
+    const second = graphReadResult(retained(binding, firstCache.evidence).evidence.result, "agent0-attestations")
+    attestations = second.data; records.push(second.source)
+  }
+  // Identical original consumer inputs: indexed data never supplies trusted proofs.
+  const output = synthesize({ address: GRAPH_COGS_POLICY.subject, identities: first.data, attestations, sources: records })
+  insist(assessAddressSchemaOk(output) && output.address === GRAPH_COGS_POLICY.subject &&
+    output.verdict !== "allow" && output.attesterSettledCount === 0)
+  const checked = readGraphQualifiedReservations(parent, sources, { now })
+  insist(JSON.stringify(checked) === JSON.stringify(budget)); unclaimed(); now()
+  return Object.freeze({ sourceHash: sources.sourceHash, ledgerHash: budget.ledgerHash,
+    budget: Object.freeze({ reservations: budget.reservations, evidence: budget.evidence, video: budget.video,
+      reservedAtomic: budget.reservedAtomic, lastHash: budget.lastHash }), queries: Object.freeze(rows),
+    output: frozenData({ output }).output as Assessment })
+}
+function assessmentState(directory: string, identity: DirectoryIdentity, history: GraphAssessmentHistory,
+  now: () => number, claimed: boolean): GraphAssessmentReplay {
+  const inventory = () => {
+    now(); sameDirectory(directory, identity)
+    const handle = opendirSync(directory, { bufferSize: 4 }), names: string[] = []
+    try {
+      for (;;) { const entry = handle.readSync(); if (entry === null) break
+        insist(names.length < 3 && entry.isFile()); names.push(entry.name) }
+    } finally { handle.closeSync() }
+    insist(JSON.stringify(names.sort()) === JSON.stringify([...(claimed ? [".claim"] : []), "commit.json", "result.json"]))
+  }
+  inventory()
+  const text = readBudgetText(join(directory, "result.json"), true, CACHE_RESULT_BYTES), value: unknown = JSON.parse(text)
+  shape(value, ["format", "policyHash", "subject", "sourceHash", "storedAt", "history", "hash"])
+  insist(value.format === "arcade-graph-assessment-cache-v1" && value.policyHash === GRAPH_COGS_POLICY_HASH &&
+    value.subject === GRAPH_COGS_POLICY.subject && value.sourceHash === history.sourceHash &&
+    Number.isSafeInteger(value.storedAt) && Number(value.storedAt) >= Math.max(...history.queries.map(row => Math.max(row.storedAt, row.completedAt))) &&
+    Number(value.storedAt) <= now() && JSON.stringify(value.history) === JSON.stringify(history) && JSON.stringify(value) + "\n" === text)
+  const body = { format: value.format, policyHash: value.policyHash, subject: value.subject,
+    sourceHash: value.sourceHash, storedAt: value.storedAt, history }
+  insist(value.hash === hash(JSON.stringify(body)))
+  const marker = readBudgetText(join(directory, "commit.json")), commit: unknown = JSON.parse(marker)
+  shape(commit, ["format", "policyHash", "sourceHash", "resultHash"])
+  insist(commit.format === "arcade-graph-assessment-commit-v1" && commit.policyHash === GRAPH_COGS_POLICY_HASH &&
+    commit.sourceHash === history.sourceHash && commit.resultHash === hash(text) && JSON.stringify(commit) + "\n" === marker)
+  now()
+  insist(readBudgetText(join(directory, "result.json"), true, CACHE_RESULT_BYTES) === text &&
+    readBudgetText(join(directory, "commit.json")) === marker)
+  inventory(); now()
+  return Object.freeze({ mode: "historical-assessment-replay", newPaidQueries: 0, cacheHits: history.queries.length,
+    freshConsumerRun: false, storedAt: Number(value.storedAt), artifactHash: hash(marker), history })
+}
+/** Historical artifact only; no runGraphJob/assess, key, signer, transport or
+ * refresh. Reads never manufacture a missing artifact or reset exposure. */
+export function readGraphAssessmentCache(parent: string, sources: GraphSourceManifest,
+  options: GraphAssessmentOptions = {}): GraphAssessmentReplay {
+  try {
+    const now = cacheClock(options), history = graphAssessmentHistory(parent, sources, now)
+    const directory = assessmentDirectory(parent, sources), identity = privateDirectory(directory)
+    const state = assessmentState(directory, identity, history, now, false)
+    insist(JSON.stringify(graphAssessmentHistory(parent, sources, now)) === JSON.stringify(history))
+    insist(assessmentState(directory, identity, history, now, false).artifactHash === state.artifactHash); now()
+    return state
+  } catch { throw new Error(ASSESSMENT_CACHE_FAIL) }
+}
+/** Supplied-output consistency, not proof of an original consumer run. Exclusive
+ * result/commit storage; uncertain partial writes and claims are never removed. */
+export function writeGraphAssessmentCache(parent: string, sources: GraphSourceManifest, output: unknown,
+  options: GraphAssessmentOptions & { readonly afterResultSync?: () => void; readonly afterCommitSync?: () => void } = {}): GraphAssessmentReplay {
+  try {
+    const now = cacheClock(options), history = graphAssessmentHistory(parent, sources, now)
+    insist((options.afterResultSync === undefined || typeof options.afterResultSync === "function") &&
+      (options.afterCommitSync === undefined || typeof options.afterCommitSync === "function") &&
+      JSON.stringify(copyPlainData(output)) === JSON.stringify(history.output))
+    const parentIdentity = privateDirectory(parent), directory = assessmentDirectory(parent, sources)
+    mkdirSync(directory, { mode: 0o700 }); const identity = privateDirectory(directory)
+    syncDirectory(parent, parentIdentity)
+    const claim = ownClaim(directory, identity), storedAt = now()
+    const body = { format: "arcade-graph-assessment-cache-v1", policyHash: GRAPH_COGS_POLICY_HASH,
+      subject: GRAPH_COGS_POLICY.subject, sourceHash: sources.sourceHash, storedAt, history }
+    const text = JSON.stringify({ ...body, hash: hash(JSON.stringify(body)) }) + "\n"
+    insist(Buffer.byteLength(text) <= CACHE_RESULT_BYTES)
+    freshBudgetFile(join(directory, "result.json"), text, CACHE_RESULT_BYTES); syncDirectory(directory, identity)
+    options.afterResultSync?.(); now(); claim.check()
+    const marker = JSON.stringify({ format: "arcade-graph-assessment-commit-v1", policyHash: GRAPH_COGS_POLICY_HASH,
+      sourceHash: sources.sourceHash, resultHash: hash(text) }) + "\n"
+    freshBudgetFile(join(directory, "commit.json"), marker); syncDirectory(directory, identity)
+    options.afterCommitSync?.(); now(); claim.check()
+    assessmentState(directory, identity, history, now, true)
+    insist(JSON.stringify(graphAssessmentHistory(parent, sources, now)) === JSON.stringify(history))
+    now(); claim.check(); claim.release()
+    return readGraphAssessmentCache(parent, sources, { now, ...(options.signal === undefined ? {} : { signal: options.signal }) })
+  } catch { throw new Error(ASSESSMENT_CACHE_FAIL) }
+}
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {
     process.stdout.write("Read-only Graph reservation audit. No live calls, keys, writes or nested gates.\nUsage: e2e-graph-cogs.sh [--audit-reservations /absolute/private/reservations.jsonl]\n")

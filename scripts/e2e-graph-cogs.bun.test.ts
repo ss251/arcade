@@ -1,5 +1,5 @@
 import { expect, test, spyOn } from "bun:test"
-import { createGraphBalanceRecorder, readGraphBalanceJournal, verifyGraphJournaledQuery, readGraphQualifiedReservations, openGraphQualifiedReservationWriter, type GraphBalanceObservation } from "./e2e-graph-cogs.ts"
+import { createGraphBalanceRecorder, readGraphBalanceJournal, verifyGraphJournaledQuery, readGraphQualifiedReservations, openGraphQualifiedReservationWriter, writeGraphAssessmentCache, readGraphAssessmentCache, type GraphBalanceObservation } from "./e2e-graph-cogs.ts"
 import { createHash } from "node:crypto"
 import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSync, linkSync, mkdirSync, realpathSync, existsSync, readdirSync, copyFileSync, unlinkSync, renameSync, lstatSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -8,6 +8,8 @@ import { spawnSync } from "node:child_process"
 import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, verifyGraphCapturedQuery, writeGraphQueryCache, readGraphQueryCache, bindGraphQueryBalances, claimGraphReservation, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
 import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObservation, type GraphPaymentIntent } from "../skills/counterparty-graph/graph-client.ts"
 import { encodeAbiParameters, encodeEventTopics, parseAbi } from "viem"
+import { graphReadResult } from "../skills/counterparty-graph/run.ts"
+import { synthesize } from "../skills/counterparty-graph/synthesize.ts"
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 const header = () => JSON.stringify({ format: "arcade-graph-reservations-v1", policyHash: GRAPH_COGS_POLICY_HASH })
@@ -1201,6 +1203,173 @@ test("frozen journal fixture time supplies the intent deadline even when the wal
   recorder.recordPreForward(journalBalance(time), intent, captureSignal())
   expect(existsSync(join(f.journal, "pre-forward.json"))).toBe(true)
   expect(() => recorder.close()).toThrow(); f.writer.close()
+}))
+
+test("assessment replay refuses empty history without manufacturing a cache or a key", () => owned(parent => {
+  const sources = readGraphSourceManifest(sourceCopy(parent)); initializeGraphReservationState(parent)
+  const before = readdirSync(parent).sort()
+  expect(() => readGraphAssessmentCache(parent, sources)).toThrow(/^graph_cogs_assessment_cache_refused$/)
+  expect(() => writeGraphAssessmentCache(parent, sources, {})).toThrow(/^graph_cogs_assessment_cache_refused$/)
+  expect(readdirSync(parent).sort()).toEqual(before)
+}))
+
+function declaredAssessment(first: ReturnType<typeof verifyGraphCapturedQuery>, second?: ReturnType<typeof verifyGraphCapturedQuery>) {
+  const a = graphReadResult(first.result, "agent0-identities"), b = second === undefined ? undefined : graphReadResult(second.result, "agent0-attestations")
+  return synthesize({ address: GRAPH_COGS_POLICY.subject, identities: a.data, attestations: b?.data ?? {},
+    sources: b === undefined ? [a.source] : [a.source, b.source] })
+}
+async function assessmentFixture<T>(queries: 1 | 2, work: (f: {
+  parent: string; source: string; sources: ReturnType<typeof readGraphSourceManifest>;
+  directory: string; first: Awaited<ReturnType<typeof recordQualifiedDeclaredQuery>>; output: ReturnType<typeof synthesize>;
+}) => T | Promise<T>) {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-assessment-")))
+  try {
+    if (queries === 1) {
+      const data = { _meta: declaredIdentityData()._meta, asWallet: [], asOwner: [] }
+      const f = await declaredJournaledQuery(parent, "990000", data), sources = readGraphSourceManifest(f.source)
+      const journal = readGraphBalanceJournal(parent, f.binding)
+      return await work({ parent, source: f.source, sources, directory: f.directory,
+        first: { binding: f.binding, evidence: f.evidence, after: journal.after, receiptTimestamp: f.protocol.receiptTimestamp },
+        output: declaredAssessment(f.evidence) })
+    }
+    const source = sourceCopy(parent), sources = readGraphSourceManifest(source), directory = initializeGraphReservationState(parent)
+    const writer = openGraphQualifiedReservationWriter(parent, sources)
+    const first = await recordQualifiedDeclaredQuery(parent, sources, writer)
+    const second = await recordQualifiedDeclaredQuery(parent, sources, writer, first); writer.close()
+    return await work({ parent, source, sources, directory, first, output: declaredAssessment(first.evidence, second.evidence) })
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+}
+function assessmentPath(parent: string) {
+  const names = readdirSync(parent).filter(name => name.startsWith("assessment-")); expect(names).toHaveLength(1)
+  return join(parent, names[0]!)
+}
+for (const queries of [1, 2] as const) test(`complete ${queries}-query assessment replay retains provenance and every quota without a fresh consumer run`, () => assessmentFixture(queries, f => {
+  const ledger = readFileSync(join(f.directory, "reservations.jsonl")), result = writeGraphAssessmentCache(f.parent, f.sources, f.output)
+  expect(result).toMatchObject({ mode: "historical-assessment-replay", cacheHits: queries, newPaidQueries: 0, freshConsumerRun: false,
+    history: { budget: { reservations: queries, evidence: queries, reservedAtomic: String(queries * 10000) }, output: f.output } })
+  expect(result.history.output.sources).toHaveLength(queries)
+  expect(result.history.output.sources.every(source => source.costAtomic === "10000" && source.paymentTx !== null && source.blockHash === declaredIdentityData()._meta.block.hash)).toBe(true)
+  expect(result.history.queries.every(query => query.capturedAt <= query.storedAt && query.completedAt <= result.storedAt)).toBe(true)
+  expect(Object.isFrozen(result.history.output)).toBe(true); expect(Object.isFrozen(result.history.output.sources[0])).toBe(true)
+  const dir = assessmentPath(f.parent)
+  expect(readdirSync(dir).sort()).toEqual(["commit.json", "result.json"])
+  expect(lstatSync(dir).mode & 0o777).toBe(0o700); expect(lstatSync(join(dir, "result.json")).mode & 0o777).toBe(0o600)
+  expect(readGraphAssessmentCache(f.parent, f.sources)).toEqual(result)
+  expect(() => writeGraphAssessmentCache(f.parent, f.sources, f.output)).toThrow(/^graph_cogs_assessment_cache_refused$/)
+  expect(readFileSync(join(f.directory, "reservations.jsonl"))).toEqual(ledger)
+}), 15000)
+
+test("an actual no-key no-network child replays the complete assessment without entering consumer or signer", () => assessmentFixture(2, f => {
+  const result = writeGraphAssessmentCache(f.parent, f.sources, f.output), dir = assessmentPath(f.parent)
+  const before = readFileSync(join(dir, "result.json"))
+  const childCode = `import{mock}from"bun:test";let forbidden=0;const refuse=()=>{forbidden++;throw Error("forbidden operation")};
+    globalThis.fetch=refuse;const runPath=${JSON.stringify(resolve(import.meta.dir, "../skills/counterparty-graph/run.ts"))},
+    clientPath=${JSON.stringify(resolve(import.meta.dir, "../skills/counterparty-graph/graph-client.ts"))};
+    const run=await import(runPath),client=await import(clientPath);
+    mock.module(runPath,()=>({...run,assess:refuse,runGraphJob:refuse}));
+    mock.module(clientPath,()=>({...client,readPayerKey:refuse,runKeyCommand:refuse,makePaidQuery:refuse,paidQuery:refuse}));
+    const h=await import(${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))});
+    const result=h.readGraphAssessmentCache(${JSON.stringify(f.parent)},h.readGraphSourceManifest(${JSON.stringify(f.source)}));
+    if(forbidden)process.exit(98);console.log(JSON.stringify(result));`
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", childCode], { env: { PATH: "" }, encoding: "utf8", timeout: 8000, maxBuffer: 65536 })
+  expect(child.status).toBe(0); expect(child.stderr).toBe(""); expect(JSON.parse(child.stdout)).toEqual(result)
+  expect(readFileSync(join(dir, "result.json"))).toEqual(before)
+}), 15000)
+
+test("missing required second query refuses assessment storage while preserving the first successful query cache", async () => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "arcade-graph-assessment-")))
+  try {
+    const source = sourceCopy(parent), sources = readGraphSourceManifest(source); initializeGraphReservationState(parent)
+    const writer = openGraphQualifiedReservationWriter(parent, sources), first = await recordQualifiedDeclaredQuery(parent, sources, writer); writer.close()
+    const before = readFileSync(join(parent, "cache-" + first.binding.queryHash, "result.json"))
+    expect(() => writeGraphAssessmentCache(parent, sources, declaredAssessment(first.evidence))).toThrow(/^graph_cogs_assessment_cache_refused$/)
+    expect(readdirSync(parent).some(name => name.startsWith("assessment-"))).toBe(false)
+    expect(readFileSync(join(parent, "cache-" + first.binding.queryHash, "result.json"))).toEqual(before)
+  } finally { rmSync(parent, { recursive: true, force: true }) }
+})
+test("supplied assessment mismatches refuse before creating any artifact", () => assessmentFixture(1, f => {
+  for (const patch of [{ verdict: "allow" }, { attesterSettledCount: 1 }, { sources: [] }, { extra: true },
+    { address: GRAPH_COGS_POLICY.payer }]) expect(() => writeGraphAssessmentCache(f.parent, f.sources, { ...f.output, ...patch })).toThrow(/^graph_cogs_assessment_cache_refused$/)
+  expect(readdirSync(f.parent).some(name => name.startsWith("assessment-"))).toBe(false)
+}))
+for (const fault of ["extra", "truncated", "symlink", "hardlink", "mode", "commit", "rehashed-output", "source", "query-cache", "active-global"] as const)
+  test(`assessment replay refuses ${fault} without refreshing or rewriting`, () => assessmentFixture(1, f => {
+    writeGraphAssessmentCache(f.parent, f.sources, f.output)
+    const dir = assessmentPath(f.parent), path = join(dir, "result.json")
+    let writer: GraphReservationWriter | undefined
+    if (fault === "extra") writeFileSync(join(dir, "extra"), "x", { mode: 0o600 })
+    if (fault === "truncated") writeFileSync(path, "{")
+    if (fault === "symlink") { const original = join(f.parent, "original"); renameSync(path, original); symlinkSync(original, path) }
+    if (fault === "hardlink") linkSync(path, join(f.parent, "alias"))
+    if (fault === "mode") chmodSync(path, 0o644)
+    if (fault === "commit") writeFileSync(join(dir, "commit.json"), "{}\n")
+    if (fault === "rehashed-output") {
+      const { hash: _old, ...value } = JSON.parse(readFileSync(path, "utf8")); value.history.output.verdict = "allow"
+      const text = JSON.stringify({ ...value, hash: hash(JSON.stringify(value)) }) + "\n"; writeFileSync(path, text)
+      const marker = JSON.parse(readFileSync(join(dir, "commit.json"), "utf8")); marker.resultHash = hash(text)
+      writeFileSync(join(dir, "commit.json"), JSON.stringify(marker) + "\n")
+    }
+    if (fault === "source") writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed")
+    if (fault === "query-cache") writeFileSync(join(f.parent, "cache-" + f.first.binding.queryHash, "result.json"), "{}\n")
+    if (fault === "active-global") writer = openGraphQualifiedReservationWriter(f.parent, f.sources)
+    const bytes = readFileSync(path), ledger = readFileSync(join(f.directory, "reservations.jsonl"))
+    expect(() => readGraphAssessmentCache(f.parent, f.sources)).toThrow(/^graph_cogs_assessment_cache_refused$/)
+    expect(readFileSync(path)).toEqual(bytes); expect(readFileSync(join(f.directory, "reservations.jsonl"))).toEqual(ledger)
+    writer?.close()
+  }))
+for (const phase of ["result", "commit"] as const) test(`an actual assessment child exits after ${phase} fsync retaining the partial claim`, () => assessmentFixture(1, f => {
+  const childCode = cacheChild(f, `const h=await import(${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))});
+    h.writeGraphAssessmentCache(parent,h.readGraphSourceManifest(${JSON.stringify(f.source)}),${JSON.stringify(f.output)},
+    {${phase === "result" ? "afterResultSync" : "afterCommitSync"}(){process.exit(40)}});process.exit(99)`)
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", childCode], { env: { PATH: "" }, encoding: "utf8", timeout: 8000, maxBuffer: 4096 })
+  expect(child.status).toBe(40); expect(child.stdout).toBe(""); expect(child.stderr).toBe("")
+  const dir = assessmentPath(f.parent)
+  expect(existsSync(join(dir, ".claim"))).toBe(true); expect(existsSync(join(dir, "result.json"))).toBe(true)
+  expect(existsSync(join(dir, "commit.json"))).toBe(phase === "commit")
+  expect(() => readGraphAssessmentCache(f.parent, f.sources)).toThrow(/^graph_cogs_assessment_cache_refused$/)
+  expect(() => writeGraphAssessmentCache(f.parent, f.sources, f.output)).toThrow()
+}))
+for (const fault of ["abort", "deadline", "source-change"] as const) test(`assessment ${fault} after result fsync retains uncertainty`, () => assessmentFixture(1, f => {
+  let time = Date.now(); const controller = new AbortController()
+  expect(() => writeGraphAssessmentCache(f.parent, f.sources, f.output, { now: () => time, signal: controller.signal,
+    afterResultSync() { if (fault === "abort") controller.abort(); else if (fault === "deadline") time += 5000
+      else writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "changed") },
+  })).toThrow(/^graph_cogs_assessment_cache_refused$/)
+  const dir = assessmentPath(f.parent)
+  expect(existsSync(join(dir, "result.json"))).toBe(true); expect(existsSync(join(dir, ".claim"))).toBe(true)
+  expect(() => readGraphAssessmentCache(f.parent, f.sources)).toThrow()
+}))
+
+test("a later unresolved reservation blocks historical assessment replay without erasing the artifact", () => assessmentFixture(1, f => {
+  writeGraphAssessmentCache(f.parent, f.sources, f.output)
+  const path = join(assessmentPath(f.parent), "result.json"), bytes = readFileSync(path)
+  const writer = openGraphQualifiedReservationWriter(f.parent, f.sources)
+  writer.reserve({ allocation: "video", queryHash: hash("later unknown query"), balanceAtomic: "990000" }); writer.close()
+  expect(() => readGraphAssessmentCache(f.parent, f.sources)).toThrow(/^graph_cogs_assessment_cache_refused$/)
+  expect(readFileSync(path)).toEqual(bytes)
+  expect(readGraphReservations(join(f.directory, "reservations.jsonl"))).toMatchObject({ reservations: 2, reservedAtomic: "20000" })
+}))
+test("assessment read cancellation, backwards time and late acknowledgement preserve bytes", () => assessmentFixture(1, f => {
+  writeGraphAssessmentCache(f.parent, f.sources, f.output)
+  const path = join(assessmentPath(f.parent), "result.json"), bytes = readFileSync(path), time = Date.now()
+  for (const fault of ["abort", "backwards", "deadline"] as const) {
+    const controller = new AbortController(); if (fault === "abort") controller.abort(); let calls = 0
+    expect(() => readGraphAssessmentCache(f.parent, f.sources, { signal: controller.signal,
+      now: () => ++calls === 1 ? time : fault === "backwards" ? time - 1 : time + 5000,
+    })).toThrow(/^graph_cogs_assessment_cache_refused$/)
+  }
+  expect(readFileSync(path)).toEqual(bytes)
+}))
+test("assessment bytes changed during final history verification cannot pass readback", () => assessmentFixture(1, f => {
+  writeGraphAssessmentCache(f.parent, f.sources, f.output)
+  const path = join(assessmentPath(f.parent), "result.json"), time = Date.now(); let total = 0
+  readGraphAssessmentCache(f.parent, f.sources, { now: () => { total++; return time } })
+  let calls = 0
+  expect(() => readGraphAssessmentCache(f.parent, f.sources, { now: () => {
+    if (++calls === Math.floor(total * 0.7)) writeFileSync(path, "{changed")
+    return time
+  } })).toThrow(/^graph_cogs_assessment_cache_refused$/)
+  expect(readFileSync(path, "utf8")).toBe("{changed")
 }))
 
 function sourceCopy(parent: string) {

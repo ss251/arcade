@@ -1,5 +1,17 @@
 # Plan G — execution records
 
+## September 8 — G15 full historical assessment replay checkpoint
+
+The [assessment-replay brief](task-15-assessment-replay-brief.md) and
+[assessment-replay report](task-15-assessment-replay-report.md) join complete
+qualified query caches into an exclusive private assessment artifact. Read-only
+replay retains cost/transaction/block/acquisition facts and every quota charge,
+with zero new paid queries and no fresh consumer run. An actual child traps
+consumer/key/signer/network entry points and still returns the same artifact.
+344 focused Bun/1764 assertions,24 consumer Vitest and exact strict passed.
+Sole full gate passed5371Vitest/1767Bun, strict and both builds; local commit
+follows. No operational root, real key/RPC/payment or push.
+
 ## September 8 — G15 opt-in qualified-writer checkpoint
 
 The [qualified-writer brief](task-15-qualified-writer-brief.md) and

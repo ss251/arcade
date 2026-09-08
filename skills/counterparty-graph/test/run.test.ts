@@ -22,6 +22,15 @@ const fixture = (first = firstData(), second = secondData()) => {
 const module = () => import("../run.ts")
 
 describe("inert original identity selector alias", () => {
+  it("exposes the original retained result decoder without key or query work", async () => {
+    const { graphReadResult } = await module(), raw = result(firstData())
+    expect(graphReadResult(raw, "agent0-identities")).toEqual({ data: raw.data, source: {
+      name: "agent0-identities", endpoint: "https://gateway.thegraph.com/api/x402/subgraphs/id/43s9hQRurMGjuYnC1r2ZwS6xSQktbFyXMPMqGKUFJojb",
+      subgraphId: "43s9hQRurMGjuYnC1r2ZwS6xSQktbFyXMPMqGKUFJojb", chain: "eip155:8453", block: 41,
+      blockHash: HASH, costAtomic: "10000", paymentTx: TX,
+    } })
+    expect(() => graphReadResult({ ...raw, paymentTx: null }, "agent0-identities")).toThrow("Graph query unavailable")
+  })
   it("derives the same sorted unique follow-up IDs without running a consumer", async () => {
     const { graphQueryIds } = await module(), input = firstData()
     input.asOwner = [agent(), { ...agent(), id: "8453:3", agentId: "3" }]

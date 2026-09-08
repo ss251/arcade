@@ -1,5 +1,21 @@
 # SDD ledger — Plan G
 
+2026-09-08 09:42 IST — G15S sole14774 full gate PASS:5371Vitest242/69.01s;
+1767Bun98/13774assert238.07s;root/webstrict/clientSSR354/169ms. Eight paths,
+3links/privacy0;five source/brief pins frozen. Original harness/consumer
+mechanical restoration passes; client/synthesis/schema unchanged. Atomic local
+commit/mainFF next; no full repeat, operational root/key/live/spend or push.
+
+2026-09-08 09:35 IST — G15S full historical assessment storage/readback
+implemented after missing-export Red.21selectedBun116assert20.10s passed;
+strict found three fixture diagnostics from one missing Awaited annotation,
+corrected without production changes. Final344Bun1764assert50.56s,
+24consumerVitest702ms and4rootsstrict0 PASS. Actual no-key/no-network child
+traps consumer/signing/key entry points; two real offline reservations retained.
+Source guard mechanically restores original harness/consumer, client/synthesis
+unchanged. Eight-path audit/freeze/sole sequential gate next; no operational
+root, real key/RPC/spend, payment-policy change, approval replay or push.
+
 2026-09-08 09:25 IST — G15R sole44108 full gate PASS:5370Vitest242/69.12s;
 1743Bun98/13646assert218.43s;root/webstrict/clientSSR354/169ms. Six paths,
 3links/privacy0 and three frozen source/brief pins; original harness restoration

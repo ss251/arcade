@@ -58,6 +58,8 @@ const queryIds = (data: Record<string, unknown>, address: string): string[] | nu
 }
 /** Inert alias for retained-result correlation; no key, query or consumer run. */
 export { queryIds as graphQueryIds }
+/** Inert original result decoder; retained facts do not execute the consumer. */
+export { readResult as graphReadResult }
 export const assess = async (input: { readonly address: string }, deps: {
   readonly payerKey: string; readonly query: PaidQuery
 }): Promise<Assessment> => {
