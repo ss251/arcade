@@ -4,7 +4,7 @@ import { mkdtempSync, chmodSync, writeFileSync, readFileSync, rmSync, symlinkSyn
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
-import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
+import { GRAPH_COGS_POLICY, GRAPH_COGS_POLICY_HASH, decodeGraphReservations, readGraphReservations, checkGraphBalance, initializeGraphReservationState, openGraphReservationWriter, readGraphBalance, GRAPH_COGS_RPC, GRAPH_COGS_SOURCE_FILES, readGraphSourceManifest, bindGraphQuery, createGraphResponseRecorder, readGraphResponseCapture, type GraphReservationWriter, type GraphBalanceTransport, type GraphQueryBinding, type GraphResponseRecorder } from "./e2e-graph-cogs.ts"
 import { document, AGENT0_BASE_SUBGRAPH_ID, makePaidQuery, type GraphResponseObservation } from "../skills/counterparty-graph/graph-client.ts"
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex")
@@ -668,4 +668,160 @@ test("a failed post-sync operation cannot release its claim or overwrite the ret
   expect(existsSync(join(f.dir, "response-02.json"))).toBe(false)
   expect(() => recorder.close()).toThrow("graph_cogs_capture_refused")
   expect(existsSync(join(f.dir, ".claim"))).toBe(true)
+}))
+test("retained capture readback is immutable, byte-preserving and never receipt proof", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding)
+  await recorder.observe(observation(f.binding), captureSignal())
+  await recorder.observe(observation(f.binding, "paid"), captureSignal())
+  const paths = readdirSync(f.dir).sort(), before = paths.map(path => readFileSync(join(f.dir, path)))
+  const result = readGraphResponseCapture(f.parent, f.binding)
+  expect(result.claimPresent).toBe(true)
+  expect(result.summary).toEqual(recorder.snapshot())
+  expect(result.records[1]?.observation).toEqual(observation(f.binding, "paid"))
+  expect(result.summary.receiptProof).toBe("not_checked")
+  expect(Object.isFrozen(result)).toBe(true); expect(Object.isFrozen(result.records)).toBe(true)
+  expect(Object.isFrozen(result.records[0]?.observation.headers)).toBe(true)
+  expect(paths.map(path => readFileSync(join(f.dir, path)))).toEqual(before)
+  recorder.close()
+  expect(readGraphResponseCapture(f.parent, f.binding).claimPresent).toBe(false)
+}))
+function rewriteCapture(path: string, change: (row: Record<string, unknown>) => void) {
+  const row = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>
+  change(row)
+  const { hash: _old, ...body } = row
+  writeFileSync(path, JSON.stringify({ ...body, hash: hash(JSON.stringify(body)) }) + "\n")
+}
+test("missing capture state is never initialized by readback", () => captureOwned(async f => {
+  const before = readdirSync(f.parent)
+  expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+  expect(readdirSync(f.parent)).toEqual(before)
+}))
+test("empty and interrupted byte-complete captures remain inspectable but never paid success", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding, { afterRecordSync() { throw Error("interrupted") } })
+  expect(readGraphResponseCapture(f.parent, f.binding).summary).toMatchObject({ responses: 0, paidResponses: 0, receiptProof: "not_checked" })
+  await expect(recorder.observe(observation(f.binding), captureSignal())).rejects.toThrow()
+  const partial = readGraphResponseCapture(f.parent, f.binding)
+  expect(partial.claimPresent).toBe(true)
+  expect(partial.summary).toMatchObject({ responses: 1, paidResponses: 0, receiptProof: "not_checked" })
+  expect(() => recorder.close()).toThrow()
+}))
+test("malformed claims, missing intent, extra files and record gaps refuse without repairing bytes", async () => {
+  for (const fault of ["claim", "intent", "extra", "gap", "symlink", "hardlink", "public", "bom"] as const) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding)
+    await recorder.observe(observation(f.binding), captureSignal())
+    const path = join(f.dir, "response-01.json")
+    if (fault === "claim") writeFileSync(join(f.dir, ".claim"), "{}\n")
+    if (fault === "intent") unlinkSync(join(f.dir, "intent.json"))
+    if (fault === "extra") writeFileSync(join(f.dir, "unknown.json"), "{}\n", { mode: 0o600 })
+    if (fault === "gap") renameSync(path, join(f.dir, "response-02.json"))
+    if (fault === "symlink") { renameSync(path, join(f.parent, "response.json")); symlinkSync(join(f.parent, "response.json"), path) }
+    if (fault === "hardlink") linkSync(path, join(f.parent, "response.json"))
+    if (fault === "public") chmodSync(path, 0o644)
+    if (fault === "bom") writeFileSync(path, Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), readFileSync(path)]))
+    const names = readdirSync(f.dir).sort(), before = names.map(name => readFileSync(join(f.dir, name)))
+    expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+    expect(readdirSync(f.dir).sort()).toEqual(names)
+    expect(names.map(name => readFileSync(join(f.dir, name)))).toEqual(before)
+  })
+})
+test("recomputed record hashes do not authorize changed policies, query bindings, order or future times", async () => {
+  const changes: ((row: Record<string, unknown>) => void)[] = [
+    row => { row.policyHash = hash("different policy") }, row => { row.queryHash = hash("different request") },
+    row => { row.sequence = 2 }, row => { row.previousHash = hash("disconnected") },
+    row => { row.capturedAt = Date.now() + 60000 }, row => { row.extra = true },
+    row => { (row.observation as Record<string, unknown>).phase = "paid" },
+    row => { (row.observation as Record<string, unknown>).bodySha256 = hash("different body") },
+  ]
+  for (const change of changes) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding)
+    await recorder.observe(observation(f.binding), captureSignal()); recorder.close()
+    rewriteCapture(join(f.dir, "response-01.json"), change)
+    expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("duplicate JSON keys and truncated tails cannot become canonical retained records", async () => {
+  for (const fault of ["duplicate", "tail", "space"] as const) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding)
+    await recorder.observe(observation(f.binding), captureSignal()); recorder.close()
+    const path = join(f.dir, "response-01.json"), text = readFileSync(path, "utf8")
+    writeFileSync(path, fault === "duplicate" ? text.replace('"sequence":1', '"sequence":1,"sequence":1') : fault === "tail" ? text.trimEnd() : " " + text)
+    expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("reversed capture time and a second paid response refuse even when the file chain is rehashed", async () => {
+  for (const fault of ["time", "paid"] as const) await captureOwned(async f => {
+    let time = Date.now() - 1000
+    const recorder = createGraphResponseRecorder(f.parent, f.binding, { now: () => time })
+    await recorder.observe(observation(f.binding), captureSignal()); time++
+    await recorder.observe(observation(f.binding, "paid"), captureSignal()); time++
+    await recorder.observe(observation(f.binding, "rpc"), captureSignal()); recorder.close()
+    rewriteCapture(join(f.dir, "response-03.json"), row => {
+      if (fault === "time") row.capturedAt = time - 2
+      else row.observation = observation(f.binding, "paid")
+    })
+    expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("manifest/source mismatch and forged binding objects refuse retained readback", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding)
+  await recorder.observe(observation(f.binding), captureSignal()); recorder.close()
+  expect(() => readGraphResponseCapture(f.parent, { ...f.binding })).toThrow("graph_cogs_capture_refused")
+  writeFileSync(join(f.source, "skills/counterparty-graph/run.ts"), "// different fixture source\n")
+  expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+}))
+test("a concurrent change after initial manifest read is caught by the second byte capture", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding)
+  await recorder.observe(observation(f.binding), captureSignal())
+  let ticks = 0, changed = false
+  expect(() => readGraphResponseCapture(f.parent, f.binding, { now() {
+    if (++ticks === 5) { changed = true; writeFileSync(join(f.dir, "intent.json"), "{}\n") }
+    return Date.now()
+  } })).toThrow("graph_cogs_capture_refused")
+  expect(changed).toBe(true)
+}))
+test("readback deadlines refuse rather than returning a late snapshot", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding)
+  await recorder.observe(observation(f.binding), captureSignal()); recorder.close()
+  const base = Date.now(); let reads = 0
+  expect(() => readGraphResponseCapture(f.parent, f.binding, { now: () => base + (++reads >= 8 ? 5000 : 0) })).toThrow("graph_cogs_capture_refused")
+}))
+test("a separate keyless read-only process verifies retained capture without emitting raw provider data", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding)
+  await recorder.observe(observation(f.binding, "challenge", "private-provider-sentinel"), captureSignal()); recorder.close()
+  const names = readdirSync(f.dir).sort(), before = names.map(name => readFileSync(join(f.dir, name)))
+  const source = resolve(import.meta.dir, "e2e-graph-cogs.ts")
+  const code = `import {readGraphSourceManifest,bindGraphQuery,readGraphResponseCapture} from ${JSON.stringify(source)};
+    const binding=bindGraphQuery(${JSON.stringify(identityQuery())},readGraphSourceManifest(${JSON.stringify(f.source)}));
+    const value=readGraphResponseCapture(${JSON.stringify(f.parent)},binding);console.log(JSON.stringify({claimPresent:value.claimPresent,summary:value.summary}));`
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", code], { cwd: tmpdir(), env: { PATH: "" }, encoding: "utf8", timeout: 3000, maxBuffer: 32768 })
+  expect(child.status).toBe(0); expect(child.stderr).toBe("")
+  expect(JSON.parse(child.stdout)).toMatchObject({ claimPresent: false, summary: { responses: 1, paidResponses: 0, receiptProof: "not_checked" } })
+  expect(child.stdout).not.toContain("private-provider-sentinel"); expect(child.stdout).not.toContain(f.parent)
+  expect(names.map(name => readFileSync(join(f.dir, name)))).toEqual(before)
+}))
+test("readback refuses oversized files and more than32 record names before trusting stored summaries", async () => {
+  for (const fault of ["oversized", "count"] as const) await captureOwned(async f => {
+    const recorder = createGraphResponseRecorder(f.parent, f.binding)
+    await recorder.observe(observation(f.binding), captureSignal()); recorder.close()
+    const path = join(f.dir, "response-01.json")
+    if (fault === "oversized") writeFileSync(path, "x".repeat(2 * 1024 * 1024 + 1))
+    else for (let n = 2; n <= 33; n++) copyFileSync(path, join(f.dir, "response-" + String(n).padStart(2, "0") + ".json"))
+    expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
+  })
+})
+test("a fully rehashed but over-budget stored capture cannot bypass the16MiB read bound", () => captureOwned(async f => {
+  const recorder = createGraphResponseRecorder(f.parent, f.binding)
+  await recorder.observe(observation(f.binding), captureSignal()); recorder.close()
+  const template = JSON.parse(readFileSync(join(f.dir, "response-01.json"), "utf8")) as Record<string, unknown>
+  let previousHash = hash(readFileSync(join(f.dir, "intent.json"), "utf8"))
+  const large = "a".repeat(1048576)
+  for (let sequence = 1; sequence <= 12; sequence++) {
+    const row: Record<string, unknown> = { ...template, sequence, previousHash,
+      observation: observation(f.binding, sequence === 1 ? "challenge" : "rpc", large) }
+    const { hash: _old, ...body } = row
+    const digest = hash(JSON.stringify(body)); previousHash = digest
+    writeFileSync(join(f.dir, "response-" + String(sequence).padStart(2, "0") + ".json"), JSON.stringify({ ...body, hash: digest }) + "\n", { mode: 0o600 })
+    if (sequence === 11) expect(readGraphResponseCapture(f.parent, f.binding).summary.responses).toBe(11)
+  }
+  expect(() => readGraphResponseCapture(f.parent, f.binding)).toThrow("graph_cogs_capture_refused")
 }))

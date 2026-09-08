@@ -1,5 +1,16 @@
 # SDD ledger — Plan G
 
+2026-09-08 05:49 IST — G15G sole66026 gate PASS:5337Vitest242/69.89s;
+1494Bun98/12457assert198.83s;root/webstrict/clientSSR353/187ms. Six paths,
+3links/privacy0;3source/briefpins unchanged after result annotations. Atomic
+commit/mainFF next; client unchanged, no full repeat/live/key/spend or push.
+
+2026-09-08 05:44 IST — G15G private readback implemented after missing-export
+Red.72Bun483assert2.79s;2rootsstrict0 after one fixture annotation correction.
+Canonical envelopes/inventory/hash chain/time/byte bounds and double-read checks;
+actual keyless child read preserved all bytes. Claim absence is not clean-close
+or payment proof. Sole gate next; no key/RPC/spend/cache authority or push.
+
 2026-09-08 05:35 IST — G15F sole78900 gate PASS:5337Vitest242/69.64s;
 1481Bun98/12389assert199.32s;root/webstrict/clientSSR331/162ms. Six paths,
 3links/privacy0;3source/briefpins unchanged after result annotations. Atomic

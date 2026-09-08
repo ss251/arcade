@@ -1,5 +1,15 @@
 # Plan G — execution records
 
+## September 8 — G15 private readback checkpoint
+
+The [readback brief](task-15-readback-brief.md) and
+[readback report](task-15-readback-report.md) validate bounded retained capture
+bytes without writes.72 focused Bun/483 assertions and exact strict passed,
+including keyless cross-process byte preservation and over-limit rehashed data.
+Claim presence/absence is not clean-close or payment proof; every result retains
+receiptProof:not_checked. Sole full gate passed5337Vitest/1494Bun,root/webstrict
+and both web builds. Local commit follows; no live call.
+
 ## September 8 — G15 private recorder checkpoint
 
 The [recorder brief](task-15-recorder-brief.md) and

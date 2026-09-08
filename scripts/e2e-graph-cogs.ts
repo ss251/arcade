@@ -658,6 +658,103 @@ export function createGraphResponseRecorder(parent: string, binding: GraphQueryB
   } catch { throw new Error(CAPTURE_FAIL) }
 }
 
+export interface GraphCapturedRecord {
+  readonly sequence: number
+  readonly capturedAt: number
+  readonly previousHash: string
+  readonly hash: string
+  readonly observation: GraphResponseObservation
+}
+export interface GraphCaptureReadback {
+  readonly queryHash: string
+  readonly sourceHash: string
+  readonly createdAt: number
+  readonly claimPresent: boolean
+  readonly records: readonly GraphCapturedRecord[]
+  readonly summary: GraphCaptureSummary
+}
+/** Private read-only snapshot, never receipt/cache authority. Claim absence is
+ * not proof of acknowledged close; a retained claim is not repaired or removed.
+ * Double reads detect cooperative concurrent changes, not a malicious owner. */
+export function readGraphResponseCapture(parent: string, binding: GraphQueryBinding, options: {
+  readonly now?: () => number
+} = {}): GraphCaptureReadback {
+  try {
+    const now = options.now ?? Date.now; insist(typeof now === "function")
+    const started = now(); insist(Number.isSafeInteger(started) && started > 0 && Number.isSafeInteger(started + 5000))
+    let lastTime = started
+    const active = () => {
+      const time = now(); insist(Number.isSafeInteger(time) && time >= lastTime && time < started + 5000)
+      lastTime = time
+    }
+    const root = bindings.get(binding); insist(root !== undefined)
+    const sourceCurrent = () => insist(hash(JSON.stringify(sourceFiles(root))) === binding.sourceHash)
+    sourceCurrent(); privateDirectory(parent)
+    const directory = join(parent, "query-" + binding.queryHash), identity = privateDirectory(directory)
+    const inventory = () => {
+      active(); sameDirectory(directory, identity)
+      const handle = opendirSync(directory, { bufferSize: 16 }), names: string[] = []
+      try {
+        for (;;) {
+          const entry = handle.readSync(); if (entry === null) break
+          insist(names.length < 34 && entry.isFile()); names.push(entry.name)
+        }
+      } finally { handle.closeSync() }
+      return names.sort()
+    }
+    const names = inventory(), claimPresent = names.includes(".claim")
+    const count = names.length - (claimPresent ? 2 : 1)
+    insist(count >= 0 && count <= 32 && JSON.stringify(names) === JSON.stringify([
+      ...(claimPresent ? [".claim"] : []), "intent.json", ...Array.from({ length: count }, (_, i) => captureName(i + 1)),
+    ].sort()))
+    const pins: { name: string; digest: string; bytes: number; maximum: number }[] = []
+    const read = (name: string, maximum = MAX_BYTES) => {
+      active(); const text = readBudgetText(join(directory, name), true, maximum); active()
+      pins.push({ name, digest: hash(text), bytes: Buffer.byteLength(text), maximum }); return text
+    }
+    const manifestText = read("intent.json"), manifest: unknown = JSON.parse(manifestText)
+    shape(manifest, ["format", "policyHash", "queryHash", "binding", "createdAt"])
+    insist(manifest.format === "arcade-graph-capture-v1" && manifest.policyHash === GRAPH_COGS_POLICY_HASH &&
+      manifest.queryHash === binding.queryHash && JSON.stringify(manifest.binding) === JSON.stringify(binding) &&
+      JSON.stringify(manifest) + "\n" === manifestText && Number.isSafeInteger(manifest.createdAt) &&
+      Number(manifest.createdAt) > 0 && Number(manifest.createdAt) <= started)
+    const createdAt = Number(manifest.createdAt)
+    if (claimPresent) {
+      const text = read(".claim"), claim: unknown = JSON.parse(text)
+      shape(claim, ["policyHash", "claimId"])
+      insist(claim.policyHash === GRAPH_COGS_POLICY_HASH && typeof claim.claimId === "string" &&
+        HASH.test(claim.claimId) && JSON.stringify(claim) + "\n" === text)
+    }
+    const records: GraphCapturedRecord[] = []
+    let lastHash = hash(manifestText), storedBytes = 0, paid = 0, previousTime = createdAt
+    for (let sequence = 1; sequence <= count; sequence++) {
+      const text = read(captureName(sequence), CAPTURE_FILE_BYTES), row: unknown = JSON.parse(text)
+      storedBytes += Buffer.byteLength(text); insist(storedBytes <= CAPTURE_TOTAL_BYTES)
+      shape(row, ["format", "policyHash", "queryHash", "sequence", "previousHash", "capturedAt", "observation", "hash"])
+      insist(row.format === "arcade-graph-response-v1" && row.policyHash === GRAPH_COGS_POLICY_HASH &&
+        row.queryHash === binding.queryHash && row.sequence === sequence && row.previousHash === lastHash &&
+        Number.isSafeInteger(row.capturedAt) && Number(row.capturedAt) >= previousTime && Number(row.capturedAt) <= started &&
+        typeof row.hash === "string" && HASH.test(row.hash) && JSON.stringify(row) + "\n" === text)
+      const observation = captureObservation(row.observation, binding), capturedAt = Number(row.capturedAt)
+      insist(sequence === 1 ? observation.phase === "challenge" : observation.phase !== "challenge")
+      if (observation.phase === "paid") insist(++paid <= 1)
+      const body = { format: row.format, policyHash: row.policyHash, queryHash: row.queryHash,
+        sequence, previousHash: lastHash, capturedAt, observation }
+      insist(hash(JSON.stringify(body)) === row.hash)
+      records.push(Object.freeze({ sequence, capturedAt, previousHash: lastHash, hash: row.hash, observation }))
+      previousTime = capturedAt; lastHash = row.hash
+    }
+    for (const pin of pins) {
+      active(); const text = readBudgetText(join(directory, pin.name), true, pin.maximum); active()
+      insist(hash(text) === pin.digest && Buffer.byteLength(text) === pin.bytes)
+    }
+    insist(JSON.stringify(inventory()) === JSON.stringify(names)); sourceCurrent(); active()
+    return Object.freeze({ queryHash: binding.queryHash, sourceHash: binding.sourceHash, createdAt, claimPresent,
+      records: Object.freeze(records), summary: Object.freeze({ responses: count, paidResponses: paid,
+        storedBytes, lastHash, receiptProof: "not_checked" }) })
+  } catch { throw new Error(CAPTURE_FAIL) }
+}
+
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {
     process.stdout.write("Read-only Graph reservation audit. No live calls, keys, writes or nested gates.\nUsage: e2e-graph-cogs.sh [--audit-reservations /absolute/private/reservations.jsonl]\n")
