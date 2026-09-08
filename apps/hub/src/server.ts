@@ -538,9 +538,24 @@ const main = Effect.gen(function* () {
     websocket: {
       open() {},
       async message(ws, raw) {
-        const parsed = await run(
-          decodeRunnerMessage(JSON.parse(String(raw))).pipe(Effect.either)
-        )
+        /*
+         * Parse inside the guard, not outside it.
+         *
+         * `Bun.serve`'s `error` boundary covers `fetch` and nothing else, so a throw here
+         * became an unhandled rejection and took the process down — one malformed frame
+         * from any unauthenticated client, since /ws accepts a socket before a Hello proves
+         * anything. That is worse than the /ratings leak this is the twin of: it crashes
+         * rather than merely tells. The decoder already answers a structurally wrong message
+         * with the same Ack; a syntactically wrong one now gets it too.
+         */
+        let payload: unknown
+        try {
+          payload = JSON.parse(String(raw))
+        } catch {
+          ws.send(JSON.stringify({ _tag: "Ack", ok: false, detail: "bad message" }))
+          return
+        }
+        const parsed = await run(decodeRunnerMessage(payload).pipe(Effect.either))
         if (parsed._tag === "Left") {
           ws.send(JSON.stringify({ _tag: "Ack", ok: false, detail: "bad message" }))
           return
@@ -1312,31 +1327,6 @@ const main = Effect.gen(function* () {
 
         const jobId = newJobId()
 
-        /*
-         * Claim the authorization before any work is dispatched.
-         *
-         * `rail.verify` asks the chain whether this nonce has been used, and until this job
-         * settles the honest answer is no — for the original request and for every copy of
-         * its PAYMENT-SIGNATURE header sent in the same window. So a captured header could
-         * be replayed to dispatch N jobs, the seller's agent would run N times, and exactly
-         * one settle would land. The seller pays for N inference runs and is paid once.
-         *
-         * The claim is keyed on the authorization's own identity — network, payer, nonce —
-         * which is what USDC itself makes single use, so it is scoped no more narrowly than
-         * the thing it protects. A replay against a DIFFERENT listing by the same seller is
-         * refused too, which is correct: one signature authorizes one payment.
-         */
-        const claimed = await run(store.claimAuthorization(
-          [verified.network, verified.payer.toLowerCase(), verified.payload.payload.authorization.nonce.toLowerCase()].join("|"),
-          jobId
-        ))
-        if (!claimed) {
-          return json({
-            error: "authorization_already_used",
-            detail: "this payment authorization has already been accepted for a job. It authorizes one " +
-              "payment, and settlement may still be in flight. Sign a fresh authorization to buy again."
-          }, 402)
-        }
 
         // The probe (no payment header) returned above and never reaches here — the tree
         // reservation happens only on the paid retry, after `rail.verify`, so a refusal
@@ -1354,6 +1344,46 @@ const main = Effect.gen(function* () {
           if (!ok) {
             return json({ error: "tree_budget_exceeded", detail: `this call tree's ceiling is ${formatPrice(ceiling)}` }, 402)
           }
+        }
+
+        /*
+         * Claim the authorization — after every refusal that creates no job, and before any
+         * work is dispatched.
+         *
+         * `rail.verify` asks the chain whether this nonce has been used, and until this job
+         * settles the honest answer is no — for the original request and for every copy of
+         * its PAYMENT-SIGNATURE header sent in the same window. So a captured header could
+         * be replayed to dispatch N jobs, the seller's agent would run N times, and exactly
+         * one settle would land: the seller pays for N inference runs and is paid once. The
+         * chain cannot close that window. Only the hub can, by claiming the authorization
+         * when it accepts one rather than when it settles.
+         *
+         * The claim is keyed on the authorization's own identity — network, payer, nonce —
+         * which is what USDC itself makes single use, so it is scoped no more narrowly than
+         * the thing it protects. A replay against a DIFFERENT listing by the same seller is
+         * refused too, which is correct: one signature authorizes one payment.
+         *
+         * POSITION MATTERS, and it is why this sits here rather than beside `rail.verify`.
+         * A claim is never released, so claiming before the tree-budget check would burn a
+         * legitimate authorization on a request that was then refused with 402 and produced
+         * no job at all — the buyer would have to re-sign for nothing. Every refusal that
+         * creates no job now happens above this line; below it, the job row is written and
+         * dispatched.
+         */
+        const claimed = await run(store.claimAuthorization(
+          [verified.network, verified.payer.toLowerCase(), verified.payload.payload.authorization.nonce.toLowerCase()].join("|"),
+          jobId
+        ))
+        if (!claimed) {
+          // A child reserved budget a few lines up and is now refused, so hand it back —
+          // a refusal that creates no job must not hold a root's ceiling. `releaseTree` is
+          // the same call the pipeline's terminal branches make, and is a no-op for a root.
+          if (lineage.hop > 0) await run(store.releaseTree(jobId))
+          return json({
+            error: "authorization_already_used",
+            detail: "this payment authorization has already been accepted for a job. It authorizes one " +
+              "payment, and settlement may still be in flight. Sign a fresh authorization to buy again."
+          }, 402)
         }
 
         // Record the job BEFORE answering, so the 202 is backed by state that survives this
@@ -1590,6 +1620,15 @@ if (escrowBoot === undefined) {
   // Armed escrow owns actual process shutdown, not only an in-memory Scope.
   // Journal release follows request/fiber interruption and bounded action cleanup.
   const shutdown = new AbortController(), stop = () => shutdown.abort()
+  /*
+   * Defence in depth for the class. Bun.serve's `error` boundary covers `fetch` only, so a
+   * throw anywhere else async — a socket handler, a timer, a background task — would exit
+   * the process and take every connected runner's listings with it. A public hub should
+   * log and keep serving instead. This is a net, not a licence: anything caught here is a
+   * defect worth fixing at its source, which is why it logs loudly.
+   */
+  process.on("unhandledRejection", (reason) => console.error("[hub] unhandled rejection", reason))
+  process.on("uncaughtException", (error) => console.error("[hub] uncaught exception", error))
   process.on("SIGINT", stop); process.on("SIGTERM", stop)
   // The application scope is INSIDE layer provision. With an outer application
   // scope, the inner layer scope closed its journal before the application's

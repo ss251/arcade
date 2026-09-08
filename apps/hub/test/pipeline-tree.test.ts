@@ -141,6 +141,36 @@ describe("receipt tree", () => {
     expect(out.st.committedAtomic).toBe(0n)
   })
 
+  it("still says 'not charged' for a mined revert, which the hub read and therefore knows", async () => {
+    /*
+     * A transaction hash is not itself uncertainty. The rail attaches one both when its
+     * receipt poll runs out — unknown — and when it READ the receipt and saw a revert. A
+     * reverted transferWithAuthorization moves nothing, so that buyer really was not
+     * charged, and downgrading it to "unknown, go reconcile" would be a hub throwing away a
+     * fact it already has.
+     */
+    const stateRef = Effect.runSync(Ref.make({
+      ...makeTestState({ [buyer.address]: 10_000_000n }),
+      failSettlement: true, failSettlementTxHash: `0x${"cd".repeat(32)}`, failSettlementReverted: true
+    }))
+    const rail = makeTestRail(stateRef)
+    const layer = Layer.mergeAll(StoreLive, Layer.succeed(RailTag, rail), Layer.succeed(BrokerTag, stub(ok)))
+    const out = await Effect.runPromise(Effect.provide(Effect.gen(function* () {
+      const store = yield* StoreTag
+      const rootId = "job_rootrevert00000a", childId = "job_childrevert0000a"
+      const rootLineage = ROOT_LINEAGE(rootId)
+      yield* store.reserveTree(rootId, childId, parsePrice("$0.01"), parsePrice("$0.05"))
+      const c = yield* runJob({ jobId: childId, listing: child, seller: SELLER, input: {}, verified: yield* Effect.promise(() => verifiedFor(rail, parsePrice("$0.01"))), lineage: childLineage({ ...rootLineage, skillId: "parent" }, rootId) })
+      const st = yield* store.treeState(rootId)
+      return { c, st }
+    }), layer))
+    expect(out.c.receipt.settled).toBe(false)
+    expect(out.c.receipt.settleTx).toBeUndefined()
+    expect(out.c.receipt.unresolvedSettleTx).toBeUndefined()
+    expect(out.c.receipt.reason).not.toMatch(/unconfirmed/)
+    expect(out.st.reservedAtomic).toBe(0n)
+  })
+
   it("releases the reservation when the child's dispatch dies before `finish` ever runs", async () => {
     const stateRef = Effect.runSync(Ref.make(makeTestState({ [buyer.address]: 10_000_000n })))
     const rail = makeTestRail(stateRef)

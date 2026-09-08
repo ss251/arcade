@@ -58,7 +58,24 @@ export class PaymentAlreadyAttempted extends Data.TaggedError("PaymentAlreadyAtt
 /** Broadcasting the settlement failed. Distinct from a rejected authorization. */
 export class SettlementFailed extends Data.TaggedError("SettlementFailed")<{
   readonly reason: string
+  /**
+   * The transaction, when one reached the wire. Its presence alone does NOT mean the
+   * outcome is unknown — see `settled`.
+   */
   readonly txHash?: string
+  /**
+   * What this failure knows about the buyer's money.
+   *
+   *  - `undefined` — nothing was broadcast. The authorization is untouched and the buyer
+   *    was not charged.
+   *  - `"reverted"` — the transaction was mined and reverted. The hub READ that receipt, so
+   *    it knows no USDC moved and may say so.
+   *  - `"unknown"` — the transaction is on the wire and its receipt could not be read. The
+   *    buyer may or may not have been charged, and only reconciliation can say.
+   *
+   * Collapsing the last two loses the distinction that decides what a buyer is told.
+   */
+  readonly settled?: "reverted" | "unknown"
 }> {}
 
 /** Arc's public RPC rate limit (-32011). Retried with exponential backoff, never hammered. */

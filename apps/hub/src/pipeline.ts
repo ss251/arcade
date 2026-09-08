@@ -280,22 +280,27 @@ export const runJob = (args: RunJobArgs) => {
       Effect.catchAll((e) => Effect.succeed({
         ok: false as const,
         reason: e._tag,
-        txHash: "txHash" in e && typeof e.txHash === "string" ? e.txHash : undefined
+        txHash: "txHash" in e && typeof e.txHash === "string" ? e.txHash : undefined,
+        settled: "settled" in e && typeof e.settled === "string" ? e.settled : undefined
       }))
     )
 
     if (!settled.ok) {
       /*
-       * Two different facts wear the same `settled: false`, and only one of them entitles
+       * Three different facts wear the same `settled: false`, and only two of them entitle
        * this hub to tell a buyer they were not charged.
        *
-       * With no hash, nothing was broadcast: the authorization is untouched, the buyer's
-       * balance is untouched, and the existing wording is true. With a hash, this hub does
-       * not know — the transaction exists and may well have moved the buyer's USDC. Saying
-       * "you were not charged" there is a claim about the chain nobody checked. Say what is
-       * actually known, and hand over the reference to reconcile against.
+       * Nothing broadcast: the authorization is untouched and the existing wording is true.
+       * Broadcast and REVERTED: the hub read that receipt, a reverted
+       * `transferWithAuthorization` moves nothing, so the wording is true there as well —
+       * this is a fact the hub has, not one it is assuming. Broadcast and UNREADABLE: the
+       * hub does not know, the transaction may well have moved the buyer's USDC, and saying
+       * "you were not charged" is a claim about the chain nobody checked.
+       *
+       * The rail reports which of the three it is, because inferring it from the presence
+       * of a transaction hash gets the reverted case wrong in the direction that matters.
        */
-      return settled.txHash === undefined
+      return settled.settled !== "unknown"
         ? yield* finish(outcome, false, `settlement failed (${settled.reason})`)
         : yield* finish(
             outcome,

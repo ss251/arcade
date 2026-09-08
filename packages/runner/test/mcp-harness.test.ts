@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -102,10 +102,21 @@ process.stdout.write(JSON.stringify(outcome));
       const run = spawnSync("bun", ["run", driver], {
         cwd: new URL("../../..", import.meta.url),
         env: { PATH: process.env["PATH"] ?? "", HOME: dir },
-        encoding: "utf8", timeout: 7_000
+        encoding: "utf8", timeout: 20_000
       })
       expect(run.status, run.stderr).toBe(0)
       expect(JSON.parse(run.stdout).status).toBe("timeout")
+      /*
+       * Wait for the pid file rather than reading it once.
+       *
+       * The child writes it as its first statement, but `execSkill`'s own 2s bound can
+       * elapse before a cold `bun run` has executed that line at all — which on a loaded
+       * machine it does. The outcome is "timeout" either way, so a single read raced the
+       * child's start and reported ENOENT for a defect that was not there. Observed on
+       * 2026-09-09 under full parallel load; passes in 2.7s isolated.
+       */
+      for (let attempt = 0; attempt < 100 && !existsSync(pidFile); attempt++) await delay(50)
+      expect(existsSync(pidFile), "the fixture child never started, so there was nothing to terminate").toBe(true)
       pid = Number(readFileSync(pidFile, "utf8"))
       expect(Number.isSafeInteger(pid) && pid > 0).toBe(true)
       for (let attempt = 0; attempt < 50 && alive(); attempt++) await delay(20)
@@ -118,5 +129,5 @@ process.stdout.write(JSON.stringify(outcome));
       if (pid !== undefined && Number.isSafeInteger(pid) && pid > 0 && alive()) process.kill(pid, "SIGKILL")
       rmSync(dir, { recursive: true, force: true })
     }
-  }, 10_000)
+  }, 30_000)
 })

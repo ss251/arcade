@@ -42,6 +42,8 @@ export interface TestRailState {
    * not charged.
    */
   failSettlementTxHash?: string
+  /** With `failSettlementTxHash`, makes it the mined-revert case rather than the unknown one. */
+  failSettlementReverted?: boolean
 }
 
 export const makeTestRail = (
@@ -125,7 +127,11 @@ export const makeTestRail = (
       if (state.failSettlement) {
         return yield* new SettlementFailed({
           reason: "test: forced settlement failure",
-          ...(state.failSettlementTxHash === undefined ? {} : { txHash: state.failSettlementTxHash })
+          // A hash without "unknown" is the mined-revert shape, which the hub DOES know the
+          // answer to; the timeout shape is the one that has to say unknown.
+          ...(state.failSettlementTxHash === undefined
+            ? {}
+            : { txHash: state.failSettlementTxHash, settled: state.failSettlementReverted === true ? "reverted" as const : "unknown" as const })
         })
       }
 

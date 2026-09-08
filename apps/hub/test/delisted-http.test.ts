@@ -229,6 +229,26 @@ describe("delisting at the actual paid HTTP endpoint", () => {
     expect(response.status).toBe(403)
     expect(await response.text()).not.toContain("__bunfallback")
   })
+  it.each([["not-json"], [""], ["{"], ["\u0000\u0001"]])("survives a malformed websocket frame (%j) instead of exiting", async (frame) => {
+    /*
+     * Bun.serve's error boundary covers `fetch` and nothing else, so a throw in the socket
+     * handler became an unhandled rejection and killed the process — one frame, from any
+     * unauthenticated client, since /ws accepts a socket before a Hello proves anything.
+     * The hub answering /healthz afterwards is the whole assertion.
+     */
+    const socket = new WebSocket(base.replace("http:", "ws:") + "/ws")
+    await new Promise<void>((resolve, reject) => {
+      socket.addEventListener("open", () => resolve(), { once: true })
+      socket.addEventListener("error", () => reject(new Error("socket did not open")), { once: true })
+    })
+    const replied = new Promise<string>((resolve) =>
+      socket.addEventListener("message", (event) => resolve(String(event.data)), { once: true }))
+    socket.send(frame)
+    expect(JSON.parse(await replied)).toMatchObject({ _tag: "Ack", ok: false })
+    socket.close()
+    // Still serving, and the runner that was connected before is still connected.
+    expect((await fetch(`${base}/healthz`)).ok).toBe(true)
+  })
   it("answers an unhandled route throw with a bare 500 that carries no source", async () => {
     // Defence in depth for the class rather than the instance: whatever throws, the caller
     // gets a bare 500 and the detail goes to the log.

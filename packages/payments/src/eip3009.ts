@@ -462,11 +462,14 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
             Schedule.compose(Schedule.recurs(60))
           )
         }),
-        Effect.catchAll(() => new SettlementFailed({ reason: "receipt timeout", txHash: hash }))
+        // Broadcast, receipt unreadable: genuinely unknown until someone reconciles.
+        Effect.catchAll(() => new SettlementFailed({ reason: "receipt timeout", txHash: hash, settled: "unknown" }))
       )
 
       if (receipt.status !== "success") {
-        return yield* new SettlementFailed({ reason: `tx reverted (${receipt.status})`, txHash: hash })
+        // The receipt WAS read. A reverted transferWithAuthorization moves nothing, so the
+        // buyer was not charged and the hub is entitled to say so plainly.
+        return yield* new SettlementFailed({ reason: `tx reverted (${receipt.status})`, txHash: hash, settled: "reverted" })
       }
 
       return { txHash: hash, payer: verified.payer, amountAtomic: verified.amountAtomic } satisfies SettledPayment
