@@ -52,6 +52,36 @@ payment approval was replayed, no validity/cap/replay rule was widened, and no
 mainnet operation or GitHub push is claimed by this follow-up. Plan I packaging,
 owner acceptance/capture and submission remain separate.
 
+### Dated follow-up — September 8, 2026
+
+The frozen table above is kept as written; this section supersedes its **M6, M7 and M8**
+rows, which were accurate at `f300b79` and are no longer. It covers `c5fdb47..977e860`
+(38 commits) — the Plan G Graph lane, Plan I packaging, and the fixes and deployment that
+followed.
+
+| Move | Status at `977e860` | Not established |
+| --- | --- | --- |
+| M6 — Gateway Nanopayments sessions | Session product merged; the F1 gate remains the only live evidence (deposit, verification, accepted transfer, buyer debit). | Recipient credit still pending batch; no separate live session-product evidence. |
+| M7 — The Graph ledger subgraph and Base cost-of-goods skill | Merged. `arcade-ledger-arc-testnet` is deployed on Subgraph Studio and indexing Arc testnet; ledger mappings, hub index reads and the cost-of-goods skill are on main, with the paid-query lane journalled and replayable offline. | No paid Graph purchase is claimed as independent live evidence. |
+| M8 — Marketplace, receipt-tree views, dashboards and publish wizard | Merged and deployed. The live web app serves the marketplace, listing and receipt pages, the seller dashboard and the publish wizard. | Escrow UI remains inactive pending the ERC-8183 deployment. |
+
+Also in this range: Plan I packaging (architecture diagram, video shot list and narration
+draft, submission checklist, partner feedback), the reproducible continuity snapshot script
+used by the README block, a cold-install fix for `@circle-fin/unified-balance-kit`, and a
+test-timeout fix. ETHGlobal check-in #1 was submitted on September 8 and is recorded at
+[superpowers/checkins/2026-09-08.md](superpowers/checkins/2026-09-08.md).
+
+**Deployment, September 8.** The hub and web services were redeployed from `977e860` and
+both verified live: `https://arcade-hub-production.up.railway.app` (`/healthz`,
+`/openapi.json`, `/listings`, a real HTTP 402 challenge) and
+`https://arcade-web-production-8dc4.up.railway.app` (marketplace, buyer, chat, publish,
+seller and listing routes). The production ENS re-point remains **pending**: the deployed
+hub advertises the seller as payee, while the retained ENS record is bound to FeeSplitterV2
+`0x9e304ec1…`, and the documented re-point preflight refuses on that mismatch by design.
+
+No mainnet operation, no new live payment approval and no video are claimed by this
+follow-up.
+
 ## Evidence and limits
 
 The [runbook](runbook.md) records the actual hashes, amounts, refusal observations, cleanup and deviations: [lineage](runbook.md#plan-a--evidence-lineage), [adapter evidence](runbook.md#plan-b--evidence-publish-adapters), [pay-tests](runbook.md#plan-c--evidence-automatic-delisting-and-recovery), [ERC-8004](runbook.md#plan-d--erc-8004-identity-and-settlement-evidence) and [ENS](runbook.md#ens-namespaces-sepolia). Use those measured amounts rather than the plan's earlier demo estimates.

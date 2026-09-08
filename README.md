@@ -8,6 +8,8 @@ Buyers are agents. So a seller's agent can itself buy from another seller mid-ru
 
 [Continuity: what existed before ETHOnline, what changed, and what is verified](docs/CONTINUITY.md). [Public development records](docs/superpowers/sdd/README.md).
 
+**Live on Arc testnet:** marketplace <https://arcade-web-production-8dc4.up.railway.app> · hub API <https://arcade-hub-production.up.railway.app> (`/healthz`, `/openapi.json`, `/listings`). A listing is only valid while its seller's runner is dialled in, so an empty catalogue is the discovery guarantee working rather than an outage.
+
 An **Agent Skill (open standard)** is a portable `SKILL.md` folder, described by the
 [Agent Skills specification](https://agentskills.io/specification). The same folder
 runs in Codex, ChatGPT, Cursor, Copilot, Gemini CLI and Claude Code, with each
@@ -36,28 +38,28 @@ The generated snapshot below is reproducible with
 [dated evidence/attribution](docs/CONTINUITY.md) explain the boundaries.
 
 <!-- continuity:start -->
-<!-- continuity:revision be98d15579f8e79ca0b64c0c1bd0232b83ffdc53 -->
+<!-- continuity:revision 977e860147c9a3c76a3f5fb3699af161d0b0eee5 -->
 
-**Snapshot:** [`be98d15`](https://github.com/ss251/arcade/commit/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53). Later commits are not included; this is history, not a completion or live-deployment claim.
+**Snapshot:** [`977e860`](https://github.com/ss251/arcade/commit/977e860147c9a3c76a3f5fb3699af161d0b0eee5). Later commits are not included; this is history, not a completion or live-deployment claim.
 
 **Pre-existing:** 112 reachable commits through [`57183db`](https://github.com/ss251/arcade/commit/57183dbab5769d18af8c7077a9b6fd6d4dee78da) (2026-08-07T15:07:30+05:30), the prior Arc hackathon build.
 
 **Planning baseline:** [`6f38178`](https://github.com/ss251/arcade/commit/6f38178567d89a522a2d67e9ea947273bbc91d58) (2026-09-04T22:01:18+05:30), 1 commit(s) after the inherited build.
 
-**ETHOnline history:** 217 reachable commits after the prior build, including planning; 216 after the execution baseline. [Full comparison](https://github.com/ss251/arcade/compare/57183dbab5769d18af8c7077a9b6fd6d4dee78da...be98d15579f8e79ca0b64c0c1bd0232b83ffdc53).
+**ETHOnline history:** 252 reachable commits after the prior build, including planning; 251 after the execution baseline. [Full comparison](https://github.com/ss251/arcade/compare/57183dbab5769d18af8c7077a9b6fd6d4dee78da...977e860147c9a3c76a3f5fb3699af161d0b0eee5).
 
 | Plan | Declared path patterns | Matching non-merge commits | First → last matching commit |
 |---|---:|---:|---|
-| [A](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-A-settlement-core.md) | 27 | 62 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`1705d30`](https://github.com/ss251/arcade/commit/1705d308fca55fc1d1820ed0c7641f879f548ce0) |
-| [B](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-B-publish-adapters.md) | 33 | 27 | [`24be298`](https://github.com/ss251/arcade/commit/24be2982e3759769e90ad5e05fb17f2c6c46b156) → [`44bfca3`](https://github.com/ss251/arcade/commit/44bfca32f21727973fc35fe97a1a7be91564c101) |
-| [C](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-C-canary.md) | 14 | 86 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`115e0f8`](https://github.com/ss251/arcade/commit/115e0f8320325f7b3bb434a6285a869f36e0e54d) |
-| [D](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-D-erc8004.md) | 16 | 70 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`baefbc7`](https://github.com/ss251/arcade/commit/baefbc775c1a29780f97be3f1451a83ea6bb33d0) |
-| [E](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-E-ens.md) | 20 | 93 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`115e0f8`](https://github.com/ss251/arcade/commit/115e0f8320325f7b3bb434a6285a869f36e0e54d) |
-| [F](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-F-gateway-sessions.md) | 24 | 73 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`baefbc7`](https://github.com/ss251/arcade/commit/baefbc775c1a29780f97be3f1451a83ea6bb33d0) |
-| [G](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-G-graph.md) | 32 | 64 | [`d03f0d1`](https://github.com/ss251/arcade/commit/d03f0d1fe1800bc2bc11514a8ebf90791dae5668) → [`49008c8`](https://github.com/ss251/arcade/commit/49008c8d9e49bb4d8c720810fd314c72332f72f0) |
-| [H](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-H-web.md) | 26 | 53 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`64ef613`](https://github.com/ss251/arcade/commit/64ef61306b147cbe0d05636c896fb1469b075ec6) |
-| [I](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-04-I-packaging.md) | 31 | 10 | [`bd5bd2e`](https://github.com/ss251/arcade/commit/bd5bd2e2c3b20f77837d475c1b34aead11a501f8) → [`be98d15`](https://github.com/ss251/arcade/commit/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53) |
-| [J](https://github.com/ss251/arcade/blob/be98d15579f8e79ca0b64c0c1bd0232b83ffdc53/docs/superpowers/plans/2026-09-06-J-arc-native.md) | 26 | 138 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`115e0f8`](https://github.com/ss251/arcade/commit/115e0f8320325f7b3bb434a6285a869f36e0e54d) |
+| [A](https://github.com/ss251/arcade/blob/977e860147c9a3c76a3f5fb3699af161d0b0eee5/docs/superpowers/plans/2026-09-04-A-settlement-core.md) | 27 | 62 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`1705d30`](https://github.com/ss251/arcade/commit/1705d308fca55fc1d1820ed0c7641f879f548ce0) |
+| [B](https://github.com/ss251/arcade/blob/977e860147c9a3c76a3f5fb3699af161d0b0eee5/docs/superpowers/plans/2026-09-04-B-publish-adapters.md) | 33 | 27 | [`24be298`](https://github.com/ss251/arcade/commit/24be2982e3759769e90ad5e05fb17f2c6c46b156) → [`44bfca3`](https://github.com/ss251/arcade/commit/44bfca32f21727973fc35fe97a1a7be91564c101) |
+| [C](https://github.com/ss251/arcade/blob/977e860147c9a3c76a3f5fb3699af161d0b0eee5/docs/superpowers/plans/2026-09-04-C-canary.md) | 14 | 87 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`0c550a2`](https://github.com/ss251/arcade/commit/0c550a214ee508b5a5bf980e5c52863c1c4a3cc7) |
+| [D](https://github.com/ss251/arcade/blob/977e860147c9a3c76a3f5fb3699af161d0b0eee5/docs/superpowers/plans/2026-09-04-D-erc8004.md) | 16 | 70 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`baefbc7`](https://github.com/ss251/arcade/commit/baefbc775c1a29780f97be3f1451a83ea6bb33d0) |
+| [E](https://github.com/ss251/arcade/blob/977e860147c9a3c76a3f5fb3699af161d0b0eee5/docs/superpowers/plans/2026-09-04-E-ens.md) | 20 | 94 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`0c550a2`](https://github.com/ss251/arcade/commit/0c550a214ee508b5a5bf980e5c52863c1c4a3cc7) |
+| [F](https://github.com/ss251/arcade/blob/977e860147c9a3c76a3f5fb3699af161d0b0eee5/docs/superpowers/plans/2026-09-04-F-gateway-sessions.md) | 24 | 73 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`baefbc7`](https://github.com/ss251/arcade/commit/baefbc775c1a29780f97be3f1451a83ea6bb33d0) |
+| [G](https://github.com/ss251/arcade/blob/977e860147c9a3c76a3f5fb3699af161d0b0eee5/docs/superpowers/plans/2026-09-04-G-graph.md) | 32 | 72 | [`d03f0d1`](https://github.com/ss251/arcade/commit/d03f0d1fe1800bc2bc11514a8ebf90791dae5668) → [`0c550a2`](https://github.com/ss251/arcade/commit/0c550a214ee508b5a5bf980e5c52863c1c4a3cc7) |
+| [H](https://github.com/ss251/arcade/blob/977e860147c9a3c76a3f5fb3699af161d0b0eee5/docs/superpowers/plans/2026-09-04-H-web.md) | 26 | 53 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`64ef613`](https://github.com/ss251/arcade/commit/64ef61306b147cbe0d05636c896fb1469b075ec6) |
+| [I](https://github.com/ss251/arcade/blob/977e860147c9a3c76a3f5fb3699af161d0b0eee5/docs/superpowers/plans/2026-09-04-I-packaging.md) | 31 | 23 | [`bd5bd2e`](https://github.com/ss251/arcade/commit/bd5bd2e2c3b20f77837d475c1b34aead11a501f8) → [`8b7526f`](https://github.com/ss251/arcade/commit/8b7526ff0cfd5cb798ef446e368b96443e3cf0f2) |
+| [J](https://github.com/ss251/arcade/blob/977e860147c9a3c76a3f5fb3699af161d0b0eee5/docs/superpowers/plans/2026-09-06-J-arc-native.md) | 26 | 143 | [`ed9832c`](https://github.com/ss251/arcade/commit/ed9832cfff41f390ab2067b0163bd4f8aeaa7041) → [`8b7526f`](https://github.com/ss251/arcade/commit/8b7526ff0cfd5cb798ef446e368b96443e3cf0f2) |
 
 Counts measure commits touching the plans' declared paths, not exclusive plan ownership, authorship, added lines or completion. They overlap and cannot be summed. Shared files, broad directories and later edits can count in several rows; unlisted implementation paths are not counted. The endpoint links do not define contiguous plan ranges.
 Paths come from every first-column entry in the committed File structure tables at this snapshot; sibling paths, braces, numeric ranges, wildcards and directory ellipses are expanded. No current worktree edits enter the result.
@@ -224,6 +226,8 @@ Testnet and mainnet credentials are never interchangeable.
 
 Not a diagram — a transaction. A buyer signed an authorization **offline, paying zero gas**; the facilitator broadcast it; USDC moved.
 
+**Provenance.** The three transactions in this section were run during the prior Encode × Circle build, whose settlement, two-machine and demo evidence belongs to that run — see [docs/CONTINUITY.md](docs/CONTINUITY.md). Hashes, blocks, gas and USDC deltas are checkable on [testnet.arcscan.app](https://testnet.arcscan.app); the latency figures and the two-machine log assertions come from a private evidence file and are not independently checkable from this repo. Evidence produced during ETHOnline is in [docs/runbook.md](docs/runbook.md) and `docs/evidence/`.
+
 | | measured |
 |---|---|
 | EIP-3009 `transferWithAuthorization` | [`0xc9b77c1e…`](https://testnet.arcscan.app/tx/0xc9b77c1e6c62fec6d10298af0f6cdcfc7f05b3ad6e7ef4ccdbb5a1e6b4ebc2f8) · block 53480033 |
@@ -272,6 +276,25 @@ bun --no-env-file packages/buyer/src/cli.ts usdc-flow-check --hub http://127.0.0
   --input '{"address":"0xAeB742d58cc7F5CF656fCD9Beb07Bf0C1ACa6f5b"}' --max-amount 0.05
 ```
 
+**What each process needs.** The hub reads `ARCADE_RAIL` (`eip3009` or `gateway`), `ARCADE_FACILITATOR_KEY`
+(the key that broadcasts settlements — required whenever the hub is publicly reachable), `ARCADE_DB` (a file path;
+omit it and the store is in memory), `ARCADE_HUB_SECRET` (pin it, or every restart invalidates job tokens buyers
+already paid for), `ARCADE_PUBLIC_URL` and `ARCADE_FEE_BPS`. The seller runner reads `ARCADE_SELLER_KEY` and,
+optionally, `ARCADE_FEE_SPLITTER` to route payouts through FeeSplitterV2. The buyer reads `ARCADE_BUYER_KEY`.
+Keys belong in your OS keychain and are read inside the process, never in `.env`, arguments or logs; the full
+table is in [docs/runbook.md](docs/runbook.md).
+
+**Funding a testnet buyer.** Arc testnet USDC comes from Circle's faucet, and on Arc that same token is the gas
+token, so one drip covers both:
+
+```bash
+curl -s https://api.circle.com/v1/faucet/drips \
+  -H 'content-type: application/json' \
+  -d '{"address":"0xYOURADDRESS","blockchain":"ARC-TESTNET","usdc":true}'
+```
+
+`"native": true` is rejected — USDC *is* the native token on Arc.
+
 Use only separately approved testnet identities and spending bounds. Wallet funds and Gateway credit are different; [explicit funding](docs/sessions.md) has separate journal, gas and identity gates. Never place private keys in source, command arguments, committed configuration or logs.
 
 See exactly what publishing would reveal — and what it wouldn't:
@@ -290,7 +313,7 @@ ingestion](docs/agent-plugins.md) for selectors, local generation and scope limi
 
 **What the hub can see:** a listing's public projection (name, description, tags, price, bounds, input/output schemas) and the *outputs* of jobs it paid for.
 
-**What the hub can never see:** your engine choice, entry point, system prompt, secret names, egress rules, working directory, or the code itself. This is enforced *structurally*, not by policy: `toPublicListing` is a schema transformation into a type with nowhere to put those fields, and the runner is pull-model — it dials out and receives jobs, so there is no code path by which credentials could be transmitted. A property test (`packages/core/test/secrecy.property.test.ts`) asserts it over arbitrary generated manifests.
+**What the hub can never see:** your engine choice, entry point, system prompt, secret names, egress rules, working directory, or the code itself. The projection is enforced *structurally*, not by policy: `toPublicListing` is a schema transformation into a type with nowhere to put those fields, and a property test (`packages/core/test/secrecy.property.test.ts`) asserts exactly that over arbitrary generated manifests — no private field survives the transformation. The pull model is the design argument on top of it: the runner dials out and receives jobs, so the hub never initiates a read of seller state. That second half is an architecture claim, not a proven whole-program property; no test enumerates every outbound message the daemon can emit.
 
 **What this does not protect against:** a seller who deliberately exfiltrates their own secrets from inside their own sandbox. The boundary protects sellers from the platform, not the platform from sellers.
 
@@ -356,7 +379,7 @@ A skill declares the capability and its ceiling:
 "engine":  { "capabilities": ["web-search", "hire-skills"] }
 ```
 
-and its agent gets a `hire_skill` tool. `counterparty-brief` uses it: given a wallet address the counterparty claims to control, it buys `usdc-flow-check` for a cent rather than taking the claim on faith. One buyer action, two sellers, two settlements — **$0.25 in, ~$0.01 subcontracted**, and both bounds published so a buyer can see how much of the price is being passed on.
+and its agent gets a `hire_skill` tool. `counterparty-brief` declares it: given a wallet address the counterparty claims to control, it buys `usdc-flow-check` for a cent rather than taking the claim on faith. Its manifest declares **$0.25 in with a $0.02 sub-spend ceiling**, and both bounds are published so a buyer can see how much of the price is being passed on. The hop itself is proven on chain by the Plan A lineage run (`loop-probe` $0.30 → `wallet-risk-note` $0.05 → `usdc-flow-check` $0.01, [docs/runbook.md](docs/runbook.md)); a paid `counterparty-brief` call has not been recorded.
 
 **The sandbox never receives a key.** The runner keeps the sub-purchase wallet and brokers each buy over a Unix socket; the skill gets a per-job token — an HMAC over the job id, useless for any other job, revoked when the job ends. The ledger lives in the runner, so `maxSubSpendUsd` is enforced by a process the agent doesn't control. **An injected agent can spend the declared budget and not a cent more, because it never holds the means to.**
 
@@ -414,15 +437,30 @@ The conformance-tested rail registry keeps `ARCADE_RAIL=eip3009` as the ordinary
 
 ## Verify
 
+Offline — nothing running, no keys, no network beyond the package install:
+
 ```bash
+bun install
 bun run test
 bun run test:vitest -- packages/core/test/secrecy.property.test.ts
 bun run test:vitest -- packages/payments/test/rail.conformance.test.ts
 bun run typecheck
 bun run web:build
-curl -s http://127.0.0.1:8787/listings/usdc-flow-check | jq 'has("engine")'   # must be false
-curl -s http://127.0.0.1:8787/openapi.json | jq '.paths | keys'               # one path per listing
 ```
+
+Against the live deployment — no local hub needed:
+
+```bash
+curl -s https://arcade-hub-production.up.railway.app/listings/usdc-flow-check | jq 'has("engine")'
+# false — the private half of the manifest has nowhere to live in the public projection
+
+curl -s https://arcade-hub-production.up.railway.app/openapi.json | jq '[.paths | keys[] | select(startswith("/x/"))]'
+# one /x/:seller/:skill path per connected listing, alongside the six fixed routes
+```
+
+Both curls work against a local hub too; start one with the Quickstart above and swap the
+host for `http://127.0.0.1:8787`. Against the live hub the listing routes appear only while
+a seller runner is connected.
 
 Built for the [Encode × Circle Programmable Money hackathon](https://www.encodeclub.com/programmes/arc-hackathon). Author: ss251.
 
