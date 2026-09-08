@@ -1,5 +1,21 @@
 # Plan I progress
 
+2026-09-08 12:00 IST — I2B sole81518fullgate PASS5371Vitest242/69.20s,
+1862Bun99/14475assert313.23s,root/webstrict/clientSSR364/192ms. Six paths,
+3links/privacy0; three source/brief pins and original sanitizer/native-test
+bytes unchanged. Actual private storage/readback only, CLI inactive; prior I2A
+H8 failure retained, no full-repeat relabel. Final local commit/exact-one FF
+next, then bounded synthetic listener lifecycle. No live/signing/spend/push.
+
+2026-09-08 11:53 IST — I2B fresh private sanitized artifact store/readback
+implemented after missing-export Red.41nativeBun291assert2.73s/2rootsstrict0
+PASS. Actual four-phase child exit/cancellation/corruption/readback fixtures,
+no raw-header persistence, one attempt/no repair, historical shape-only metadata.
+Bun mock/cache/temp-alias fixture failures corrected without store relaxation.
+Original sanitizer/native tests/payment source preserved; CLI inactive.
+Six-path audit/freeze and sole sequential four-worker gate next; no keys,
+real client capture/RPC/payment/approval replay/policy change/push.
+
 2026-09-08 11:29 IST — I2A sole48795fullgate:5371Vitest tests PASS,
 241suites PASS/1H8teardown FAIL70.34s. Original listener identity not retained;
 no residual H8 fixture found, root cause unconfirmed. Isolated95372 H8 PASS

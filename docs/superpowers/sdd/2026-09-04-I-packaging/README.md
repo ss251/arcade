@@ -24,6 +24,8 @@ are merged; unresolved live gates are not prerequisites we can invent.
 - [CLI interop status](../../../interop/circle-cli.md).
 - [Task2 offline sanitizer brief](task-2-sanitizer-brief.md),
   [shape-only implementation record](task-2-sanitizer-report.md).
+- [Task2 private storage brief](task-2-storage-brief.md),
+  [sanitized artifact checkpoint](task-2-storage-report.md).
 
 I2A's sole full gate passed all5371Vitest tests but failed an H8 teardown
 assertion. One isolated H8 check passed11tests; the skipped1835Bun/strict/build
@@ -39,7 +41,7 @@ research. Secrets/bearer material/private journals never enter these records.
 | Task | State / next concrete action |
 |---|---|
 | I1 CLI prerequisites | Historical record reused; no provisioning replay or current readiness claim |
-| I2 capture/decoder | Pure sanitizer14native tests/strict pass; no listener/writer or real captured fixture yet; live capture remains paused with J4 |
+| I2 capture/decoder | Sanitizer plus explicit private one-attempt store/readback;41native tests/strict and sole storage full gate pass; no listener, active CLI or real captured fixture; live paused with J4 |
 | I3 CLI paid evidence | Paused with J4; no authorization or live purchase |
 | I4 continuity generator | Implemented; pinned snapshot, all A–J declared-path activity,32 focused tests/full gate passed; I5 markers integrated |
 | I5 README | Seven sections and pinned snapshot implemented; product bytes preserved, sole full gate passed; I6 current diagram next |
