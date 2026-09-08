@@ -144,7 +144,11 @@ describe("session shared kernel and memory authority", () => {
     for (let n = 1; n <= 100; n++) { const p = pair(n, 1n); await run(s.reserveSessionJob(p.binding, p.job)); await run(s.finishSessionJob(finish(n, 1n, false))) }
     const extra = pair(101, 1n); await tag(s.reserveSessionJob(extra.binding, extra.job), "SessionCapacity")
     expect((await run(s.getSessionSnapshot(sid())))?.calls).toHaveLength(100)
-  }, 20000)
+    // 60s, not the global 30s: this is the slowest test in the suite (100 sequential
+    // reserve/finish round trips) and it runs while 240+ other files share the CPU. It
+    // asserts the 100-call CAP, never a latency budget, so a tighter timeout only buys
+    // false reds — it took 5.2s alone and 22.4s under full parallel load on 2026-09-08.
+  }, 60000)
   it("enforces 10000 retained sessions using actual validated maximum-size state", () => {
     const state: SessionLedgerState = { sessions: new Map(), sessionCalls: new Map(), jobs: new Map(), receipts: [] }
     for (let n = 1; n <= 10000; n++) state.sessions.set(sid(n), Session.make({ ...initial(n), spentAtomic: 0n }))
