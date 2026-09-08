@@ -91,7 +91,11 @@ describe("J11C public listing rail declarations", () => {
     const { rails: _rails, ...legacy } = raw()
     const listing = decodeListings([legacy])[0]!
     expect(listing).not.toHaveProperty("rails")
-    expect(renderToStaticMarkup(<ListingCard listing={listing} />)).toContain("Accepted rails unavailable")
+    // No inference and no announcement: a card with no declaration renders no rail line.
+    const html = renderToStaticMarkup(<ListingCard listing={listing} />)
+    expect(html).not.toContain("Accepts (declared)")
+    expect(html).not.toContain("listing-rails")
+    for (const rail of ["gateway", "exact", "escrow"]) expect(html).not.toContain(rail)
     expect((await view(legacy)).listing?.id).toBe("diff-triage")
   })
   it.each([

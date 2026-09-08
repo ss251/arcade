@@ -29,11 +29,15 @@ it("renders actual H4-decoded catalogue data and independent failure states thro
     const ok = await read("ok")
     expect(ok).toContain("Diff Triage"); expect(ok).toContain("$1.24"); expect(ok).toContain("hub receipts")
     expect(ok).toContain("pay-tested"); expect(ok).toContain("recorded settled volume")
-    expect(ok).toContain("Accepted rails unavailable")
+    // A catalogue with no declarations says nothing about rails and shows no rail filter,
+    // rather than repeating an "unavailable" line and a control that empties the grid.
+    expect(ok).not.toContain("Accepts (declared)")
+    expect(ok).not.toContain("Declared payment rail")
     const rails = await read("rails")
     expect(rails).toContain("Accepts (declared): gateway · exact · escrow")
     expect(rails).toContain("Accepts (declared): exact")
-    expect(rails).toContain("Accepted rails unavailable")
+    // The third listing declares nothing: it is still listed, just silent about rails.
+    expect(rails).toContain("Declared payment rail")
     expect(rails.replaceAll("<!-- -->", "")).toContain("3 of 3 catalogue listings shown")
     expect(rails).toContain("not current payment availability")
     for (const mode of ["stats-down", "malformed-stats"]) {

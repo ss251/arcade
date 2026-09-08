@@ -19,10 +19,18 @@ describe("H6 marketplace evidence and presentation", () => {
     expect(html).toContain('href="/skill/diff-triage"')
     expect(html).not.toContain("verified"); expect(html).not.toContain("name is live")
   })
-  it("distinguishes explicit no-history from an older hub's missing metadata", () => {
-    expect(card()).toContain("no recorded pay-test")
+  it("says nothing about a pay-test it has no record of, in either absent form", () => {
+    // Both absences used to print a sentence about the absence, on every card. The rule
+    // that matters is unchanged and asserted below: an unknown pay-test must never be
+    // rendered as a passing or failing one. Silence satisfies it; a sentence only added
+    // noise to a nine-card catalogue.
+    const explicit = card()
+    expect(explicit).not.toContain("pay-test")
+    expect(explicit).not.toContain("is-settled"); expect(explicit).not.toContain("is-refused")
     const { payTested: _test, ...legacy } = marketListing()
-    expect(renderToStaticMarkup(<ListingCard listing={legacy} observedAtMs={OBSERVED} />)).toContain("pay-test status unavailable")
+    const missing = renderToStaticMarkup(<ListingCard listing={legacy} observedAtMs={OBSERVED} />)
+    expect(missing).not.toContain("pay-test")
+    expect(missing).not.toContain("is-settled"); expect(missing).not.toContain("is-refused")
   })
   it("uses the serialized observation time and never creates an explorer URL from a bare hash", () => {
     const html = card({ payTested: { atMs: OBSERVED - 7_200_000, jobId: "", ok: true, settleTx: `0x${"ab".repeat(32)}` } })
@@ -45,9 +53,14 @@ describe("H6 marketplace evidence and presentation", () => {
     expect(html).toContain(over.delisted ? "delisted" : "name expired")
   })
   it("does not turn absent latency into zero or display an empty sample as measured latency", () => {
-    expect(card()).toContain("call statistics unavailable")
+    // The defect this guards against is a fabricated measurement, not a missing sentence.
+    // Absent stats and a zero-call sample both render nothing at all, which cannot be
+    // misread as "0s p50" the way a printed zero could.
+    expect(card()).not.toContain("p50")
     const html = card({ stats: { calls: 0, settled: 0, successRate: 0, p50LatencyMs: 0, p95LatencyMs: 0 } })
-    expect(html).toContain("no recorded calls"); expect(html).not.toContain("0s p50")
+    expect(html).not.toContain("p50"); expect(html).not.toContain("0s")
+    const real = card({ stats: { calls: 17, settled: 15, successRate: 15 / 17, p50LatencyMs: 2471, p95LatencyMs: 3113 } })
+    expect(real).toContain("15/17 settled"); expect(real).toContain("2.5s p50")
   })
   it("escapes hostile seller prose and retains the exact price string", () => {
     const html = card({ description: "<img src=x onerror=alert(1)>", price: "$0.000001" })
