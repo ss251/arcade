@@ -1459,6 +1459,246 @@ for (const cancel of [false, true]) test(`simulated owner derivation with owned-
     closed: true, calls: 1, derived: cancel ? 0 : 1, argsOk: true, simulation: true })
 })
 
+function ownerConsumerChild(parent: string, action: string, beforeImport = "") {
+  return `import{mock}from"bun:test";import{mkdirSync,readFileSync,readdirSync,existsSync,writeFileSync,renameSync}from"node:fs";import{join}from"node:path";
+    const parent=${JSON.stringify(parent)},os=await import("node:os"),accountInfo=os.userInfo();
+    mock.module("node:os",()=>({...os,userInfo:()=>({...accountInfo,homedir:parent})}));
+    globalThis.fetch=()=>{throw Error("ambient network forbidden")};${beforeImport}
+    const h=await import(${JSON.stringify(resolve(import.meta.dir, "e2e-graph-cogs.ts"))});
+    const state=h.graphCogsOwnerRoot();mkdirSync(state,{recursive:true,mode:0o700});${action}`
+}
+test("controlled owner consumer refuses missing known state before any command or transport", () => owned(parent => {
+  const script = ownerConsumerChild(parent, `let commands=0,requests=0;
+    const result=await h.runGraphCogsOwner({allocation:"evidence",keyCommand:async()=>{commands++;throw Error("command forbidden")},transport:async()=>{requests++;throw Error("request forbidden")}});
+    console.log(JSON.stringify({result,commands,requests,files:readdirSync(state)}));`)
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", script], { env: { PATH: "" }, cwd: resolve(import.meta.dir, ".."), encoding: "utf8", timeout: 5000, maxBuffer: 4096 })
+  expect(child.stderr).toBe(""); expect(child.status).toBe(0)
+  expect(JSON.parse(child.stdout)).toMatchObject({ result: { stopReason: "refusal", error: "graph_cogs_consumer_refused" }, commands: 0, requests: 0, files: [] })
+}))
+
+function ownerConsumerScenario(parent: string, scenario: string) {
+  const before = `const scenario=${JSON.stringify(scenario)},P=${JSON.stringify(GRAPH_COGS_POLICY)};
+    const{encodeAbiParameters,encodeEventTopics,parseAbi}=await import("viem");
+    const accountsPath="viem/accounts",accounts=await import(accountsPath),dummy="0x"+"11".repeat(32),actualAccount=accounts.privateKeyToAccount(dummy);
+    let signatures=0,factories=0,commands=0,requests=0,unsigned=0,paid=0,balanceReads=0,admissionBeforeKey=false;
+    let balance=scenario==="low-admission"?909999n:1000000n,height=40;
+    const paidAdmission=[],blocks=new Map(),receipts=new Map(),controller=new AbortController();
+    const makeBlock=n=>({number:"0x"+n.toString(16),hash:"0x"+(n===40?"e":n===41?"b":"9").repeat(64),timestamp:"0x"+Math.floor(Date.now()/1000).toString(16)});
+    blocks.set(height,makeBlock(height));
+    if(scenario!=="wrong-key")mock.module(accountsPath,()=>({...accounts,privateKeyToAccount:key=>{
+      if(key!==dummy)throw Error("unexpected public fixture key");return{...actualAccount,address:P.payer,
+      signTypedData:async args=>{signatures++;return actualAccount.signTypedData(args)}}}}));
+    const clientPath=${JSON.stringify(resolve(import.meta.dir, "../skills/counterparty-graph/graph-client.ts"))},
+      client=await import(clientPath),originalFactory=client.makePaidQuery;
+    const stalledCommand=command=>keyCommand(command);
+    mock.module(clientPath,()=>({...client,makePaidQuery:(...args)=>{factories++;return originalFactory(...args)},...(scenario==="cleanup-uncertain"?{runKeyCommand:stalledCommand}:{})}));
+    const enc=value=>Buffer.from(JSON.stringify(value)).toString("base64"),ABI=parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)","event AuthorizationUsed(address indexed authorizer, bytes32 indexed nonce)"]);
+    const meta={block:{number:19,hash:"0x"+"c".repeat(64)},hasIndexingErrors:false};
+    const keyCommand=async command=>{
+      commands++;if(JSON.stringify(command)!==JSON.stringify(["/usr/bin/security","find-generic-password","-s","graph-x402-payer","-a","GRAPH_X402_PAYER_KEY","-w"]))throw Error("wrong item");
+      const rows=readFileSync(join(state,P.namespace,"reservations.jsonl"),"utf8").trim().split("\\n"),latest=JSON.parse(rows.at(-1));
+      const balanceDir="balance-"+latest.queryHash,queryDir="query-"+latest.queryHash;
+      admissionBeforeKey=existsSync(join(state,balanceDir,"admission.json"))&&existsSync(join(state,balanceDir,".claim"))&&existsSync(join(state,queryDir,"intent.json"));
+      if(scenario==="key-pending"||scenario==="cleanup-uncertain")return new Promise(()=>{});
+      if(scenario==="corrupt-head")writeFileSync(join(state,P.namespace,"head-01.json"),"{}\\n");
+      if(scenario==="mutate-options")runOptions.allocation="video";
+      return{code:scenario==="missing-key"?44:0,stdout:scenario==="missing-key"?"":dummy+"\\n"};
+    };
+    const transport=Object.assign(async(input,init)=>{
+      requests++;const url=String(input),body=JSON.parse(String(init.body));
+      if(init.redirect!=="error"||init.credentials!=="omit"||!(init.signal instanceof AbortSignal))throw Error("unsafe transport");
+      if(url===client.GATEWAY_BASE+P.subgraph){
+        const header=new Headers(init.headers).get("payment-signature");
+        if(!header){unsigned++;return new Response(null,{status:402,headers:{"payment-required":enc({x402Version:2,resource:{url:"http://mainnet-thegraph-arbitrum-04-asia-east1.thegraph.com/subgraphs/id/"+P.subgraph},
+          accepts:[{scheme:"exact",network:P.chain,asset:P.token,amount:"10000",payTo:P.merchant,maxTimeoutSeconds:300,extra:{assetTransferMethod:"eip3009",name:"USD Coin",version:"2"}}]})}})}
+        paid++;const payload=JSON.parse(Buffer.from(header,"base64").toString()).payload,nonce=payload.authorization.nonce;
+        const ledger=h.readGraphReservations(join(state,P.namespace,"reservations.jsonl"));
+        const responseDirs=readdirSync(state).filter(n=>n.startsWith("query-")),latest=responseDirs.find(n=>{
+          const manifest=JSON.parse(readFileSync(join(state,n,"intent.json"),"utf8"));return manifest.binding.body===JSON.stringify(body)});
+        const balanceDir=latest&&"balance-"+latest.slice(6);
+        paidAdmission.push(ledger.reservations===paid&&!!latest&&!!balanceDir&&existsSync(join(state,latest,"forward.json"))&&existsSync(join(state,balanceDir,"pre-forward.json")));
+        balance-=10000n;height++;const block=makeBlock(height);blocks.set(height,block);
+        const tx="0x"+(paid===1?"a":"f").repeat(64),base={address:P.token,transactionHash:tx,blockHash:block.hash,blockNumber:block.number,transactionIndex:"0x0",removed:false};
+        receipts.set(tx,{transactionHash:tx,blockHash:block.hash,blockNumber:block.number,transactionIndex:"0x0",status:"0x1",logs:[
+          {...base,logIndex:"0x0",topics:encodeEventTopics({abi:ABI,eventName:"Transfer",args:{from:P.payer,to:P.merchant}}),data:encodeAbiParameters([{type:"uint256"}],[scenario==="bad-receipt"?9999n:10000n])},
+          {...base,logIndex:"0x1",topics:encodeEventTopics({abi:ABI,eventName:"AuthorizationUsed",args:{authorizer:P.payer,nonce}}),data:"0x"}]});
+        const data=body.variables.address?{_meta:meta,asWallet:scenario==="empty"?[]:[{id:"8453:7",agentId:"7",chainId:"8453",owner:P.subject,agentWallet:P.subject}],asOwner:[]}:{_meta:meta,feedbacks:[]};
+        if(scenario==="abort-paid")controller.abort();
+        if(scenario==="delay-paid"){setTimeout(()=>controller.abort(),5);await new Promise(resolve=>setTimeout(resolve,25))}
+        return Response.json({data},{status:scenario==="paid-500"||scenario==="second-500"&&paid===2?500:200,headers:{"payment-response":enc({success:true,network:P.chain,payer:P.payer,transaction:tx})}});
+      }
+      if(url!==h.GRAPH_COGS_RPC)throw Error("foreign request");
+      let result;
+      if(body.method==="eth_chainId")result="0x2105";
+      else if(body.method==="eth_getBlockByNumber")result=blocks.get(body.params[0]==="latest"?height:Number(BigInt(body.params[0])));
+      else if(body.method==="eth_getTransactionReceipt")result=receipts.get(body.params[0]);
+      else if(body.method==="eth_call"){
+        balanceReads++;
+        if(scenario==="delay-pre"&&balanceReads===2){setTimeout(()=>controller.abort(),5);await new Promise(resolve=>setTimeout(resolve,25))}
+        if(scenario==="after-error"&&balanceReads===3)throw Error("synthetic after read failure");
+        if(scenario==="low-pre"&&balanceReads===2)balance=909999n;
+        if(scenario==="bad-after-delta"&&balanceReads===3)balance=980000n;
+        if(scenario==="below-floor-after"&&balanceReads===3)balance=899999n;
+        result="0x"+balance.toString(16).padStart(64,"0");
+      }else throw Error("unexpected RPC");
+      return Response.json({jsonrpc:"2.0",id:body.id,result});
+    },{preconnect(){}});
+  `
+  return ownerConsumerChild(parent, `h.initializeGraphReservationState(state);
+    let firstCacheBytes=null,firstCachePath=null;
+    if(scenario==="partial-cache"){
+      const sources=h.readGraphSourceManifest(),binding=h.bindGraphQuery({subgraphId:P.subgraph,document:client.document("identities"),variables:{address:P.subject}},sources),writer=h.openGraphQualifiedReservationWriter(state,sources);
+      const before=await h.readGraphBalance(transport),summary=writer.reserve({allocation:"evidence",queryHash:binding.queryHash,balanceAtomic:before.balanceAtomic});
+      const journal=h.createGraphBalanceRecorder(state,binding,h.claimGraphReservation(state,binding,summary),before),recorder=h.createGraphResponseRecorder(state,binding);
+      const result=await client.makePaidQuery(dummy,{fetch:transport,observeResponse:recorder.observe,beforePaidRequest:async(intent,signal)=>{
+        journal.recordPreForward(await h.readGraphBalance(transport,{signal}),intent,signal);await recorder.beforePaidRequest(intent,signal);
+      }})({subgraphId:P.subgraph,document:client.document("identities"),variables:{address:P.subject}});
+      recorder.close();const evidence=h.verifyGraphCapturedQuery(state,binding);h.writeGraphQueryCache(state,binding,evidence);
+      journal.recordAfter(await h.readGraphBalance(transport),new AbortController().signal);journal.close();writer.close();
+      firstCachePath=join(state,"cache-"+binding.queryHash,"result.json");firstCacheBytes=readFileSync(firstCachePath,"utf8");
+    }
+    const baseline={commands,requests,unsigned,paid,signatures,factories},started=performance.now();
+    const runOptions={allocation:"evidence",keyCommand:scenario==="cleanup-uncertain"?client.runKeyCommand:keyCommand,transport,signal:controller.signal,...(scenario==="key-pending"||scenario==="cleanup-uncertain"?{timeoutMs:1000}:{})};
+    const outcome=await h.runGraphCogsOwner(runOptions);
+    const durationMs=performance.now()-started;
+    const countBefore={commands,requests,unsigned,paid,signatures,factories};
+    if(scenario==="delay-pre"||scenario==="delay-paid")await new Promise(resolve=>setTimeout(resolve,60));
+    if(outcome.stopReason==="end_turn"&&(scenario==="materialize"||scenario==="corrupt-artifact")){
+      const dir=join(state,readdirSync(state).find(n=>n.startsWith("assessment-")));
+      if(scenario==="materialize")renameSync(dir,join(state,"retained-original-assessment"));else writeFileSync(join(dir,"result.json"),"{}\\n");
+    }
+    let replay=null;if(outcome.stopReason==="end_turn")replay=await h.runGraphCogsOwner({allocation:"video",keyCommand:async()=>{throw Error("replay key forbidden")},transport:async()=>{throw Error("replay network forbidden")}});
+    else await h.runGraphCogsOwner({allocation:"evidence",keyCommand,transport});
+    const ledger=h.readGraphReservations(join(state,P.namespace,"reservations.jsonl")),names=readdirSync(state);
+    const journalNames=names.filter(n=>n.startsWith("balance-"));
+    const secondRpcStart=outcome.stopReason==="end_turn"&&outcome.artifact.history.queries.length===2?JSON.parse(readFileSync(join(state,"cache-"+outcome.artifact.history.queries[1].queryHash,"result.json"),"utf8")).evidence.firstRpcId:null;
+    console.log(JSON.stringify({simulation:true,identity:scenario==="wrong-key"?"real-mismatch":"mocked-owner",outcome,replay,baseline,durationMs,secondRpcStart,
+      firstCachePreserved:firstCachePath===null?null:readFileSync(firstCachePath,"utf8")===firstCacheBytes,
+      countBefore,countAfter:{commands,requests,unsigned,paid,signatures,factories},balanceReads,admissionBeforeKey,paidAdmission,
+      ledger,globalClaim:existsSync(join(state,P.namespace,".claim")),queryCaches:names.filter(n=>n.startsWith("cache-")).length,
+      afterFiles:journalNames.filter(n=>existsSync(join(state,n,"after.json"))).length,
+      artifacts:names.filter(n=>n.startsWith("assessment-")).length}));`, before)
+}
+function runConsumerScenario(parent: string, scenario: string) {
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", ownerConsumerScenario(parent, scenario)],
+    { env: { PATH: "" }, cwd: resolve(import.meta.dir, ".."), encoding: "utf8", timeout: 15000, maxBuffer: 65536 })
+  expect(child.stderr).toBe(""); expect(child.status).toBe(0)
+  return JSON.parse(child.stdout)
+}
+for (const scenario of ["empty", "two-queries"] as const) test(`controlled owner consumer runs original client for ${scenario} then replays without more capabilities`, () => owned(parent => {
+  const result = runConsumerScenario(parent, scenario), count = scenario === "empty" ? 1 : 2
+  expect(result.simulation).toBe(true); expect(result.identity).toBe("mocked-owner")
+  expect(result.outcome).toMatchObject({ stopReason: "end_turn", mode: "controlled-consumer",
+    accounting: { queryReservations: count, cacheHits: 0, forwardIntents: count, qualifiedQueries: count,
+      afterBalances: count, belowFloor: false, lastBalanceAtomic: String(1000000 - count * 10000), consumerWorkSettled: true } })
+  expect(result.outcome.artifact.history.output.sources).toHaveLength(count)
+  expect(result.outcome.artifact.history.output.attesterSettledCount).toBe(0)
+  expect(result.replay).toMatchObject({ stopReason: "end_turn", mode: "historical-replay",
+    accounting: { queryReservations: 0, cacheHits: count, forwardIntents: 0, qualifiedQueries: 0, afterBalances: 0 } })
+  expect(result.replay.artifact).toEqual(result.outcome.artifact)
+  expect(result.countAfter).toEqual(result.countBefore)
+  expect(result.countAfter).toMatchObject({ commands: 1, unsigned: count, paid: count, signatures: count, factories: 1 })
+  expect(result.balanceReads).toBe(count * 3); expect(result.admissionBeforeKey).toBe(true)
+  expect(result.paidAdmission).toEqual(Array.from({ length: count }, () => true))
+  expect(result.ledger).toMatchObject({ reservations: count, reservedAtomic: String(count * 10000), unresolved: count })
+  expect(result.globalClaim).toBe(false); expect(result.queryCaches).toBe(count); expect(result.artifacts).toBe(1)
+}), 20000)
+for (const scenario of ["missing-key", "wrong-key", "low-admission", "low-pre", "paid-500", "bad-receipt", "after-error", "bad-after-delta", "below-floor-after", "abort-paid"] as const)
+  test(`controlled owner consumer retains/refuses ${scenario} with no automatic retry`, () => owned(parent => {
+    const result = runConsumerScenario(parent, scenario), noReserve = scenario === "low-admission"
+    const sent = ["paid-500", "bad-receipt", "after-error", "bad-after-delta", "below-floor-after", "abort-paid"].includes(scenario)
+    expect(result.outcome).toMatchObject({ stopReason: "refusal", error: "graph_cogs_consumer_refused",
+      accounting: { queryReservations: noReserve ? 0 : 1, qualifiedQueries: 0, consumerWorkSettled: true } })
+    expect(result.countAfter).toEqual(result.countBefore)
+    expect(result.countAfter.paid).toBe(sent ? 1 : 0)
+    expect(result.countAfter.commands).toBe(noReserve ? 0 : 1)
+    expect(result.ledger.reservations).toBe(noReserve ? 0 : 1); expect(result.globalClaim).toBe(true); expect(result.artifacts).toBe(0)
+    if (!noReserve) expect(result.admissionBeforeKey).toBe(true)
+    if (sent) expect(result.paidAdmission).toEqual([true])
+    if (sent && scenario !== "after-error") expect(result.afterFiles).toBe(1)
+    else expect(result.afterFiles).toBe(0)
+    if (["after-error", "bad-after-delta", "below-floor-after"].includes(scenario)) expect(result.queryCaches).toBe(1)
+    else expect(result.queryCaches).toBe(0)
+    if (scenario === "below-floor-after") expect(result.outcome.accounting).toMatchObject({ belowFloor: true, lastBalanceAtomic: "899999" })
+  }), 20000)
+
+for (const scenario of ["delay-pre", "delay-paid", "key-pending", "corrupt-head"] as const)
+  test(`controlled owner consumer drains ${scenario} without late signing or another send`, () => owned(parent => {
+    const result = runConsumerScenario(parent, scenario)
+    expect(result.outcome).toMatchObject({ stopReason: "refusal", accounting: { reservationAttempts: 1, queryReservations: 1, qualifiedQueries: 0, consumerWorkSettled: true } })
+    expect(result.countAfter).toEqual(result.countBefore)
+    expect(result.countAfter).toMatchObject({ commands: 1, paid: scenario === "delay-paid" ? 1 : 0, signatures: scenario.startsWith("delay-") ? 1 : 0 })
+    expect(result.globalClaim).toBe(true); expect(result.artifacts).toBe(0)
+    expect(result.afterFiles).toBe(scenario === "delay-paid" ? 1 : 0)
+    if (scenario === "key-pending") { expect(result.durationMs).toBeGreaterThan(2900); expect(result.durationMs).toBeLessThan(5500); expect(result.countAfter.factories).toBe(0) }
+  }), 20000)
+test("controlled owner consumer preserves first cache and both reservations after a second paid failure", () => owned(parent => {
+  const result = runConsumerScenario(parent, "second-500")
+  expect(result.outcome).toMatchObject({ stopReason: "refusal", accounting: { reservationAttempts: 2, queryReservations: 2,
+    qualifiedQueries: 1, forwardIntents: 2, afterBalances: 2, lastBalanceAtomic: "980000", consumerWorkSettled: true } })
+  expect(result.countAfter).toEqual(result.countBefore)
+  expect(result.countAfter).toMatchObject({ commands: 1, factories: 1, paid: 2, signatures: 2 })
+  expect(result.ledger).toMatchObject({ reservations: 2, reservedAtomic: "20000" })
+  expect(result.queryCaches).toBe(1); expect(result.globalClaim).toBe(true); expect(result.artifacts).toBe(0)
+}), 20000)
+test("controlled owner consumer reuses a prior first-query cache and reserves only the missing pinned query before key lookup", () => owned(parent => {
+  const result = runConsumerScenario(parent, "partial-cache")
+  expect(result.outcome).toMatchObject({ stopReason: "end_turn", mode: "controlled-consumer",
+    accounting: { reservationAttempts: 1, queryReservations: 1, cacheHits: 1, forwardIntents: 1, qualifiedQueries: 1, afterBalances: 1 } })
+  expect(result.firstCachePreserved).toBe(true); expect(result.secondRpcStart).toBe(1)
+  expect(result.admissionBeforeKey).toBe(true); expect(result.paidAdmission).toEqual([true, true])
+  expect(result.countAfter.factories - result.baseline.factories).toBe(1)
+  expect(result.countAfter.paid - result.baseline.paid).toBe(1)
+  expect(result.countAfter.unsigned - result.baseline.unsigned).toBe(1)
+  expect(result.countAfter).toEqual(result.countBefore)
+  expect(result.ledger).toMatchObject({ reservations: 2, evidence: 2, reservedAtomic: "20000" })
+  expect(result.replay).toMatchObject({ stopReason: "end_turn", mode: "historical-replay", accounting: { queryReservations: 0, cacheHits: 2 } })
+}), 20000)
+test("controlled owner consumer can materialize complete retained query history without re-entering a payer", () => owned(parent => {
+  const result = runConsumerScenario(parent, "materialize")
+  expect(result.outcome.stopReason).toBe("end_turn")
+  expect(result.replay).toMatchObject({ stopReason: "end_turn", mode: "historical-replay", accounting: { reservationAttempts: 0, queryReservations: 0, cacheHits: 2 } })
+  expect(result.replay.artifact.history).toEqual(result.outcome.artifact.history)
+  expect(result.countAfter).toEqual(result.countBefore); expect(result.globalClaim).toBe(false); expect(result.artifacts).toBe(1)
+}), 20000)
+test("controlled owner consumer never turns an existing corrupt assessment into a paid cache miss", () => owned(parent => {
+  const result = runConsumerScenario(parent, "corrupt-artifact")
+  expect(result.outcome.stopReason).toBe("end_turn")
+  expect(result.replay).toMatchObject({ stopReason: "refusal", accounting: { reservationAttempts: 0, queryReservations: 0, cacheHits: 0 } })
+  expect(result.countAfter).toEqual(result.countBefore); expect(result.globalClaim).toBe(false)
+  expect(result.ledger.reservations).toBe(2); expect(result.queryCaches).toBe(2)
+}), 20000)
+
+test("controlled owner consumer reports an unacknowledged simulated command owner as uncertain cleanup and retains its claim", () => owned(parent => {
+  const result = runConsumerScenario(parent, "cleanup-uncertain")
+  expect(result.outcome).toMatchObject({ stopReason: "refusal", accounting: { reservationAttempts: 1, queryReservations: 1,
+    qualifiedQueries: 0, consumerWorkSettled: false } })
+  expect(result.countAfter).toEqual(result.countBefore)
+  expect(result.countAfter).toMatchObject({ commands: 1, factories: 0, signatures: 0, paid: 0 })
+  expect(result.globalClaim).toBe(true); expect(result.artifacts).toBe(0)
+  expect(result.durationMs).toBeGreaterThan(6900); expect(result.durationMs).toBeLessThan(9500)
+}), 20000)
+
+test("controlled owner consumer snapshots allocation so mutable caller options cannot reclassify its second reservation", () => owned(parent => {
+  const result = runConsumerScenario(parent, "mutate-options")
+  expect(result.outcome.stopReason).toBe("end_turn")
+  expect(result.ledger).toMatchObject({ reservations: 2, evidence: 2, video: 0, reservedAtomic: "20000" })
+}), 20000)
+
+test("controlled owner consumer refuses malformed configuration and getters without escaping its fixed error", () => owned(parent => {
+  const action = `let getters=0;const accessor={allocation:"evidence",get transport(){getters++;throw Error("private fixture diagnostic")}};
+    const inputs=[undefined,null,{}, {allocation:"wrong"},{allocation:"evidence",signal:{}},{allocation:"evidence",extra:true},accessor];
+    const results=[];for(const input of inputs)results.push(await h.runGraphCogsOwner(input));
+    console.log(JSON.stringify({results,getters,files:readdirSync(state)}));`
+  const child = spawnSync(process.execPath, ["--no-env-file", "-e", ownerConsumerChild(parent, action)], {
+    env: { PATH: "" }, cwd: resolve(import.meta.dir, ".."), encoding: "utf8", timeout: 5000, maxBuffer: 8192,
+  })
+  expect(child.stderr).toBe(""); expect(child.status).toBe(0)
+  const result = JSON.parse(child.stdout)
+  expect(result.getters).toBe(0); expect(result.files).toEqual([]); expect(result.results).toHaveLength(7)
+  expect(result.results.every((value: { stopReason: string; error: string }) => value.stopReason === "refusal" && value.error === "graph_cogs_consumer_refused")).toBe(true)
+}))
+
 function sourceCopy(parent: string) {
   const dir = join(parent, "source"); mkdirSync(dir, { mode: 0o700 })
   for (const path of GRAPH_COGS_SOURCE_FILES) {

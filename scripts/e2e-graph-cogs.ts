@@ -9,9 +9,9 @@ import { constants, openSync, closeSync, lstatSync, fstatSync, readSync, realpat
 import { dirname, isAbsolute, normalize, join, resolve } from "node:path"
 import { userInfo } from "node:os"
 import { privateKeyToAccount } from "viem/accounts"
-import { runKeyCommand, type Runner } from "../skills/counterparty-graph/graph-client.ts"
+import { runKeyCommand, document, makePaidQuery, type Runner } from "../skills/counterparty-graph/graph-client.ts"
 import { encodeGraphQuery, GATEWAY_BASE, validateGraphChallengeHeader, readGraphSettlementHeader, readGraphPaidBody, readGraphRpcBody, verifyGraphReceiptEvidence, type QueryArgs, type GraphResponseObservation, type GraphPaymentIntent, type PaidResult } from "../skills/counterparty-graph/graph-client.ts"
-import { graphQueryIds, graphReadResult } from "../skills/counterparty-graph/run.ts"
+import { graphQueryIds, graphReadResult, runGraphJob } from "../skills/counterparty-graph/run.ts"
 import { synthesize, type Assessment, type Source } from "../skills/counterparty-graph/synthesize.ts"
 import { copyPlainData, plainObject, assessAddressSchemaOk } from "../skills/counterparty-graph/validate-output.ts"
 
@@ -1868,6 +1868,221 @@ export async function readGraphOwnerPayerKey(options: {
     active(); return value
   } catch { throw new Error("graph_cogs_owner_key_unavailable") }
   finally { if (timer !== undefined) clearTimeout(timer) }
+}
+
+export interface GraphCogsAccounting {
+  readonly reservationAttempts: number
+  readonly queryReservations: number
+  readonly cacheHits: number
+  readonly forwardIntents: number
+  readonly qualifiedQueries: number
+  readonly afterBalances: number
+  readonly belowFloor: boolean | null
+  readonly lastBalanceAtomic: string | null
+  readonly consumerWorkSettled: boolean
+}
+export type GraphCogsOutcome =
+  { readonly stopReason: "end_turn"; readonly mode: "historical-replay" | "controlled-consumer"; readonly artifact: GraphAssessmentReplay; readonly accounting: GraphCogsAccounting } |
+  { readonly stopReason: "refusal"; readonly error: "graph_cogs_consumer_refused"; readonly accounting: GraphCogsAccounting }
+/** Fixed-root library integration, not a live CLI or approval. Misses require
+ * explicit command/transport capabilities; import/default CLI invokes neither.
+ * Every reserve survives failure; no retry, takeover, reset or automatic refund. */
+export async function runGraphCogsOwner(options: {
+  readonly allocation: "evidence" | "video"
+  readonly keyCommand?: Runner
+  readonly transport?: typeof globalThis.fetch
+  readonly signal?: AbortSignal
+  readonly now?: () => number
+  readonly timeoutMs?: number
+}): Promise<GraphCogsOutcome> {
+  const controller = new AbortController(), abort = () => controller.abort()
+  let externalSignal: AbortSignal | undefined
+  let timer: ReturnType<typeof setTimeout> | undefined, done = false, settled = true
+  let reservationAttempts = 0, queryReservations = 0, cacheHits = 0, forwardIntents = 0, qualifiedQueries = 0, afterBalances = 0
+  let belowFloor: boolean | null = null, lastBalanceAtomic: string | null = null
+  const outstanding = new Set<Promise<unknown>>()
+  const track = <T>(work: Promise<T>): Promise<T> => {
+    outstanding.add(work); void work.then(() => outstanding.delete(work), () => outstanding.delete(work)); return work
+  }
+  const accounting = (): GraphCogsAccounting => Object.freeze({ reservationAttempts, queryReservations, cacheHits, forwardIntents,
+    qualifiedQueries, afterBalances, belowFloor, lastBalanceAtomic, consumerWorkSettled: settled })
+  const observeBalance = (value: GraphBalanceObservation) => {
+    belowFloor = belowFloor === true || BigInt(value.balanceAtomic) < BigInt(GRAPH_COGS_POLICY.floorAtomic)
+    lastBalanceAtomic = value.balanceAtomic; return value
+  }
+  const drain = async () => {
+    controller.abort()
+    if (outstanding.size === 0) return
+    let grace: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([Promise.allSettled([...outstanding]),
+        new Promise<never>((_, reject) => { grace = setTimeout(() => reject(new Error("cleanup uncertain")), 6000) })])
+    } catch { settled = false }
+    finally { if (grace !== undefined) clearTimeout(grace) }
+  }
+  try {
+    insist(plainObject(options))
+    const allowed = ["allocation", "keyCommand", "transport", "signal", "now", "timeoutMs"]
+    for (const name of Reflect.ownKeys(options)) {
+      insist(typeof name === "string" && allowed.includes(name) && "value" in Object.getOwnPropertyDescriptor(options, name)!)
+    }
+    // Snapshot trusted capability/configuration references before any await.
+    const allocation = options.allocation, transport = options.transport, keyCommand = options.keyCommand,
+      now = options.now ?? Date.now, timeout = options.timeoutMs ?? 80000
+    const requestedSignal = options.signal
+    insist((allocation === "evidence" || allocation === "video") &&
+      (transport === undefined || typeof transport === "function") && (keyCommand === undefined || typeof keyCommand === "function") &&
+      (requestedSignal === undefined || requestedSignal instanceof AbortSignal))
+    externalSignal = requestedSignal
+    insist(typeof now === "function" && Number.isSafeInteger(timeout) && timeout >= 1 && timeout <= 80000)
+    const started = now(), deadline = started + timeout; let previous = started
+    insist(Number.isSafeInteger(started) && started > 0 && Number.isSafeInteger(deadline))
+    const active = () => {
+      const current = now()
+      insist(!done && !controller.signal.aborted && !externalSignal?.aborted &&
+        Number.isSafeInteger(current) && current >= previous && current < deadline)
+      previous = current; return current
+    }
+    active(); externalSignal?.addEventListener("abort", abort, { once: true }); timer = setTimeout(abort, timeout)
+    const parent = graphCogsOwnerRoot(), sources = readGraphSourceManifest()
+    const absent = (path: string) => {
+      try { lstatSync(path); return false }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return true; throw error }
+    }
+    active()
+    if (!absent(assessmentDirectory(parent, sources))) {
+      const artifact = readGraphAssessmentCache(parent, sources, { now, signal: controller.signal })
+      active(); cacheHits = artifact.cacheHits
+      return Object.freeze({ stopReason: "end_turn", mode: "historical-replay", artifact, accounting: accounting() })
+    }
+    const budget = readGraphQualifiedReservations(parent, sources, { now, signal: controller.signal })
+    insist(budget.unresolved === 0 && absent(join(parent, GRAPH_COGS_POLICY.namespace, ".claim"))); active()
+    const firstBinding = bindGraphQuery({ subgraphId: GRAPH_COGS_POLICY.subgraph, document: document("identities"),
+      variables: { address: GRAPH_COGS_POLICY.subject } }, sources)
+    const cached = new Map<string, { binding: GraphQueryBinding; cache: GraphCachedQuery }>()
+    const retained = (binding: GraphQueryBinding, prior?: GraphQueryEvidence) => {
+      const entry = budget.entries.find(row => row.queryHash === binding.queryHash)
+      if (entry === undefined) return undefined
+      insist(entry.state === "retained-consistency" && entry.proof !== null)
+      const cache = readGraphQueryCache(parent, binding, { now, signal: controller.signal, ...(prior === undefined ? {} : { parent: prior }) })
+      insist(cache.cacheHash === entry.proof.cacheHash && cache.evidence.hash === entry.proof.queryEvidenceHash)
+      cached.set(binding.queryHash, { binding, cache }); return cache
+    }
+    const secondBinding = (first: GraphCachedQuery) => {
+      const ids = graphQueryIds(first.evidence.result.data, GRAPH_COGS_POLICY.subject)
+      if (ids === null || ids.length === 0) return undefined
+      const meta = first.evidence.result.data._meta
+      insist(plainObject(meta) && plainObject(meta.block) && typeof meta.block.hash === "string")
+      return bindGraphQuery({ subgraphId: GRAPH_COGS_POLICY.subgraph, document: document("attestations"),
+        variables: { agentIds: ids, block: { hash: meta.block.hash } } }, sources, { binding: firstBinding, blockHash: meta.block.hash })
+    }
+    const first = retained(firstBinding), second = first === undefined ? undefined : secondBinding(first)
+    const secondCache = second === undefined ? undefined : retained(second, first!.evidence)
+    const missing = first === undefined ? firstBinding : second !== undefined && secondCache === undefined ? second : undefined
+    if (missing === undefined) {
+      const history = graphAssessmentHistory(parent, sources, cacheClock({ now, signal: controller.signal }))
+      const artifact = writeGraphAssessmentCache(parent, sources, history.output, { now, signal: controller.signal })
+      active(); cacheHits = artifact.cacheHits
+      return Object.freeze({ stopReason: "end_turn", mode: "historical-replay", artifact, accounting: accounting() })
+    }
+    insist(typeof transport === "function" && typeof keyCommand === "function")
+    const writer = openGraphQualifiedReservationWriter(parent, sources)
+    interface PendingQuery { binding: GraphQueryBinding; balance: GraphBalanceRecorder; response: GraphResponseRecorder;
+      parent?: GraphQueryEvidence; preRecorded: boolean }
+    let pending: PendingQuery | undefined, querying = false
+    const prepare = async (binding: GraphQueryBinding) => {
+      active(); insist(pending === undefined)
+      const before = observeBalance(await readGraphBalance(transport, { now, signal: controller.signal }))
+      active(); checkGraphBalance(before.balanceAtomic)
+      reservationAttempts++ // An unacknowledged write may still have persisted; never infer a refund.
+      const summary = writer.reserve({ allocation, queryHash: binding.queryHash, balanceAtomic: before.balanceAtomic })
+      queryReservations++
+      const handoff = claimGraphReservation(parent, binding, summary, { now })
+      const balance = createGraphBalanceRecorder(parent, binding, handoff, before, { now })
+      const response = createGraphResponseRecorder(parent, binding, { now })
+      const prior = binding.kind === "attestations" ? cached.get(firstBinding.queryHash)?.cache.evidence : undefined
+      insist(binding.kind !== "attestations" || prior !== undefined)
+      pending = { binding, balance, response, preRecorded: false, ...(prior === undefined ? {} : { parent: prior }) }
+      active()
+    }
+    await prepare(missing)
+    const seen = new Set<string>()
+    const envelope = await runGraphJob({ input: { address: GRAPH_COGS_POLICY.subject } }, {}, {
+      signal: controller.signal,
+      readKey: () => {
+        active(); writer.snapshot()
+        return track(readGraphOwnerPayerKey({ run: keyCommand, signal: controller.signal, now }))
+      },
+      makeQuery: key => {
+        active(); writer.snapshot()
+        const factory = makePaidQuery(key, { fetch: transport, signal: controller.signal, now,
+          timeoutMs: Math.max(1, deadline - active()),
+          observeResponse: async (observation, signal) => {
+            active(); signal.throwIfAborted(); insist(pending !== undefined && querying); writer.snapshot()
+            await pending.response.observe(observation, signal); active()
+          },
+          beforePaidRequest: async (intent, signal) => {
+            active(); signal.throwIfAborted(); insist(pending !== undefined && querying); writer.snapshot()
+            const current = pending
+            const before = observeBalance(await readGraphBalance(transport, { now, signal }))
+            active(); signal.throwIfAborted(); insist(current === pending)
+            current.balance.recordPreForward(before, intent, signal); current.preRecorded = true
+            await current.response.beforePaidRequest(intent, signal)
+            active(); signal.throwIfAborted(); forwardIntents++
+          },
+        })
+        return args => track((async () => {
+          active(); insist(!querying && seen.size < 2)
+          const body = encodeGraphQuery(args), parentCache = cached.get(firstBinding.queryHash)?.cache
+          const binding = body === firstBinding.body ? firstBinding : parentCache === undefined ? undefined : secondBinding(parentCache)
+          insist(binding !== undefined && body === binding.body && !seen.has(binding.queryHash)); seen.add(binding.queryHash)
+          const hit = cached.get(binding.queryHash)
+          if (hit) {
+            writer.snapshot()
+            const checked = readGraphQueryCache(parent, hit.binding, { now, signal: controller.signal,
+              ...(binding.kind === "identities" ? {} : { parent: parentCache!.evidence }) })
+            insist(checked.cacheHash === hit.cache.cacheHash); active(); cacheHits++; return checked.evidence.result
+          }
+          if (pending === undefined) await prepare(binding)
+          insist(pending !== undefined && pending.binding.queryHash === binding.queryHash)
+          const current = pending; querying = true
+          let cache: GraphCachedQuery | undefined
+          try {
+            const result = await factory(args); active()
+            current.response.close()
+            const scoped = { now, ...(current.parent === undefined ? {} : { parent: current.parent }) }
+            const evidence = verifyGraphCapturedQuery(parent, binding, scoped)
+            insist(JSON.stringify(copyPlainData(result)) === JSON.stringify(evidence.result))
+            cache = writeGraphQueryCache(parent, binding, evidence, { ...scoped, signal: controller.signal })
+          } finally {
+            try {
+              if (current.preRecorded) {
+                // Cleanup-only read: cancellation must not suppress post-forward facts.
+                // No signer/factory/paid dispatch is reachable from this block.
+                const signal = AbortSignal.timeout(5000)
+                const after = observeBalance(await readGraphBalance(transport, { now, signal })); afterBalances++
+                current.balance.recordAfter(after, signal); current.balance.close()
+              }
+            } finally { querying = false }
+          }
+          active(); insist(cache !== undefined && current.preRecorded && writer.snapshot().unresolved === 0)
+          qualifiedQueries++; cached.set(binding.queryHash, { binding, cache }); pending = undefined
+          return cache.evidence.result
+        })())
+      },
+    })
+    active(); insist(envelope.stopReason === "end_turn" && pending === undefined && outstanding.size === 0 &&
+      writer.snapshot().unresolved === 0)
+    writer.close()
+    const artifact = writeGraphAssessmentCache(parent, sources, envelope.output, { now, signal: controller.signal }); active()
+    return Object.freeze({ stopReason: "end_turn", mode: "controlled-consumer", artifact, accounting: accounting() })
+  } catch {
+    await drain()
+    return Object.freeze({ stopReason: "refusal", error: "graph_cogs_consumer_refused", accounting: accounting() })
+  } finally {
+    done = true; controller.abort(); externalSignal?.removeEventListener("abort", abort)
+    if (timer !== undefined) clearTimeout(timer)
+  }
 }
 export function graphCogsMain(args: readonly string[]): number {
   if (args.length === 1 && args[0] === "--help") {

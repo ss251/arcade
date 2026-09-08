@@ -1,5 +1,17 @@
 # Plan G — execution records
 
+## September 8 — G15 controlled consumer checkpoint
+
+The [consumer-integration brief](task-15-consumer-integration-brief.md) and
+[consumer-integration report](task-15-consumer-integration-report.md) join fixed
+owner state, qualified reservations, journals and immediate caches to the
+original consumer/client.384 focused Bun/2067 assertions and exact strict pass.
+Only synthetic owned-child fixtures execute; no actual key or payment. Cache
+replay avoids all consuming capabilities, failures retain claims, and bounded
+cleanup reports uncertainty. Original client/consumer/payment rules unchanged.
+Sole full gate passed5371Vitest/1807Bun, strict and both builds; local commit
+follows. No live release or push.
+
 ## September 8 — G15 fixed owner-boundary checkpoint
 
 The [owner-boundary brief](task-15-owner-boundary-brief.md) and

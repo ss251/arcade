@@ -1,5 +1,21 @@
 # SDD ledger — Plan G
 
+2026-09-08 10:43 IST — G15U sole84737fullgate PASS5371Vitest242/69.82s;
+1807Bun98/14075assert293.98s;root/webstrict/clientSSR390/198ms. Six paths,
+3links/privacy0 and three source/brief pins frozen; original harness restoration
+passes/client-consumer unchanged. Atomic local commit/exact-one mainFF next.
+No full repeat, operational state, real Keychain/key/live/spend or push.
+
+2026-09-08 10:36 IST — G15U controlled original-consumer integration implemented
+after missing-export and configuration-mutation/malformed-signal Reds. Final
+384focusedBun2067assert120.88s/2rootsstrict0 PASS. Owned child fixtures use
+synthetic owner derivation/transport and actual original consumer/client; no
+owner authentication or payment is claimed. Immediate per-query caches survive
+later failure; complete replay/materialization uses no key or network. Uncertain
+cleanup retains claims and is explicitly reported. Original harness restoration
+passes/client-consumer unchanged. Six-path audit/freeze and sole sequential
+four-worker gate next; no operational state, live/spend/approval replay/push.
+
 2026-09-08 09:56 IST — G15T sole56334 full gate PASS:5371Vitest242/68.97s;
 1783Bun98/13818assert240.90s;root/webstrict/clientSSR347/186ms. Six paths,
 3links/privacy0;three source/brief pins frozen. Original harness restoration
