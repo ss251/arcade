@@ -1,6 +1,7 @@
 import { useId } from "react"
 import arcMarkSvg from "../marks/arc-mark.svg?raw"
 import usdcSvg from "../marks/usdc.svg?raw"
+import arcadeMarkSvg from "../marks/arcade-mark.svg?raw"
 
 /**
  * Brand marks, vendored — never hotlinked.
@@ -37,4 +38,19 @@ export const UsdcMark = ({ size = 26 }: { size?: number }) => (
       __html: usdcSvg.replace(/<svg /, `<svg width="${size}" height="${size}" `)
     }}
   />
+)
+
+/**
+ * ARCADE's own mark: the receipt tree drawn as an A. An apex node hires two leaf nodes and
+ * the crossbar is settlement joining the two hops — the one object in the product nobody
+ * else has, so it is the mark.
+ *
+ * `currentColor` throughout, so it is the page's ink in either scheme and never a fourth
+ * hue (blue is USDC, green settled, red not settled); no gradient, so no id collision and
+ * no plate. The SVG file itself carries no comment or role: it is inlined on every page,
+ * and the anchor around it owns the accessible name. Size is the only knob.
+ */
+export const ArcadeMark = ({ size = 20 }: { size?: number }) => (
+  <span className="arcade-mark" style={{ width: size, height: size }} aria-hidden="true"
+    dangerouslySetInnerHTML={{ __html: arcadeMarkSvg }} />
 )

@@ -319,10 +319,23 @@ a {
   flex-wrap: wrap;
 }
 
+/*
+ * The brand. Mark plus wordmark, in ink, in the sans: this file reserves mono for values
+ * read glyph by glyph, and a name is not one of those. The mark is currentColor so it is
+ * the same ink as the word and never a fourth hue.
+ */
 .mark {
-  font: 600 15px/1 var(--mono);
-  letter-spacing: 0.12em;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font: 600 16px/1 var(--sans);
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  color: var(--ink);
 }
+.mark:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; border-radius: 2px; }
+.arcade-mark { display: inline-flex; flex: none; }
+.arcade-mark svg { width: 100%; height: 100%; display: block; }
 
 .meta {
   font: 12px/1.6 var(--mono);

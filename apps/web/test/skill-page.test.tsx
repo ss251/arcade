@@ -223,7 +223,9 @@ describe("H8 listing page and public receipt records", () => {
     expect(out).toContain("counterparty-graph")
     expect(out).toContain(`href="${url(TX)}"`)
     expect(out).toContain(`href="${url(CHILD_TX)}"`)
-    expect(out).not.toMatch(/<svg|tree-edge|parentNodeId|rootJobId|\/trees\/|0ms/)
+    // The brand mark in the header is an inline SVG; this guard is about the receipt records,
+    // so it inspects everything after the site chrome.
+    expect(out.slice(out.indexOf("</header>"))).not.toMatch(/<svg|tree-edge|parentNodeId|rootJobId|\/trees\/|0ms/)
   })
   it.each(["gateway", "test", "invalid-kind"])("keeps %s references unlinked through real H4 decoding", kind => {
     const r = row(kind === "invalid-kind" ? { settleRefKind: undefined } :
@@ -253,7 +255,7 @@ describe("H8 listing page and public receipt records", () => {
     const prefix = css.slice(0, css.indexOf(marker))
     // Re-locked 2026-09-08 for the same deliberate marketplace/token rewrite; see the
     // note in listing-rails.test.tsx. An intentional edit re-pins this hash.
-    expect(createHash("sha256").update(prefix).digest("hex")).toBe("11363248c06d9d8f043caf5190cd3c61f0ea181cefc26b9d55ce92608fe7e465")
+    expect(createHash("sha256").update(prefix).digest("hex")).toBe("d54458c7dbec53d3c1793d1c518a0b3ebebcf682b4b3acb5852ae481e12a88be")
     const end = css.indexOf("/* Ordinary buyer recovery")
     expect(end).toBeGreaterThan(css.indexOf(marker))
     const scoped = css.slice(css.indexOf(marker), end)

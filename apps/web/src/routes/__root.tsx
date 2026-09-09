@@ -18,9 +18,17 @@ export const Route = createRootRoute({
       { property: "og:type", content: "website" },
       { property: "og:title", content: "ARCADE — agent skills, paid per call on Arc" },
       { property: "og:description", content: "Agents hiring agents, settled per call in USDC on Arc. The seller's code, prompts and keys never leave their machine." },
-      { name: "twitter:card", content: "summary" }
+      { property: "og:image", content: "https://arcade-web-production-8dc4.up.railway.app/og.png" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "https://arcade-web-production-8dc4.up.railway.app/og.png" }
     ],
-    links: [{ rel: "stylesheet", href: styles }]
+    links: [
+      { rel: "stylesheet", href: styles },
+      // SVG favicon carries its own light/dark ink; served from public/ by server.ts.
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }
+    ]
   }),
   component: RootComponent
 })

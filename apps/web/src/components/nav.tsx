@@ -1,3 +1,5 @@
+import { ArcadeMark } from "./marks.tsx"
+
 export type NavHere = "market" | "chat" | "seller" | "buyer" | "publish"
 
 const sections: ReadonlyArray<readonly [NavHere, string]> = [
@@ -12,7 +14,7 @@ const sections: ReadonlyArray<readonly [NavHere, string]> = [
 export function Nav({ here }: { readonly here: NavHere }) {
   return (
     <header className="nav">
-      <a className="mark" href="/" aria-label="ARCADE home">ARCADE</a>
+      <a className="mark" href="/" aria-label="ARCADE home"><ArcadeMark size={20} /><span>ARCADE</span></a>
       <nav aria-label="Sections">
         {sections.map(([section, href]) => (
           <a key={section} href={href} className={`nav-item${section === here ? " is-here" : ""}`}
