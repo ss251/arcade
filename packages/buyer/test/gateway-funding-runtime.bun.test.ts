@@ -256,7 +256,7 @@ describe("F11 account-wide funding journal", () => {
 })
 
 describe("F11 explicit runtime construction", () => {
-  it("exposes a synchronous no-IO operation facade and refuses already-cancelled execution", async () => {
+  it("exposes a synchronous no-IO operation facade and refuses already-canceled execution", async () => {
     const f = await setup(), controller = new AbortController(); controller.abort()
     let reads = 0, signers = 0, sends = 0
     const deps = {
@@ -270,7 +270,7 @@ describe("F11 explicit runtime construction", () => {
     expect(reads + signers + sends).toBe(0)
     const result = await operation.executeDepositOnce()
     expect(result.status).toBe("refused")
-    expect(result.code).toBe("cancelled")
+    expect(result.code).toBe("canceled")
     expect(reads + signers + sends).toBe(0)
     expect(await readdir(f.root)).toEqual([])
     await operation.close()
@@ -290,7 +290,7 @@ describe("F11 explicit runtime construction", () => {
     }
     const operation = FundingRuntime.createFundingOperation({ authority, operationId, request, journalPath: f.journalPath }, deps)
     const execution = operation.executeDepositOnce(); await paused; controller.abort()
-    expect((await execution).code).toBe("cancelled")
+    expect((await execution).code).toBe("canceled")
     let cleanup: "resolved" | "uncertain" = "resolved"
     try { await operation.close() } catch { cleanup = "uncertain" }
     release()
@@ -594,12 +594,12 @@ describe("F11 bounded production transport", () => {
     await expect(deps.rpc("eth_chainId", [], controller.signal)).rejects.toThrow()
   })
   it("cancels a late response body after its uncooperative fetch missed the deadline", async () => {
-    const controller = new AbortController(); let release!: (response: Response) => void, cancelled = 0
+    const controller = new AbortController(); let release!: (response: Response) => void, canceled = 0
     const deps = FundingRuntime.createFundingDependencies({ signal: controller.signal, deadlineMs: performance.now() + 30,
       fetch: Object.assign(() => new Promise<Response>(resolve => { release = resolve }), { preconnect() {} }) })
     await expect(deps.rpc("eth_chainId", [], controller.signal)).rejects.toThrow()
-    release(new Response(new ReadableStream({ cancel() { cancelled++ } }), { headers: { "content-type": "application/json" } }))
+    release(new Response(new ReadableStream({ cancel() { canceled++ } }), { headers: { "content-type": "application/json" } }))
     await new Promise(resolve => setTimeout(resolve, 5))
-    expect(cancelled).toBe(1)
+    expect(canceled).toBe(1)
   })
 })

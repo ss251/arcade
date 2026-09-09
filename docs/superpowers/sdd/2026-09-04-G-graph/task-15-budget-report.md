@@ -46,7 +46,7 @@ Errors are fixed codes and never echo private file paths or provider data.
 
 Do not use the audit file argument as production authority. The later writer
 must choose one fixed non-disposable namespace; a complete artifact replay must
-avoid key lookup and be labelled historical, not fresh runner execution.
+avoid key lookup and be labeled historical, not fresh runner execution.
 
 ## Executed checks
 

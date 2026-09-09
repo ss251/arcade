@@ -53,7 +53,7 @@ const fakeClient = (script: ReadonlyArray<FakeMessage>, spy: FakeRunner) =>
             },
             async *[Symbol.asyncIterator]() {
               for (const m of script) {
-                // A real runner would not produce another turn after an abort. Modelling
+                // A real runner would not produce another turn after an abort. Modeling
                 // that is the whole point: an enforcement bound that only takes effect
                 // after the loop drains has enforced nothing.
                 if (spy.signal?.aborted === true) return

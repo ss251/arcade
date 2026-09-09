@@ -27,7 +27,7 @@ Body size is1024bytes; Bun can return413 before the handler, after which the
 remaining listener lifetime still expires. Development error pages are disabled.
 No request body, raw header or credential is written by the application.
 
-The result separates captured/refused/cancelled/expired from listenerClosed.
+The result separates captured/refused/canceled/expired from listenerClosed.
 Client identity is always unverified and client acknowledgement unconfirmed.
 Successful/refused responses get only a25ms flush opportunity, not a delivery
 guarantee. The owned server then receives one forced stop and at most750ms for

@@ -109,7 +109,7 @@ Registries on Arc testnet (https://docs.arc.io/arc/tutorials/register-your-first
 
 Args: `agentId`, value=`1`, valueDecimals=`0`, tag1=`"arcade-settled"`, tag2=`skillId`, endpoint=`${HUB}/x/${seller}/${skillId}`, feedbackURI=`${HUB}/receipts/${jobId}` (JSON includes proof-of-payment `{fromAddress,toAddress,chainId,txHash:settleTx}`), feedbackHash=`keccak256(bytes(receiptJSON))`. Arc tutorial ABI names those string slots `tag/metadataURI/evidenceURI/comment`; the **signature** is `giveFeedback(uint256,int128,uint8,string,string,string,string,bytes32)`.
 
-**Display:** listing + `arcade_describe_skill` shows `agentId` and attester-filtered count, labelled **“ARCADE settlement evidence (`clientAddress == ARCADE_8004_ATTESTER`)”**. Optional ENSIP-25 `agent-registration[<ERC-7930 Arc IdentityRegistry>][<agentId>] = "1"` (https://docs.ens.domains/ensip/25/) only if this register shipped.
+**Display:** listing + `arcade_describe_skill` shows `agentId` and attester-filtered count, labeled **“ARCADE settlement evidence (`clientAddress == ARCADE_8004_ATTESTER`)”**. Optional ENSIP-25 `agent-registration[<ERC-7930 Arc IdentityRegistry>][<agentId>] = "1"` (https://docs.ens.domains/ensip/25/) only if this register shipped.
 
 **It is NOT:** a score, a `getSummary` gate, a first-call cap, Sybil-resistant reputation (arXiv 2606.26028; EIP-8004 Security Considerations require trusted `clientAddresses`), or a substitute for never-broadcast. 0xdevair: a badge is not a receipt (https://x.com/0xdevair/status/2095411572663283938).
 
@@ -198,7 +198,7 @@ ETHGlobal rejects TTS, phone, <720p, >4 min (https://ethglobal.com/events/ethonl
 | 1:10–2:00 | Hire tree. Buyer pays `wallet-risk-note` ($0.05). Child Arc settle from **sub-buy wallet**, not the buyer. Receipt `childSettleTxs[]`. Open both txs. `A→B→A` 409. One sentence: hop 2 is seller working capital. |
 | 2:00–2:40 | Graph COGS. `subgraph-brief` pays Agent0 on Base at $0.01 (`amount:10000`). Structured verdict. Kill Graph key → **no Arc settlement**. |
 | 2:40–3:05 | ENS two beats: `setText` revert after revoke; buyer refuses tampered `payTo`. |
-| 3:05–3:25 | Continuity + runbook. 112 commits 2026-07-25→08-07 vs this week. Flip after Sep 16, deployed by Sep 30. If 8004/Agent0 shipped: 5s of attester feedback, labelled evidence not score. |
+| 3:05–3:25 | Continuity + runbook. 112 commits 2026-07-25→08-07 vs this week. Flip after Sep 16, deployed by Sep 30. If 8004/Agent0 shipped: 5s of attester feedback, labeled evidence not score. |
 | 3:25–3:35 | Diagram: verify → sandbox → validate → settle. |
 
 **README structure**

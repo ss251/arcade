@@ -14,7 +14,7 @@ New `arcade_open_session({budgetUsd, rail?})` and `arcade_close_session({})` are
 non-idempotent lifecycle mutations. Their text explicitly says opening/closing
 spends nothing; open creates no deposit/escrow and close revokes no authorization.
 The exact canonical positive six-decimal string budget cannot exceed process
-remaining. Explicit rails are Gateway, EIP-3009 and labelled testing-only Test;
+remaining. Explicit rails are Gateway, EIP-3009 and labeled testing-only Test;
 omission passes through to the hub/F9 selected supported rail, without fallback.
 The existing ordinary localhost default is unchanged; session opening requires
 HTTPS or literal 127.0.0.1/[::1] HTTP and otherwise gives a fixed configuration hint.
@@ -22,13 +22,13 @@ HTTPS or literal 127.0.0.1/[::1] HTTP and otherwise gives a fixed configuration 
 F10 consumes the actual F9 openSession/BuyerSession Effects, never session tokens
 or an ID-only payment path. The handle captures buyer, network, fetch and chain.
 Active call/quote uses a bounded direct listing serviceName projection; the SDK's
-seller argument is that URL segment, not the catalogue wallet field. The actual
+seller argument is that URL segment, not the catalog wallet field. The actual
 F9 quote receives actual input (default {}), is read-only, and call independently
 probes again. No active-session ENS/hire fallback, metadata-price fallback,
 environment key reread or production-wide SDK reset is introduced.
 
 Open, close and purchases share one predecessor-preserving lease. Relevant own
-JSON is bounded/copied before awaiting it. Cancelled queued B may return early,
+JSON is bounded/copied before awaiting it. Canceled queued B may return early,
 but its node remains dependent on active A before releasing C, and B never runs.
 Active work is joined through Effect cleanup rather than releasing its successor
 from a raced cancellation. Actual installed MCP extra.signal is forwarded into
@@ -79,7 +79,7 @@ ordinary balanceAtomic implementation is unchanged.
 ## Actual Red/Green chronology (IST)
 
 - 03:32:40: four genuine Reds against unchanged mcp.ts: two lifecycle advertisement
-  assertions; pre-cancelled ordinary purchase reached the paid seam; cancelled
+  assertions; pre-canceled ordinary purchase reached the paid seam; canceled
   middle B executed, producing [1,2,3] instead of [1,3]. No missing-module failure.
 - 03:34:44: both cancellation lease regressions Green after the shared lease and
   signal propagation. Lifecycle was not implemented yet.
@@ -94,7 +94,7 @@ ordinary balanceAtomic implementation is unchanged.
 - 03:42:09:19 new cases Green including actual Client/InMemoryTransport active
   cancellation/disconnect and explicit unsupported IDs. This initially tested the
   SDK seam with injected Effects; it was not yet actual F9 signing coverage.
-- 03:44:55:22 cases Green with actual protocol A/cancelled-B/C ordering, concurrent
+- 03:44:55:22 cases Green with actual protocol A/canceled-B/C ordering, concurrent
   opens and old budget-read generation handling.
 - B9 independently captured two genuine old-lane/new-handle Reds on source7d87459d.
   Author fully read and reproduced its unchanged private fixture:0 pass/2 fail/8

@@ -12,6 +12,6 @@ link public SDD records and exclude private material. Record real gate totals.
 
 Do not copy the plan template's blanket failure/refund, two-vendor, Graph-paid,
 Circle-pay or mainnet-complete claims. Preserve separate child spending, cost,
-gas, uncertainty and escrow custody limitations. The old diagram stays labelled
+gas, uncertainty and escrow custody limitations. The old diagram stays labeled
 historical until I6 rendering. Add dated index links without erasing older reports.
 One docs-only gate and atomic main fast-forward; no live replay or push.

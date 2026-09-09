@@ -2,7 +2,7 @@
   "id": "diff-triage",
   "version": "0.1.0",
   "serviceName": "Diff Triage",
-  "description": "Structured triage of a code diff: what it changes, what could break, which tests are missing, and whether it is safe to merge. Pay per diff \u2014 no seat, no per-user licence.",
+  "description": "Structured triage of a code diff: what it changes, what could break, which tests are missing, and whether it is safe to merge. Pay per diff \u2014 no seat, no per-user license.",
   "tags": [
     "code-review",
     "ci",
@@ -87,7 +87,7 @@
         "items": {
           "type": "string"
         },
-        "description": "Behaviour this diff changes that nothing appears to cover"
+        "description": "Behavior this diff changes that nothing appears to cover"
       },
       "verdict": {
         "type": "string",

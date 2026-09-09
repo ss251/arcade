@@ -384,14 +384,14 @@ describe("hub Graph service", () => {
   })
 
   it("aborts and cancels an unfinished body when the Effect is interrupted", async () => {
-    let cancelled = false
+    let canceled = false
     let requestSignal: AbortSignal | undefined
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new TextEncoder().encode("{"))
       },
       cancel() {
-        cancelled = true
+        canceled = true
       }
     })
     const fetchImpl = (async (_input: string | URL | Request, init?: RequestInit) => {
@@ -407,14 +407,14 @@ describe("hub Graph service", () => {
     const fiber = Effect.runFork(makeGraph({ url: URL_, fetchImpl }).stats())
     await vi.waitFor(() => expect(requestSignal).toBeDefined())
     await Effect.runPromise(Fiber.interrupt(fiber))
-    await vi.waitFor(() => expect(cancelled).toBe(true))
+    await vi.waitFor(() => expect(canceled).toBe(true))
     expect(requestSignal?.aborted).toBe(true)
   })
 
   it("cancels a late response body when a non-cooperative fetch resolves after interruption", async () => {
     let release!: (response: Response) => void
     let requestStarted = false
-    let cancelled = false
+    let canceled = false
     const fetchImpl = (async () => {
       requestStarted = true
       return await new Promise<Response>((resolve) => { release = resolve })
@@ -425,7 +425,7 @@ describe("hub Graph service", () => {
 
     release(new Response(new ReadableStream<Uint8Array>({
       cancel() {
-        cancelled = true
+        canceled = true
       }
     }), {
       headers: {
@@ -433,7 +433,7 @@ describe("hub Graph service", () => {
         "content-encoding": "identity"
       }
     }))
-    await vi.waitFor(() => expect(cancelled).toBe(true))
+    await vi.waitFor(() => expect(canceled).toBe(true))
   })
 
   it("refuses a loopback redirect and times out an unfinished loopback body", async () => {

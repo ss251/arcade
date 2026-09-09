@@ -3,7 +3,7 @@
 # G6 readiness — public discovery, static coverage, existing A9 proof
 
 September 6, 2026. Read-only preparation, not G6 source/deployment release.
-Read full Plan G Task6, G3/G4/G5 decisions, actual catalogue/detail/discovery,
+Read full Plan G Task6, G3/G4/G5 decisions, actual catalog/detail/discovery,
 schema and G7 reciprocal decoder, H/G8 merge seams, and retained A9/provenance
 records. `ts-testing` informed the proposed behavioral matrix only. No tests,
 network, keys, Git, generation, deployment or funding were performed here.
@@ -48,7 +48,7 @@ three-registry/one-template coverage claims are not acceptable implementations.
   supplies the signed message nor the verification evidence. The discovery code's
   “per-listing” comment does not change this actual storage/registration behavior.
 
-### Empty production catalogue is an observation, not a fallback trigger
+### Empty production catalog is an observation, not a fallback trigger
 
 Parent-retained `internal/task6-hub-observation.json` records two HTTP200 reads at
 2026-09-06T02:21:52Z: `/listings` was 2 bytes with empty projection, discovery
@@ -107,7 +107,7 @@ such as `discovery_unavailable`, `discovery_invalid`, `unapproved_splitter`,
    positive uint256 amount. Amount must equal exact six-decimal parsePrice of the
    listing price (bounded before parsing); no Number money or invented default.
 3. Join exact current listing id/seller to resource, then canonicalize address
-   casing. Every eligible catalogue listing needs one matching resource; reject
+   casing. Every eligible catalog listing needs one matching resource; reject
    duplicate/conflicting resources, amount/seller drift or missing match before
    writing anything. Discovery-only resources are excluded as not currently
    listable, not treated as evidence of a new listing; ENS filtering explains why
@@ -253,7 +253,7 @@ remain explicit; a collision cannot be relabeled a successful unique-root match.
 This proves indexing of known historical events, not a fresh payment, complete
 Marketplace, skill-specific historical counts, Studio dashboard Synced status or
 current-head finality. Historical RPC absence does not erase retained evidence;
-separate any new read from the dated proof. Current empty catalogue does not
+separate any new read from the dated proof. Current empty catalog does not
 prevent this known-source query. Do not invoke e2e-lineage, funding or F1/G1 again.
 G1's one-shot deployment authority is consumed; a future G6 deployment remains
 NOT RUN without fresh explicit authority. No owner request is needed now.
@@ -269,7 +269,7 @@ Concrete integration gap: H's draft `/stats` (H plan:288–321) always computes
 values from Store/SQLite, but separately reads statsSource. Changing only that
 seam after a successful Graph probe would falsely label SQLite numbers as Graph.
 Keep source:"hub" until actual selected values and provenance come from the same
-compatible read. A Graph settlement subset also cannot relabel hub catalogue/call
+compatible read. A Graph settlement subset also cannot relabel hub catalog/call
 counts. Resolve this narrow contract in the later H/G8 decisions, not in G6.
 
 G9 waits for G8 and must preserve F10's MCP session behavior. Its literal

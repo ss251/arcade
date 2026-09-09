@@ -29,12 +29,12 @@ Private job IDs and tokens are never labels, keys for public navigation or links
 The component consumes H4's supplied explorer URL and checks its settled/hash/
 configured-explorer relationship. It does not infer a rail from a hash, invent
 missing URLs or turn Gateway/Test references into mined evidence. The digest is
-labelled recorded, not independently committed on chain. Amounts are recorded
+labeled recorded, not independently committed on chain. Amounts are recorded
 sub-spend versus recorded ceiling; missing evidence is not zero. Negative status
 is qualified as “not recorded settled,” not a refund or no-charge guarantee.
 
 Small state text now uses existing ink tokens; semantic settlement/refusal border
-colours remain. Source-calculated ink/card contrast is 16.439266:1 light and
+colors remain. Source-calculated ink/card contrast is 16.439266:1 light and
 13.629524:1 dark. These calculations and static focus/scroll rules do not replace
 actual computed-style, accessibility-tree, keyboard or viewport observations.
 

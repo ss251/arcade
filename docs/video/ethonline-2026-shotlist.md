@@ -96,7 +96,7 @@ sed -n '/^### Guarantees, and what is not guaranteed/,/^### Mainnet/p' README.md
 Label this a documentation view backed by offline tests, not a fresh failure
 transaction. The [pipeline tests](../../apps/hub/test/pipeline.test.ts) are
 source evidence. If I9 needs a visible actual fixture failure, prepare and verify
-a separate labelled fixture view first; do not invent balance observations.
+a separate labeled fixture view first; do not invent balance observations.
 
 ### Beat 3 — retained three-hop proof
 
@@ -142,7 +142,7 @@ sed -n '117,175p' docs/evidence/m6-gateway.md
 ```
 
 This is a retained report, not a newly filmed twenty-call run. A later explicitly
-labelled offline capture can use its documented harness only after reviewing
+labeled offline capture can use its documented harness only after reviewing
 its owned-loopback/process requirements; do not run it during another gate.
 Twenty fixture transfer UUIDs cannot be captioned “one mined batch.” The
 [F1 record](../evidence/m6-gateway.md) separately describes a consumed deposit
@@ -156,7 +156,7 @@ sed -n '1,100p' docs/evidence/J/declared-rails-browser.md
 ```
 
 These are retained synthetic UI observations, not screenshots or current server
-state. For a real UI take, I9 must recreate an owned, labelled fixture, inspect
+state. For a real UI take, I9 must recreate an owned, labeled fixture, inspect
 the actual screen and stop its exact processes afterward. Existing public
 production is not evidence that today's local main is deployed. Do not open
 live wallets or manufacture global counts/margin totals to fill this window.
@@ -212,7 +212,7 @@ does not establish current mainnet readiness.
   human review. Do not stage old CP3 footage or claim a new export exists.
 
 No fallback silently upgrades evidence. If a required shot cannot be produced,
-use a clearly labelled dated source view, revise the narration to match, or
+use a clearly labeled dated source view, revise the narration to match, or
 leave the capture pending. Missing `e2e-tree-settle.sh`, the read-only-only
 `e2e-graph-cogs.sh` checkpoint, unimplemented Gateway live mode, paused Circle
 CLI and blocked escrow deployment are not runnable live-proof capture commands.

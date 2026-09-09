@@ -19,7 +19,7 @@ spend or payment was used for this checkpoint. J4 stays paused.
   identities, and builds sourceAccount plus explicit allocation/destination
   adapter. Kit construction disables analytics and error reporting.
 - SDK return fields are projected and matched to expected terms; raw traces,
-  capabilities and error text are never retained. Returned hash is labelled
+  capabilities and error text are never retained. Returned hash is labeled
   `sdk_returned`, not independently confirmed. This is not settlement evidence.
 - The [J4 preflight](../../../evidence/J/circle-cli-preflight.md) now records the
   exact source-only root Gateway refusal, including that no sent validBefore

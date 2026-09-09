@@ -99,27 +99,27 @@ describe("MCP by-name authority before account access", () => {
   })
   it("aborts and cancels a stalled quote body without reaching the key", async () => {
     vi.useFakeTimers(); vi.stubEnv("ARCADE_BUYER_KEY", "PRIVATE_INVALID_KEY")
-    let cancelled = false, signal: AbortSignal | null | undefined
+    let canceled = false, signal: AbortSignal | null | undefined
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       signal = new Request(input, init).signal
-      return new Response(new ReadableStream<Uint8Array>({ cancel() { cancelled = true } }), { status: 402 })
+      return new Response(new ReadableStream<Uint8Array>({ cancel() { canceled = true } }), { status: 402 })
     }))
     const pending = m.handleTool("arcade_call_skill", { name: NAME, input: INPUT })
     await vi.advanceTimersByTimeAsync(10001)
     const out = await pending
     expect(out.isError).toBe(true); expect(textOf(out)).toMatch(/quote/i)
-    expect(signal?.aborted).toBe(true); expect(cancelled).toBe(true); expect(textOf(out)).not.toContain("PRIVATE")
+    expect(signal?.aborted).toBe(true); expect(canceled).toBe(true); expect(textOf(out)).not.toContain("PRIVATE")
   })
   it("cancels an uncooperative quote response that arrives after the deadline", async () => {
     vi.useFakeTimers()
-    let release!: (response: Response) => void, cancelled = false
+    let release!: (response: Response) => void, canceled = false
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => { release = resolve })))
     const pending = m.handleTool("arcade_call_skill", { name: NAME, input: INPUT })
     await vi.advanceTimersByTimeAsync(10001)
     expect((await pending).isError).toBe(true)
-    release(new Response(new ReadableStream<Uint8Array>({ cancel() { cancelled = true } }), { status: 402 }))
+    release(new Response(new ReadableStream<Uint8Array>({ cancel() { canceled = true } }), { status: 402 }))
     await vi.advanceTimersByTimeAsync(1)
-    expect(cancelled).toBe(true)
+    expect(canceled).toBe(true)
   })
   it("uses the real SDK's last signing gate when a payee changes after the MCP quote", async () => {
     m.__setCallSkill(undefined)

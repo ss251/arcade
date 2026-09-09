@@ -17,9 +17,9 @@ import { dirname } from "node:path"
  * Change `hubUrl` to a public origin, leave `hubWsUrl` on localhost, and the runner fetches
  * listings from production while announcing over the local socket. Every surface then
  * reports health: `checkHub(cfg.hubUrl)` pings production and says up, the daemon logs
- * "connected to ws://localhost…" and genuinely is connected, and the public catalogue
+ * "connected to ws://localhost…" and genuinely is connected, and the public catalog
  * stays empty for a reason visible from neither end. The runbook step that fixes the
- * empty-catalogue trap is the step that opens this one.
+ * empty-catalog trap is the step that opens this one.
  *
  * So the field no longer exists on disk. Two values that must agree cannot disagree when
  * only one of them is written down — the boundary, rather than a check that they match.

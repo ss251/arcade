@@ -93,14 +93,14 @@ describe("owned Unified Balance Gateway network boundary", () => {
     } finally { f.boundary.close() }
   })
   it("aborts a stalled body and refuses all late requests after the deadline", async () => {
-    let cancelled = 0
-    const request = vi.fn(async () => new Response(new ReadableStream({ cancel() { cancelled++ } }), { headers: { "content-type": "application/json" } }))
+    let canceled = 0
+    const request = vi.fn(async () => new Response(new ReadableStream({ cancel() { canceled++ } }), { headers: { "content-type": "application/json" } }))
     const boundary = createUnifiedGatewayBoundary({ request, beforeTransfer: async () => {}, signal: new AbortController().signal,
       deadlineMs: performance.now() + 30 })
     try {
       await expect(boundary.fetch(endpoint + "info", { method: "GET" })).rejects.toThrow("unified_network_refused")
       await expect(boundary.fetch(endpoint + "info", { method: "GET" })).rejects.toThrow("unified_network_refused")
-      expect(cancelled).toBe(1); expect(request).toHaveBeenCalledTimes(1)
+      expect(canceled).toBe(1); expect(request).toHaveBeenCalledTimes(1)
     } finally { boundary.close() }
   })
   it("does not install global fetch on creation and restores an exclusive owned scope", async () => {

@@ -180,7 +180,7 @@ describe("the publish adapters (M1)", () => {
   it("sells all three on an api key, and the model-free two on no credential at all", () => {
     // The spec's rule: "all three sellable with `api-key` or `none`". A tool call to an MCP
     // server or an HTTP operation involves no provider terms, so `none` is the honest
-    // default there — there is no model whose licence could forbid the resale.
+    // default there — there is no model whose license could forbid the resale.
     expect(termsFor("mcp", "none").sellable).toBe(true)
     expect(termsFor("openapi", "none").sellable).toBe(true)
     for (const a of ["skill", "mcp", "openapi"] as const) {

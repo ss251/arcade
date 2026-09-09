@@ -1,4 +1,4 @@
-# H6 brief: read-only marketplace and catalogue evidence
+# H6 brief: read-only marketplace and catalog evidence
 
 Replace H5's `/` shell with the marketplace described by
 [Plan H Task 6](../../plans/2026-09-04-H-web.md), following the
@@ -11,14 +11,14 @@ F-before-H merge dependency. Nothing in this increment signs, spends or settles.
 The real Start server function reads H4's listSkills and stats once in parallel.
 Independent nullable results and fixed local error codes preserve one successful
 feed when the other fails. Unavailable values never become invented zeros, and
-an empty eligible catalogue is not proof that no runner is serving. No polling,
+an empty eligible catalog is not proof that no runner is serving. No polling,
 retry, per-card detail/statistics/receipt fanout or H4 transport change is added.
 One serialized observation time keeps rendered ages stable across server rendering
 and hydration. Passing the router request signal does not prove immediate upstream
 fetch cancellation; the unchanged H4 reads retain their own finite bounds.
 
 Cards distinguish absent pay-test metadata on older hubs from explicit null, and
-failed observations from passing ones. The additive hub catalogue projection reads
+failed observations from passing ones. The additive hub catalog projection reads
 existing store-derived metadata once, overwrites any similarly named manifest
 field and publishes only atMs, ok, optional safely shaped passing reference and
 the redacted compatibility value `jobId:""`. That empty field is not correlation
@@ -26,9 +26,9 @@ or a capability. No buyer, private job ID, nonce, signature or diagnostic is add
 Existing discovery, delisting and ENS-expired filtering is unchanged.
 
 Neither a bare reference nor its hash shape supplies rail/network authority, so
-pay-test badges have no guessed explorer link. Catalogue ENS names are annotations,
+pay-test badges have no guessed explorer link. Catalog ENS names are annotations,
 not independently verified resolution. Explicitly expired names fall back to the
-service name and remain labelled; expired and delisted cards have no detail link.
+service name and remain labeled; expired and delisted cards have no detail link.
 Ordinary native detail links remain informational future destinations, not a
 completed listing page or buying flow.
 
@@ -63,7 +63,7 @@ but did not independently repeat the author's keyboard/detail-click sequence.
 This document publisher did not run or inspect browser pixels.
 
 The [root hub report](task-6-hub-report.md) separately records two actual-router
-Reds for missing safe catalogue fields while the existing one-read/no-write case
+Reds for missing safe catalog fields while the existing one-read/no-write case
 passed. Root's final focused repeat was **3 Bun tests / 57 assertions**. The
 supplemental failed-reference fixture first passed a partial equality check;
 an explicit missing-settleTx assertion closed that coverage gap without requiring

@@ -59,7 +59,7 @@ JSON capture rejects accessors, exotic prototypes, symbols, sparse arrays,
 non-JSON values, invalid scalar Unicode, depth above16, more than1000 array rows,
 more than50000 nodes and more than1MiB captured string/key bytes. Each response
 also has an exact1MiB raw byte bound and fatal streaming UTF-8 including EOF.
-The catalogue uses a closed current-public field set and validates the fields
+The catalog uses a closed current-public field set and validates the fields
 needed for payment discovery; this is not a replacement for the full core
 PublicListing decoder. Description/output-schema/price drift and missing or
 duplicate matches fail closed. Discovery-only entries are excluded because
@@ -73,7 +73,7 @@ not silently upgraded into EIP-3009 evidence.
 
 Transport has a10-second timer plus per-continuation monotonic deadline checks.
 Uncooperative read-only promises race cancellation; late acquired response bodies
-are cancelled and never decoded. No late network result can trigger a write.
+are canceled and never decoded. No late network result can trigger a write.
 Local file operations are awaited, regular-file/NOFOLLOW/nonblocking opened,
 and read into a fixed65537-byte buffer with a65536-byte acceptance bound.
 The deadline is checked before final rename; no claim of a hard kernel-filesystem

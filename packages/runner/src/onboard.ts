@@ -47,8 +47,8 @@ export const planIdentity = (input: IdentityInput): IdentityPlan => {
         )
       }
     }
-    const normalised = input.importKey.startsWith("0x") ? input.importKey : `0x${input.importKey}`
-    return { _tag: "Import", privateKey: normalised, address }
+    const normalized = input.importKey.startsWith("0x") ? input.importKey : `0x${input.importKey}`
+    return { _tag: "Import", privateKey: normalized, address }
   }
 
   if (input.seller !== undefined && input.seller !== "") {

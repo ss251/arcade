@@ -41,7 +41,7 @@ Parent additionally approved neutral false-receipt price wording. At06:30:48 IST
 the exact added SettleError regression failed1case/48skipped: stored settled:false
 rendered "$0 charged". The row now renders an em dash with the accessible title
 "No settlement recorded; not a balance proof." Amount formatting, settled values,
-columns, status/reason, canary labels and semantic colours remain intact. No new
+columns, status/reason, canary labels and semantic colors remain intact. No new
 accounting classifier or inferred cancellation state was introduced.
 
 After the agreed helper became available, all49 UI Vitest cases passed at
@@ -138,7 +138,7 @@ collected structure tests failed at06:42:10 IST (2FAIL/49skipped), checking both
 index and detail. The narrow source adds overflow-x:auto on the receipt tape,
 640px minimum table width to preserve readable columns, and a named focusable
 region with a visible keyboard-focus outline on both surfaces. Columns, receipt
-arithmetic, row colours and reference decisions are unchanged. The initial scroll
+arithmetic, row colors and reference decisions are unchanged. The initial scroll
 correction passed51 UI tests and exact3 strict0 before the next related finding.
 
 Parent's desktop/source check also found the blanket fee(5%) table heading

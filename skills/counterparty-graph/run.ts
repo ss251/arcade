@@ -94,10 +94,10 @@ const refusal = (error: string): GraphEnvelope => ({ stopReason: "refusal", erro
 const bounded = async <T>(work: () => Promise<T>, signal: AbortSignal): Promise<T> => {
   signal.throwIfAborted()
   let stop: (() => void) | undefined
-  const cancelled = new Promise<never>((_, reject) => {
+  const canceled = new Promise<never>((_, reject) => {
     stop = () => reject(invalid()); signal.addEventListener("abort", stop, { once: true })
   })
-  try { return await Promise.race([Promise.resolve().then(() => { signal.throwIfAborted(); return work() }), cancelled]) }
+  try { return await Promise.race([Promise.resolve().then(() => { signal.throwIfAborted(); return work() }), canceled]) }
   finally { if (stop) signal.removeEventListener("abort", stop) }
 }
 export const runGraphJob = async (job: unknown, env: Record<string, string | undefined>, deps: JobDependencies = {}): Promise<GraphEnvelope> => {

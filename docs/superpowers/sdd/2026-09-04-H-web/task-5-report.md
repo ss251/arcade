@@ -34,7 +34,7 @@ Actual observations at 14:16–14:18 UTC:
 - Mobile 390×844, both light/dark: document scroll width 390. Nav links each 44px high and spanning x=70..336.33, clear of the 46px sidebar rail.
 - Real keyboard Tab traversal reached market; computed focus outline was solid 2px.
 - Real coordinate clicks, selected through the accessibility tree, navigated `/chat` → `/` → `/chat`. Marketplace width stayed 390 with padding-left 24px. A synthetic browser-only conversation survived the reloads, appeared in the sidebar, and opened into the transcript. New-chat cleared the on-screen transcript without deleting stored history; sidebar open/close worked. No live conversation or provider was used.
-- Inspected all four screenshot files below. The marketplace image intentionally shows only the route shell, not invented catalogue content.
+- Inspected all four screenshot files below. The marketplace image intentionally shows only the route shell, not invented catalog content.
 
 Screenshots (private local artifacts, retained for parent inspection):
 

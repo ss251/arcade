@@ -41,7 +41,7 @@ identity encoding. Responses require JSON media type, fatal UTF-8, bounded bytes
 identity encoding and exact declared Content-Length when present; bounded chunked
 responses are accepted. Every pending read has a removable abort waiter.
 Consecutive empty chunks are capped at 1024. Cancellation is linked to the
-caller, late fetch bodies can only be cancelled, and reader cleanup waits at
+caller, late fetch bodies can only be canceled, and reader cleanup waits at
 most 50 ms. These are local bounds, not remote cancellation or TCP-EOF guarantees.
 
 ## Actual Red/Green chronology

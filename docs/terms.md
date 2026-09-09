@@ -19,7 +19,7 @@ Ten providers checked. The API/consumer split holds everywhere it was checked �
 | **Google Gemini** | ✅ for the API — ⚠️ **Search grounding bans resale separately** | ❌ (one limb, not three) | a *feature* stricter than the provider |
 | **xAI** | ⚠️ AUP binds API users and forbids "reselling any Input or Output" | ❌ | the outlier |
 | **OpenRouter** | ⚠️ no reselling API access; you inherit every upstream provider's terms | — | pass-through liability |
-| **Mistral** | not verified — the legal centre would not yield the document cleanly | — | treat as unknown |
+| **Mistral** | not verified — the legal center would not yield the document cleanly | — | treat as unknown |
 
 ## The clauses
 
@@ -81,13 +81,13 @@ So the operative distinction is not "programmatic vs interactive" and not "first
 | A **user** running a tool that drives Claude Code on their own plan | metered against the plan; contemplated |
 | A **developer** shipping a product that offers Claude login or routes plan credentials for its users | prohibited |
 
-A caution that survives regardless: extracting the OAuth token and using it as a raw API bearer against `/v1/messages` is a different path from driving Claude Code, and it is refused — "This credential is only authorized for use with Claude Code." Anthropic can also change billing and rate-limit behaviour without notice, which the legal page reserves explicitly.
+A caution that survives regardless: extracting the OAuth token and using it as a raw API bearer against `/v1/messages` is a different path from driving Claude Code, and it is refused — "This credential is only authorized for use with Claude Code." Anthropic can also change billing and rate-limit behavior without notice, which the legal page reserves explicitly.
 
 ### The Codex contrast
 
 OpenAI documents the **Codex app-server** as being for "deep integration inside your own product", and ships **"Sign in with ChatGPT"** as a first-party feature of that embedding path (`learn.chatgpt.com/docs/app-server`, `/docs/auth`). That is a vendor-documented BYO-subscription architecture with no Anthropic equivalent, and several products ship on it.
 
-The caveat is worth carrying: OpenAI has never affirmatively blessed subscription auth in a third-party **commercial** product. Asked directly (openai/codex discussion #8338), a maintainer addressed only the Apache licence and declined the terms question across three follow-ups. So the permission is architectural and implied, never written — which is a materially better position than Anthropic's explicit prohibition, and materially worse than §A.1's explicit grant.
+The caveat is worth carrying: OpenAI has never affirmatively blessed subscription auth in a third-party **commercial** product. Asked directly (openai/codex discussion #8338), a maintainer addressed only the Apache license and declined the terms question across three follow-ups. So the permission is architectural and implied, never written — which is a materially better position than Anthropic's explicit prohibition, and materially worse than §A.1's explicit grant.
 
 **What this changes, and what it does not.** It settles that *programmatic* and *third-party* are not themselves the problem. Two things remain prohibited, and they are the two ARCADE actually touches:
 
@@ -122,7 +122,7 @@ So a Codex CLI endpoint backed by a ChatGPT subscription is out, but for its own
 
 > "**We assign any rights, title, and interests—if any—in the Outputs of the Services to you.**"
 
-The general Terms of Use, which apply to all account holders rather than only consumers, still close the subscription route: §3.6(4) forbids "copying, transferring, leasing, lending, selling, or sub-licensing the entire or part of the Services" without authorisation, and §2.3 "Do not transfer, lend, rent, or provide your account to others in any form."
+The general Terms of Use, which apply to all account holders rather than only consumers, still close the subscription route: §3.6(4) forbids "copying, transferring, leasing, lending, selling, or sub-licensing the entire or part of the Services" without authorization, and §2.3 "Do not transfer, lend, rent, or provide your account to others in any form."
 
 ### Google Gemini
 
@@ -282,7 +282,7 @@ A subscription-backed marketplace would be cheaper to run and easier to onboard,
 - **The seller carries the consequence.** A suspended account is theirs, and they would have taken that risk on our recommendation.
 - **It is not a durable business.** A marketplace whose unit economics depend on a terms violation is one enforcement sweep from zero, and no buyer should build a workflow on it.
 
-The honest version of "monetize idle agent capacity" is that your *agents* are the product — your prompts, your scaffolding, your judgement about what a good brief looks like. The inference underneath is a cost line you pay at commercial rates, like any other business.
+The honest version of "monetize idle agent capacity" is that your *agents* are the product — your prompts, your scaffolding, your judgment about what a good brief looks like. The inference underneath is a cost line you pay at commercial rates, like any other business.
 
 ## Adding a provider
 

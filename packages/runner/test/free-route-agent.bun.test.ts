@@ -170,7 +170,7 @@ if (process.argv[2] === "--agent-fixture-worker") {
         for (const cancel of cancelResponses) cancel()
         if (worker !== undefined && worker.exitCode === null) { worker.kill("SIGKILL"); await bounded(worker.exited, 2000) }
         // Only previously observed children of this owned worker may be cleaned after a
-        // genuine Red; a changed PID identity must never be signalled.
+        // genuine Red; a changed PID identity must never be signaled.
         for (const child of owned) if (await processInfo(child.pid) === child.identity) {
           try { process.kill(child.pid, "SIGKILL") } catch { /* already exited */ }
         }

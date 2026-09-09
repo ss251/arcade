@@ -276,11 +276,11 @@ H5's own full gate passed 2,317 Vitest tests / 115 files, 322 Bun tests /
 and SSR build. See the [parent review](task-5-parent-review.md). The scoped
 checkpoint is ready for an atomic commit, not a main merge or future-page claim.
 
-## September 5: H6 marketplace and catalogue projection
+## September 5: H6 marketplace and catalog projection
 
 H5 committed as `031d6c9`. H6 replaces its `/` shell with the read-only marketplace,
 preserving H4's one-parallel-list/stats read boundary and independent partial
-states. Store-derived catalogue pay-test metadata is additive and privacy-limited:
+states. Store-derived catalog pay-test metadata is additive and privacy-limited:
 absent remains unknown for old hubs, explicit null means no history, and the
 compatibility jobId is redacted to an empty string. Bare references receive no
 guessed explorer authority; ENS annotations and recorded totals are not independent

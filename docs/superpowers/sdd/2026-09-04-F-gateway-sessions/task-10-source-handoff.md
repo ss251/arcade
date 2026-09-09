@@ -41,7 +41,7 @@ structured output or query strings. The public session ID is not payment auth.
 USDC string and a known explicitly supported rail; reject duplicate/unknown
 properties and malformed values before key/IO. Budget cannot exceed the current
 process remaining ceiling. Default rail must be the selected ready hub/SDK rail,
-never an assumed Gateway fallback. Explicit TestRail remains labelled testing.
+never an assumed Gateway fallback. Explicit TestRail remains labeled testing.
 Advertise open and close as non-idempotent lifecycle mutations, but state plainly
 opening/closing spends and escrows nothing; each intentional call can authorize
 USDC. No one-batch/mined/discount/zero-total-fee promise.
@@ -75,9 +75,9 @@ a successfully closed handle must not reset process issued/spent/exposure totals
 
 `handleTool` accepts optional request context signal; createServer forwards actual
 handler `extra.signal`. Installed SDK supplies an AbortController per request,
-aborts it on notifications/cancelled and aborts all handlers on transport close.
+aborts it on notifications/canceled and aborts all handlers on transport close.
 Check cancellation before joining the queue and immediately after lease acquisition.
-A cancelled middle waiter must never release its successor before the predecessor
+A canceled middle waiter must never release its successor before the predecessor
 finishes. Avoid detachable work; if caller returns early while queued, retain only
 a cancellation-owned queue node whose completion cannot execute the request.
 Pass the same signal to Effect.runPromise/either, including legacy paid execution;

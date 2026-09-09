@@ -44,7 +44,7 @@ Fixed checks gave 11 pass / 24 assertions. Six actual partial-write/sync/close/
 witness fault cases initially had a namespace-fixture typo (colon vs hyphen),
 not a product Red. Corrected filesystem cases, causal close witness and stale
 head cases reached 19 pass / 67. Factory absence was separately a missing-API
-failure; implementation reached 20 pass / 73 with cancelled no-IO construction.
+failure; implementation reached 20 pass / 73 with canceled no-IO construction.
 
 Independent G3 checkpoint ca4f982bd8abc39b326ea44f8a1119be8e697b270bab096cb6a9bedb6f88387b
 reproduced three genuine failures in six private tests: first burn fee escalation,
@@ -123,7 +123,7 @@ checking remaining aggregate authorized gas, always label exact deposit proof
 credit_pending, and verify pinned historical Wallet code at the receipt block.
 
 Two exact Content-Length discrepancies (declared1 and99 vs actual JSON bytes)
-were accepted; an ignored-abort late fetch body was never cancelled. All three
+were accepted; an ignored-abort late fetch body was never canceled. All three
 were genuine transport Reds. Runtime now requires exact declared byte equality
 and explicitly cancels a late response's body. No raw response, URL, provider
 diagnostic or cancellation reason is projected. Existing total5-second HTTP,
@@ -149,7 +149,7 @@ correlation, including keyless read-only reconciliation then explicit retirement
 Lost send acknowledgement retains the locally derived prepared hash, forbids
 repeat execution, and permits only exact keyless deposit reconciliation with
 credit_pending. Finalization refuses that unproved API credit. Concurrent
-execution/cancelled late signer result cannot call the send adapter.
+execution/canceled late signer result cannot call the send adapter.
 
 ## Final bounded ownership and recovery corrections
 

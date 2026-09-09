@@ -48,7 +48,7 @@ context or arbitrary source can enter the manifest.
 
 Pilot-only remains an intentionally supported compatibility selection; the
 generator separately owns append-only preservation of every existing reviewed
-pin. Rendering a selection does not itself claim discovery, catalogue pruning
+pin. Rendering a selection does not itself claim discovery, catalog pruning
 or atomic hub snapshot authority.
 
 FeeSplitterSmoke retains the exact G4/G5 source/ABI/handler/zero-height behavior.

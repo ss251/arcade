@@ -1,6 +1,6 @@
 # ARCADE at ETHOnline 2026 — continuity design ("Charizard")
 
-> September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
+> September 6, 2026 terminology update: portable folders are now labeled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
 
 Status: approved scope, 2026-09-04 (supersedes the first, narrower draft of the same date). Derived from `docs/superpowers/research/ethonline-2026/` (sponsor research, X sweeps, three-model debate, `DEBATE/SYNTHESIS.md`) and the owner's decisions: partners **Arc + The Graph + ENS**; full scope including Gateway sessions; all three publish adapters; Circle CLI interop before Gateway; the Graph payment hop on Base mainnet with a funded payer; research artifacts committed once hacking opens (Sept 4, 09:30pm IST).
 
@@ -96,7 +96,7 @@ Arc testnet registries (docs.arc.io): Identity `0x8004A818BFB912233c491871b3d84c
 - **Identity**: `arcade identity register <skill>` calls `IdentityRegistry.register(agentURI)` from the seller key, `agentURI = <hub>/listings/<id>/agent-registration.json` (public JSON: `active`, `x402Support: true`, endpoints, ENS name, `supportedTrusts: ["arcade-validation"]`); persists `agentId`; then `setApprovalForAll(ARCADE_OPERATOR, true)`. Runs for every listing the seller publishes (explicit command, idempotent).
 - **Validation**: after each job reaches a terminal state, the hub operator key calls `validationRequest(ARCADE_VALIDATOR, agentId, requestURI, requestHash)` where the request JSON holds the input hash, output hash, schema hash and outcome; the validator key answers `validationResponse(requestHash, settled ? 100 : 0, responseURI, responseHash, "arcade-settle")`. Best-effort, queued, never blocks settlement. ARCADE is the first marketplace exercising the ValidationRegistry per job.
 - **Reputation**: attester calls `giveFeedback(agentId, 1, 0, "arcade-settled", skillId, endpoint, receiptURI, keccak256(feedbackJSON))` only on settled receipts, feedback JSON with `proofOfPayment{…txHash: settleTx}`.
-- Display: agent id, registration tx, validation pass count, attester-filtered feedback count, labelled "settlement evidence". Never `getSummary`, never a gate, never a score.
+- Display: agent id, registration tx, validation pass count, attester-filtered feedback count, labeled "settlement evidence". Never `getSummary`, never a gate, never a score.
 
 ## 7. M5 — ENSv2 namespaces
 

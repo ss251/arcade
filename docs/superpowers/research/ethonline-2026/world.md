@@ -1,6 +1,6 @@
 # World / AgentKit research for ARCADE — ETHOnline 2026
 
-> September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
+> September 6, 2026 terminology update: portable folders are now labeled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
 
 Target prize: **AgentKit Continuity — $3,500** (continuity track). Researched 2026-09-04.
 Every claim below carries a URL or a repo file path. Repo clone used: `worldcoin/agentkit` @ `main` (latest commit `2026-08-24 fix: resolve cargo-deny advisory failures (#41)`, via `gh api repos/worldcoin/agentkit/commits`).

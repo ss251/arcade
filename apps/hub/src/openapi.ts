@@ -400,7 +400,7 @@ export const buildOpenApi = (params: OpenApiParams): Record<string, unknown> => 
 }
 
 /**
- * `/skill.md` — the agent-readable catalogue.
+ * `/skill.md` — the agent-readable catalog.
  *
  * The cheapest distribution mechanism in this market: a markdown file an agent can be
  * pointed at, which tells it what exists and what it costs. Generated from the live
@@ -415,7 +415,7 @@ export const buildAgentSkill = (params: OpenApiParams): string => {
   const { listings: allListings, origin } = params
   const listings = liveListings(allListings)
 
-  const catalogue =
+  const catalog =
     listings.length === 0
       ? "_No skills are listed right now — a hub only advertises skills whose seller is currently connected._"
       : listings
@@ -439,7 +439,7 @@ Built rails: ${(params.rails ?? [params.rail]).join(", ")} — construction inve
 
 ## What is for sale
 
-${catalogue}
+${catalog}
 
 ## How to buy
 

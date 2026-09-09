@@ -52,7 +52,7 @@ export const graphStatsPayload = (graph: Graph, hubTotals: HubGraphTotals | Effe
     }))
 
 /** One whole-batch deadline, bounded input and max4 concurrency. Oversize input
- * omits optional evidence; it never truncates the existing catalogue itself. */
+ * omits optional evidence; it never truncates the existing catalog itself. */
 export const graphEvidenceOf = (graph: Graph, listingIds: readonly string[]): Effect.Effect<ReadonlyMap<string, ListingGraphEvidence>> =>
   Effect.suspend(() => {
     const ids: string[] = []

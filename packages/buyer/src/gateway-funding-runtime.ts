@@ -98,17 +98,17 @@ async function bounded<T>(work: (signal: AbortSignal) => Promise<T>, d: Pick<Fun
   const controller = new AbortController(), deadline = Math.min(d.deadlineMs, d.now() + maximum)
   let timer: ReturnType<typeof setTimeout> | undefined, onAbort: (() => void) | undefined
   try {
-    insist(!d.signal.aborted && d.now() < deadline, "cancelled")
+    insist(!d.signal.aborted && d.now() < deadline, "canceled")
     const stop = new Promise<never>((_resolve, reject) => {
-      onAbort = () => { controller.abort(); reject(new FundingFailure("cancelled")) }
+      onAbort = () => { controller.abort(); reject(new FundingFailure("canceled")) }
       d.signal.addEventListener("abort", onAbort, { once: true })
       timer = setTimeout(onAbort, Math.max(0, deadline - d.now()))
     })
     const result = await Promise.race([Promise.resolve().then(() => {
-      insist(!controller.signal.aborted && !d.signal.aborted && d.now() < deadline, "cancelled")
+      insist(!controller.signal.aborted && !d.signal.aborted && d.now() < deadline, "canceled")
       return work(controller.signal)
     }), stop])
-    insist(!controller.signal.aborted && !d.signal.aborted && d.now() < deadline, "cancelled")
+    insist(!controller.signal.aborted && !d.signal.aborted && d.now() < deadline, "canceled")
     return result
   } finally {
     controller.abort()
@@ -147,9 +147,9 @@ async function wire(fetchFn: typeof fetch, url: string, method: "GET" | "POST", 
       reader = result.body.getReader()
       const chunks: Uint8Array[] = []; let bytes = 0, empty = 0
       while (true) {
-        insist(!finished && !activeSignal.aborted && performance.now() < deadlineMs, "cancelled")
+        insist(!finished && !activeSignal.aborted && performance.now() < deadlineMs, "canceled")
         const next = await bounded(() => reader!.read(), { signal: activeSignal, deadlineMs, now: context.now }, 5000)
-        insist(!finished && !activeSignal.aborted && performance.now() < deadlineMs, "cancelled")
+        insist(!finished && !activeSignal.aborted && performance.now() < deadlineMs, "canceled")
         if (next.done) break
         insist(next.value instanceof Uint8Array)
         if (next.value.byteLength === 0) { insist(++empty <= 1024); continue }
@@ -208,7 +208,7 @@ function captureDependencies(input: FundingDependencies): FundingDependencies {
   if (d.journalIO !== undefined) d.journalIO = Object.freeze(own(d.journalIO, ["testRoot", "checkpoint"]))
   return Object.freeze(d) as unknown as FundingDependencies
 }
-function check(d: FundingDependencies) { insist(!d.signal.aborted && d.now() < d.deadlineMs, "cancelled") }
+function check(d: FundingDependencies) { insist(!d.signal.aborted && d.now() < d.deadlineMs, "canceled") }
 const rpc = (d: FundingDependencies, method: string, params: readonly unknown[] = []) => bounded(signal => d.rpc(method, params, signal), d)
 const walletAbi = parseAbi(["function deposit(address token, uint256 value)", "function totalBalance(address token,address depositor) view returns(uint256)",
   "function paused() view returns(bool)", "function domain() view returns(uint32)", "function isTokenSupported(address token) view returns(bool)",
@@ -464,7 +464,7 @@ export function createFundingOperation(input: FundingOperationInput, dependencie
         journal = opened
         if (d.signal.aborted || d.now() >= d.deadlineMs || closed || closing || uncertain) {
           try { await opened.close() } catch { lateCleanupFailed = true }
-          fail("cancelled")
+          fail("canceled")
         }
         return opened
       })

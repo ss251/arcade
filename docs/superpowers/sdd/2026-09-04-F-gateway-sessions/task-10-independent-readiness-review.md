@@ -37,7 +37,7 @@ abort every schema-valid ID. F10 source need not expand outside mcp.ts/tests.
 1. **One captured queue operation, not a raced unlock.** Current serializePurchase
    awaits a predecessor then releases its own successor promise in finally.
    Preserve this dependency when B cancels between active A and queued C: B may
-   return a fixed cancelled result promptly, but B's queue node must wait for A
+   return a fixed canceled result promptly, but B's queue node must wait for A
    and then release C without running B. A Promise.race followed by an immediate
    finally-release breaks ordering. Normalize/copy relevant own-data arguments
    and claim lifecycle intent before awaiting the lease; a queued mutable object
@@ -66,8 +66,8 @@ abort every schema-valid ID. F10 source need not expand outside mcp.ts/tests.
    close POST follows. Unknown status preserves both handle and process totals.
 
 4. **Private routes need private validation/diagnostics.** Current quoteAtomic
-   probes `{}` on a wallet-shaped URL and falls back to catalogue price; current
-   findListing reads the whole catalogue. Neither implements active-session quote.
+   probes `{}` on a wallet-shaped URL and falls back to catalog price; current
+   findListing reads the whole catalog. Neither implements active-session quote.
    Use the bounded direct listing serviceName projection and captured F9 quote
    with actual input, then fresh call probe. Current decodeArgs emits TreeFormatter
    values and handleTool reflects arbitrary error.message: new/session branches

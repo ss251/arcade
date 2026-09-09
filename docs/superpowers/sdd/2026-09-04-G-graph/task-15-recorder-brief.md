@@ -18,7 +18,7 @@ paid responses. Enforce private ownership/modes, no aliases, closed data shapes,
 fixed query/RPC destinations and query-body correlation. Bound each file2MiB,
 total records16MiB,32 snapshots and each acknowledgement5s. These are new
 offline recorder limits, not changes to any existing payment/session validity,
-cap or replay guard. Synchronous filesystem calls cannot be forcibly cancelled;
+cap or replay guard. Synchronous filesystem calls cannot be forcibly canceled;
 check the signal/clock before and after IO and never acknowledge late success.
 
 This is captured-response evidence only: no receipt verifier, validated-result

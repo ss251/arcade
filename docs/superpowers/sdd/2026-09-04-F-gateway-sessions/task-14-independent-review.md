@@ -87,7 +87,7 @@ authorization to edit H now or grounds to expand this approved F14 slice.
 
 Root/child references share the helper. Gateway UUIDs remain full escaped text;
 TestRail is labeled simulated. Existing pay-test/identity links remain separate.
-Index/detail reference headings, semantic settlement colours, money formatting
+Index/detail reference headings, semantic settlement colors, money formatting
 and child indentation remain. Default rail no longer claims every historical
 row is mined or simulated; TestRail disclosure composes with mixed histories.
 Header/footer and false-receipt price cell no longer turn unknown paid outcomes

@@ -201,7 +201,7 @@ The execution plan targets **September 16, 2026** for the public-mainnet flip an
 - Wrong chain/domain/decimals: correct the manifest or RPC selection and rerun the check.
 - `RPC failed`: inspect availability privately, without pasting authenticated RPC URLs into logs.
 - Facilitator unfunded: owner funds the correct address on the correct network, then reruns the check.
-- Empty catalogue: inspect the runner's stored `hubUrl`, seller key match and websocket connection.
+- Empty catalog: inspect the runner's stored `hubUrl`, seller key match and websocket connection.
 - Browser still selects testnet: rebuild the web bundle with the selected network.
 
 Related: [Plan A](superpowers/plans/2026-09-04-A-settlement-core.md), [owner actions, item 20](superpowers/plans/2026-09-04-01-owner-actions.md), [operations runbook](runbook.md).

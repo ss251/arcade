@@ -34,7 +34,7 @@ must be measured after captions, holds and transitions have been assembled.
 | Beat | Seconds | Max words | Evidence / intended view |
 |---|---:|---:|---|
 | 1 | 30 | 75 | [Publish and privacy boundaries](../../seller-guide.md), local preview only until capture |
-| 2 | 22 | 55 | [Rail-specific guarantees](../../../README.md#guarantees-and-what-is-not-guaranteed); clearly labelled offline schema-failure demonstration |
+| 2 | 22 | 55 | [Rail-specific guarantees](../../../README.md#guarantees-and-what-is-not-guaranteed); clearly labeled offline schema-failure demonstration |
 | 3 | 45 | 112 | [A9 retained lineage proof](../../runbook.md#plan-a--evidence-lineage), not a new paid run |
 | 4 | 23 | 57 | [G6 selected indexed match](../../superpowers/sdd/2026-09-04-G-graph/task-6-indexed-match-review.md); Base paid-query proof absent |
 | 5 | 32 | 80 | [C10 canary](../../superpowers/sdd/2026-09-04-C-canary/task-10-report.md), [D13 identity](../../superpowers/sdd/2026-09-04-D-erc8004/task-13-report.md), [stopped ENS demo](../../runbook.md#ens-namespaces-sepolia) |

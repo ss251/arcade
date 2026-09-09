@@ -384,12 +384,12 @@ export const makeEip3009Rail = (config: Eip3009Config): Rail => {
       // Derived from what the BUYER SIGNED, not from process config. The authorization
       // names its own recipient, so if that recipient is a splitter this must call it — and
       // reading a global here could route a settlement at a contract the buyer never
-      // authorised, or miss one they did. `p.to` is the single source of truth for where
+      // authorized, or miss one they did. `p.to` is the single source of truth for where
       // this specific payment goes.
       // Whether this payment routes through a splitter is a fact about the challenge the
       // buyer signed, so it travels in the requirements rather than being re-derived from
       // process config. Reading a global here could call a contract the buyer never
-      // authorised, or miss one they did.
+      // authorized, or miss one they did.
       const target = p.to
       const useSplitter = verified.requirements.extra?.["feeSplitter"] === target
       // Likewise for the splitter's version: it is a fact of the challenge the buyer signed

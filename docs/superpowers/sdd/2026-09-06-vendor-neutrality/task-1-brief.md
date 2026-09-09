@@ -19,7 +19,7 @@ Normalize format wording in selected historical public plan/spec/research copies
 with an explicit dated note. Preserve original private research and actual Git
 history. Historical commit identifiers must remain exact; do not rewrite their
 quoted subject as if Git changed. Replace the old subject quotation with a
-clearly labelled format-neutral description and original commit hash instead.
+clearly labeled format-neutral description and original commit hash instead.
 Do not touch unrelated vendor SDK names, source commands or personal skill paths.
 
 Write real help/render failures first; implement copy changes and documentation.

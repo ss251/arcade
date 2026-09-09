@@ -11,7 +11,7 @@ indexing proof. The reviewer authored the renderer integration, not this generat
 
 Read all 289 generator source lines, all 299 test lines and the full frozen author
 report; complete Task6, the 302-line readiness and current 115-line parent decisions;
-and actual catalogue/discovery producers plus public listing and money contracts.
+and actual catalog/discovery producers plus public listing and money contracts.
 The current `/listings` projection lacks a splitter and filters both delisted and
 ENS-expired records. Actual `buildWellKnownX402` advertises the default rail and
 does not filter ENS expiry. The implementation correctly joins these two surfaces
@@ -37,7 +37,7 @@ before awaiting transport. It reads regular non-symlink files with bounded buffe
 performs two GETs with no credentials/body/authentication headers and no retries,
 and checks cancellation before a local replacement. Fatal UTF-8 includes EOF;
 response bytes, captured JSON structure and monotonic operation time are bounded.
-Late uncooperative fetch acquisition is cancelled and cannot reach the write path.
+Late uncooperative fetch acquisition is canceled and cannot reach the write path.
 Fixed failures are owned through a WeakMap rather than inspecting thrown provider
 objects. Real manifest validation and all twelve required asset checks precede
 temporary-file creation; cooperative output changes prevent rename.
@@ -74,7 +74,7 @@ regression passes. The final suite contains those regressions; this review
 repeated final Green only and did not reconstruct or rerun earlier source bytes.
 Additional fixed-size file hardening is explicitly supplemental, not a FIFO Red.
 
-Two GETs are not an atomic catalogue snapshot. Matching announcements prove no
+Two GETs are not an atomic catalog snapshot. Matching announcements prove no
 signed-Hello, historical listing allocation, current code identity or complete
 Marketplace coverage. Transport assertions use injected responses; no actual
 HTTP framing/server integration or ten-second timeout wall-clock experiment was

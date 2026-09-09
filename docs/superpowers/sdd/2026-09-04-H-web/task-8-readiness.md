@@ -4,7 +4,7 @@
 
 Read-only preparation; **no H8 implementation release**. Fully read actual Task8
 (including its tests/page/CSS), H3 private tree route/producer, H4 shapes/decoder
-and bounded client, H6 catalogue/decisions, current formatter and E13 Confirm/tests.
+and bounded client, H6 catalog/decisions, current formatter and E13 Confirm/tests.
 Read H9's upcoming browser job-store interface. No source/public/test, Git, network,
 browser, credential or process work occurred. H7 geometry remains frozen.
 

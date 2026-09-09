@@ -239,8 +239,8 @@ const withDeadline = async (hire: (call: HireCall) => Promise<unknown>, call: Om
     if (parent?.aborted) controller.abort()
     controller.signal.throwIfAborted()
     const work = Promise.resolve().then(() => hire({ ...call, signal: controller.signal, timeoutMs }))
-    const cancelled = new Promise<never>((_, reject) => controller.signal.addEventListener("abort", () => reject(new Error(BROKER_ERROR)), { once: true }))
-    return await Promise.race([work, cancelled])
+    const canceled = new Promise<never>((_, reject) => controller.signal.addEventListener("abort", () => reject(new Error(BROKER_ERROR)), { once: true }))
+    return await Promise.race([work, canceled])
   } finally { clearTimeout(timer); parent?.removeEventListener("abort", abort); controller.abort() }
 }
 
@@ -312,8 +312,8 @@ export const runWalletRiskJob = async (job: unknown, env: Record<string, string 
 const bounded = async <T>(work: () => Promise<T>, signal: AbortSignal): Promise<T> => {
   signal.throwIfAborted()
   let stop: (() => void) | undefined
-  const cancelled = new Promise<never>((_, reject) => { stop = () => reject(new Error()); signal.addEventListener("abort", stop, { once: true }) })
-  try { return await Promise.race([Promise.resolve().then(work), cancelled]) } finally { if (stop) signal.removeEventListener("abort", stop) }
+  const canceled = new Promise<never>((_, reject) => { stop = () => reject(new Error()); signal.addEventListener("abort", stop, { once: true }) })
+  try { return await Promise.race([Promise.resolve().then(work), canceled]) } finally { if (stop) signal.removeEventListener("abort", stop) }
 }
 const main = async () => {
   const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 129_000)

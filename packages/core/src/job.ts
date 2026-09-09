@@ -81,7 +81,7 @@ const REFUSAL_STOP_REASONS: ReadonlySet<string> = new Set([
 
 /**
  * Matched by prefix as well as exactly: providers report a refusal category alongside the
- * reason (`refusal:cyber`), and an exact-match set would let a categorised refusal through
+ * reason (`refusal:cyber`), and an exact-match set would let a categorized refusal through
  * as a successful answer — charging the buyer for a decline.
  */
 export const isRefusal = (stopReason: string | undefined): boolean => {

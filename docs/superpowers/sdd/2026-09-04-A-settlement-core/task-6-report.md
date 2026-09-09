@@ -46,7 +46,7 @@ matching the brief exactly.
 field (it's a commitment record, not a full receipt), so the "reason" slot the brief
 describes renders as "not settled" rather than a specific cause. Added one CSS rule
 (`tr.child td{...}`) for the indent/muted styling, consistent with the page's existing
-semantic-colour rules (`.settled`/`.unsettled` reused, not redefined).
+semantic-color rules (`.settled`/`.unsettled` reused, not redefined).
 
 ## Tests
 

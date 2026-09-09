@@ -217,7 +217,7 @@ describe("job-local Agent SDK relay (simulated upstream only)", () => {
     expect(hits).toBe(1)
   })
 
-  it("refuses an already-cancelled job without creating a relay", async () => {
+  it("refuses an already-canceled job without creating a relay", async () => {
     const controller = new AbortController(); controller.abort()
     await expect(open("http://127.0.0.1:1", { signal: controller.signal })).rejects.toThrow("agent relay request refused")
   })

@@ -170,7 +170,7 @@ runtime as the F11 implementation.
 
 The retained inventory has no currently accepted deployed-code/proxy fingerprint
 or live membership/delay/balance/fee observation. Nonempty eth_getCode alone must
-not be labelled a source/deployment match. Freeze the concrete read-only identity
+not be labeled a source/deployment match. Freeze the concrete read-only identity
 predicate with parent before enabling that runtime mutation gate; until evidence
 is adequate, return unavailable, not a success stub. This is a technical runtime
 prerequisite, not a request for owner funding or new research in this task.

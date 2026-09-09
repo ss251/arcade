@@ -46,7 +46,7 @@ hash. Do not manufacture a child's network or use process config as provenance.
 Keep Gateway UUIDs visible as escaped Gateway transfer references, not transaction
 links or a promise that a batch mined. TestRail is simulated evidence. A link is
 a reference for independent inspection, not fresh receipt/status verification.
-Preserve money formatting, canary markers, existing settlement colours, child
+Preserve money formatting, canary markers, existing settlement colors, child
 indentation and all escaping. No unrelated redesign or canary/pay-test rewrite.
 
 Public session provenance is a boolean `session`, derived from the trusted

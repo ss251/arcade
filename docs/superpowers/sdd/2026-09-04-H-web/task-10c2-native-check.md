@@ -21,7 +21,7 @@ No full gate was run during any browser check. A harness stderr update suggestio
 was ignored; it was not an instruction to modify the installed tool.
 
 Final totals:8 explicit result reads,1 tree read,9 actual preflights,0 payment POSTs,
-0 wallet calls. Selection, storage notification and unmount cancelled held reads.
+0 wallet calls. Selection, storage notification and unmount canceled held reads.
 No capability reached a web request header/URL or rendered DOM; no cookie,
 Authorization or Referer was forwarded. The actual local failed write counter
 incremented once; successful removal reduced2 rows to1, and malformed-key removal

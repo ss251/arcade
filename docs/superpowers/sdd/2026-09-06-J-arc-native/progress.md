@@ -46,7 +46,7 @@ Initial3genuineREDs, then198focusedtestsPASS; actual11routecasesPASS after
 one React-comment assertion correction;10-rootstrict0. ExistingCSSprefix
 unchanged; oldH8scope tightened and completepre-J11hash added. Actual in-app
 browser keyboard/filter+390mobile/1280desktop screenshots inspected after
-sharedChrome permissionblock; bothownedtabsclosed,viewportreset. Catalogue
+sharedChrome permissionblock; bothownedtabsclosed,viewportreset. Catalog
 five-minute cutoff prevented finalcounterread; PID/portsverifiedgone. Separate
 detail1/receipts1/other0,gracefulexit0/portsclosed. Finalfocus/strict/freeze/
 sole4workerfullgate next. J11C2receipt evidence remains; no keys/live/spend/push.

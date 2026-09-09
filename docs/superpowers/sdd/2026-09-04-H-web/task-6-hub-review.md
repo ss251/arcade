@@ -1,6 +1,6 @@
 > Historical H6 independent hub review, September 5, 2026. Original retained unchanged; only this banner differs. This bounded source/test review is separate from author browser observations and the parent full gate.
 
-# H6 hub catalogue projection — independent review, September 5, 2026
+# H6 hub catalog projection — independent review, September 5, 2026
 
 Verdict: **CLEAN** on the final parent-owned production/test files. Read-only
 review; no edits to hub or web source/tests, no full suite, Git mutation or live

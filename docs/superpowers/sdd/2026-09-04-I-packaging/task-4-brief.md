@@ -20,4 +20,4 @@ symlink. No shell interpolation, Git writes, network, keys or payment code.
 Use real disposable Git histories for parser/range/snapshot/check/write tests,
 plus the actual repository read-only run. Bound child commands and output;
 preserve all unrelated README bytes. One four-worker full gate before commit.
-I2/I3 remain paused and no synthetic fixture is labelled a live CLI capture.
+I2/I3 remain paused and no synthetic fixture is labeled a live CLI capture.

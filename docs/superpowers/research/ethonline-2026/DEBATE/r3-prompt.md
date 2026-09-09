@@ -9,4 +9,4 @@ Produce your FINAL position as a build brief for one solo builder with 8 days (S
 6. The Arc mainnet-readiness plan (config shape, boot checks, runbook contents) and the Circle CLI / Gateway decision.
 7. The video script, beat by beat with timestamps, and the README "what existed before / what is new" structure.
 8. The remaining disagreements you still hold against the other two, each in one sentence with a reference, and your confidence.
-Every factual claim referenced (repo file:line, URL, post). Opinion labelled. 1,500–2,800 words. Markdown only, starting with a one-line title naming yourself.
+Every factual claim referenced (repo file:line, URL, post). Opinion labeled. 1,500–2,800 words. Markdown only, starting with a one-line title naming yourself.

@@ -23,7 +23,7 @@ optional batch. No claimed per-field freshness or current-head synchronization.
 ## Tests and deviations
 
 Before source changes, five actual-router tests had one pass/four failures:
-three missing /graph/stats behaviors returned404; one initial catalogue failure
+three missing /graph/stats behaviors returned404; one initial catalog failure
 was a fixture trying to set Store-derived delisted state through putListing.
 Corrected fixture uses three real recordPayTest failures. Re-run before source:
 one pass/four genuine failures (now absent graph key plus three missing routes).
@@ -36,11 +36,11 @@ Graph-off, malformed facts/defects/accessors, strict four-field projection,
 bounded fanout/cancellation, fixed fallback503, actual G7 env/decoder wiring,
 hidden-listing filter, retained detail fields and zero external/mutation counters.
 Synthetic GraphQL responses are injected at fetch only; this is not live Graph
-or a browser transport test. Existing Graph-off catalogue and H feeds/CORS tests
+or a browser transport test. Existing Graph-off catalog and H feeds/CORS tests
 remain for the sole full gate. No seller/pay-test/session mutation was performed.
 
 Literal source-label probing was rejected: /stats is computed from local receipts,
-and G's index cannot supply active catalogue/seller/failed-call counts. Actual
+and G's index cannot supply active catalog/seller/failed-call counts. Actual
 index totals are separate at /graph/stats. Feedback is not automatically proven
 settlement-backed. G6's live Marketplace remains historically null; no zero or
 canonical listing attribution is invented. Web Graph display is not added by

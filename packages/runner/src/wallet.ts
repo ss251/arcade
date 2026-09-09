@@ -127,11 +127,11 @@ export const generateWallet = (): SellerWallet => {
 
 /** Derive the address a key controls, rejecting anything that is not a usable key. */
 export const addressForKey = (privateKey: string): string => {
-  const normalised = privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`
-  if (!/^0x[0-9a-fA-F]{64}$/.test(normalised)) {
+  const normalized = privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`
+  if (!/^0x[0-9a-fA-F]{64}$/.test(normalized)) {
     throw new WalletError("not a private key — expected 32 hex bytes, optionally 0x-prefixed")
   }
-  return privateKeyToAccount(normalised as `0x${string}`).address
+  return privateKeyToAccount(normalized as `0x${string}`).address
 }
 
 export const normaliseAddress = (address: string): string => {

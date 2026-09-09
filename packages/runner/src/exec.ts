@@ -272,7 +272,7 @@ export const execSkill = (args: ExecArgs) =>
 
     // D2: refusal is read from stop_reason, NEVER the exit code. A refusing agent
     // frequently exits 0 — treating that as success would charge for a non-answer.
-    // `isRefusal` matches categorised reasons (`refusal:cyber`) by prefix.
+    // `isRefusal` matches categorized reasons (`refusal:cyber`) by prefix.
     if (envelope.stopReason !== undefined && envelope.stopReason !== "end_turn") {
       if (isRefusal(envelope.stopReason)) {
         yield* Effect.fail(

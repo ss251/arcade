@@ -253,16 +253,16 @@ describe("stock viem Sepolia reader", () => {
   })
   it("bounds streamed bodies including a never-ending body after headers, aborting the request", async () => {
     vi.useFakeTimers()
-    let signal: AbortSignal | undefined, cancelled = false
+    let signal: AbortSignal | undefined, canceled = false
     const reader = sepoliaEnsReader({ env: ENV, timeoutMs: 100, fetch: async request => {
       signal = request.signal
-      return new Response(new ReadableStream<Uint8Array>({ cancel() { cancelled = true } }), { headers: { "content-type": "application/json" } })
+      return new Response(new ReadableStream<Uint8Array>({ cancel() { canceled = true } }), { headers: { "content-type": "application/json" } })
     } })
     const result = run(resolveEnsListing(reader, NAME))
     await vi.advanceTimersByTimeAsync(15_001)
     expect(await result).toMatchObject({ _tag: "Left", left: { _tag: "EnsResolutionUnavailable" } })
     expect(signal?.aborted).toBe(true)
-    expect(cancelled).toBe(true)
+    expect(canceled).toBe(true)
   })
   it.each([302, 500, 200])("refuses redirects, HTTP failures or oversized bodies (HTTP %s)", async status => {
     const reader = sepoliaEnsReader({ env: ENV, fetch: async () => new Response(status === 200 ? "x".repeat(131_073) : "SECRET", { status }) })

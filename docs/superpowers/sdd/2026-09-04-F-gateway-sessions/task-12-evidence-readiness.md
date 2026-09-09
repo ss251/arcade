@@ -110,7 +110,7 @@ duplicate send attempts and unknown methods/origins fail the test. Permit real
 HTTP/WebSocket only to owned loopback surfaces, and fail/count all other outbound
 attempts, including redirect/preconnect/provider paths. No copied RailTest result
 may masquerade as GatewayLive evidence. A separate genuine RailTest case retains
-its `test` reference kind and is labelled accordingly.
+its `test` reference kind and is labeled accordingly.
 
 Clear canary and all optional paid/attestation writer credentials. Do not send a
 splitter/agent claim in the probe's handshake that triggers unrelated contract or
@@ -152,7 +152,7 @@ Status must conserve budget/spent/held; no next call after held uncertainty or a
 failed outcome. The paid probe, single signed retry and EVERY result poll carry
 both session headers; polling also carries the distinct job-token header to a
 query-free validated same-origin job path. Any actual-input quote uses the same
-session context, with no public-rail/catalogue fallback. No redirects or hire
+session context, with no public-rail/catalog fallback. No redirects or hire
 lineage. Probe/quote/read counts are not job or settlement counts.
 
 Offline fixture instrumentation asserts exactly twenty signatures, twenty paid

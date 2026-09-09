@@ -9,7 +9,7 @@ Studio deployment or live indexed proof. Task6 remains open until that evidence.
 The [approved Task6](../../plans/2026-09-04-G-graph.md#task-6-regenerate-the-splitter-list-from-a-live-hub-deploy-and-prove-the-query)
 is implemented with reviewed safety/attribution corrections, not its illustrative
 unbounded discovery, zero-height fallback or credential-in-argv commands.
-The generator joins the actual public catalogue and default EIP-3009 discovery,
+The generator joins the actual public catalog and default EIP-3009 discovery,
 but announcements are only candidates. A frozen two-profile policy determines
 source authority. The pilot remains the explicit historical block-zero exception;
 A9 is independently pinned to its creation block 60460646. Existing pins cannot

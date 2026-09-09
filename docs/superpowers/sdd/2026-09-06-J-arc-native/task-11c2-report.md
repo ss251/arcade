@@ -28,7 +28,7 @@ Create/fund transaction references are not supplied by this public feed and
 remain unavailable; this is not the spec's complete buyer lifecycle history.
 Quoted allocation is separate from reported seller/fee/refund transfers; a
 principal refund is not recovery of gas or other costs. Existing native
-disclosure, layout, colours and address wrapping are reused, with no CSS change.
+disclosure, layout, colors and address wrapping are reused, with no CSS change.
 Browser signer, saved-job recovery, budgets, sessions, payment limits, caps,
 replay protection and dependencies are untouched.
 

@@ -45,7 +45,7 @@ describe("anonymous bounded Gateway balance observation", () => {
     expect(await readGatewayBalance(address, { fetch })).toBeNull()
     expect(fetch).not.toHaveBeenCalled()
   })
-  it("stops before transport when already cancelled", async () => {
+  it("stops before transport when already canceled", async () => {
     const fetch = transport()
     expect(await readGatewayBalance(account, { fetch, signal: AbortSignal.abort() })).toBeNull()
     expect(fetch).not.toHaveBeenCalled()

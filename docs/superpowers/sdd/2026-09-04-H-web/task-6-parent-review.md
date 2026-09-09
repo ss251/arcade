@@ -36,7 +36,7 @@ corrected in the [brief](task-6-brief.md), not rewritten in original reports.
 
 Unavailable/empty/partial data and simulated/canary versus independently verified
 evidence remain distinct. No pay-test hash creates an explorer link. No private
-job capability or raw diagnostic enters the catalogue. The checkpoint is ready
+job capability or raw diagnostic enters the catalog. The checkpoint is ready
 for its atomic local commit. Seller/detail/buyer/publish pages and the canonical
 full-F-before-H merge remain later work; no payment, deployment or live ENS
 verification is claimed by this marketplace increment.

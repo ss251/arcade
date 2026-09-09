@@ -21,7 +21,7 @@ flag. This is a trusted-checkout utility, not an OS sandbox for malicious code.
 One installed headless Chrome, max2 renderers, isolated empty home/cache/profile,
 bounded startup/CDP/page/run deadlines, no wallet extensions, downloads or external
 browser DNS. The wrapper performs public HTTP reads; screenshots/browser requests
-remain local. Body text, image hashes, actual computed colour scheme, browser
+remain local. Body text, image hashes, actual computed color scheme, browser
 version and cleanup metadata are retained in a fresh temporary output directory.
 Each image is a1440x1000 viewport, not full-page/phone/touch/accessibility proof.
 The script records failure and stops; it never automatically retries or installs
@@ -77,16 +77,16 @@ images/HTML and handoffs are excluded from the atomic12-path commit.
 
 ## What the actual frames show
 
-The public catalogue has four listings. Diff Triage metadata shows$0.12/version
+The public catalog has four listings. Diff Triage metadata shows$0.12/version
 0.1.0 and the selected public seller. Totals, seller summary, pay-test history,
 identity/freshness/count evidence and recent receipts are unavailable, not zero
 or fabricated. The fresh buyer has no saved ordinary jobs; sessions are honestly
-labelled unavailable. Publish is passive; its manual command scrolls inside its
+labeled unavailable. Publish is passive; its manual command scrolls inside its
 panel. Chat is disabled because this capture process has no model credential.
 The only automatically created storage key observed is the local conversation
 history key; no job token, wallet, signature, private result or paid request.
 
-Both scheme colours matched actual ARCADE body tokens; all page widths were
+Both scheme colors matched actual ARCADE body tokens; all page widths were
 contained within1440px and all recorded browser error arrays were empty.
 This is rendered read-only local build/public-feed evidence, not a production
 web deployment, a complete live ledger or funded-wallet recovery demonstration.

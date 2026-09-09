@@ -113,14 +113,14 @@ describe("concrete bounded escrow RPC transport (offline fetch)", () => {
     expect(h.sent()).toBe(false)
   })
   it("cancels a stalled response body without another request", async () => {
-    const h = await setup(); let cancelled = false, requests = 0
+    const h = await setup(); let canceled = false, requests = 0
     const fetch = (async (_url, _init) => { requests++
-      return new Response(new ReadableStream({ pull: () => new Promise(() => {}), cancel: () => { cancelled = true } }),
+      return new Response(new ReadableStream({ pull: () => new Promise(() => {}), cancel: () => { canceled = true } }),
         { headers: { "content-type": "application/json" } })
     }) as typeof globalThis.fetch
     await expect(createEscrowChain({ ...h.options, deadlineMs: performance.now() + 25, fetch })
       .nonceState(h.f.context.call.evaluator, h.controller.signal)).rejects.toThrow("escrow_chain_refused")
-    expect(requests).toBe(1); expect(cancelled).toBe(true)
+    expect(requests).toBe(1); expect(canceled).toBe(true)
   })
   it("never signs with an acquisition that returns after cancellation", async () => {
     const h = await rpcFixture(); let release!: (account: typeof evaluator) => void, signatures = 0

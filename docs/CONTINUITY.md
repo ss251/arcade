@@ -76,7 +76,7 @@ both verified live: `https://arcade-hub-production.up.railway.app` (`/healthz`,
 `/openapi.json`, `/listings`, a real HTTP 402 challenge) and
 `https://arcade-web-production-8dc4.up.railway.app` (marketplace, buyer, chat, publish,
 seller and listing routes). The production seller runner was restarted on current `main`,
-which raised the live catalogue from four listings to nine across five adapter types, and
+which raised the live catalog from four listings to nine across five adapter types, and
 the **ENS production re-point executed**: Sepolia tx
 [`0x95536ac0…`](https://sepolia.etherscan.io/tx/0x95536ac0df37ec691aee6a82e3465ad76e2abe021983ac0c42bfa196c9e50b54),
 block 11662373. `usdc-flow-check.scf821769ed.arcade.eth` now names the production hub and
@@ -118,7 +118,7 @@ The [runbook](runbook.md) records the actual hashes, amounts, refusal observatio
 
 These demonstrations used owned, temporary services that were stopped after their runs. D's registration URI still refers to its stopped loopback service, and its explicitly approved blanket ERC-721 operator grant remains in place. E's loopback URLs are not production endpoints: the demonstrated name is expired, its raw price is 11,000 atomic while the untouched context still describes 10,000, and its scoped daemon price permission remains revoked. Production re-pointing, another owner revival, price restoration and scoped regrant are separate pending owner actions. The first failed ENS supervisor run remains failed; its separately approved continuation is the successful run, with both histories preserved.
 
-On-chain payment/event proofs, off-chain catalogue observations and unsigned synthetic refusal tests are identified separately. Private keys, registration secrets, journals, SQLite stores and owner handoffs are not public evidence exports. No mainnet settlement, full Gateway session, paid Graph workflow or new ETHOnline submission/video is claimed here.
+On-chain payment/event proofs, off-chain catalog observations and unsigned synthetic refusal tests are identified separately. Private keys, registration secrets, journals, SQLite stores and owner handoffs are not public evidence exports. No mainnet settlement, full Gateway session, paid Graph workflow or new ETHOnline submission/video is claimed here.
 
 ## AI collaboration attribution
 

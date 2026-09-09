@@ -16,7 +16,7 @@ source/test, dependency, Git or live changes. Private reproductions only.
    success fixtures used invented hash-shaped test references, hiding this
    compatibility gap. No network or actual transfer is involved in the repro.
 2. **Closed artifact schema omits rail/reference-category correlation.** A public
-   `SessionReceipt` labelled `gateway` accepts a settled call with `onchain` plus
+   `SessionReceipt` labeled `gateway` accepts a settled call with `onchain` plus
    a hash, while the ledger itself correctly rejects this combination. This is a
    schema consistency/defense gap, not an observed remote settlement exploit.
 

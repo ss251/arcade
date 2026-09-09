@@ -2,7 +2,7 @@ import { keccak256, stringToHex, type Hex } from "viem"
 
 const UINT_MAX = (1n << 256n) - 1n
 const ZERO = "0x0000000000000000000000000000000000000000"
-export const fundingFailureCodes = Object.freeze(["configuration_invalid", "read_unavailable", "deployment_identity_unavailable", "policy_refused", "journal_unavailable", "operation_owned", "operation_uncertain", "operation_consumed", "evidence_unavailable", "cancelled"] as const)
+export const fundingFailureCodes = Object.freeze(["configuration_invalid", "read_unavailable", "deployment_identity_unavailable", "policy_refused", "journal_unavailable", "operation_owned", "operation_uncertain", "operation_consumed", "evidence_unavailable", "canceled"] as const)
 export type FundingFailureCode = typeof fundingFailureCodes[number]
 /** Fixed diagnostics: no provider value, cause or capability is retained. */
 export class FundingFailure extends Error {

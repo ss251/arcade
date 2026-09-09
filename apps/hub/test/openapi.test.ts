@@ -93,7 +93,7 @@ describe("delisted discovery", () => {
       .toEqual([`/x/${SELLER}/first-live`, `/x/${SELLER}/last-live`])
     expect(JSON.stringify(doc)).not.toMatch(/hidden-listing|hidden_listing|HIDDEN_LISTING_DESCRIPTION/)
   })
-  it("does not advertise hidden listings in the Markdown catalogue", () => {
+  it("does not advertise hidden listings in the Markdown catalog", () => {
     const text = buildAgentSkill(params(mixed))
     expect(text.indexOf("first-live")).toBeLessThan(text.indexOf("last-live"))
     expect(text).toContain("last-live")
@@ -108,7 +108,7 @@ describe("delisted discovery", () => {
     expect(resources[0]!.accepts[0]!.payTo).toBe(first.feeSplitter)
     expect(JSON.stringify(doc)).not.toMatch(/hidden-listing|HIDDEN_LISTING_DESCRIPTION/)
   })
-  it("handles an entirely delisted catalogue without changing the caller's array", () => {
+  it("handles an entirely delisted catalog without changing the caller's array", () => {
     const original = Object.freeze([hidden])
     expect(liveListings(original)).toEqual([])
     expect(Object.keys(buildOpenApi(params(original))["paths"] as object).some((path) => path.startsWith("/x/"))).toBe(false)
@@ -217,7 +217,7 @@ describe("openapi document", () => {
   })
 
   it("leaks nothing private — THE regression guard for this surface", () => {
-    // Serialise the whole document and search it. Not a field-by-field check: the point is
+    // Serialize the whole document and search it. Not a field-by-field check: the point is
     // that no future edit can reintroduce a private value anywhere in the tree, including
     // inside prose, examples or an extension someone adds later.
     const doc = JSON.stringify(buildOpenApi(params([record()])))
@@ -276,7 +276,7 @@ describe("/skill.md", () => {
   })
 
   it("says so plainly when nothing is for sale", () => {
-    // A hub with every runner offline must not render an empty catalogue that reads like
+    // A hub with every runner offline must not render an empty catalog that reads like
     // a broken page.
     expect(buildAgentSkill(params([]))).toContain("No skills are listed right now")
   })

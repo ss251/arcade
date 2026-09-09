@@ -27,7 +27,7 @@ completion cannot enter a subsequent action. No signing/payment retries.
 Store the accepted row before polling. Surface H9 stored/already-stored/recovered/
 capacity/conflict/unavailable outcomes in a closed UI projection, without the
 capability. A storage failure may leave this run's recovery only in RAM. Lost202
-is not automatic retry authority. A cancelled wallet prompt/signature or admitted
+is not automatic retry authority. A canceled wallet prompt/signature or admitted
 job may continue outside this browser; do not promise revocation or no charge.
 
 ## Result interpretation

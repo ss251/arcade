@@ -69,7 +69,7 @@ export interface EngineTerms {
 
 /**
  * Provider terms differ, and the differences are load-bearing rather than cosmetic.
- * Quoted here because a summary of a licence is how a summary becomes the licence.
+ * Quoted here because a summary of a license is how a summary becomes the license.
  *
  * ANTHROPIC — Commercial Terms §A.1 permit use "including to power products and services
  * Customer makes available to its own customers and end users". Consumer Terms forbid it

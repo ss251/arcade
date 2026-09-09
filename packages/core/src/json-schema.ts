@@ -81,7 +81,7 @@ export const validateJson = (value: Json, schema: Json): boolean => {
        * 40 characters is 430ms and each further character roughly doubles it.
        *
        * Bounding the inputs is what makes the match affordable without replacing the
-       * engine. A pattern longer than PATTERN_MAX cannot be honoured, and a value longer
+       * engine. A pattern longer than PATTERN_MAX cannot be honored, and a value longer
        * than PATTERN_VALUE_MAX is rejected rather than matched — refusing is safe here
        * because this gate exists to reject malformed input, so failing closed on input
        * nobody can afford to check keeps the meaning it already had. A short pattern can

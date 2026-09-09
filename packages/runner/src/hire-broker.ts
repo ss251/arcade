@@ -150,7 +150,7 @@ export const startHireBroker = (options: HireBrokerOptions): HireBroker => {
 
       // An unknown or finished job has no ledger, so a token cannot outlive its work.
       if (ledger === undefined || !tokenValid(jobId, token)) {
-        return json({ error: "this job is not authorised to hire" }, 403)
+        return json({ error: "this job is not authorized to hire" }, 403)
       }
 
       const raw = await new Promise<string>((resolve) => {

@@ -20,7 +20,7 @@ const bounded = <A, E>(action: () => Effect.Effect<A, E>, millis: number): Effec
   Effect.suspend(action).pipe(Effect.timeoutOption(millis), Effect.map(out => out._tag === "Some" ? out.value : undefined),
     Effect.catchAllCause(cause => Cause.isInterrupted(cause) ? Effect.interrupt : Effect.succeed(undefined)))
 
-/** Demand-only detail reads. Never call this across the catalogue's four-second feed. */
+/** Demand-only detail reads. Never call this across the catalog's four-second feed. */
 export const listingEvidence = (rec: ListingRecord, erc: Erc8004, chain: ReturnType<typeof loadChainConfig>, rail: string):
 Effect.Effect<ListingEvidence | undefined> => Effect.gen(function* () {
   const agentId = rec.agentId, registry = chain.erc8004?.identity

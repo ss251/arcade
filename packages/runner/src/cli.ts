@@ -573,7 +573,7 @@ const main = Effect.gen(function* () {
      *
      * That is why a seller ends up on `export ARCADE_SELLER_KEY` forever: it works, and it
      * dies with the shell. Restart the daemon from a different terminal and the listings
-     * vanish — which on a public hub is an empty catalogue nobody can explain.
+     * vanish — which on a public hub is an empty catalog nobody can explain.
      *
      * This writes the keychain and NOTHING else. It does not touch the config, mint an
      * address, or change the hub.

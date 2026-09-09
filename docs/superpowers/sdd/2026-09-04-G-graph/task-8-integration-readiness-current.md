@@ -53,7 +53,7 @@ literal plan, but **actual H1 already prevents false labeling**:
 undefined if source is not hub; H server972–974 returns503 in that case.
 Store.statsSource is currently constant hub. Merely replacing that one line with
 a successful Graph probe would therefore break `/stats`, not make truthful Graph
-stats. Keep it hub. GraphStats lacks H's catalogue listings/sellers/all-call counts,
+stats. Keep it hub. GraphStats lacks H's catalog listings/sellers/all-call counts,
 and two EIP-3009 emitters cannot stand in for hub Gateway/test/all-receipt totals.
 
 Smallest later G8 work is Graph layer/service wiring and bounded optional evidence
@@ -70,7 +70,7 @@ redesign is required for absent/optional G8 evidence. Preserve D's independently
 verified erc8004 projection and its different validation semantics.
 
 One exact future compatibility edit is easy to miss: G6 graph-splitters.ts uses a
-closed current catalogue field set. A later valid listing.graph key would currently
+closed current catalog field set. A later valid listing.graph key would currently
 fail its discovery decode. G8 integration must explicitly admit/ignore the new
 bounded public optional field in the generator and its actual-producer fixtures,
 without treating it as splitter binding authority. This is deferred compatibility,

@@ -10,7 +10,7 @@ browser, build, whole-suite, credentials, payment or Git operation was performed
 
 Read the complete current readiness and Task 8 contract, all 166 lines of the loader,
 205 lines of its tests, 22-line root route, full frozen author report, and relevant
-H4 decoder/client/formatter and existing catalogue route. The current ts-testing
+H4 decoder/client/formatter and existing catalog route. The current ts-testing
 skill was applied to focused behavior checks, without introducing a test framework.
 
 | Artifact | SHA-256 |
@@ -49,7 +49,7 @@ Generated registration was only consumed, never generated or edited by this revi
 - The display clock is sampled once at the return boundary, including refusal,
   and a bad clock gives a fixed error rather than fabricated time. The route passes
   router cancellation to the server-function call without asserting that H4's
-  separately bounded upstream reads are synchronously cancelled.
+  separately bounded upstream reads are synchronously canceled.
 - The actual GET server-function delegates validation/projection to loadSkillPage
   before Start serialization and renders the pure page from loader data. Its route
   registration exists. It imports no key-holding buyer API or capability store.

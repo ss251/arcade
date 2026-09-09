@@ -74,7 +74,7 @@ Plan I Tasks 1–3 already provision the CLI agent wallet on Arc testnet and rep
 
 ## 6. J4 — Circle's plugin as supply
 
-The already-queued Agent Plugins ingest uses `circlefin/skills` as its fixture: `arcade publish ./circlefin-skills/plugins/circle` expands `.codex-plugin/plugin.json` into one `skill` listing per SKILL.md (16) and one `mcp` listing per server in `.mcp.json`; unsupported connector types are reported, not silently dropped. Publish two (`pay-via-agent-wallet`, `use-gateway`) live. Licence note (Apache-2.0) in the listing description.
+The already-queued Agent Plugins ingest uses `circlefin/skills` as its fixture: `arcade publish ./circlefin-skills/plugins/circle` expands `.codex-plugin/plugin.json` into one `skill` listing per SKILL.md (16) and one `mcp` listing per server in `.mcp.json`; unsupported connector types are reported, not silently dropped. Publish two (`pay-via-agent-wallet`, `use-gateway`) live. License note (Apache-2.0) in the listing description.
 
 ## 7. J5 — ERC-8183 escrow rail
 

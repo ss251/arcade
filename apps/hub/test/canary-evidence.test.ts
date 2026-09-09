@@ -93,7 +93,7 @@ describe("offline, reconnect and recovery are different evidence", () => {
       id, seller: buyer, delisted: false, payTested: row()
     } }, row(), seller)).toThrow()
   })
-  it("does not treat malformed catalogue documents as proof of absence", () => {
+  it("does not treat malformed catalog documents as proof of absence", () => {
     for (const bad of [{ listings: {} }, { openapi: {} }, { wellKnown: { resources: null } }]) {
       expect(() => assertHiddenEvidence({ ...snapshot("hidden"), ...bad }, seller)).toThrow()
     }

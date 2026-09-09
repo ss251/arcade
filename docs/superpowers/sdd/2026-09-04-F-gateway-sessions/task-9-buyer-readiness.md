@@ -86,7 +86,7 @@ poll/status and close; the literal plan accidentally drops it from session.call.
 
 MCP's actual-input `quoteAt` currently uses publicJson with no protected headers.
 Session calls must quote the session rail with both headers, not the public default
-rail or catalogue fallback. Keep advisory `arcade_quote` honest about which rail it
+rail or catalog fallback. Keep advisory `arcade_quote` honest about which rail it
 quoted; do not claim the session is affordable from an unrelated default challenge.
 
 ## Strict wire decoding and safe local failure channels

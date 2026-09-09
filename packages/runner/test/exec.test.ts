@@ -152,7 +152,7 @@ describe("runner env scrub", () => {
   })
 
   it("keeps the sandbox's own HOME even if a reserved name reaches buildEnv directly", () => {
-    // Defence in depth. `SecretName` should mean this can never happen, so the assertion is
+    // Defense in depth. `SecretName` should mean this can never happen, so the assertion is
     // about the ordering surviving independently of the validation — two rules that fail
     // separately are worth more than one rule asserted twice.
     const forged = { ...manifest(), secrets: ["HOME", "USER"] } as never

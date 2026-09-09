@@ -40,7 +40,7 @@ import { EnsNameExpired, EnsResolutionUnavailable, ensRefusal, parseArcadeEndpoi
  * form in `content`, which is what the model reads, and the raw object only in
  * `structuredContent`, which is what code parses. Never the other way round.
  *
- * **The catalogue is the same attack, earlier and cheaper** (T-EXEC-004). A listing's
+ * **The catalog is the same attack, earlier and cheaper** (T-EXEC-004). A listing's
  * name, description, tags and `replaces` are free text a stranger typed, and they reach
  * this model during discovery — before any purchase and, on this front-end, before any
  * human sees anything at all. That last part is why it matters more here than in the web
@@ -93,8 +93,8 @@ let reservedAtomic = 0n
 let purchases: Promise<void> = Promise.resolve()
 let pendingPurchases = 0
 class SessionToolFailure extends Error { constructor(readonly code: string) { super(code) } }
-const cancelled = () => new SessionToolFailure("request_cancelled")
-const checkSignal = (signal?: AbortSignal) => { if (signal?.aborted) throw cancelled() }
+const canceled = () => new SessionToolFailure("request_cancelled")
+const checkSignal = (signal?: AbortSignal) => { if (signal?.aborted) throw canceled() }
 
 /** The lease includes discovery, signing and outcome handling: two callers cannot
  * observe the same remaining budget. Uncertain outcomes retain their reservation. */
@@ -110,7 +110,7 @@ const serializePurchase = <A>(work: () => Promise<A>, signal?: AbortSignal): Pro
   // Cancellation may answer a queued caller promptly, but its node still joins
   // the predecessor before releasing C. Active work is joined through cleanup.
   return new Promise<A>((resolve, reject) => {
-    const abort = () => { if (!acquired) { signal?.removeEventListener("abort", abort); reject(cancelled()) } }
+    const abort = () => { if (!acquired) { signal?.removeEventListener("abort", abort); reject(canceled()) } }
     signal?.addEventListener("abort", abort, { once: true })
     run.then(resolve, reject).finally(() => signal?.removeEventListener("abort", abort))
     if (signal?.aborted) abort()
@@ -280,7 +280,7 @@ const findListing = async (skillId: string): Promise<Listing> => {
 }
 
 /**
- * The real price, from the endpoint itself rather than the catalogue.
+ * The real price, from the endpoint itself rather than the catalog.
  *
  * Probing the 402 costs nothing and cannot be signed, so an agent can always find out what
  * something costs before committing to it. The listing price and the challenge should
@@ -307,7 +307,7 @@ const UINT256 = 1n << 256n
 const atomicAmount = (value: unknown): value is string => typeof value === "string" && value.length <= 78 && /^(0|[1-9][0-9]*)$/.test(value) && BigInt(value) < UINT256
 const publicAddress = (value: string) => /^0x[0-9a-fA-F]{40}$/.test(value) && !/^0x0{40}$/i.test(value)
 
-/** Buying uses a bounded actual-input probe, never catalogue/advisory-price fallback.
+/** Buying uses a bounded actual-input probe, never catalog/advisory-price fallback.
  * Both headers and streamed JSON share a deadline; no credential crosses this boundary. */
 const publicJson = async (url: string, status: number, input?: unknown, signal?: AbortSignal, fetcher: typeof fetch = globalThis.fetch, timeoutMs = 10000): Promise<unknown> => {
   checkSignal(signal)
@@ -488,7 +488,7 @@ const CallArgs = Schema.Struct({
  * And an EMPTY struct is not rendered as an object at all — Effect emits
  * `{anyOf: [{type:"object"},{type:"array"}]}` for `Schema.Struct({})`, which is a correct
  * description of "an empty structure" and an invalid MCP `inputSchema`. The three no-arg
- * tools would have advertised a schema no client could read. Normalised explicitly rather
+ * tools would have advertised a schema no client could read. Normalized explicitly rather
  * than by hand-writing those three, so they still share the one definition that the
  * runtime check uses.
  */
@@ -546,7 +546,7 @@ export const TOOLS: ReadonlyArray<Tool> = [
     title: "Quote a skill",
     description:
       "What one call would cost, taken from the endpoint's own payment challenge rather " +
-      "than the catalogue. Free, signs nothing, charges nothing. Also reports the " +
+      "than the catalog. Free, signs nothing, charges nothing. Also reports the " +
       "remaining session budget, so you can check affordability before committing.",
     inputSchema: toolInput(QuoteArgs),
     annotations: { title: "Quote a skill", ...READ_ONLY, idempotentHint: true }
@@ -817,7 +817,7 @@ const sessionBudget = async (args: unknown, signal?: AbortSignal): Promise<CallT
  *
  * A tool that throws surfaces to the model as an opaque protocol failure it cannot act on;
  * a tool that returns `isError` with a sentence explaining what to do next lets the agent
- * correct itself. Wrapping here rather than in the server handler means the behaviour is
+ * correct itself. Wrapping here rather than in the server handler means the behavior is
  * the same however this is called — including from tests.
  */
 export const handleTool = async (name: string, rawArgs: unknown, context?: { readonly signal?: AbortSignal }): Promise<CallToolResult> => {
@@ -836,7 +836,7 @@ export const handleTool = async (name: string, rawArgs: unknown, context?: { rea
     return await (["arcade_call_skill", "arcade_open_session", "arcade_close_session"].includes(name)
       ? serializePurchase(run, signal) : run())
   } catch (e) {
-    if (signal?.aborted) return fail("request_cancelled: Operation cancelled. Any issued or uncertain payment remains reserved. Private diagnostics withheld.")
+    if (signal?.aborted) return fail("request_cancelled: Operation canceled. Any issued or uncertain payment remains reserved. Private diagnostics withheld.")
     if (e instanceof SessionToolFailure) return fail(`${e.code}: Session operation refused or unavailable. Private diagnostics withheld.\n${budgetLine()}`)
     if (privateLane) return fail(`session_unavailable: Session operation refused or unavailable. Private diagnostics withheld.\n${budgetLine()}`)
     return fail(String((e as Error)?.message ?? e))

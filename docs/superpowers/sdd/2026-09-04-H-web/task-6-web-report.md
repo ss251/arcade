@@ -4,7 +4,7 @@
 
 Status: author source/test freeze; parent review, full gates and commit remain separate.
 Base: H5 commit `031d6c9`. This report covers the seven web files below, not the
-parent-owned hub catalogue projection or its independent tests.
+parent-owned hub catalog projection or its independent tests.
 
 ## Contract and scope
 
@@ -18,9 +18,9 @@ parent-owned hub catalogue projection or its independent tests.
 - Prices and totals use decoder-validated exact display strings. Totals explicitly
   say recorded, identify their hub/subgraph source, and explain that records can
   include test and hub-owned canary traffic. Stored listing counts need not equal
-  the filtered visible catalogue. No customer-demand or independent chain proof.
-- Catalogue ENS names remain annotations, not independently verified resolution.
-  Explicitly expired names fall back to the service name and remain labelled;
+  the filtered visible catalog. No customer-demand or independent chain proof.
+- Catalog ENS names remain annotations, not independently verified resolution.
+  Explicitly expired names fall back to the service name and remain labeled;
   expired/delisted cards have no detail link. Ordinary native `/skill/<id>` links
   are informational future H9 links; that page is not implemented by H6.
 - No pay-test explorer link: its reference lacks rail/network authority. No extra

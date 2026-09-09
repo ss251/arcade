@@ -166,9 +166,9 @@ const fetchBody = async (request: Request, fetcher: (request: Request) => Promis
   let bodyReader: ReadableStreamDefaultReader<Uint8Array> | undefined
   let onAbort: (() => void) | undefined
   const download = async () => {
-    if (signal.aborted) throw new Error("ENS request cancelled")
+    if (signal.aborted) throw new Error("ENS request canceled")
     const response = await fetcher(new Request(request, { redirect: "error", credentials: "omit", signal }))
-    if (signal.aborted) { void response.body?.cancel().catch(() => {}); throw new Error("ENS request cancelled") }
+    if (signal.aborted) { void response.body?.cancel().catch(() => {}); throw new Error("ENS request canceled") }
     if (!response.ok || response.redirected || Number(response.headers.get("content-length")) > MAX_BODY || !response.body) throw new Error("ENS response refused")
     bodyReader = response.body.getReader()
     const decoder = new TextDecoder("utf-8", { fatal: true })
@@ -184,7 +184,7 @@ const fetchBody = async (request: Request, fetcher: (request: Request) => Promis
   }
   try {
     return await Promise.race([download(), new Promise<never>((_resolve, reject) => {
-      onAbort = () => reject(new Error("ENS request cancelled"))
+      onAbort = () => reject(new Error("ENS request canceled"))
       signal.addEventListener("abort", onAbort, { once: true })
       if (signal.aborted) onAbort()
     })])

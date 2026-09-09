@@ -85,7 +85,7 @@ Libraries (README table): `@x402/fetch`/`@x402/hedera`/`@x402/core` `^2.18.0` (c
 - Transfer method per ecosystem (same doc): EVM → **EIP-3009 or Permit2**; **Hedera → "Hedera Transfer Transaction"** with "HBAR or any HTS fungible token". "Facilitators support **networks**, not specific tokens."
 - **Arc is not a registered/default network.** Arc (`eip155:5042002`) appears nowhere in the repo (code search count 0) and is absent from the "Default Assets for Dollar-String Pricing" EVM table (which lists Base, Ethereum, Polygon, Arbitrum, Monad, Sei, Celo, XDC, …). ARCADE's Arc flow is protocol-legal ("x402 can support any `eip155:<chainId>` network at the protocol level") but has no registered default asset and no third-party facilitator — ARCADE self-facilitates, which the doc explicitly names as a valid "production settlement path".
 - **Facilitator interface** (spec §7): HTTP REST, `POST /verify` (read-only, "MUST NOT commit payment state or write onchain state") and `POST /settle`, both taking `{ x402Version, paymentPayload, paymentRequirements }`. `GET /supported` returns `kinds`. This is precisely ARCADE's `Rail.verify` / `Rail.settle` split.
-- Scheme catalogue: `exact` (per-chain files incl. `scheme_exact_hedera.md`, `scheme_exact_evm.md`), `upto`, `batch-settlement`; transports v2 for `http`, `mcp`, **`a2a`** (`specs/transports-v2/a2a.md` — relevant to the "multi-agent negotiation via A2A" bonus).
+- Scheme catalog: `exact` (per-chain files incl. `scheme_exact_hedera.md`, `scheme_exact_evm.md`), `upto`, `batch-settlement`; transports v2 for `http`, `mcp`, **`a2a`** (`specs/transports-v2/a2a.md` — relevant to the "multi-agent negotiation via A2A" bonus).
 
 ---
 

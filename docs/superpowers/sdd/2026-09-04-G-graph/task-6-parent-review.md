@@ -11,7 +11,7 @@ implementation checkpoint, not live Task6 completion.
 
 ## Contract and actual review
 
-Current catalogue/discovery is only a candidate join. The generator uses the
+Current catalog/discovery is only a candidate join. The generator uses the
 actual public producer's six-decimal price grammar, canonical seller identity
 and exact payment coordinates, with bounded own-JSON capture and fixed errors.
 Captured write permission cannot be changed by a later awaited transport. Two

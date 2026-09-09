@@ -233,7 +233,7 @@ export const runClaudeAgent = async (
   process.once("SIGTERM", cancel)
   process.once("SIGINT", cancel)
   const aborted = new Promise<never>((_resolve, reject) => {
-    abort.signal.addEventListener("abort", () => reject(new Error("engine cancelled")), { once: true })
+    abort.signal.addEventListener("abort", () => reject(new Error("engine canceled")), { once: true })
   })
   // A timeout during scratch creation must not produce an unhandled rejection.
   void aborted.catch(() => {})
@@ -243,7 +243,7 @@ export const runClaudeAgent = async (
     // jobs discover a seller's personal config, seat or keychain through that fallback.
     // This is an owned config directory, not a HOME override.
     if (agent.credential !== "subscription") scratch = await mkdtemp(join(tmpdir(), "arcade-agent-config-"))
-    if (abort.signal.aborted) throw new Error("engine cancelled")
+    if (abort.signal.aborted) throw new Error("engine canceled")
     const nativeEnv = { ...process.env }
     const customBase = process.env["ANTHROPIC_BASE_URL"]
     if (scratch !== undefined && customBase !== undefined && customBase !== "") {
@@ -263,7 +263,7 @@ export const runClaudeAgent = async (
       nativeEnv["ANTHROPIC_BASE_URL"] = relay.baseUrl
       nativeEnv["ANTHROPIC_API_KEY"] = relay.capability
     }
-    if (abort.signal.aborted) throw new Error("engine cancelled")
+    if (abort.signal.aborted) throw new Error("engine canceled")
     stream = runQuery({
       prompt,
       options: {
@@ -306,7 +306,7 @@ export const runClaudeAgent = async (
         },
         ...(scratch === undefined && claudeBinary() !== undefined ? { pathToClaudeCodeExecutable: claudeBinary()! } : {}),
         spawnClaudeCodeProcess: (options) => {
-          if (abort.signal.aborted) throw new Error("engine cancelled")
+          if (abort.signal.aborted) throw new Error("engine canceled")
           const child = spawn(options.command, options.args, {
             cwd: options.cwd,
             env: options.env,

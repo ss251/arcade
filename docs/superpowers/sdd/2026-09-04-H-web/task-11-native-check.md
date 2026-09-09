@@ -18,7 +18,7 @@ qualified; public hashes had no guessed transaction links or raw diagnostics.
 
 One explicit successful wallet action requested only eth_requestAccounts. Rejected
 and malformed accounts showed a fixed public-address fallback. A fourth held
-account request was cancelled by manual typing/selection; later completion could
+account request was canceled by manual typing/selection; later completion could
 not replace that selection or restore old totals. No signature, chain-switch or
 payment method was invoked. This proves synthetic-provider lifecycle, not any
 particular installed wallet. Separate pure tests cover abort and 15-second timeout.

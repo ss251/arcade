@@ -2,7 +2,7 @@
 
 Draft. This allocates responsibility between the platform, sellers and buyers. It exists because "compliance is the seller's responsibility" is not a thing a platform gets to assert without having said so anywhere.
 
-Not legal advice, and not yet reviewed by a lawyer. It is written to be honest about what the software actually does rather than to maximise what the platform can disclaim.
+Not legal advice, and not yet reviewed by a lawyer. It is written to be honest about what the software actually does rather than to maximize what the platform can disclaim.
 
 ## 1. What ARCADE is
 
@@ -26,7 +26,7 @@ The platform helps where it can, and the help is enforcement rather than advice:
 
 **2.2 Your content.** You warrant you have the rights to the prompts, code and data your skill uses, and that its output does not infringe.
 
-**2.3 What you grant a buyer.** On settlement you grant the buyer a perpetual, worldwide, non-exclusive licence to use, modify and redistribute the output of that call, including commercially.
+**2.3 What you grant a buyer.** On settlement you grant the buyer a perpetual, worldwide, non-exclusive license to use, modify and redistribute the output of that call, including commercially.
 
 This needs saying because every provider checked assigns Output rights to *you*, the API customer — OpenAI §4.1 ("owns all Output"), DeepSeek ("we assign any rights… to you"), Z.ai §IV.4. A buyer paying for a work product would otherwise receive something whose usage rights were undefined. Note you can only grant what you hold: if your provider's terms restrict downstream use of Output, that restriction passes through, and it is your job to say so in the listing.
 
@@ -44,7 +44,7 @@ This needs saying because every provider checked assigns Output rights to *you*,
 
 Stated as commitments rather than disclaimers, since a document that only disclaims is not worth writing:
 
-- **Settle only on success.** A job that refuses, times out, exceeds its bounds, returns invalid output or is rejected by a protocol limit does not settle, and the buyer's authorisation goes uncashed. That is the refund.
+- **Settle only on success.** A job that refuses, times out, exceeds its bounds, returns invalid output or is rejected by a protocol limit does not settle, and the buyer's authorization goes uncashed. That is the refund.
 - **Never receive seller code.** The published projection is constructed from named public fields, not filtered from a private one, so a new private field cannot leak by omission.
 - **Fence untrusted content in both directions**, at the protocol edge, without either party opting in.
 - **Publish the take-rate on-chain.** The fee split is immutable in a deployed contract; anyone can read the ratio and check a receipt against it.
@@ -52,7 +52,7 @@ Stated as commitments rather than disclaimers, since a document that only discla
 
 ## 5. What the platform does not warrant
 
-That any listing is accurate, available, or fit for a purpose. That a seller complies with their provider's terms. That an output is correct. The marketplace is a settlement and dispatch layer; the judgement about whether a given seller is worth paying is the buyer's, informed by the objective statistics the platform computes and the receipt-gated ratings it collects.
+That any listing is accurate, available, or fit for a purpose. That a seller complies with their provider's terms. That an output is correct. The marketplace is a settlement and dispatch layer; the judgment about whether a given seller is worth paying is the buyer's, informed by the objective statistics the platform computes and the receipt-gated ratings it collects.
 
 ## 6. Data
 

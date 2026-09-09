@@ -26,7 +26,7 @@ Incomplete/unresolved states do not imply a refund, untouched balance or zero
 spend. Unknown digest/budget fields remain unavailable; malformed topology is
 unavailable before partial rendering; empty input has a neutral fallback.
 
-The existing warm semantic design system supplies all colours and typography.
+The existing warm semantic design system supplies all colors and typography.
 Small node-state text now uses ink for contrast; green/red borders still encode
 recorded settlement status, blue remains money, native links use ink. Styles
 are tree-scoped, use contained horizontal scrolling and add no animation.
@@ -56,7 +56,7 @@ The frontend design and TypeScript-testing skills guided those decisions.
 - Parent added the specific small-state-text regression first: **24 collected,
   1 failed /23 passed** at10:41:33 IST. Changing only that scoped fill to ink
   then passed **64 tests /2 files** at10:41:50 IST. Final declared ink/card
-  ratios16.4392662 and13.6295243 pass normal AA/AAA. These are source-colour
+  ratios16.4392662 and13.6295243 pass normal AA/AAA. These are source-color
   calculations, not yet browser-computed readings.
 
 ## Independent review and boundary checks

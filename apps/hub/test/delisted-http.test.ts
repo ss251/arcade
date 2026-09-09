@@ -121,11 +121,11 @@ afterAll(async () => {
 })
 
 describe("delisting at the actual paid HTTP endpoint", () => {
-  it("hides the persisted verdict from every catalogue, not the explanatory detail", async () => {
+  it("hides the persisted verdict from every catalog, not the explanatory detail", async () => {
     const detail = await (await fetch(`${base}/listings/dead-listing`)).json()
     expect(detail).toMatchObject({ delisted: true, payTested: { ok: false }, payTestHistory: [{ ok: false }, { ok: false }, { ok: false }] })
-    const catalogue = await (await fetch(`${base}/listings`)).json()
-    expect(catalogue.map((r: { id: string }) => r.id)).toEqual(["live-listing"])
+    const catalog = await (await fetch(`${base}/listings`)).json()
+    expect(catalog.map((r: { id: string }) => r.id)).toEqual(["live-listing"])
     for (const path of ["/openapi.json", "/.well-known/x402", "/skill.md", "/", "/_feed"]) {
       const response = await fetch(base + path)
       expect(response.ok).toBe(true)
@@ -250,7 +250,7 @@ describe("delisting at the actual paid HTTP endpoint", () => {
     expect((await fetch(`${base}/healthz`)).ok).toBe(true)
   })
   it("answers an unhandled route throw with a bare 500 that carries no source", async () => {
-    // Defence in depth for the class rather than the instance: whatever throws, the caller
+    // Defense in depth for the class rather than the instance: whatever throws, the caller
     // gets a bare 500 and the detail goes to the log.
     const response = await fetch(`${base}/ratings`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jobId: "nope", stars: 5 })

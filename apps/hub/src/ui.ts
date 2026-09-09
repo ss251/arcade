@@ -38,7 +38,7 @@ import { hasSessionMarker, receiptChildExplorer, receiptExplorer } from "./recei
  * monotonous — the distinction it was reaching for is verification, not machine-origin.
  * (design-sauce Law 3.)
  *
- * **Every semantic colour has exactly one meaning.** Blue is USDC amounts and nothing else;
+ * **Every semantic color has exactly one meaning.** Blue is USDC amounts and nothing else;
  * green is the word "settled" and nothing else; red is "not settled" and nothing else.
  * Links are underlined ink, not blue — the moment blue also means "clickable" it stops
  * meaning money. (design-sauce Law 2.)
@@ -271,7 +271,7 @@ const STYLE = `
  *
  * macOS "Show scroll bars: Always" turns overlay scrollbars off system-wide, so this page —
  * which is always taller than the viewport, because the receipt tape grows — carries a
- * permanent 15px grey bar down its right edge. On a page whose whole argument is that the
+ * permanent 15px gray bar down its right edge. On a page whose whole argument is that the
  * numbers are quiet and the evidence speaks, that bar is the loudest thing in frame.
  *
  * Both dialects, because either alone leaves the bar on the other engine. The long version
@@ -297,7 +297,7 @@ a:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 
 /* The sandbox disclosure is a MEASURED fact about the deployment, so it is mono like every
    other measured fact. It deliberately does not take --refuse: red means "this call did not
-   settle" and every row under a sandbox banner did settle, simulated. Borrowing the colour
+   settle" and every row under a sandbox banner did settle, simulated. Borrowing the color
    would make the page argue with itself. */
 .sandbox{margin:16px 0 0;max-width:62ch;font:12px/1.6 var(--mono);color:var(--ink);
   border:1px solid var(--line);border-left-width:3px;padding:10px 12px;border-radius:2px}
@@ -354,7 +354,7 @@ td.skill{color:var(--ink)}
    FOR the parent row, not a call of its own. */
 tr.child td{padding-top:0;padding-left:22px;color:var(--slate);font-size:12px}
 
-/* Brand marks. Self-contained objects, not semantic colour — carrying one does not license
+/* Brand marks. Self-contained objects, not semantic color — carrying one does not license
    a third hue anywhere else on the page. The plate is dark-only and sits BEHIND the mark. */
 .plate{display:inline-flex;align-items:center;justify-content:center;vertical-align:-3px;
   background:var(--mark-plate);border-radius:5px;padding:2px}

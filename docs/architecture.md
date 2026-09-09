@@ -152,7 +152,7 @@ Three documents, all generated from the live listing set so none can advertise a
 |---|---|---|
 | `/openapi.json` | any OpenAPI client | one concrete `POST /x/<seller>/<skill>` per listing, with input schema, documented `402`, and price in dollars and atomic units |
 | `/.well-known/x402` | clients that speak the protocol and not OpenAPI | the same payment envelope the paid endpoints return |
-| `/skill.md` | an agent's context | the catalogue as markdown, deliberately short because every line costs the reader |
+| `/skill.md` | an agent's context | the catalog as markdown, deliberately short because every line costs the reader |
 
 `accepts[]` in the OpenAPI document is derived from the `PaymentRequirements` schema the rail itself constructs, not hand-written — the first live probe caught a hand-written version documenting `maxAmountRequired`, an x402 v1 field name this rail does not emit.
 

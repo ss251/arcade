@@ -1,4 +1,4 @@
-# J11C1 — declared rail labels and catalogue filter
+# J11C1 — declared rail labels and catalog filter
 
 Implements the [bounded web brief](task-11c1-brief.md) after
 [J11B2](task-11b2-report.md), using the existing ARCADE design system.
@@ -14,14 +14,14 @@ Implements the [bounded web brief](task-11c1-brief.md) after
   boundary carry only this projection. Card and detail labels say Accepts
   (declared), with fixed public names rather than arbitrary seller strings.
   Detail explicitly disclaims current availability and browser escrow purchases.
-- The native labelled catalogue filter uses already fetched data only. All,
+- The native labeled catalog filter uses already fetched data only. All,
   Gateway, Exact, Escrow and Declaration unavailable are distinct. A live
   result count and separate no-match/empty/outage messages preserve provenance;
   recorded marketplace totals do not become filtered totals. No wallet,
   storage, payment/challenge probe, route or upstream behavior change.
 - Additive token-based CSS preserves every pre-J11 byte. Controls retain44px
   targets, visible keyboard focus, wrapping and existing card grids/typography.
-  No new semantic colours, dependencies, hero redesign or signing surface.
+  No new semantic colors, dependencies, hero redesign or signing surface.
 
 ## Verification
 
@@ -48,7 +48,7 @@ replay, squash or push.
 The [browser observation](../../../evidence/J/declared-rails-browser.md)
 records actual native selection, keyboard operation, mobile/desktop screenshot
 inspection, the shared-harness permission failure, separate in-app fallback,
-catalogue hard-cutoff limitation and independently checked process/port cleanup.
+catalog hard-cutoff limitation and independently checked process/port cleanup.
 This does not replace H14 owner live-wallet/visual acceptance.
 
 ## Remaining

@@ -76,7 +76,7 @@ Settlement has a30s deadline. Post-begin typed errors, synchronous throws,
 defects, interruption, malformed settlement or atomic-finish failure expose no
 output/terminal receipt and retain settling/uncertain liability. A defective or
 stuck50ms marker cannot erase the hold. A late noncooperative settlement response
-cannot resume the cancelled pipeline or authorize another attempt.
+cannot resume the canceled pipeline or authorize another attempt.
 
 Only atomic persistence permits returned output or EIP D enqueue. Gateway/Test
 skip D. EIP uses the actual verified/bound payee and bounded best-effort50ms

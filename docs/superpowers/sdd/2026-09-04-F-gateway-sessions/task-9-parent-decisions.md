@@ -126,7 +126,7 @@ No exported reset, global session, implicit retry or wallet-wide guarantee.
 
 F10 propagates installed MCP handler extra.signal through queue/lifecycle/session
 operations and into Effect.runPromise. Check abort before joining and immediately
-after acquiring the queue lease. A cancelled middle waiter cannot run later or
+after acquiring the queue lease. A canceled middle waiter cannot run later or
 release its successor ahead of the active predecessor. Actual MCP cancellation
 and disconnect tests must prove no later signing, plus conservative exposure if
 signer entry already occurred. Do not reflect signal.reason in public errors.

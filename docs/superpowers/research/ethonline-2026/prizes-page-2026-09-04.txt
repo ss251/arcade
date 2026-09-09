@@ -307,7 +307,7 @@ Up to 3 teams will receive $2,000
 
 Institutional adoption is the dominant narrative in the market right now, and tokenised collateral is the sharpest edge of it. Post tokenised treasuries against a repo agreement and the collateral leg becomes programmatic and provable instead of a parallel paper process.
 
-Build an enterprise finance application on Hedera using the Asset Tokenization Studio. Use the SDK as it stands, adapt it, extend the web application, or improve it. ATS supports ERC-3643 alongside ERC-1400, with compliance controls, corporate actions, and coupon handling already in the box. Real asset classes and real lifecycle management will be favoured over a token with a name on it.
+Build an enterprise finance application on Hedera using the Asset Tokenization Studio. Use the SDK as it stands, adapt it, extend the web application, or improve it. ATS supports ERC-3643 alongside ERC-1400, with compliance controls, corporate actions, and coupon handling already in the box. Real asset classes and real lifecycle management will be favored over a token with a name on it.
 
 Ideas
 

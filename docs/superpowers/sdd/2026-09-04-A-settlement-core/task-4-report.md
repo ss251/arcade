@@ -8,7 +8,7 @@ Added a transactional tree reservation ledger to the hub store, exactly per the 
 
 - `apps/hub/src/store.ts`
   - New `TreeRow` interface: `{ childJobId: string; amountAtomic: bigint; state: "reserved" | "committed" | "released" }`.
-  - `StoreState.trees: Map<string, Array<TreeRow>>`, initialised in `empty()`.
+  - `StoreState.trees: Map<string, Array<TreeRow>>`, initialized in `empty()`.
   - `Store` interface gains `reserveTree`, `commitTree`, `releaseTree`, `treeState`.
   - `makeStore` implements all four:
     - `reserveTree` is a single `Ref.modify` — held = sum of amounts for rows whose state is not `"released"`; refuses (returns `false`, state untouched) when `held + amount > ceiling`; a zero ceiling refuses everything since any positive amount already exceeds it. This makes the check-and-insert atomic within the process.
@@ -22,7 +22,7 @@ Added a transactional tree reservation ledger to the hub store, exactly per the 
   - Two new prepared statements: `upsertTree` (insert-or-update-state-on-conflict) and `setTreeStateStmt` (plain `UPDATE ... SET state = ? WHERE child_job_id = ?`).
   - `store` object's `reserveTree`/`commitTree`/`releaseTree` are write-through wrappers around `inner`'s in-memory implementation via `Effect.tap`, exactly matching the existing `putJob`/`putReceipt`/`putRating` pattern. `treeState` is a pure read and is left to the `...inner` spread (not overridden) — consistent with `getJob`/`allReceipts`/`ratingsFor` etc.
   - `emptyState()` (used by `StoreFromEnv` when `ARCADE_DB` is unset) gains `trees: new Map()`.
-  - Did not wrap `reserveTree` in `db.transaction(...)` — the brief says to do so "only if `Ref.modify` is not sufficient for your runtime," and `Ref.modify` is already the single serialisation point for one process; the SQLite row write follows it as a side effect, matching how every other mutation in this file already works.
+  - Did not wrap `reserveTree` in `db.transaction(...)` — the brief says to do so "only if `Ref.modify` is not sufficient for your runtime," and `Ref.modify` is already the single serialization point for one process; the SQLite row write follows it as a side effect, matching how every other mutation in this file already works.
 
 - `apps/hub/test/store.test.ts`
   - Its local `emptyState()` helper (used to build a bare in-memory `Store` for the pre-existing fee-sweep/stats/listings tests) also had to gain `trees: new Map()`. This wasn't spelled out verbatim in the brief's task-4 code blocks, but it's a direct consequence of the brief's own merge note — every place that constructs a `StoreState` literal must carry `trees`, or the file fails `tsc --noEmit` (this `StoreState` literal is passed straight into `makeStore(Ref.Ref<StoreState>)`, so a missing property is a type error, not just a runtime gap). Confirmed necessary and sufficient — `bunx tsc --noEmit` is clean with this one-line addition and no other file constructs a `StoreState` literal.
@@ -137,7 +137,7 @@ Commit: `c7f422e` — `feat(hub): transactional tree reservation ledger, durable
 
 **Quality / discipline.** Matched existing patterns exactly: `Ref.modify` for the atomic check-and-insert (mirrors `backfillFeeSweep`'s use of `Ref.modify` for its own atomic read-modify-write), `Ref.update` for simple state transitions, `Effect.tap` write-through wrappers identical in shape to `putJob`/`putReceipt`/`putRating`. `SCHEMA`, `StoreState`, `empty()`/`emptyState()`/`initial` were all appended to, never rewritten, per the merge note — nothing from a future plan (`pay_tests`, `erc8004_docs`, `sessions`, `ListingRecord` fields) was touched or anticipated. No restructuring elsewhere in either file.
 
-**Testing — real behaviour, not just shape.**
+**Testing — real behavior, not just shape.**
 - Refuse-beyond-ceiling: covered by test 1 (`60_000 + 60_000 > 100_000` refused, first reservation still holds) and test 3 (zero ceiling refuses any positive amount).
 - Release-then-reserve: covered by test 2 — commits `job_c1` (60k moves to committed), reserves then releases `job_c2` (30k freed back), then successfully reserves `job_c3` for 40k, and asserts final `committedAtomic`/`reservedAtomic` are exactly `60_000n`/`40_000n` — this specifically exercises that a released row's amount stops counting toward `held`.
 - SQLite durability: reserve one child, commit it, reserve a second child (left in `reserved` state), close the handle, reopen on the same path, and assert both `committedAtomic` and `reservedAtomic` survive the round trip with correct bigint values.
@@ -159,12 +159,12 @@ Commit: `c7f422e` — `feat(hub): transactional tree reservation ledger, durable
 
 In `apps/hub/src/store.ts`, inside the same `Ref.modify` body in `reserveTree`, added two guards before the existing ceiling check:
 
-1. `if (amountAtomic <= 0n) return [false, s]` — a non-positive reservation amount is refused outright (the "optionally" item from the finding; implemented because it's a cheap, unambiguous safety check with no cost to any existing behaviour — no existing test relied on a zero/negative amount succeeding).
+1. `if (amountAtomic <= 0n) return [false, s]` — a non-positive reservation amount is refused outright (the "optionally" item from the finding; implemented because it's a cheap, unambiguous safety check with no cost to any existing behavior — no existing test relied on a zero/negative amount succeeding).
 2. A scan over **all** roots' rows (`for (const rows of s.trees.values())`), refusing (`[false, s]`, state untouched) if any row anywhere already has this `childJobId`. A child job id is unique hub-wide, so this correctly catches a duplicate reserved against a *different* `rootJobId` too, not just the same one.
 
 The SQL `upsertTree` statement and its `ON CONFLICT(child_job_id) DO UPDATE SET state = excluded.state` clause were left exactly as they were — per the finding, this path can no longer be reached with a conflicting id from `reserveTree`, and the clause still serves its original purpose of making `commitTree`/`releaseTree` replays idempotent against the same row.
 
-No sqlite schema or write-through wrapper changes were needed — the fix is entirely in the in-memory `Ref.modify`, which is the single serialisation point the SQL write already follows.
+No sqlite schema or write-through wrapper changes were needed — the fix is entirely in the in-memory `Ref.modify`, which is the single serialization point the SQL write already follows.
 
 ### Tests added
 
@@ -237,4 +237,4 @@ Commit: `9b51bc6` — `fix(hub): refuse duplicate child reservations in the tree
 - The duplicate check is intentionally hub-wide (all roots), not scoped to `rootJobId`, since the finding and the interface both treat `childJobId` as globally unique — scoping it to one root would have missed a duplicate reserved under a different (possibly wrong) root, which is the more dangerous case.
 - Verified via full RED/GREEN cycle against the actual pre-fix commit rather than reasoning about it — the failure output above was captured by literally checking out the pre-fix file, not simulated.
 - No regressions: `apps/hub/test/store.test.ts` (12 tests, unrelated store coverage) and the full `tree-ledger` + `tree-ledger-sqlite` suites are all green; `bunx tsc --noEmit` is clean.
-- Concerns: none new. The `amountAtomic > 0n` validation is a strict superset of prior behaviour (nothing before relied on non-positive amounts succeeding), so it's a pure hardening with no observed behavioural cost.
+- Concerns: none new. The `amountAtomic > 0n` validation is a strict superset of prior behavior (nothing before relied on non-positive amounts succeeding), so it's a pure hardening with no observed behavioural cost.

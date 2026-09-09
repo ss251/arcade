@@ -58,7 +58,7 @@ if (process.env["ARCADE_MARKET_LISTINGS_FIXTURE"] === "1") {
   setTimeout(() => process.exit(1), 30_000).unref()
 } else {
   const { afterAll, beforeAll, describe, expect, test } = await import("bun:test")
-  describe("H6 actual catalogue evidence projection", () => {
+  describe("H6 actual catalog evidence projection", () => {
     let child: ChildProcess | undefined, origin = "", output = "", didClose = false
     let closed: Promise<void> = Promise.resolve()
     const bounded = async (promise: Promise<unknown>, ms: number) => {

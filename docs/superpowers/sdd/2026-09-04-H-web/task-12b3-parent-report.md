@@ -15,7 +15,7 @@ directory output remains the CLI singular object; generated batches stay unwritt
 
 The client makes one fixed same-origin, cookie-free, no-redirect POST, with a42s
 total budget and1MiB response cap. It revalidates actual canonical CLI JSON and
-target/kind. Late fetch/body completion is cancelled/ignored after expiry or abort;
+target/kind. Late fetch/body completion is canceled/ignored after expiry or abort;
 no retry or raw diagnostic is returned. Chunk count/empty storms are bounded and
 bytes are copied before retaining. Existing quote/payment readers were not changed.
 

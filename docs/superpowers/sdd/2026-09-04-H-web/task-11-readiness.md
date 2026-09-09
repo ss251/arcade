@@ -49,7 +49,7 @@ Totals need not equal a sum over only currently published listing rows.
   wallet response from replacing a newer manual selection or unmounted owner.
   Public address in the URL is intentional; no capability belongs there.
 - Route query selection changes must refresh the form/view consistently. Preserve
-  H8's honest limit: cancelling the Start RPC is not proof of cancelling H4 upstream
+  H8's honest limit: canceling the Start RPC is not proof of canceling H4 upstream
   reads. One bounded summary request is sufficient; no poll or retry loop.
 - Append only seller-scoped CSS and a scoped `.wrap` flow adjustment as needed.
   The literal 380px minimum input plus two buttons overflows a 390px viewport;

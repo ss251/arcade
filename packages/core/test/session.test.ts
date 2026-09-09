@@ -56,7 +56,7 @@ describe("session public schemas are budgets, not financial proofs", () => {
   it.each(["12345678-1234-0234-8234-000000000001", "12345678-1234-4234-0234-000000000001", "12345678-1234-9234-8234-000000000001"])("refuses a noncanonical Gateway UUID %s", reference => {
     expect(() => SessionCall.make({ ...call, state: "settled", settled: true, settleRef: reference, settleRefKind: "gateway-transfer" })).toThrow()
   })
-  it("bounds simulated reference syntax without labelling it as a chain hash", () => {
+  it("bounds simulated reference syntax without labeling it as a chain hash", () => {
     const make = (reference: string) => SessionCall.make({ ...call, state: "settled", settled: true, settleRef: reference, settleRefKind: "test" })
     expect(make("0xtest" + "a".repeat(14)).settleRefKind).toBe("test")
     expect(make("0xtest" + "a".repeat(122)).settleRef?.length).toBe(128)

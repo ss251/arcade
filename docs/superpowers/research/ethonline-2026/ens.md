@@ -465,7 +465,7 @@ Registry-hierarchy page: resolution "walks down the registry tree starting from
 the root, querying resolver and subregistry pointers at each level. The deepest
 resolver found along the path takes precedence (**longest-suffix matching**).
 When a name lacks its own resolver, it inherits from the closest ancestor that
-has one configured." → ENSv2 gets ENSIP-10-style wildcard behaviour structurally:
+has one configured." → ENSv2 gets ENSIP-10-style wildcard behavior structurally:
 set one resolver at `arcade.eth` and every descendant inherits it unless
 overridden. UniversalResolverV2 is the single entry point; viem's
 `getEnsText`/`getEnsAddress` use it with full CCIP-read.
@@ -745,7 +745,7 @@ call it decorative:
    `setAddr(node, coinType, arcAddress)`, so `ens get address x.arcade.eth
    --coin-type <n>` returns the Arc settlement address.
 3. Demo beat: *revoke the daemon's `authorizeTextRoles` on Sepolia → next buyer
-   call on Arc refuses to settle.* One tx on Sepolia visibly changes behaviour on
+   call on Arc refuses to settle.* One tx on Sepolia visibly changes behavior on
    Arc. That is the "functional demo, no hard-coded values" the prize wants.
 
 ### 6.5 Which open-track ENSv2 criteria this hits

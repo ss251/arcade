@@ -19,7 +19,7 @@ operational environment, key, signer, RPC/API/network, send, Git or full suite.
 
 Pause openFundingJournal at header_sync, after it already owns the main journal
 FileHandle and account claim. Abort the runtime signal. executeDepositOnce returns
-refused/cancelled. Calling operation.close resolves before the paused acquisition
+refused/canceled. Calling operation.close resolves before the paused acquisition
 is released. Then release the checkpoint and await the last parent-directory
 handle's actual close plus an event-loop continuation so the open finishes.
 
@@ -33,7 +33,7 @@ close behavior is preserved. After late open completion:
 
 Exact observed JSON:
 ```json
-{"status":"refused","code":"cancelled","closeResolvedBeforeOpenReleased":true,"closeBeforeRelease":0,"mainCloseCalls":0,"mainStillOpen":true,"cleanCloseWitness":false,"poison":false,"claimRetained":true,"rpc":0,"gateway":0,"signer":0,"sends":0,"normal":0}
+{"status":"refused","code":"canceled","closeResolvedBeforeOpenReleased":true,"closeBeforeRelease":0,"mainCloseCalls":0,"mainStillOpen":true,"cleanCloseWitness":false,"poison":false,"claimRetained":true,"rpc":0,"gateway":0,"signer":0,"sends":0,"normal":0}
 ```
 Followed by OWNED_FIXTURE_CLEANUP_COMPLETE, exit0: this diagnostic intentionally
 asserts the observed defect, rather than representing a passing desired-behavior
@@ -165,7 +165,7 @@ FileHandle.close was still wrapped only for counting. No test file was added.
 Observed output, exit0 (1.123 seconds):
 
 ```json
-{"status":"refused","code":"cancelled","closeRejectedBeforeOpenReleased":true,"closeFailureCode":"journal_unavailable","closeBeforeRelease":0,"mainCloseCalls":1,"mainStillOpen":false,"cleanCloseWitness":true,"poison":false,"claimRetained":true,"rpc":0,"gateway":0,"signer":0,"sends":0,"normal":0}
+{"status":"refused","code":"canceled","closeRejectedBeforeOpenReleased":true,"closeFailureCode":"journal_unavailable","closeBeforeRelease":0,"mainCloseCalls":1,"mainStillOpen":false,"cleanCloseWitness":true,"poison":false,"claimRetained":true,"rpc":0,"gateway":0,"signer":0,"sends":0,"normal":0}
 ```
 
 Followed by `OWNED_FIXTURE_CLEANUP_COMPLETE`. The witness was observed only after

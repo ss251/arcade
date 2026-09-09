@@ -14,7 +14,7 @@ fallback-link Red are historical evidence, not rewritten as final results.
 ## Scope and exact pins
 
 Read the complete final component and component tests, all graph CSS and its
-actual global colour tokens; compared with the initial review and previously
+actual global color tokens; compared with the initial review and previously
 read real H3 producer/H4 decoder contract. The frozen layout pair and visual
 fixture were not edited. Only this new private report was written. No Git,
 source/public changes, full gate, build, browser, live network, key, spending or
@@ -44,12 +44,12 @@ All five final pins were checked before and after final focused verification.
   unused authorization. Existing positive text remains recorded evidence.
 - SVG focus suppression is scoped to the viewport; details links get their own
   ink outline. Static rules do not prove actual keyboard or accessibility-tree
-  behaviour, which remains root's browser check.
+  behavior, which remains root's browser check.
 - Fixture ceiling is `$0.20`, matching actual `formatPrice`; this is a display
   fixture correction, not a money calculation or product defect.
 - The final local contrast correction changes only small state-text fill to
   existing ink and removes state-specific text overrides. Semantic border
-  colours, component behaviour and geometry remain unchanged.
+  colors, component behavior and geometry remain unchanged.
 
 Fileless in-memory reversal of only component wording/position/link edits
 exactly reconstructed initial component `c5b2f92a…`. Reversing the final contrast
@@ -75,9 +75,9 @@ text pairs below normal-text AA 4.5:1 on pre-contrast CSS:
 Root received the concrete finding before thaw, added a collected regression,
 and reports 24 component cases / 1 genuine failure before its CSS correction.
 That Red is parent-attributed; this reviewer independently calculated the
-failing colour ratios and reran the corrected suite. Final ink/card ratios are
+failing color ratios and reran the corrected suite. Final ink/card ratios are
 **16.439266 light / 13.629524 dark**, passing normal AA and AAA. These are exact
-declared-source colour pairs, not browser-computed colours or screenshot tests.
+declared-source color pairs, not browser-computed colors or screenshot tests.
 
 The contrast-check skill guided thresholds and pair analysis. Its wrapper
 would install missing `node_modules`, so it was not executed: no download was

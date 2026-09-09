@@ -9,7 +9,7 @@ and repair only the affected verification environment, not production source.
 
 Current Confirm uses an interval capturing old onApprove/terms, cancels on pointer
 release/leave/cancel and unmount only, and has no keyboard hold. Deny directly
-calls onDeny without cancelling the hold. Guard the action against changed full
+calls onDeny without canceling the hold. Guard the action against changed full
 decision identity/terms/input/block state, denial, blur/visibility and unmount.
 Use monotonic elapsed time and one-use completion for a displayed decision. The
 owning component supplies an explicit opaque decision identity; it must cover

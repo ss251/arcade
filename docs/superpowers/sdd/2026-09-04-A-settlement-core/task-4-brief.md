@@ -79,7 +79,7 @@ export interface TreeRow {
 }
 ```
 
-Initialise `trees: new Map()` in `empty()`. Extend `Store`:
+Initialize `trees: new Map()` in `empty()`. Extend `Store`:
 
 Historical excerpt (not current operator instructions):
 ```ts
@@ -221,7 +221,7 @@ Historical excerpt (not current operator instructions):
     releaseTree: (child) => Effect.tap(inner.releaseTree(child), () => Effect.sync(() => setTreeStateStmt.run("released", child))),
 ```
 
-Wrap the `reserveTree` body in `db.transaction(...)` only if `Ref.modify` is not sufficient for your runtime; the in-memory `Ref.modify` is the serialisation point for one process, and the row write follows it.
+Wrap the `reserveTree` body in `db.transaction(...)` only if `Ref.modify` is not sufficient for your runtime; the in-memory `Ref.modify` is the serialization point for one process, and the row write follows it.
 
 - [ ] **Step 8: Run both tests and the store suite**
 

@@ -52,7 +52,7 @@ the legacy Purchase branch still makes an unconditional no-charge statement.
    Before signing and before paid forwarding, compare the fresh derived terms
    against the captured approval/signature. Terms movement is refusal, not a new
    confirmation or a payment retry. The signature remains potentially usable after
-   a post-sign refusal, so do not say it was cancelled or nothing can be charged.
+   a post-sign refusal, so do not say it was canceled or nothing can be charged.
 4. Use the reviewed rail discriminator and pinned domains before wallet prompting.
    Malformed/unknown Gateway metadata cannot fall through to USDC. Prefer existing
    Gateway signing/recovery helper through a narrow EIP-1193 account adapter, with

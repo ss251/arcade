@@ -34,7 +34,7 @@ Quote returns exact priceAtomic/rail/network/serviceName/skillId/skillVersion/se
 (seller here is a wallet). The SDK call's historically named seller argument is a
 service URL segment. MCP's bounded direct listing projection supplies that segment;
 F9 repeats its own listing and actual-input challenge binding. Active-session quote
-never calls legacy quoteAtomic or falls back to catalogue price. Capture the exact
+never calls legacy quoteAtomic or falls back to catalog price. Capture the exact
 origin/fetch/ready network alongside the handle; no later key lookup for that handle.
 The existing default localhost origin is not accepted by F9's stricter session
 origin policy: refuse it consistently, without changing ordinary defaults or
@@ -45,9 +45,9 @@ silently substituting a new origin. Literal loopback or HTTPS configuration work
 Use explicit idle/opening/open/closing/open-uncertain/close-uncertain state, not
 handle presence as mutation authority. Normalize/copy own-data arguments before
 awaiting the shared purchase lease. Open/close/call use that same lease; retain
-the predecessor dependency even when a queued middle caller is cancelled. Check
+the predecessor dependency even when a queued middle caller is canceled. Check
 cancellation before enqueue, after acquisition and before IO/account/SDK entry.
-No cancelled waiter executes later or releases a successor ahead of active work.
+No canceled waiter executes later or releases a successor ahead of active work.
 
 Read-only quote/budget capture the handle and generation and do not write global
 lifecycle state. Only queued explicit close performs lost-close status recovery
@@ -87,7 +87,7 @@ parent-approved fixed createServer refusal for those two IDs before dispatch;
 test explicit wire IDs through InMemoryTransport. Other requests propagate actual
 handler extra.signal. Exercise Client cancellation and transport close while
 queued and after SDK signer/attempt entry; join handler finalizers before reset.
-The decisive queue fixture is active A, cancelled middle B, then C: C must wait
+The decisive queue fixture is active A, canceled middle B, then C: C must wait
 for A and B must never invoke an operation. No native fixture is required for
 this real installed-protocol proof; no stdio/socket/process claim will be made.
 

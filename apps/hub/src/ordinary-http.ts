@@ -30,8 +30,8 @@ export const readOrdinaryBody = async (req: Request): Promise<string> => {
   const reader = req.body?.getReader()
   if (reader === undefined) { if (length !== null && length !== "0") return invalid(); return "" }
   const deadline = performance.now() + BODY_MS
-  let timer: ReturnType<typeof setTimeout> | undefined, finished = false, cancelled = false
-  const cancel = () => { if (!cancelled) { cancelled = true; void reader.cancel().catch(() => {}) } }
+  let timer: ReturnType<typeof setTimeout> | undefined, finished = false, canceled = false
+  const cancel = () => { if (!canceled) { canceled = true; void reader.cancel().catch(() => {}) } }
   const controller = new AbortController()
   const stop = () => { controller.abort(); cancel() }
   timer = setTimeout(stop, BODY_MS); req.signal.addEventListener("abort", stop, { once: true })

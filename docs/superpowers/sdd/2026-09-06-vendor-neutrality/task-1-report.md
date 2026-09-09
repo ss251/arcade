@@ -23,7 +23,7 @@ model vendors; both currently approved routes target GLM.
 
 Eleven format-description lines across five existing public historical files
 were normalized, each with a dated terminology note. The old B4 report retains
-commit26434f1 with a labelled scope description, not a falsified subject quote.
+commit26434f1 with a labeled scope description, not a falsified subject quote.
 Private originals and Git history remain unchanged. Plans remain historical,
 including their existing implementation deviations and command examples.
 
@@ -69,7 +69,7 @@ The sole full invocation (14540) passed 4,285 Vitest tests across 193 files in
 61.84s, then Bun recorded 784 passes /6,003 assertions and two collection errors
 in 167.75s. The new worktree had root dependencies but omitted the separate
 subgraph toolchain, so schema/ABI suites could not import their pinned packages.
-This invocation exited1; it is not labelled a clean full-gate pass.
+This invocation exited1; it is not labeled a clean full-gate pass.
 
 After it stopped, the subgraph's unchanged frozen Bun lockfile was installed
 with lifecycle scripts disabled. Only the two uncollected suites were run:

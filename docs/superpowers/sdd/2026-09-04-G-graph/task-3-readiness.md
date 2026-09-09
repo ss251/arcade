@@ -15,7 +15,7 @@ Nothing below authorizes rerunning that deployment or infers new live coverage.
 
 ## Recommended bounded decision
 
-Release an explicitly labelled **G3 local staging commit**, keeping the active
+Release an explicitly labeled **G3 local staging commit**, keeping the active
 manifest limited to the existing pilot smoke mapping. Stage the renderer and ABI
 contracts now; activate each new data source in the same later commit as its real
 handler. This satisfies every-commit buildability without implementing G4/G5 early.
@@ -142,7 +142,7 @@ under a separate parent release for read-only network checks:
   proxy emitting address from implementation bytecode/ABI. Verify relevant deployed
   implementation/upgrade history if needed to interpret historical logs. Compare
   full inputs/indexed flags, not just topic0 (indexed flags do not change topic0).
-- Missing/unverified explorer ABI may produce an explicitly labelled inactive
+- Missing/unverified explorer ABI may produce an explicitly labeled inactive
   candidate from pinned upstream documentation, as the plan allows. It must not be
   described as deployment-verified or silently promoted into trusted coverage.
   Unsupported endpoints or absent historical receipts leave verification unresolved.
@@ -169,7 +169,7 @@ Separate **source discovery**, **contract verification**, and **canonical hub
 assignment**. A checked-in address is a selection for indexing; an operator-reviewed
 provenance record is what can establish verification. Neither `source: static` nor
 `source: metadata` is authority. G3 should seed no canonical listing binding.
-Treat any retained `listingId` as a labelled hint/comment, never sufficient context
+Treat any retained `listingId` as a labeled hint/comment, never sufficient context
 to assign Listing/Agent/Splitter relations. Prefer omitting operational listingId
 from the pilot entry until a binding exists instead of silently discarding it.
 

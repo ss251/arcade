@@ -125,7 +125,7 @@ No paid attempt occurred, so no exact sent validBefore exists. Root Gateway
 first predicts requirements_mismatch on echoed timeout; vanilla root EIP-3009
 has no maximum lifetime. See the precise source-only trace in the preflight.
 
-- [ ] `scripts/e2e-circle-cli.sh`: start hub (both rails) + runner locally, then: `curl -i` the unpaid 402 (all accepts), `circle services inspect <url> --output json` (assert scheme `GatewayWalletBatched`, price, method), `circle gateway balance --address <agent> --chain ARC-TESTNET`, `circle services pay <url> -X POST --address <agent> --chain ARC-TESTNET --max-amount 0.01 --data '<canaryInput>' --output json`; assert HTTP 200 body and a receipt whose payer is the Circle SCA. Journal to `docs/evidence/J/circle-cli.jsonl`. Agent wallet from Plan I Task 1; if the CLI refuses the chain, capture the exact error and fall back to `--estimate` evidence plus the header replay from Plan I Task 2. Do not guess at CLI behaviour; record it.
+- [ ] `scripts/e2e-circle-cli.sh`: start hub (both rails) + runner locally, then: `curl -i` the unpaid 402 (all accepts), `circle services inspect <url> --output json` (assert scheme `GatewayWalletBatched`, price, method), `circle gateway balance --address <agent> --chain ARC-TESTNET`, `circle services pay <url> -X POST --address <agent> --chain ARC-TESTNET --max-amount 0.01 --data '<canaryInput>' --output json`; assert HTTP 200 body and a receipt whose payer is the Circle SCA. Journal to `docs/evidence/J/circle-cli.jsonl`. Agent wallet from Plan I Task 1; if the CLI refuses the chain, capture the exact error and fall back to `--estimate` evidence plus the header replay from Plan I Task 2. Do not guess at CLI behavior; record it.
 - [ ] Commit: `test(e2e): Circle CLI agent wallet inspects and pays an ARCADE listing on Arc testnet`.
 
 ### Task 5: Unified Balance delegate funding (J3)
@@ -322,7 +322,7 @@ fee, payout, completion and hook may create an escrow Settlement. Explicit
 local treasury and eligible observed funding/submission are required; no
 independent RPC, current admin-state or receipt-tree verification is claimed.
 Web [J11C1](../sdd/2026-09-06-J-arc-native/task-11c1-report.md) adds bounded
-declared-rail labels and a local catalogue filter, with actual browser checks.
+declared-rail labels and a local catalog filter, with actual browser checks.
 This does not add a browser escrow signer or assert live availability.
 Read-only [J11C2](../sdd/2026-09-06-J-arc-native/task-11c2-report.md) adds
 coherent public escrow outcomes, numeric job/contract references and matching

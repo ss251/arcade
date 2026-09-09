@@ -241,7 +241,7 @@ export const fetchWithPayment = (
         signal: saved.stable.signal ? AbortSignal.any([signal, saved.stable.signal]) : signal }))
       if (observed !== null) available = observed
     }
-    if (saved.stable.signal?.aborted) return yield* new RpcFailure({ method: "402", reason: "Payment request cancelled. Nothing was signed." })
+    if (saved.stable.signal?.aborted) return yield* new RpcFailure({ method: "402", reason: "Payment request canceled. Nothing was signed." })
     const selected = yield* Effect.try({ try: () => selectAccept(affordable.map(c => c.requirements), preference, available, escrow !== undefined),
       catch: () => new RpcFailure({ method: "402", reason: "Unsupported payment requirements. Nothing was signed." }) })
     if (selected === undefined) {
@@ -261,7 +261,7 @@ export const fetchWithPayment = (
       catch: () => new RpcFailure({ method: "beforeSign", reason: "Payment authority check failed. Nothing was signed." })
     })
     if (refusal !== null) return yield* new RpcFailure({ method: "beforeSign", reason: refusal })
-    if (saved.stable.signal?.aborted) return yield* new RpcFailure({ method: "402", reason: "Payment request cancelled. Nothing was signed." })
+    if (saved.stable.signal?.aborted) return yield* new RpcFailure({ method: "402", reason: "Payment request canceled. Nothing was signed." })
 
     if (selected.rail === "erc8183") {
       if (escrow === undefined || cap === undefined) return yield* new RpcFailure({ method: "402", reason: "Escrow is not configured. Nothing was signed." })

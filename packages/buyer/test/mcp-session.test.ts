@@ -240,31 +240,31 @@ describe("captured session wallet inspection", () => {
     expect(out.structuredContent?.walletUsdc).toBeNull(); expect(text(out)).not.toContain("PRIVATE_RPC"); expect(fetch).toHaveBeenCalledTimes(1)
   })
   it.each(["deadline", "cancel"] as const)("%s includes an unfinished wallet body and cancels it without changing process totals", async mode => {
-    vi.useFakeTimers(); fakeSession(); let entered!: () => void, cancelled = false, transportSignal: AbortSignal | null | undefined
+    vi.useFakeTimers(); fakeSession(); let entered!: () => void, canceled = false, transportSignal: AbortSignal | null | undefined
     const started = new Promise<void>(resolve => { entered = resolve }), controller = new AbortController()
     vi.stubGlobal("fetch", vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       transportSignal = init?.signal; entered()
-      return new Response(new ReadableStream<Uint8Array>({ cancel() { cancelled = true } }), { status: 200 })
+      return new Response(new ReadableStream<Uint8Array>({ cancel() { canceled = true } }), { status: 200 })
     }))
     await invoke("arcade_open_session", { budgetUsd: "1" })
     const pending = invoke("arcade_budget", {}, controller.signal); await started
     if (mode === "deadline") await vi.advanceTimersByTimeAsync(5001); else controller.abort("PRIVATE_WALLET_CANCEL")
     const out = await pending
     expect(mode === "deadline" ? out.structuredContent?.walletUsdc === null : out.isError).toBe(true)
-    expect(transportSignal?.aborted).toBe(true); expect(cancelled).toBe(true); expect(m.spentSoFarAtomic()).toBe(0n)
+    expect(transportSignal?.aborted).toBe(true); expect(canceled).toBe(true); expect(m.spentSoFarAtomic()).toBe(0n)
     expect(text(out)).not.toContain("PRIVATE_WALLET_CANCEL")
   })
   it("bounds a finite zero-byte chunk storm before it can consume arbitrary body work", async () => {
-    fakeSession(); let pulls = 0, cancelled = false
+    fakeSession(); let pulls = 0, canceled = false
     vi.stubGlobal("fetch", vi.fn(async () => new Response(new ReadableStream<Uint8Array>({
       pull(controller) {
         pulls++
         if (pulls <= 3000) controller.enqueue(new Uint8Array())
         else { controller.enqueue(new TextEncoder().encode(JSON.stringify(responses()))); controller.close() }
-      }, cancel() { cancelled = true }
+      }, cancel() { canceled = true }
     }), { status: 200 })))
     await invoke("arcade_open_session", { budgetUsd: "1" }); const out = await invoke("arcade_budget", {})
-    expect(out.structuredContent?.walletUsdc).toBeNull(); expect(pulls).toBeLessThanOrEqual(1026); expect(cancelled).toBe(true)
+    expect(out.structuredContent?.walletUsdc).toBeNull(); expect(pulls).toBeLessThanOrEqual(1026); expect(canceled).toBe(true)
   })
 })
 
@@ -380,14 +380,14 @@ describe("MCP cancellation lease", () => {
     expect((await invoke("arcade_call_skill", { skillId: "flow", input })).isError).not.toBe(true)
     expect(call).toHaveBeenCalledWith(expect.objectContaining({ input }))
   })
-  it("refuses a pre-cancelled ordinary purchase before discovery or paid SDK entry", async () => {
+  it("refuses a pre-canceled ordinary purchase before discovery or paid SDK entry", async () => {
     const controller = new AbortController(); controller.abort("PRIVATE_ABORT")
     const call = vi.fn(() => Effect.succeed(ordinaryResult())); m.__setCallSkill(call)
     const result = await invoke("arcade_call_skill", { skillId: "flow", input: {} }, controller.signal)
     expect(result.isError).toBe(true); expect(text(result)).not.toContain("PRIVATE_ABORT")
     expect(fetch).not.toHaveBeenCalled(); expect(call).not.toHaveBeenCalled()
   })
-  it("a cancelled middle waiter never runs and cannot let C overtake active A", async () => {
+  it("a canceled middle waiter never runs and cannot let C overtake active A", async () => {
     let release!: () => void, entered!: () => void
     const gate = new Promise<void>(resolve => { release = resolve }), started = new Promise<void>(resolve => { entered = resolve })
     const order: number[] = [], controller = new AbortController()

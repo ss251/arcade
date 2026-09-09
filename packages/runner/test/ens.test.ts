@@ -343,10 +343,10 @@ describe("verified Sepolia writer with durable uncertainty", () => {
     // Fixed public fixture only; no key is read from environment/Keychain and no network exists.
     const fixtureKey = `0x${"01".repeat(32)}` as const
     const configured = { ...state, daemon: privateKeyToAccount(fixtureKey).address.toLowerCase() }
-    let signal: AbortSignal | undefined, cancelled = false
+    let signal: AbortSignal | undefined, canceled = false
     const writer = viemEnsWriter(fixtureKey, "https://rpc.example", { state: configured, journalPath, fetch: async request => {
       signal = request.signal
-      return new Response(new ReadableStream<Uint8Array>({ cancel() { cancelled = true } }), { headers: { "content-type": "application/json" } })
+      return new Response(new ReadableStream<Uint8Array>({ cancel() { canceled = true } }), { headers: { "content-type": "application/json" } })
     } })
     const result = writer.renew(renewal).catch(error => error)
     await vi.advanceTimersByTimeAsync(1)
@@ -354,6 +354,6 @@ describe("verified Sepolia writer with durable uncertainty", () => {
     await vi.advanceTimersByTimeAsync(10001)
     expect(await result).toBeInstanceOf(Error)
     expect(signal?.aborted).toBe(true)
-    expect(cancelled).toBe(true)
+    expect(canceled).toBe(true)
   })
 })

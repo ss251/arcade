@@ -2,7 +2,7 @@
 
 # E11 — MCP by ENS name and conservative session reservations
 
-Owned files: `packages/buyer/src/mcp.ts`, existing `packages/buyer/test/mcp.test.ts`, new `packages/buyer/test/mcp-ens.test.ts`. The separate test file isolates ENS authority, real offline SDK signing and concurrent/reserved accounting from catalogue/identity tests. Root owns E9 SDK changes including the `authorizedAmountAtomic` provenance field. No git staging/commits, real keys, network calls, payments, services or owner configuration changes.
+Owned files: `packages/buyer/src/mcp.ts`, existing `packages/buyer/test/mcp.test.ts`, new `packages/buyer/test/mcp-ens.test.ts`. The separate test file isolates ENS authority, real offline SDK signing and concurrent/reserved accounting from catalog/identity tests. Root owns E9 SDK changes including the `authorizedAmountAtomic` provenance field. No git staging/commits, real keys, network calls, payments, services or owner configuration changes.
 
 ## TDD evidence
 
@@ -15,9 +15,9 @@ Owned files: `packages/buyer/src/mcp.ts`, existing `packages/buyer/test/mcp.test
 
 ## Behavior and necessary plan adaptations
 
-- Effect Schema derives both advertised object schema and runtime XOR: exactly one `skillId`/`name`, required `input`, finite positive optional cap. Excess arguments are refused. Existing valid ID requests retain their route and read-only catalogue/identity projections remain unchanged.
+- Effect Schema derives both advertised object schema and runtime XOR: exactly one `skillId`/`name`, required `input`, finite positive optional cap. Excess arguments are refused. Existing valid ID requests retain their route and read-only catalog/identity projections remain unchanged.
 - ENS failures distinguish missing records from unavailable resolution. No RPC outage is called expiry; fixed messages omit provider/credential material. Resolution and all unsigned quote validation complete before buyer-key access.
-- Purchasing uses actual input, not the plan's `{}` probe (the real hub validates input before issuing payment requirements). Headers and complete JSON bodies share a 10-second deadline, a 128 KiB bound, no credentials and redirect refusal. Late responses are explicitly cancelled. There is no advisory-price fallback for a purchase.
+- Purchasing uses actual input, not the plan's `{}` probe (the real hub validates input before issuing payment requirements). Headers and complete JSON bodies share a 10-second deadline, a 128 KiB bound, no credentials and redirect refusal. Late responses are explicitly canceled. There is no advisory-price fallback for a purchase.
 - Exactly one decoded challenge is required. Endpoint bytes, canonical uint256 amount, nonzero payee, selected ready Arc network, USDC asset and bounded validity are checked. By-name payee/chain must agree with ENS. The SDK receives the resolved name and pinned endpoint origin, and independently repeats its final pre-sign authority check.
 - All purchases, whether by ID or ENS, share one serialized lease. The amount passed to the actual signer cannot exceed the quote, per-call ceiling or remaining session budget. A reservation exists before invoking the paying SDK.
 - Settlement accounting requires the SDK's local authorization amount to equal the reported receipt price and stay within the reserved quote. Unknown/defect/poll outcomes, malformed or contradictory receipts, and **every signed non-settlement response** retain the reservation. A remote failure does not cancel an authorization. Only explicit typed pre-sign failures or trusted SDK responses proving no local authorization may release it.

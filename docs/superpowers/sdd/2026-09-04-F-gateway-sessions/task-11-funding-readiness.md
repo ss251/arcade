@@ -144,7 +144,7 @@ Use F1's mechanics, but a separately versioned closed schema and account-scoped
 operation ownership. Required chain: validate -> exclusive claim -> fsynced plan
 and intent -> prepare/sign once -> fsynced known hash -> one broadcast -> bounded
 reads -> persist correlated terminal evidence. Journal failure at any stage
-prevents the next mutation. An already cancelled operation performs no signing/IO.
+prevents the next mutation. An already canceled operation performs no signing/IO.
 
 - Use an owned non-symlink 0700 parent, exclusive/no-follow 0600 file, fsync file
   and parent on claim, serialized bounded writes and poison-on-write/sync failure.

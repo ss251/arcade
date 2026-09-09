@@ -42,7 +42,7 @@ account is not the owner. No private owner key or actual Keychain is read.
 Two actual empty-PATH fixture children exercise close acknowledgement. The
 Keychain command implementation and account derivation are expressly mocked:
 the fixture command launches only an owned Bun child printing a public dummy
-key, and returns after it closes. The non-cancelled case returns that dummy only
+key, and returns after it closes. The non-canceled case returns that dummy only
 under simulated owner derivation; cancellation returns the fixed error after
 child close, before derivation. Neither is owner authentication or a real
 Keychain/signature proof. Actual fixed-root computation is checked against OS

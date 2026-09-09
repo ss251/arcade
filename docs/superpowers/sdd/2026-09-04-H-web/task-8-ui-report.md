@@ -15,7 +15,7 @@ converter, blanket identity/count claims and inferred explorer URLs.
   only. It renders the unchanged pure `Nav` inside `.wrap.skill-page` and consumes
   independent listing/receipt/name error states with fixed copy. A good receipt
   observation survives missing listing detail; receipt failure does not erase detail.
-- Catalogue navigation targets `/`. The detail CTA is ordinary `/chat` navigation
+- Catalog navigation targets `/`. The detail CTA is ordinary `/chat` navigation
   only, with no prefill, key/token, quote or payment authority. Missing, expired,
   delisted or mismatched detail receives no detail CTA. Shared navigation remains
   available. The page explicitly disclaims purchase-availability guarantees.

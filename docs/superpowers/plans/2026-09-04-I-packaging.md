@@ -7,13 +7,13 @@
 > Current owner rules: single-threaded, four-worker limits, one full gate per
 > commit, exact-one main fast-forward, no push or consumed approval replay.
 
-> September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
+> September 6, 2026 terminology update: portable folders are now labeled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prove a third-party Circle CLI 1.0.0 agent wallet can pay an ARCADE endpoint that was not changed for it, then package the week: a README that declares what existed before commit `57183db` and what is new, an architecture diagram that shows the new layers, a 2–4 minute human-voiced video, a submission checklist for three partner prizes, two check-ins, and the Sept 16 mainnet flip.
 
-**Architecture:** Nothing in this plan changes settlement behaviour. The interop half adds one capture script, one committed wire fixture and one test that replays that fixture through the *same* decoder the hub uses (`decodeHeaderJson` → `Schema.decodeUnknown(PaymentPayload)`, `apps/hub/src/server.ts:791-796`), so a shape regression fails in CI rather than in front of a judge. The packaging half is generator-first: the continuity table comes from `git log`, the diagram from `scripts/diagram.py`, the video from a manifest in `scripts/demo/`, so every number in the submission is re-derivable and none is typed from memory.
+**Architecture:** Nothing in this plan changes settlement behavior. The interop half adds one capture script, one committed wire fixture and one test that replays that fixture through the *same* decoder the hub uses (`decodeHeaderJson` → `Schema.decodeUnknown(PaymentPayload)`, `apps/hub/src/server.ts:791-796`), so a shape regression fails in CI rather than in front of a judge. The packaging half is generator-first: the continuity table comes from `git log`, the diagram from `scripts/diagram.py`, the video from a manifest in `scripts/demo/`, so every number in the submission is re-derivable and none is typed from memory.
 
 **Tech Stack:** Bun 1.3, TypeScript, Effect Schema, vitest 3, `@circle-fin/cli` 1.0.0 (npm latest, verified 2026-09-04), Python 3 + Excalidraw/CDP for the diagram, ffmpeg/ffprobe for the video, `gh`/`git` for the continuity table.
 
@@ -59,7 +59,7 @@ Freeze for capture is Fri Sept 12 noon; submission before **Sat Sept 13, 12:00pm
 | `scripts/continuity.ts` (new) | generates (and `--check`s) the README continuity table from `git log` |
 | `README.md` | the seven-section ETHOnline block; existing product sections kept |
 | `scripts/diagram.py` | `SPEC` gains lineage, canary, ERC-8004, ENS, subgraph, sessions |
-| `docs/architecture.excalidraw`, `docs/architecture-dark.excalidraw`, `docs/architecture.png`, `docs/architecture-dark.png` | regenerated artefacts |
+| `docs/architecture.excalidraw`, `docs/architecture-dark.excalidraw`, `docs/architecture.png`, `docs/architecture-dark.png` | regenerated artifacts |
 | `docs/narration/ethonline-2026/README.md`, `beat-1.txt` … `beat-8.txt` (new) | the human-voice script, one file per beat |
 | `scripts/narration-budget.sh` (new) | word budget per beat against its window |
 | `docs/video/ethonline-2026-shotlist.md` (new) | shot list with timestamps and the exact capture command per beat |
@@ -904,7 +904,7 @@ and after `b2l` (whose `"y": 368` becomes `"y": 362`):
      "size": 14},
 ```
 
-5. Re-aim the flow arrows at the new row centres (`f1`–`f5` keep their x, only y moves; `f6` starts below the taller hub):
+5. Re-aim the flow arrows at the new row centers (`f1`–`f5` keep their x, only y moves; `f6` starts below the taller hub):
 
 ```python
     {"t": "arrow", "id": "f1", "x": 808, "y": 170, "dx": -116, "dy": 0, "stroke": BLUE_D,
@@ -972,7 +972,7 @@ git add scripts/diagram.py docs/architecture.excalidraw docs/architecture-dark.e
 git commit -m "docs(diagram): lineage, canary, ERC-8004, ENS, subgraph and sessions in the architecture"
 ```
 
-**Acceptance:** `python3 scripts/diagram.py && python3 scripts/diagram.py --dark && git diff --exit-code docs/architecture.excalidraw docs/architecture-dark.excalidraw` exits 0 — the committed artefact is exactly what the generator produces.
+**Acceptance:** `python3 scripts/diagram.py && python3 scripts/diagram.py --dark && git diff --exit-code docs/architecture.excalidraw docs/architecture-dark.excalidraw` exits 0 — the committed artifact is exactly what the generator produces.
 
 ---
 
@@ -1091,7 +1091,7 @@ This skill does not guess. Mid-job it buys the facts from a subgraph on Base, a 
 `beat-5.txt`:
 
 ```
-Trust here is measured, not claimed. A hub-owned buyer pay-tests every listing on a schedule. This one fails three times and disappears — from the catalogue, from the OpenAPI document, from the skill file. I kill this runner; its name stops being renewed, expires, and the listing goes with it. And on Arc each listing has an ERC-8004 identity, a validation response per job, and feedback written only against settled receipts. Settlement evidence.
+Trust here is measured, not claimed. A hub-owned buyer pay-tests every listing on a schedule. This one fails three times and disappears — from the catalog, from the OpenAPI document, from the skill file. I kill this runner; its name stops being renewed, expires, and the listing goes with it. And on Arc each listing has an ERC-8004 identity, a validation response per job, and feedback written only against settled receipts. Settlement evidence.
 ```
 
 `beat-6.txt`:
@@ -1310,7 +1310,7 @@ Hand the owner `docs/narration/ethonline-2026/` and this instruction:
 > the words fit at a normal pace, so read at a normal pace rather than rushing.
 > Save the raw files anywhere and tell me the paths.
 
-- [ ] **Step 4: Normalise the voice clips**
+- [ ] **Step 4: Normalize the voice clips**
 
 The cut reads `<beat>.mp3` at a consistent level:
 
@@ -1989,7 +1989,7 @@ git commit -m "feat(mainnet): flip to Arc mainnet — chain manifest filled, spl
 
 **3. Placeholders.** The angle-bracket slots that remain — `<CIRCLE_WALLET_ADDRESS>`, `<CIRCLE_CLI_SETTLE_TX>`, the check-in tables, the mainnet evidence row — are *outputs of a command run in the same task*, not instructions to invent something. Each one is preceded by the command that produces it. No step says "add error handling", "similar to Task N", or "write tests for the above".
 
-**4. Type consistency.** `PaymentPayload`, `authorizationOf`, `signatureOf`, `networkOf`, `decodeHeaderJson` are used in Task 2 exactly as exported from `packages/payments/src/types.ts:66-126`. `A.CUT`, `A.TAKES`, `A.VO`, `A.TEXT`, `A.WORK`, `A.OUT` and `A.main` in Task 10 are the real module-level names in `scripts/demo/assemble.py`. `width_of` / `MEASURED` behaviour cited in Task 6 matches `scripts/diagram.py:181-188`. Beat names are `beat-1` … `beat-8` in Tasks 7, 9, 10 and take names `b1-publish` … `b8-continuity` in Tasks 8, 9, 10 — one naming scheme each, no drift.
+**4. Type consistency.** `PaymentPayload`, `authorizationOf`, `signatureOf`, `networkOf`, `decodeHeaderJson` are used in Task 2 exactly as exported from `packages/payments/src/types.ts:66-126`. `A.CUT`, `A.TAKES`, `A.VO`, `A.TEXT`, `A.WORK`, `A.OUT` and `A.main` in Task 10 are the real module-level names in `scripts/demo/assemble.py`. `width_of` / `MEASURED` behavior cited in Task 6 matches `scripts/diagram.py:181-188`. Beat names are `beat-1` … `beat-8` in Tasks 7, 9, 10 and take names `b1-publish` … `b8-continuity` in Tasks 8, 9, 10 — one naming scheme each, no drift.
 
 **5. Ambiguities resolved.**
 

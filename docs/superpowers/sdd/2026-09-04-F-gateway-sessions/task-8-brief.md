@@ -2,7 +2,7 @@
 
 September 6, 2026. F7 committed separately as `61fe5ca` after its complete gate
 and independent source/publication reviews. This implements
-[Plan F Task 8](../../plans/2026-09-04-F-gateway-sessions.md#task-8-the-paid-path-honours-x-arcade-session)
+[Plan F Task 8](../../plans/2026-09-04-F-gateway-sessions.md#task-8-the-paid-path-honors-x-arcade-session)
 under the [work order](../2026-09-04-A-settlement-core/work-order.md).
 
 ## Accepted architecture

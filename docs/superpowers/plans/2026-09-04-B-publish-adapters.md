@@ -1,6 +1,6 @@
 # Plan B — Publish anything (M1): `skill`, `mcp`, `openapi` adapters
 
-> September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
+> September 6, 2026 terminology update: portable folders are now labeled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -79,7 +79,7 @@ describe("the publish adapters (M1)", () => {
   it("sells all three on an api key, and the model-free two on no credential at all", () => {
     // The spec's rule: "all three sellable with `api-key` or `none`". A tool call to an MCP
     // server or an HTTP operation involves no provider terms, so `none` is the honest
-    // default there — there is no model whose licence could forbid the resale.
+    // default there — there is no model whose license could forbid the resale.
     expect(termsFor("mcp", "none").sellable).toBe(true)
     expect(termsFor("openapi", "none").sellable).toBe(true)
     for (const a of ["skill", "mcp", "openapi"] as const) {
@@ -2639,7 +2639,7 @@ git commit -m "feat(runner): introspect an OpenAPI document into one manifest pe
 
 **Interfaces:**
 - Consumes: everything from Tasks 7 and 8.
-- Produces: `publishTargetKind(target: string): "mcp" | "openapi" | "dir"` and `flagAll(args, name): ReadonlyArray<string>` exported from `packages/runner/src/cli.ts` — pure helpers the test can reach without running the CLI; `arcade publish mcp://…` and `arcade publish <spec>.json` behaviours.
+- Produces: `publishTargetKind(target: string): "mcp" | "openapi" | "dir"` and `flagAll(args, name): ReadonlyArray<string>` exported from `packages/runner/src/cli.ts` — pure helpers the test can reach without running the CLI; `arcade publish mcp://…` and `arcade publish <spec>.json` behaviors.
 
 - [ ] **Step 1: Write the failing dispatch test**
 
@@ -3039,7 +3039,7 @@ You have no tools and no repository access, so reason from the diff itself.
 Report every issue you find, including ones you are uncertain about or consider minor, and label each with a severity. Do not filter for importance: a separate step ranks them. It is better to surface a finding that gets dismissed than to silently drop a real bug.
 
 - `findings` — each carries a severity, the claim, and where in the diff it applies. `blocker` means this breaks correctness, security, or data integrity. `nit` means style or naming.
-- `testGaps` — behaviour this diff changes that nothing visible covers. An empty array means you looked and the change appears covered.
+- `testGaps` — behavior this diff changes that nothing visible covers. An empty array means you looked and the change appears covered.
 - `risk` — how much could go wrong if this merges unnoticed, not how large the diff is. A one-line change to auth is high risk; a thousand-line rename is low.
 - `verdict` — your recommendation, consistent with the findings. Do not return `ship` alongside a blocker.
 

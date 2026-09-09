@@ -484,17 +484,17 @@ describe("independent payment receipt proof", () => {
     await expect(makePaidQuery(KEY, { fetch: f.net })(request())).rejects.toThrow()
   })
   it("cancels during a stalled signed response and never forwards another authorization", async () => {
-    const f = fixture(); const controller = new AbortController(); let paid = 0, cancelled = false
+    const f = fixture(); const controller = new AbortController(); let paid = 0, canceled = false
     const net = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (new Headers(init?.headers).has("payment-signature")) {
         paid++; queueMicrotask(() => controller.abort())
-        return new Response(new ReadableStream({ cancel() { cancelled = true } }))
+        return new Response(new ReadableStream({ cancel() { canceled = true } }))
       }
       return f.net(input, init)
     }, { preconnect: () => {} })
     const q = makePaidQuery(KEY, { fetch: net, signal: controller.signal })
     await expect(q(request())).rejects.toThrow(); await expect(q(request())).rejects.toThrow()
-    expect(paid).toBe(1); expect(cancelled).toBe(true)
+    expect(paid).toBe(1); expect(canceled).toBe(true)
   })
   it.each([
     ["failed", (r: Record<string, unknown>) => ({ ...r, status: "0x0" })],

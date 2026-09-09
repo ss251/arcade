@@ -191,7 +191,7 @@ describe("validateJson", () => {
     // therefore an unauthenticated, free denial of service.
     const evil = { type: "object", required: ["text"], properties: { text: { type: "string", pattern: "^(a+)+$" } } }
 
-    it("still honours an ordinary pattern", () => {
+    it("still honors an ordinary pattern", () => {
       const schema = { type: "object", properties: { id: { type: "string", pattern: "^[a-z]+$" } } }
       expect(validateJson({ id: "abc" }, schema)).toBe(true)
       expect(validateJson({ id: "ABC" }, schema)).toBe(false)

@@ -13,7 +13,7 @@ Read: full E6/E7 plan and E5 state interfaces; current daemon lifecycle and D3 i
 - A skill absent from the currently gated dispatch set must not be renewed or receive a price update. Otherwise ENS liveness outlasts actual service.
 - Arbitrary send errors and receipt timeouts are uncertain, not permission to send again next heartbeat. Durable intent/submitted state must survive restart; confirmed failure or a pre-broadcast-only read failure is distinguishable.
 - A successful broadcast/hash alone is not confirmation. Require successful receipt, exact requested transaction hash, and matching on-chain expiry or text readback before marking publication/renewal complete.
-- Closing the daemon must prevent later writes after a pending read or receipt wait resumes. A transaction already handed to the network cannot be cancelled; preserve its checkpoint and allow only bounded reconciliation.
+- Closing the daemon must prevent later writes after a pending read or receipt wait resumes. A transaction already handed to the network cannot be canceled; preserve its checkpoint and allow only bounded reconciliation.
 
 ## Proposed implementation boundaries
 

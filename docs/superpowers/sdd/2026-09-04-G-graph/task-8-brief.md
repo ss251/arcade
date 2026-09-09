@@ -12,7 +12,7 @@ Preserve H/E/C filters, pay-test fields, D identity and every payment/session pa
 Graph-off, null marketplace, malformed data and defects fail softly; one bounded
 batch accepts at most 256 listing IDs, deduplicated, with four concurrent reads.
 
-Keep /stats and Store.statsSource hub-labelled and unchanged. The literal plan's
+Keep /stats and Store.statsSource hub-labeled and unchanged. The literal plan's
 source-only probe would relabel local counts as indexed facts; H explicitly
 refuses that. The Graph schema lacks active listing/seller/failed-call counts.
 Only /graph/stats selects an actual indexed aggregate, or two clearly hub-sourced

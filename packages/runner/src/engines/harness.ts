@@ -69,9 +69,9 @@ export interface HarnessRequest extends HarnessJob {
  * nonce is random per job so it cannot be closed from inside the payload.
  */
 export const buildPrompt = (job: HarnessJob): { prompt: string; suspected: boolean } => {
-  const serialised = typeof job.input === "string" ? job.input : JSON.stringify(job.input, null, 2)
-  const suspected = looksLikeFenceEscape(serialised)
-  const { text } = fence(serialised, { label: "the caller's request payload" })
+  const serialized = typeof job.input === "string" ? job.input : JSON.stringify(job.input, null, 2)
+  const suspected = looksLikeFenceEscape(serialized)
+  const { text } = fence(serialized, { label: "the caller's request payload" })
   return {
     prompt: `${text}\n\nProduce the result this skill exists to produce, for the payload above.`,
     suspected

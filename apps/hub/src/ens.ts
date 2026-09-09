@@ -74,7 +74,7 @@ const identity = (snapshot: EnsListingSnapshot): string =>
 
 /** Bounds uncooperative injected callbacks too; late fulfillment cannot restart work. */
 const bounded = <A>(work: () => Promise<A> | A, signal: AbortSignal, timeoutMs: number): Promise<A> => new Promise((resolve, reject) => {
-  if (signal.aborted) { reject(new Error("ENS observation cancelled")); return }
+  if (signal.aborted) { reject(new Error("ENS observation canceled")); return }
   let done = false
   const finish = (ok: boolean, value: A | undefined) => {
     if (done) return

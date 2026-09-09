@@ -39,7 +39,7 @@ export class PaymentRequired402 extends Schema.Class<PaymentRequired402>("Paymen
 /**
  * An EIP-3009 TransferWithAuthorization, signed offline by the buyer.
  *
- * A Struct rather than a Class: this is a pure wire shape with no behaviour, and keeping it
+ * A Struct rather than a Class: this is a pure wire shape with no behavior, and keeping it
  * structural means callers can build one from a plain object (which is what signing returns).
  *
  * Note the signature is NOT part of the authorization — it sits beside it in the canonical

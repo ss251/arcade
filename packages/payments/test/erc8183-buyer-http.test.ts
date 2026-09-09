@@ -67,12 +67,12 @@ describe("bounded private buyer HTTP contracts (fake fetch only)", () => {
     await expect(f.http.root(f.intent, 7n, f.input.capability, body, f.controller.signal)).rejects.toThrow("escrow_buyer_http_refused")
   })
   it("bounds a never-ending body and ignores private failure text without retrying", async () => {
-    const f = await fixture(); let requests = 0, cancelled = 0
-    const fetch = (async () => { requests++; return new Response(new ReadableStream({ cancel() { cancelled++ } }),
+    const f = await fixture(); let requests = 0, canceled = 0
+    const fetch = (async () => { requests++; return new Response(new ReadableStream({ cancel() { canceled++ } }),
       { headers: { "content-type": "application/json" } }) }) as unknown as typeof globalThis.fetch
     const http = createEscrowBuyerHttp({ ...f.options, fetch, deadlineMs: performance.now() + 30 })
     await expect(http.budget(f.intent, 7n, f.input.capability, body, f.controller.signal)).rejects.toThrow(/^escrow_buyer_http_refused$/)
     await expect(http.budget(f.intent, 7n, f.input.capability, body, f.controller.signal)).rejects.toThrow(/^escrow_buyer_http_refused$/)
-    expect(requests).toBe(1); expect(cancelled).toBe(1)
+    expect(requests).toBe(1); expect(canceled).toBe(1)
   })
 })

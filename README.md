@@ -8,7 +8,7 @@ Buyers are agents. So a seller's agent can itself buy from another seller mid-ru
 
 [Continuity: what existed before ETHOnline, what changed, and what is verified](docs/CONTINUITY.md). [Public development records](docs/superpowers/sdd/README.md).
 
-**Live on Arc testnet:** marketplace <https://arcade-web-production-8dc4.up.railway.app> · hub API <https://arcade-hub-production.up.railway.app> (`/healthz`, `/openapi.json`, `/listings`). A listing is only valid while its seller's runner is dialled in, so an empty catalogue is the discovery guarantee working rather than an outage.
+**Live on Arc testnet:** marketplace <https://arcade-web-production-8dc4.up.railway.app> · hub API <https://arcade-hub-production.up.railway.app> (`/healthz`, `/openapi.json`, `/listings`). A listing is only valid while its seller's runner is dialled in, so an empty catalog is the discovery guarantee working rather than an outage.
 
 An **Agent Skill (open standard)** is a portable `SKILL.md` folder, described by the
 [Agent Skills specification](https://agentskills.io/specification). The same folder
@@ -411,7 +411,7 @@ Any agent that reads OpenAPI can find a skill, see its price *before* calling, a
 
 The document is standard OpenAPI 3.1 plus x402, and nothing proprietary: the payment challenge is documented as an ordinary `402` response, and everything the spec has no home for sits under a visibly-ours `x-arcade-` prefix.
 
-For agents there is also an **MCP server** — `bun --no-env-file packages/buyer/src/mcp.ts`, eight tools: list, describe, quote, call, receipts, budget, open session and close session. The per-call ceiling and process budget stack with the hub session ceiling; issued and uncertain exposure is not refunded by a failed response or close. Seller output is **fenced and labelled untrusted**, with the raw object in `structuredContent`. See the [buyer guide](docs/buyer-guide.md), or `GET /skill.md` for the live catalogue.
+For agents there is also an **MCP server** — `bun --no-env-file packages/buyer/src/mcp.ts`, eight tools: list, describe, quote, call, receipts, budget, open session and close session. The per-call ceiling and process budget stack with the hub session ceiling; issued and uncertain exposure is not refunded by a failed response or close. Seller output is **fenced and labeled untrusted**, with the raw object in `structuredContent`. See the [buyer guide](docs/buyer-guide.md), or `GET /skill.md` for the live catalog.
 
 One field is deliberate. `x-arcade-payment.settlement` is `on-validated-output`. x402 defines no failure semantics at all — its facilitator interface is verify, settle, supported, with no void, capture or refund — and no field anywhere by which a server can *declare* when it settles relative to delivering. Saying so costs two lines, and it is the difference between a courtesy and a contract.
 

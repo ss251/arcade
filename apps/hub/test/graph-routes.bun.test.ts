@@ -113,7 +113,7 @@ if (process.env["ARCADE_GRAPH_ROUTES_FIXTURE"] === "1") {
       expect(after.receiptReads).toBe(before.receiptReads)
       expect(await (await get("/stats")).json()).toMatchObject({ source: "hub", settled: 1, volumeAtomic: "10000" })
     })
-    test("adds only four optional fields and preserves catalogue and detail evidence", async () => {
+    test("adds only four optional fields and preserves catalog and detail evidence", async () => {
       await get("/__graph_fixture?mode=ready")
       const rows = await (await get("/listings")).json()
       expect(rows.map((row: { id: string }) => row.id)).toEqual(["graph-skill"])

@@ -895,7 +895,7 @@ const main = Effect.gen(function* () {
             const { listing, seller, treasuryIsSeller, splitterVerified, feeSplitter, payTested, delisted } = rec
             const stats = await run(store.statsFor(listing.id))
             const ratings = await run(store.ratingsFor(listing.id))
-            // Only a requested detail page needs identity evidence. The catalogue/feed
+            // Only a requested detail page needs identity evidence. The catalog/feed
             // must not fan out ownerOf/evidence reads across every listing on each poll.
             const identity = evidenceForSkill === listing.id ? await run(listingEvidence(rec, erc8004, chainConfig, rail.name)) : undefined
             return {
@@ -1015,7 +1015,7 @@ const main = Effect.gen(function* () {
           const reference = test?.settleTx
           const publicReference = test?.ok === true && typeof reference === "string" &&
             /^0x[0-9a-fA-F]{64}$/.test(reference) && !/^0x0{64}$/.test(reference) ? reference : undefined
-          // Catalogue evidence is store-derived, not a new pay-test. Null means no
+          // Catalog evidence is store-derived, not a new pay-test. Null means no
           // recorded history; older hubs can still omit this metadata entirely.
           // Redact the job ID; this summary carries no locator or explorer authority.
           const payTested = test === undefined ? null : { atMs: test.atMs, ok: test.ok, jobId: "",
@@ -1628,10 +1628,10 @@ if (escrowBoot === undefined) {
   // Journal release follows request/fiber interruption and bounded action cleanup.
   const shutdown = new AbortController(), stop = () => shutdown.abort()
   /*
-   * Defence in depth for the class. Bun.serve's `error` boundary covers `fetch` only, so a
+   * Defense in depth for the class. Bun.serve's `error` boundary covers `fetch` only, so a
    * throw anywhere else async — a socket handler, a timer, a background task — would exit
    * the process and take every connected runner's listings with it. A public hub should
-   * log and keep serving instead. This is a net, not a licence: anything caught here is a
+   * log and keep serving instead. This is a net, not a license: anything caught here is a
    * defect worth fixing at its source, which is why it logs loudly.
    */
   process.on("unhandledRejection", (reason) => console.error("[hub] unhandled rejection", reason))

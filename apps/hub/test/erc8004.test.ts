@@ -176,9 +176,9 @@ describe("bounded registry HTTP responses", () => {
     expect(res.status).toBe(429); expect(await res.text()).toBe('{"jsonrpc":"2.0"}')
   })
   it("rejects an oversized body even without a content-length header", async () => {
-    let cancelled = false
-    const body = new ReadableStream({ pull(controller) { controller.enqueue(new Uint8Array(600_000)) }, cancel() { cancelled = true } })
+    let canceled = false
+    const body = new ReadableStream({ pull(controller) { controller.enqueue(new Uint8Array(600_000)) }, cancel() { canceled = true } })
     await expect(boundedRegistryResponse(new Response(body))).rejects.toThrow()
-    expect(cancelled).toBe(true)
+    expect(canceled).toBe(true)
   })
 })

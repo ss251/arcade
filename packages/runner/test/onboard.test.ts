@@ -10,7 +10,7 @@ import { addressForKey, generateWallet, normaliseAddress, resolveSellerKey, Wall
  *
  * `resolveSellerKey` cases use freshly generated addresses. On macOS the keychain lookup
  * genuinely runs, finds nothing for a random address, and falls through — which is the
- * behaviour under test, so the tests stay hermetic without stubbing the platform.
+ * behavior under test, so the tests stay hermetic without stubbing the platform.
  */
 
 const KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
@@ -34,7 +34,7 @@ describe("planIdentity", () => {
     expect(plan).toEqual({ _tag: "Import", privateKey: KEY, address: ADDR_FOR_KEY })
   })
 
-  it("accepts a bare key without the 0x prefix and normalises it", () => {
+  it("accepts a bare key without the 0x prefix and normalizes it", () => {
     const plan = planIdentity({ importKey: KEY.slice(2) })
     expect(plan._tag).toBe("Import")
     expect((plan as { privateKey: string }).privateKey).toBe(KEY)
@@ -126,7 +126,7 @@ describe("resolveSellerKey", () => {
 describe("checkHub", () => {
   it("reports unreachable rather than throwing, so setup can finish", async () => {
     // A hub being down must not block a seller completing onboarding — the runner
-    // reconnects with backoff, so the useful behaviour is to say so and carry on.
+    // reconnects with backoff, so the useful behavior is to say so and carry on.
     const status = await Effect.runPromise(checkHub("http://127.0.0.1:9", 250))
     expect(status.reachable).toBe(false)
     expect(status.error).toBeDefined()

@@ -28,7 +28,7 @@ Renderer may narrowly export its immutable known-source profile lookup for the
 generator. No caller-supplied trust flag, explorer discovery, zero-height fallback,
 unknown profile or conflicting seller may widen that policy. Explicitly seed A9
 in reviewed splitters.json even with no current hub announcements. Preserve every
-historical pin; the generator is not a catalogue-pruning tool. Final renderer
+historical pin; the generator is not a catalog-pruning tool. Final renderer
 must deterministically support exact selected known pins and reject duplicates,
 changed heights, unknown fields and unknown addresses.
 
@@ -72,7 +72,7 @@ explicit --hub; --write alone permits only the validated local list replacement.
 
 H-before-G8 remains the recorded integration exception. Later stats values and
 their source label must come from the same selected read. No emitter subset can
-be relabeled complete hub call/catalogue totals. These are technical scope choices,
+be relabeled complete hub call/catalog totals. These are technical scope choices,
 not owner requests. Newly approved Base10/5 paid-query authority remains separately
 queued and unused; it does not authorize an Arc-settled G15 purchase.
 

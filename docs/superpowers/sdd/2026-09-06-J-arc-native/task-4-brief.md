@@ -33,7 +33,7 @@ The CLI's inspect metadata comes from its registry lookup. A loopback testnet
 listing is not a public registry member. Use explicit POST/input for baseline
 inspection; report any absent metadata honestly. An additional inspect with
 the existing CIRCLE_DISCOVERY_URL override pointing at the owned hub's registry
-view may prove metadata consumption, but is labelled local discovery, not
+view may prove metadata consumption, but is labeled local discovery, not
 public marketplace listing.
 
 ## Safety and verification

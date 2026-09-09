@@ -296,7 +296,7 @@ describe("hire broker", () => {
     const b = start(purchaseAt(0.01))
     const r = await ask("job_unknown", "anything")
     expect(r.status).toBe(403)
-    expect(String(r.body["error"])).toMatch(/not authorised/)
+    expect(String(r.body["error"])).toMatch(/not authorized/)
   })
 
   it("refuses a forged token", async () => {
@@ -316,7 +316,7 @@ describe("hire broker", () => {
     expect(r.status).toBe(403)
   })
 
-  it("stops honouring a token once the job is closed", async () => {
+  it("stops honoring a token once the job is closed", async () => {
     // A token must not outlive the work it was issued for.
     const b = start(purchaseAt(0.01))
     const token = b.openJob("job_1", 0.05)

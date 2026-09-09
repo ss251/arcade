@@ -19,7 +19,7 @@ ASCII-safe constant-time token helper and retains all session route handlers.
 Execution index preserves main's F row plus H. No squash, push or main change.
 
 Root inspected complete main→H server/store diffs. Only approved H read-route,
-safe catalogue pay-test projection, statsSource and guarded ordinary upsert were
+safe catalog pay-test projection, statsSource and guarded ordinary upsert were
 added. SQLite/session handlers/reference helper remain identical to main.
 Pages config hash remains ec9d4b1ab31167c8d857454de03ad087f60940d2acce36390281aea9e5c14186.
 

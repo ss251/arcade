@@ -1752,7 +1752,7 @@ git commit -m "feat(hub): POST /sessions and POST /sessions/:id/close with a ses
 
 ---
 
-### Task 8: The paid path honours `x-arcade-session`
+### Task 8: The paid path honors `x-arcade-session`
 
 **Merge notes.** `apps/hub/src/server.ts` land order is **A → C → D → E → F (this task) → H → G**, and Plan A Task 5 holds the canonical order of checks inside the paid branch. Rebase before starting: A's input gate and lineage block, C's `delistRefusal`, D's routes and `AppLive`, and E's `ensWatch` are all already in the file. Add `railsLayer()` to the *existing* `Layer.mergeAll` rather than rewriting it, and rewrite `rail.challenge`/`rail.verify` to `callRail.…` in place. `apps/hub/src/pipeline.ts` order is **A → C → D → F**: `RunJobArgs` gains `rail`/`sessionId` alongside A's `lineage`, C's `canary` and D's `attest`, and the session commit/release joins D's attest hand-off in the best-effort block *after* `store.putReceipt`.
 
@@ -1763,7 +1763,7 @@ git commit -m "feat(hub): POST /sessions and POST /sessions/:id/close with a ses
 
 **Interfaces:**
 - Produces: on the paid endpoint, when `x-arcade-session` is present — the session's rail issues the challenge and verifies; `verified.payer` must equal `session.buyer` (else `403 session_buyer_mismatch`); the price is reserved before dispatch (`402 session_budget_exceeded` with the remaining budget); the receipt carries `sessionId`; settlement commits the reservation, any other outcome releases it.
-- Absent the header, behaviour is byte-identical to today: default rail, no session.
+- Absent the header, behavior is byte-identical to today: default rail, no session.
 
 - [ ] **Step 1: Write the failing test**
 

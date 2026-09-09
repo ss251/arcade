@@ -52,16 +52,16 @@ import { demoObservation, demoPublicClient } from "./scripts/ens-demo.ts";
 import { EnsNameExpired, resolveEnsListingPromise, sepoliaEnsReader } from "@arcade/buyer";
 const check = value => { if (!value) throw Error("owner re-point refused"); };
 const same = (a, b) => typeof a === "string" && typeof b === "string" && a.toLowerCase() === b.toLowerCase();
-let session, observer, closingSession, closing, cancelled = false;
+let session, observer, closingSession, closing, canceled = false;
 const closeSession = () => {
   if (!session) return Promise.resolve();
   if (closingSession === session && closing) return closing;
   closingSession = session; closing = Promise.resolve().then(() => session.close()); return closing;
 };
-const cancel = () => { cancelled = true; observer?.close(); void closeSession().catch(() => {}); };
+const cancel = () => { canceled = true; observer?.close(); void closeSession().catch(() => {}); };
 const timer = setTimeout(cancel, 300000);
 process.once("SIGTERM", cancel); process.once("SIGINT", cancel);
-const fetcher = request => { check(!cancelled); return fetch(request); };
+const fetcher = request => { check(!canceled); return fetch(request); };
 try {
   const path = ensStatePath(), state = await readEnsState(path);
   check(state?.root === "arcade.eth" && state.owner && state.daemon);
@@ -105,12 +105,12 @@ try {
   const journal = resolve(process.env.ARCADE_ENS_REPOINT_JOURNAL);
   check(![path, `${path}.setup.json`, ensJournalPath(process.env), `${path}.demo.json`, `${path}.demo-daemon.json`].map(p => resolve(p)).includes(journal));
   const binding = keccak256(stringToHex(JSON.stringify({format:"owner-repoint-v1",state,name,old:old.origin,updates})));
-  check(!cancelled);
+  check(!canceled);
   const ownerKey = process.env.ARCADE_ENS_OWNER_KEY;
   check(/^0x[0-9a-fA-F]{64}$/.test(ownerKey) && same(privateKeyToAccount(ownerKey).address,state.owner));
   session = await openSetupSession({path:journal,privateKey:ownerKey,rpcUrl:rpc,binding,root:state.root,owner:state.owner,seller:state.seller,daemon:state.daemon,
     ttlSeconds:state.ttlSeconds,sellerTtlSeconds:state.ttlSeconds,fetch:fetcher});
-  check(!cancelled);
+  check(!canceled);
   const step = `owner-repoint:${name}`, metadata = {name,resolver:state.resolver,hub:hub.origin,web:web.origin};
   await session.driver.simulate(call);
   await session.driver.checkpoint({step,state:"intent",metadata});
@@ -131,8 +131,8 @@ try {
     check(resolved.endpoint === proposed[ENS_TEXT_KEYS.endpoint] && same(resolved.payTo,before[ENS_TEXT_KEYS.payTo]) && resolved.chainCaip2 === before[ENS_TEXT_KEYS.chain]);
   }
   for (const proxy of [state.sellerRegistry,state.skillRegistry,state.resolver]) check(await pub.readContract({address:proxy,abi:rolesAbi,functionName:"roles",args:[0n,state.owner]}) === ALL_ROLES);
-  check(!cancelled);
-  await closeSession(); observer.close(); check(!cancelled);
+  check(!canceled);
+  await closeSession(); observer.close(); check(!canceled);
   console.log(JSON.stringify({name,txHash,changedKeys:updates.map(r=>r.key),pricePreserved:currentPrice,endpoint:proposed[ENS_TEXT_KEYS.endpoint],resolutionExpectedAbsent}));
 } catch { console.error("Owner re-point not proved; inspect the retained journal and chain before any retry. No automatic resend."); process.exitCode = 1; }
 finally { clearTimeout(timer); process.removeListener("SIGTERM",cancel); process.removeListener("SIGINT",cancel); observer?.close(); try { await closeSession(); } catch { console.error("Owner journal cleanup requires reconciliation."); process.exitCode = 1; } }

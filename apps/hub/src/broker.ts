@@ -54,7 +54,7 @@ export interface Broker {
   readonly complete: (jobId: string, outcome: JobOutcome) => Effect.Effect<void>
   /** Routing: which connected runner can serve this SKILL. */
   readonly runnerFor: (skillId: string) => Effect.Effect<string | undefined>
-  /** Ownership: which runner this JOB was dispatched to. Used to authorise its result. */
+  /** Ownership: which runner this JOB was dispatched to. Used to authorize its result. */
   readonly runnerForJob: (jobId: string) => Effect.Effect<string | undefined>
 }
 

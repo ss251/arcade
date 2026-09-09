@@ -175,7 +175,7 @@ export const makeEnsWriter = (a: EnsWriterOptions): EnsWriter & { stop: () => vo
   const execute = async (op: "renew" | "price", target: string, resource: string, value: string): Promise<string> => {
     let enteredSend = false, knownHash: string | undefined
     let onStop: (() => void) | undefined
-    const cancelled = new Promise<never>((_resolve, reject) => {
+    const canceled = new Promise<never>((_resolve, reject) => {
       onStop = () => reject(failed(enteredSend || knownHash ? "ens_write_uncertain" : "ens_write_unavailable", !enteredSend && !knownHash, knownHash))
       stopped.signal.addEventListener("abort", onStop, { once: true }); if (stopped.signal.aborted) onStop()
     })
@@ -254,7 +254,7 @@ export const makeEnsWriter = (a: EnsWriterOptions): EnsWriter & { stop: () => vo
       throw failed(enteredSend || knownHash ? "ens_write_uncertain" : "ens_write_unavailable", !enteredSend && !knownHash, knownHash)
     }
     }
-    try { return await Promise.race([work(), cancelled]) }
+    try { return await Promise.race([work(), canceled]) }
     finally { clearTimeout(timer); if (onStop) stopped.signal.removeEventListener("abort", onStop) }
   }
   return {
@@ -284,7 +284,7 @@ export const viemEnsWriter = (privateKey: string, rpcUrl?: string, options?: { r
       let onAbort: (() => void) | undefined
       try {
         return await context.run(controller.signal, () => Promise.race([work(), new Promise<never>((_resolve, reject) => {
-          onAbort = () => reject(Error("ENS operation cancelled"))
+          onAbort = () => reject(Error("ENS operation canceled"))
           controller.signal.addEventListener("abort", onAbort, { once: true })
           if (controller.signal.aborted) onAbort()
         })]))
@@ -296,13 +296,13 @@ export const viemEnsWriter = (privateKey: string, rpcUrl?: string, options?: { r
     const transport = http(url.href, { retryCount: 0, timeout: 5000, maxResponseBodySize: 131_072, fetchOptions: { redirect: "error", credentials: "omit" },
       fetchFn: async (input, init) => {
         const signal = context.getStore()
-        if (!signal || signal.aborted || stopped || options.isActive?.() === false) throw Error("ENS request cancelled")
+        if (!signal || signal.aborted || stopped || options.isActive?.() === false) throw Error("ENS request canceled")
         const request = new Request(input, { ...init, signal, redirect: "error", credentials: "omit" })
         const sent = await request.clone().json() as { id?: unknown }
         let reader: ReadableStreamDefaultReader<Uint8Array> | undefined, onAbort: (() => void) | undefined
         const download = async () => {
           const response = await (options.fetch ?? (r => fetch(r)))(request)
-          if (signal.aborted || stopped) { void response.body?.cancel().catch(() => {}); throw Error("ENS request cancelled") }
+          if (signal.aborted || stopped) { void response.body?.cancel().catch(() => {}); throw Error("ENS request canceled") }
           if (!response.ok || response.redirected || !response.body || Number(response.headers.get("content-length")) > 131_072) throw Error("ENS response refused")
           reader = response.body.getReader()
           const decoder = new TextDecoder("utf-8", { fatal: true })
@@ -320,7 +320,7 @@ export const viemEnsWriter = (privateKey: string, rpcUrl?: string, options?: { r
         }
         try {
           return await Promise.race([download(), new Promise<never>((_resolve, reject) => {
-            onAbort = () => reject(Error("ENS request cancelled")); signal.addEventListener("abort", onAbort, { once: true }); if (signal.aborted) onAbort()
+            onAbort = () => reject(Error("ENS request canceled")); signal.addEventListener("abort", onAbort, { once: true }); if (signal.aborted) onAbort()
           })])
         } finally { if (onAbort) signal.removeEventListener("abort", onAbort); void reader?.cancel().catch(() => {}) }
       } })

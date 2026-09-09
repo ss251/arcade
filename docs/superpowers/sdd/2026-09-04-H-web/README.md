@@ -183,7 +183,7 @@ committed as `d1f89f6` after their full test/type/web-build gate passed; this is
 live hub or browser evidence. H5's `/chat` move, native-anchor navigation and `/`
 shell are implemented and source-reviewed with author-run isolated browser checks;
 the separate H5 full test/type/client-and-SSR-build gate passed. H6 fills that shell
-with the read-only marketplace and additive safe catalogue pay-test projection;
+with the read-only marketplace and additive safe catalog pay-test projection;
 its separate full test/type/client-and-SSR-build gate passed. Final publication
 review and the atomic H6 commit remain parent-owned. Listing-detail (Task 8),
 buyer, seller and publish pages remain future work.

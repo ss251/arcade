@@ -1,11 +1,11 @@
 > Historical H6 hub implementation record, September 5, 2026. Original retained unchanged; only this banner differs. Dated checks and pending-gate statements remain historical; subsequent review and parent gates are recorded separately.
 
-# H6 hub catalogue projection — root implementation record
+# H6 hub catalog projection — root implementation record
 
 2026-09-05. Frozen source/tests; full repository gate and commit remain separate.
 Own only apps/hub/src/server.ts GET /listings additive projection and the new
 apps/hub/test/market-listings.bun.test.ts actual-router fixture. No H4 client,
-routes, catalogue filter, registry, database or payment behavior was changed.
+routes, catalog filter, registry, database or payment behavior was changed.
 
 The route publishes store-derived payTested as explicit null when no observation
 exists, otherwise atMs, ok and redacted empty jobId. Only passing, nonzero 32-byte

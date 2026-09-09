@@ -2,7 +2,7 @@
 
 # Task 4 report
 
-> September 6, 2026 terminology update: portable folders are now labelled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
+> September 6, 2026 terminology update: portable folders are now labeled Agent Skill (open standard), per the [specification](https://agentskills.io/specification). This public copy's wording changed; original private records, code behavior and Git history did not. Historical implementation details remain historical.
 
 - Commit: `26434f1`; format-neutral scope description: the skill adapter publishes an Agent Skill (open standard) SKILL.md directory as a listing. This is not a quotation of the original commit subject.
 - Implemented exact parseSkillMd, referenceFiles, loadSkillAgent and skillEngine interfaces; registered harness dispatch. Flat metadata is descriptive only: manifest credential/model/capabilities remain authoritative. Existing Claude Agent run/environment/doctor behavior reused.

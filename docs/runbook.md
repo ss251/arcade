@@ -304,8 +304,8 @@ absent, with nothing reconciling the two — so this step was two edits wearing 
 one. Change `hubUrl` to the public origin, leave `hubWsUrl` on localhost, and the runner
 reads listings from production while announcing over the local socket. Every surface then
 reports health: `checkHub` pings production and says up, the daemon logs "connected to
-ws://localhost…" and genuinely is, and the public catalogue stays empty for a reason
-visible from neither end. It is the empty-catalogue trap with a second way in, opened by
+ws://localhost…" and genuinely is, and the public catalog stays empty for a reason
+visible from neither end. It is the empty-catalog trap with a second way in, opened by
 the step that fixes the first one.
 
 `hubWsUrl` is now **derived from `hubUrl` and never written to disk** (`wsUrlFor`:
@@ -324,7 +324,7 @@ https://arcade-hub-production.up.railway.app, so the socket is
 wss://arcade-hub-production.up.railway.app/ws
 ```
 
-Note the derived socket is **`wss`**. Under the old behaviour the runner would have read
+Note the derived socket is **`wss`**. Under the old behavior the runner would have read
 listings from production while announcing over a cleartext local socket — reading from one
 hub and serving to another, with both halves individually reporting health. Deleting the
 field silences the notice; the derivation is unaffected either way.
@@ -333,13 +333,13 @@ field silences the notice; the derivation is unaffected either way.
 bun run arcade init --seller 0x3b2Bbb840A9570223aDbF2172a33BB77fE8D21AF --hub https://<public-host>
 ```
 
-**The public catalogue is only populated while a runner is dialled into it.** Point the
+**The public catalog is only populated while a runner is dialled into it.** Point the
 config back at localhost and the public URL immediately serves zero listings — correctly,
 because a listing is valid only while its runner is connected. So the public host is a live
 demo rather than a standing shopfront. Two things follow: **shoot the video with the runner
 pointed at production**, and if you send the link to a judge, send it while a runner is up
 or say plainly that it serves what is actually being served. That framing is the stronger
-one anyway — an empty catalogue is the discovery guarantee working, and most marketplaces
+one anyway — an empty catalog is the discovery guarantee working, and most marketplaces
 cannot make that claim about themselves.
 
 **Live deployment:** `https://arcade-hub-production.up.railway.app` (Railway project
@@ -649,7 +649,7 @@ default export is `{ fetch(request): Response }` — the Web-standard handler sh
 also what `Bun.serve` takes. `apps/web/server.ts` is the twenty lines that serve `dist/client`
 and fall through to it, so this runs on the same `oven/bun` image as the hub. Verified: `bun run
 build` completes with **`node` absent from `PATH` entirely**, because Bun's script runner execs
-`vite`'s bin itself rather than honouring its `#!/usr/bin/env node` shebang. The musl rollup
+`vite`'s bin itself rather than honoring its `#!/usr/bin/env node` shebang. The musl rollup
 binaries are in `bun.lock` and esbuild's Linux build is statically linked Go, so Alpine's two
 usual native-binary failures do not apply either.
 
@@ -712,7 +712,7 @@ clear the delist. The production scheduler, buyer, runner and settlement path ar
 
 Offline runners correctly return **404** from both detail routes. That alone does not
 prove delisting: the script also checks three new durable failed pay-tests for the exact
-seller/listing and omission from all four catalogues. After reconnect it verifies the
+seller/listing and omission from all four catalogs. After reconnect it verifies the
 delisted explanation, releases execution, and requires a distinct passing transaction
 before claiming recovery. It then stops its owned services and independently checks both
 durable marked receipts, ERC-20 transfers and FeeSplitterV2 childless `Settled` events using bounded RPC
@@ -767,7 +767,7 @@ Raw inputs, outputs and provider diagnostics are not published in these document
 The detail page and `arcade_describe_skill` expose measured counts from this hub's
 validator/attester only. Transferred/unverified ownership and stale/unreadable data
 withhold counts. A displayed registration transaction is **announced**, not independently
-verified by the ownership read. Catalogue polling does not query every agent's registry.
+verified by the ownership read. Catalog polling does not query every agent's registry.
 
 ### OWNER-gated live proof
 
@@ -890,7 +890,7 @@ reservation or registration. ENSv2 is beta, and deployment addresses may change.
 
 **The owner-approved isolated demo passed on September 5, 2026 at 06:47 UTC.**
 Registration, renewal, by-name Arc settlement, scoped price revocation, synthetic
-pre-signature refusal and genuine expiry-driven catalogue removal are proved below.
+pre-signature refusal and genuine expiry-driven catalog removal are proved below.
 All demo services are stopped; these are not production URLs. The first run completed
 setup but failed its short renewal-confirmation window and stopped safely. That failed
 result remains separate from the later explicitly approved owner-renewal continuation;
@@ -1152,10 +1152,10 @@ unknown submissions, or treat silence as a failed transaction.
   Arc job or settlement proof.
 - **Passive expiry** needs an initially live registration, actual Sepolia block time
   reaching the leaf's expiry, retained registration lineage, absent current exact-name
-  owner and successful catalogue observation. A failed fetch is not expiry. If runner
-  disconnect removed the row, report “registration expired and catalogue absent;
+  owner and successful catalog observation. A failed fetch is not expiry. If runner
+  disconnect removed the row, report “registration expired and catalog absent;
   removal cause unproven.” Stronger watcher proof requires a matching detail200 with
-  `ensExpired:true` plus catalogue absence. The harness never kills an arbitrary runner.
+  `ensExpired:true` plus catalog absence. The harness never kills an arbitrary runner.
 - **Revival** requires separately authorized owner/root-RENEW action: the limited
   daemon can maintain an unexpired name but cannot revive it. Do not broaden its role
   or silently register a replacement. Verify fresh hierarchy/resolution after recovery.
@@ -1202,7 +1202,7 @@ import { demoObservation, demoPublicClient } from "./scripts/ens-demo.ts";
 import { EnsNameExpired, resolveEnsListingPromise, sepoliaEnsReader } from "@arcade/buyer";
 const check = value => { if (!value) throw Error("owner re-point refused"); };
 const same = (a, b) => typeof a === "string" && typeof b === "string" && a.toLowerCase() === b.toLowerCase();
-let session, observer, closingSession, closing, cancelled = false;
+let session, observer, closingSession, closing, canceled = false;
 const controller = new AbortController();
 const closeSession = () => {
   if (!session) return Promise.resolve();
@@ -1210,7 +1210,7 @@ const closeSession = () => {
   closingSession = session; closing = Promise.resolve().then(() => session.close()); return closing;
 };
 const cancel = () => {
-  cancelled = true; controller.abort();
+  canceled = true; controller.abort();
   try { observer?.close(); } catch { /* The hard deadline still applies. */ }
   void closeSession().catch(() => {});
 };
@@ -1223,7 +1223,7 @@ const hardTimer = setTimeout(() => {
 }, 330000);
 process.once("SIGTERM", cancel); process.once("SIGINT", cancel);
 const fetcher = request => {
-  check(!cancelled);
+  check(!canceled);
   return fetch(new Request(request, {redirect:"error", credentials:"omit", signal:AbortSignal.any([request.signal,controller.signal])}));
 };
 try {
@@ -1269,12 +1269,12 @@ try {
   const journal = resolve(process.env.ARCADE_ENS_REPOINT_JOURNAL);
   check(![path, `${path}.setup.json`, ensJournalPath(process.env), `${path}.demo.json`, `${path}.demo-daemon.json`].map(p => resolve(p)).includes(journal));
   const binding = keccak256(stringToHex(JSON.stringify({format:"owner-repoint-v1",state,name,old:old.origin,updates})));
-  check(!cancelled);
+  check(!canceled);
   const ownerKey = process.env.ARCADE_ENS_OWNER_KEY;
   check(/^0x[0-9a-fA-F]{64}$/.test(ownerKey) && same(privateKeyToAccount(ownerKey).address,state.owner));
   session = await openSetupSession({path:journal,privateKey:ownerKey,rpcUrl:rpc,binding,root:state.root,owner:state.owner,seller:state.seller,daemon:state.daemon,
     ttlSeconds:state.ttlSeconds,sellerTtlSeconds:state.ttlSeconds,fetch:fetcher});
-  check(!cancelled);
+  check(!canceled);
   const step = `owner-repoint:${name}`, metadata = {name,resolver:state.resolver,hub:hub.origin,web:web.origin};
   await session.driver.simulate(call);
   await session.driver.checkpoint({step,state:"intent",metadata});
@@ -1295,12 +1295,12 @@ try {
     check(resolved.endpoint === proposed[ENS_TEXT_KEYS.endpoint] && same(resolved.payTo,before[ENS_TEXT_KEYS.payTo]) && resolved.chainCaip2 === before[ENS_TEXT_KEYS.chain]);
   }
   for (const proxy of [state.sellerRegistry,state.skillRegistry,state.resolver]) check(await pub.readContract({address:proxy,abi:rolesAbi,functionName:"roles",args:[0n,state.owner]}) === ALL_ROLES);
-  check(!cancelled);
-  await closeSession(); observer.close(); check(!cancelled);
+  check(!canceled);
+  await closeSession(); observer.close(); check(!canceled);
   console.log(JSON.stringify({name,txHash,changedKeys:updates.map(r=>r.key),pricePreserved:currentPrice,endpoint:proposed[ENS_TEXT_KEYS.endpoint],resolutionExpectedAbsent}));
 } catch { console.error("Owner re-point not proved; inspect the retained journal and chain before any retry. No automatic resend."); process.exitCode = 1; }
 finally {
-  cancelled = true; controller.abort();
+  canceled = true; controller.abort();
   try {
     try { observer?.close(); } catch { console.error("Owner observer cleanup requires reconciliation."); process.exitCode = 1; }
     try { await closeSession(); } catch { console.error("Owner journal cleanup requires reconciliation."); process.exitCode = 1; }
@@ -1339,7 +1339,7 @@ August 29 on that day's source with `ARCADE_FEE_SPLITTER` pointing at the **V1**
 `0x10079b0b…`. The hub therefore advertised the seller as payee with no splitter extra,
 while the retained ENS record was bound to FeeSplitterV2 `0x9e304ec1…`. Restarting the job
 against current `main` with the V2 address fixed the mismatch and also raised the live
-catalogue from four listings to nine, because the older process predated five of them. Both
+catalog from four listings to nine, because the older process predated five of them. Both
 splitters were read on chain first and both pay the announcing seller, so neither was ever
 a payee hazard: V1 has no `version()` and V2 returns `2`, `seller` `0xcf821769…`, `usdc`
 `0x3600…`, `feeBps` `500`.
@@ -1457,14 +1457,14 @@ with expiry 1788590760.
 **Passive expiry and cleanup passed:** no further renewal, unregister or replacement
 registration was sent. The seller served without the daemon renewal key throughout
 the observation, and the hub watcher marked the matching detail record `ensExpired`
-while it still returned HTTP200. The catalogue successfully omitted the skill. This
+while it still returned HTTP200. The catalog successfully omitted the skill. This
 distinguishes real expiry-driven removal from a disconnected runner or failed fetch.
 
 | Observation | Verified UTC / chain coordinate |
 | --- | --- |
 | Renewal disabled, seller still serving | 06:32:51 UTC; fixed expiry 1788590760 |
 | Registration expiry | 06:46:00 UTC (1788590760) |
-| Guarded name absence and watcher-driven catalogue removal confirmed | 06:46:59 UTC; block 11638715, chain timestamp 1788590808 |
+| Guarded name absence and watcher-driven catalog removal confirmed | 06:46:59 UTC; block 11638715, chain timestamp 1788590808 |
 | All owned services stopped | 06:47:00.333 UTC |
 | Supervisor's post-cleanup proof and PASS | 06:47:10.487 UTC; block 11638715, hash `0xe8faeedc519be10bc92075fe03840353e3bf7c3818ccea3ac309b275a315fb0f` |
 | Separate keyless verification after the run | Block 11638719, hash `0x5ec46dd8e11213de49e80618d98c1b77c383c0462def18996e9515d68f6927bd`, chain timestamp 1788590856 |
@@ -1497,7 +1497,7 @@ re-point command above refreshes routing and context only, not liveness or raw p
 | Renewal | Exact daemon/name/registry, confirmed hash, previous/new expiry and observed block. A log line alone is insufficient. |
 | By-name payment | Resolved authority, correlated real job/receipt, successful Arc transaction and independently checked splitter/USDC events and amounts. A signature or HTTP result is not settlement. |
 | Revocation | Before/after price, daemon-write and owner-revoke hashes, exact decoded simulation denial and unchanged known non-price records; explicit recovery status. |
-| Expiry | Live baseline token/owner/resource/expiry; owner stop time; final chain state/time; first guarded record absence and successful catalogue absence; detail200/404 distinction. Passive expiry advances the derived resource's low32-bit version while retaining token/latestOwner. |
+| Expiry | Live baseline token/owner/resource/expiry; owner stop time; final chain state/time; first guarded record absence and successful catalog absence; detail200/404 distinction. Passive expiry advances the derived resource's low32-bit version while retaining token/latestOwner. |
 | Cleanup/recovery | Authorized restoration/regrant/revival hashes and readbacks; unresolved journal operations; processes stopped or intentionally retained. |
 
 Publish only that public evidence subset. Keep setup journals, commitment secrets,
@@ -1622,10 +1622,10 @@ indexed tree/agent/feedback fields are absent, not zero. If the local fallback
 also fails, the route returns503 graph_stats_unavailable. `GET /stats` remains
 the hub ledger: its local numbers are never relabelled by an index health probe.
 
-Catalogue and detail responses can include four optional graph fields:
+Catalog and detail responses can include four optional graph fields:
 agentId, settlementCount, feedbackCount, validationPassCount. Reads are bounded
 to256 input IDs/deduplicated, four concurrent requests, one five-second batch
-deadline; larger catalogues still render but omit optional Graph evidence.
+deadline; larger catalogs still render but omit optional Graph evidence.
 Provider errors or timeouts omit evidence and never affect settlement. G7's
 cache can be stale; listing evidence does not claim a fresh indexedBlock.
 
@@ -1782,7 +1782,7 @@ steps. The page never performs these actions for you.
 Public/private columns describe the hub boundary. Full private metadata is shown
 on this local page and may contain literal sensitive text; do not share it blindly.
 No preview is put in the URL, chat or localStorage. Edit, clear, cancel or navigate
-away to discard it. Cancellation hides output immediately, but a cancelled server
+away to discard it. Cancellation hides output immediately, but a canceled server
 preview may retain its bounded process lock until cleanup finishes; retry only
 explicitly after it closes. No automatic retry, key lookup or paid call occurs.
 

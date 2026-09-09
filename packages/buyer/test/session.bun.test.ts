@@ -40,10 +40,10 @@ test("session HTTP native redirect never forwards session or payment capabilitie
 
 test("session HTTP real unfinished body shares the fixed five-second request deadline", async () => {
   const { sessionRequest } = await loadHttp()
-  let calls = 0, cancelled = false
+  let calls = 0, canceled = false
   await withSessionLoopback(() => {
     calls++
-    return new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('{"pending":')) }, cancel() { cancelled = true } }),
+    return new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('{"pending":')) }, cancel() { canceled = true } }),
       { headers: { "content-type": "application/json" } })
   }, async origin => {
     const start = performance.now()
@@ -51,7 +51,7 @@ test("session HTTP real unfinished body shares the fixed five-second request dea
     expect(performance.now() - start).toBeGreaterThanOrEqual(4800)
     expect(performance.now() - start).toBeLessThan(6000)
   })
-  expect(calls).toBe(1); expect(cancelled).toBe(true)
+  expect(calls).toBe(1); expect(canceled).toBe(true)
 }, 8000)
 
 test("session HTTP snapshots method/body/own headers before any asynchronous work", async () => {
@@ -96,26 +96,26 @@ test("session HTTP pre-abort and expired monotonic deadline never invoke fetch",
 
 test("session HTTP deadline closes a late uncooperative fetch body and cannot retry", async () => {
   const { sessionRequest } = await loadHttp()
-  let release!: (response: Response) => void, calls = 0, cancelled = false
+  let release!: (response: Response) => void, calls = 0, canceled = false
   const running = sessionRequest(inertFetch(async () => { calls++; return new Promise<Response>(resolve => { release = resolve }) }), url, input(), options(undefined, 30))
   await expect(running).rejects.toMatchObject({ _tag: "SessionHttpFailure" })
-  release(new Response(new ReadableStream({ cancel() { cancelled = true } }), { headers: { "content-type": "application/json" } }))
-  await delay(5); expect(cancelled).toBe(true); expect(calls).toBe(1)
+  release(new Response(new ReadableStream({ cancel() { canceled = true } }), { headers: { "content-type": "application/json" } }))
+  await delay(5); expect(canceled).toBe(true); expect(calls).toBe(1)
 })
 
 test("session HTTP interruption with uncooperative cancellation is bounded and never reflects its reason", async () => {
   const { sessionRequest } = await loadHttp()
-  const controller = new AbortController(); let cancelled = false
+  const controller = new AbortController(); let canceled = false
   const fetcher = inertFetch(async () => new Response(new ReadableStream({
     start(c) { c.enqueue(new TextEncoder().encode('{"private":"prefix')) },
-    cancel() { cancelled = true; return new Promise(() => {}) }
+    cancel() { canceled = true; return new Promise(() => {}) }
   }), { headers: { "content-type": "application/json" } }))
   const start = performance.now(), running = sessionRequest(fetcher, url, input(), options(controller.signal))
   const timer = setTimeout(() => controller.abort("PRIVATE_ABORT_REASON"), 20)
   try {
     const error = await running.catch(e => e as unknown)
     expect(error).toMatchObject({ _tag: "SessionHttpFailure" }); expect(String(error)).not.toContain("PRIVATE")
-    expect(performance.now() - start).toBeLessThan(250); expect(cancelled).toBe(true)
+    expect(performance.now() - start).toBeLessThan(250); expect(canceled).toBe(true)
   } finally { clearTimeout(timer) }
 })
 
@@ -153,13 +153,13 @@ test("session HTTP bounds exact request-copy bytes and rejects one byte over bef
 
 test("session HTTP refuses a consecutive-empty-chunk storm before unbounded per-read work", async () => {
   const { sessionRequest } = await loadHttp()
-  let pulls = 0, cancelled = false
+  let pulls = 0, canceled = false
   const response = new Response(new ReadableStream<Uint8Array>({
-    pull(c) { pulls++; c.enqueue(new Uint8Array()) }, cancel() { cancelled = true }
+    pull(c) { pulls++; c.enqueue(new Uint8Array()) }, cancel() { canceled = true }
   }), { headers: { "content-type": "application/json" } })
   await expect(sessionRequest(inertFetch(async () => response), url, input(), options(undefined, 150))).rejects.toMatchObject({ _tag: "SessionHttpFailure" })
   expect(pulls).toBeLessThanOrEqual(1026)
-  expect(cancelled).toBe(true)
+  expect(canceled).toBe(true)
 }, 1000)
 
 test("session native fixture executes in a separate no-env Bun process and is fully reaped", async () => {

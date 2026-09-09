@@ -21,13 +21,13 @@ protocol.js and its exposed extra.requestId. Choose the narrow app refusal:
 createServer rejects those two tool-request IDs before any dispatch, key or IO,
 with a fixed diagnostic. Test through actual transport with explicit IDs. Do not
 patch dependencies, invent a cancellation bridge or claim every schema-valid ID
-can be cancelled. Ordinary generated client tool IDs are unaffected. Transport
+can be canceled. Ordinary generated client tool IDs are unaffected. Transport
 close aborts every active handler; tests still must prove application propagation.
 
 Capture own-data normalized arguments before the queue await; delayed caller
 mutation cannot change service/input/caps. Preserve the predecessor dependency
 when a middle waiter cancels. An early caller response must not release its queue
-successor ahead of the active predecessor or allow the cancelled work to run.
+successor ahead of the active predecessor or allow the canceled work to run.
 
 Capture the handle/generation for read-only operations. Old quote/status/budget
 completion cannot clear or reclassify a newer handle, reset process totals or

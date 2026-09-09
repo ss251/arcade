@@ -104,12 +104,12 @@ export async function sessionRequest(fetchFn: typeof fetch, url: string, init: S
       let finished = false
       const done = (work: () => void) => {
         if (finished) return
-        finished = true; controller!.signal.removeEventListener("abort", cancelled); work()
+        finished = true; controller!.signal.removeEventListener("abort", canceled); work()
       }
-      const cancelled = () => done(() => reject(new SessionHttpFailure()))
-      controller!.signal.addEventListener("abort", cancelled, { once: true })
+      const canceled = () => done(() => reject(new SessionHttpFailure()))
+      controller!.signal.addEventListener("abort", canceled, { once: true })
       pending.then(value => done(() => resolve(value)), () => done(() => reject(new SessionHttpFailure())))
-      if (controller!.signal.aborted) cancelled()
+      if (controller!.signal.aborted) canceled()
     })
     const requestInit = Object.freeze({ ...request.init, signal: controller.signal })
     // A late fetch resolution may only cancel its body, never parse it or send again.
@@ -163,7 +163,7 @@ export async function sessionRequest(fetchFn: typeof fetch, url: string, init: S
       try {
         await Promise.race([reader.cancel().catch(() => {}), new Promise<void>(resolve => { cleanupTimer = setTimeout(resolve, 50) })])
       } catch { /* retain original fixed failure */ }
-      finally { if (cleanupTimer !== undefined) clearTimeout(cleanupTimer); try { reader.releaseLock() } catch { /* pending read is already cancelled */ } }
+      finally { if (cleanupTimer !== undefined) clearTimeout(cleanupTimer); try { reader.releaseLock() } catch { /* pending read is already canceled */ } }
     }
   }
 }

@@ -69,8 +69,8 @@ snapshot. Root and author received the two actual failures before correction.
 
 ### Other bounded review observations
 
-- The predecessor-linked queue retains a cancelled middle node until its prior
-  lease completes; a cancelled waiter is checked again before executing work.
+- The predecessor-linked queue retains a canceled middle node until its prior
+  lease completes; a canceled waiter is checked again before executing work.
   Active SDK Effects receive the caller signal, and their finalizers remain part
   of the serialized operation. Actual protocol cancellation/disconnect coverage
   is author evidence until independently rerun at a final frozen checkpoint.
@@ -87,7 +87,7 @@ snapshot. Root and author received the two actual failures before correction.
   This is local process accounting, not a wallet-wide persistent guarantee or
   new remote settlement proof.
 - Read-only session operations capture a context and avoid lifecycle writes;
-  old budget observations are labelled historical. Captured wallet-balance
+  old budget observations are labeled historical. Captured wallet-balance
   inspection was still under separate parent review, so no final acceptance of
   its evolving transport is implied here.
 

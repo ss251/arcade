@@ -18,7 +18,7 @@ Read full actual H7 plan, H globals and task7 readiness; actual H4 TreeNode,
 TreeView/TreeEvidenceFlag/decodeTree and relevant H4 tests; H3 tree producer and
 its lineage/evidence fixtures; actual package scripts, Vitest and web TypeScript
 configuration. Fully read ts-testing, design-sauce, emil-design-eng and
-apple-design. The local/catalogued pick-ui-library/dataviz and requested
+apple-design. The local/catalogd pick-ui-library/dataviz and requested
 superpowers implementation skills were unavailable; existing parent-directed
 execution and actual H7/H4 contracts supplied the bounded fallback. No new UI
 library or visual implementation was needed in this isolated geometry slice.
