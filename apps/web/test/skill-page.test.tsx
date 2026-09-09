@@ -255,7 +255,7 @@ describe("H8 listing page and public receipt records", () => {
     const prefix = css.slice(0, css.indexOf(marker))
     // Re-locked 2026-09-08 for the same deliberate marketplace/token rewrite; see the
     // note in listing-rails.test.tsx. An intentional edit re-pins this hash.
-    expect(createHash("sha256").update(prefix).digest("hex")).toBe("d54458c7dbec53d3c1793d1c518a0b3ebebcf682b4b3acb5852ae481e12a88be")
+    expect(createHash("sha256").update(prefix).digest("hex")).toBe("a0a964938c2fcbc5f9cf4158710b85a0cf9218061cc970bf4dc9d4df0469c365")
     const end = css.indexOf("/* Ordinary buyer recovery")
     expect(end).toBeGreaterThan(css.indexOf(marker))
     const scoped = css.slice(css.indexOf(marker), end)

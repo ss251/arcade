@@ -21,7 +21,7 @@ describe("H5 navigation and preserved chat route", () => {
   it("keeps the home wordmark separate from the five-item navigation", () => {
     const html = renderToStaticMarkup(<Nav here="chat" />)
     const outside = html.replace(/<nav\b[\s\S]*?<\/nav>/, "")
-    expect(outside).toMatch(/<a\b[^>]*href="\/"[^>]*aria-label="ARCADE home"[^>]*>(?:<span class="arcade-mark"[\s\S]*?<\/span>)?<span>ARCADE<\/span><\/a>/)
+    expect(outside).toMatch(/<a\b[^>]*href="\/"[^>]*aria-label="ARCADE home"[^>]*><span class="arcade-wordmark"[\s\S]*?<\/span><span class="visually-hidden">ARCADE<\/span><\/a>/)
     expect(html).not.toContain("<button"); expect(html).not.toContain("<script")
   })
   it("preserves the original chat loader, history, sidebar and Chat wiring byte-for-byte outside route/header edits", () => {
