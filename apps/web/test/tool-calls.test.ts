@@ -97,7 +97,7 @@ describe("tool calls — a model that actually selects a tool", () => {
   /**
    * `stopWhen` defaults to stopping after one step, which reads to a user as the model
    * going silent immediately after a lookup — the tool result arrives and nothing is said
-   * about it. This asserts the configured multi-step behaviour, not the default.
+   * about it. This asserts the configured multi-step behavior, not the default.
    */
   it("produces a follow-up answer after the tool result, rather than going quiet", async () => {
     stubHub()
@@ -110,7 +110,7 @@ describe("tool calls — a model that actually selects a tool", () => {
     expect(model.doGenerateCalls.length).toBeGreaterThan(1)
   })
 
-  it("carries the fenced catalogue into the tool result", async () => {
+  it("carries the fenced catalog into the tool result", async () => {
     // The security property, verified through the real tool-execution path rather than by
     // calling `execute` directly: whatever a model receives after selecting this tool must
     // have the seller's prose inside a fence.

@@ -20,10 +20,10 @@ it("serves the actual buyer Start route without a hub read or browser capability
     const response = await fetch(origins!.web + "/buyer", { signal: AbortSignal.timeout(15000), redirect: "error" })
     expect(response.status).toBe(200)
     const html = await response.text()
-    expect(html).toContain("What this browser can recover."); expect(html).toContain("Loading saved access on this browser")
+    expect(html).toContain("My jobs"); expect(html).toContain("Loading saved access on this browser")
     expect(html).not.toMatch(/job_token|x-job-token|PRIVATE_|No saved jobs/)
     const stats = await (await fetch(origins!.hub + "/__fixture", { signal: AbortSignal.timeout(1000) })).json()
-    expect(stats.reads).toEqual({ listings: 0, stats: 0, other: 0 })
+    expect(stats.reads).toEqual({ listings: 0, stats: 0, receipts: 0, other: 0 })
   } finally {
     if (!closed) child.kill("SIGTERM")
     try { await wait(exited, 1500) } catch { if (!closed) child.kill("SIGKILL"); await wait(exited, 1500) }

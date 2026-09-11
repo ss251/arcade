@@ -28,7 +28,7 @@ describe("buyer presentation and passive SSR", () => {
   })
   it("requires explicit reads and describes weaker historical provenance", () => {
     const html = renderToStaticMarkup(<BuyerRecoveryPanel view={view} onRead={noop} onCancel={noop} onForget={noop} />)
-    expect(html).toContain("Read result"); expect(html).toContain("Read receipt tree")
+    expect(html).toContain("View result"); expect(html).toContain("View receipt tree")
     expect(html).toContain("not the original signed buyer or nonce"); expect(html).toContain("Forget this job on this browser")
     expect(html).toContain("does not cancel a job or revoke its token")
   })

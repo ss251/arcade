@@ -35,7 +35,7 @@ it("enabled SSR exposes only an explicit preview form and still performs no IO",
 })
 it("renders full escaped columns with qualified hub boundaries and no adapter-access fiction", () => {
   const html = renderToStaticMarkup(<Wizard preview={directory} />)
-  expect(html).toContain("leaves this machine"); expect(html).toContain("stays on this machine")
+  expect(html).toContain("Leaves this machine"); expect(html).toContain("Stays on this machine")
   expect(html).toContain("hub boundary"); expect(html).toContain("not validated")
   expect(html).toContain("No model-tool grants"); expect(html).toContain("Adapter transport")
   expect(html).toContain("&lt;script&gt;PUBLIC_LITERAL&lt;/script&gt;")
@@ -45,13 +45,13 @@ it("renders full escaped columns with qualified hub boundaries and no adapter-ac
 })
 it("shows every unwritten generated listing, skipped tool and explicit manual generation step", () => {
   const html = renderToStaticMarkup(<Wizard preview={generated} />)
-  for (const text of ["read-value", "read-other", "write_value", "not-marked-read-only", "Unwritten", "--yes", "$0.05"])
+  for (const text of ["read-value", "read-other", "write_value", "not-marked-read-only", "Listing preview", "No listing files were written", "--yes", "$0.05"])
     expect(html).toContain(text)
-  expect((html.match(/leaves this machine/g) ?? [])).toHaveLength(2)
+  expect((html.match(/Leaves this machine/g) ?? [])).toHaveLength(2)
   expect(html).toContain("every eligible listing")
 })
 it("shell-quotes targets and distinguishes generating files from serving a directory", () => {
-  expect(nextPublishCommands(directory)).toBe("arcade start --skills 'skills'")
-  expect(nextPublishCommands(generated)).toBe("arcade publish 'mcp://fixture.example/mcp' --yes --out 'skills'\narcade start --skills 'skills'")
+  expect(nextPublishCommands(directory)).toBe("bun run arcade start --skills 'skills'")
+  expect(nextPublishCommands(generated)).toBe("bun run arcade publish 'mcp://fixture.example/mcp' --yes --out 'skills'\nbun run arcade start --skills 'skills'")
   expect(nextPublishCommands({ ...directory, target: "skill's/item" })).toContain("'skill'\\''s'")
 })

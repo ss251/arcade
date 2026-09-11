@@ -37,7 +37,7 @@ export const readPublishBytes = (body: ReadableStream<Uint8Array> | null, signal
         chunks.push(new Uint8Array(chunk.value))
       }
     } catch { stop() }
-    finally { try { reader.releaseLock() } catch { /* A cancelled producer may still own its pending read. */ } }
+    finally { try { reader.releaseLock() } catch { /* A canceled producer may still own its pending read. */ } }
   })()
 })
 

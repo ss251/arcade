@@ -18,7 +18,8 @@ describe("public seller dashboard", () => {
   })
   it("shows a real loss and an exact zero without treating zero as missing", () => {
     const loss = renderToStaticMarkup(<SellerBoard summary={sellerFixture("negative")} observedAtMs={NOW} />)
-    expect(loss).toContain("-$0.386"); expect(loss).toContain("loss"); expect(loss).toContain("is-refused")
+    // A negative margin is still money, not evidence of a refused payment.
+    expect(loss).toContain("-$0.386"); expect(loss).toContain("loss"); expect(loss).not.toContain("is-refused")
     const zero = renderToStaticMarkup(<SellerBoard summary={sellerFixture("zero")} observedAtMs={NOW} />)
     expect(zero).toContain("$0.00"); expect(zero).not.toContain("Unavailable")
   })

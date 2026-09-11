@@ -21,6 +21,40 @@ const links = (value: string) => value.match(/<a\s/g)?.length ?? 0
 const boxLinks = (value: string) => links(value.slice(0, value.indexOf("</svg>") + 6))
 
 describe("H7 receipt-tree rendering", () => {
+  it("offers real diagram and list views while leading with recorded call counts", () => {
+    const rendered = html()
+    expect(rendered).toContain('role="group" aria-label="Receipt view"')
+    expect(rendered).toContain('aria-pressed="true"')
+    expect(rendered).toContain(">Diagram</button>"); expect(rendered).toContain(">List</button>")
+    expect(rendered).toContain("3 calls"); expect(rendered).toContain("2 recorded settled")
+    expect(rendered.indexOf("3 calls")).toBeLessThan(rendered.indexOf("Recorded tree digest"))
+  })
+  it("renders a readable list with actual parent relationships and the same qualified links", () => {
+    const rendered = renderToStaticMarkup(<TreeGraph view={view} initialMode="list" />)
+    expect(rendered).not.toContain("<svg")
+    expect(rendered).toContain('aria-label="Receipt calls"')
+    expect(rendered).toContain("Original call"); expect(rendered).toContain("Hired by wallet risk note")
+    expect(rendered).toContain("Not recorded settled"); expect(rendered).toContain("output did not validate")
+    expect(rendered).toContain("$0.12"); expect(rendered).toContain("$0.05")
+    expect(links(rendered)).toBe(4)
+    expect(rendered).not.toContain(view.rootJobId)
+    const list = rendered.slice(rendered.indexOf('class="tree-list"'), rendered.indexOf("</ol>"))
+    expect(list.indexOf("wallet risk note")).toBeLessThan(list.indexOf("counterparty graph"))
+    expect(list.indexOf("counterparty graph")).toBeLessThan(list.indexOf("usdc flow check"))
+  })
+  it("reads a nested tree parent-first without changing diagram geometry", () => {
+    const grandchild = { ...child, nodeId: "0.0.0", parentNodeId: "0.0", hop: 2, skillId: "nested-work" }
+    const nested = { ...view, nodes: [grandchild, refused, child, root] }
+    const rendered = renderToStaticMarkup(<TreeGraph view={nested} initialMode="list" />)
+    const list = rendered.slice(rendered.indexOf('class="tree-list"'), rendered.indexOf("</ol>"))
+    expect(list.indexOf("wallet risk note")).toBeLessThan(list.indexOf("counterparty graph"))
+    expect(list.indexOf("counterparty graph")).toBeLessThan(list.indexOf("nested work"))
+    expect(list.indexOf("nested work")).toBeLessThan(list.indexOf("usdc flow check"))
+  })
+  it("withholds an unsafe or refused transaction in the list as in the diagram", () => {
+    const rendered = renderToStaticMarkup(<TreeGraph view={{ ...view, nodes: [root, { ...child, explorer: "https://evil.example/PRIVATE" }, { ...refused, settleTx: childTx, explorer: explorer(childTx) }] }} initialMode="list" />)
+    expect(links(rendered)).toBe(2); expect(rendered).not.toContain("PRIVATE")
+  })
   it("links the two settled boxes only to their exact supplied transaction targets", () => {
     const rendered = html()
     expect(boxLinks(rendered)).toBe(2)
@@ -122,11 +156,11 @@ describe("H7 receipt-tree rendering", () => {
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8")
     expect(css).toMatch(/\.tree-viewport\s*\{[^}]*overflow-x:\s*auto/)
     expect(css).toMatch(/\.tree-viewport svg\s*\{[^}]*max-width:\s*none/)
-    expect(css).toMatch(/\.tree-details a:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--ink\)/)
+    expect(css).toMatch(/\.tree-details a:focus-visible\s*\{[^}]*outline:\s*1\.5px solid var\(--focus-ring\)/)
     expect(css).toMatch(/\.tree \.node\.is-settled[^}]*var\(--stamp\)/)
     expect(css).toMatch(/\.tree \.node\.is-refused[^}]*var\(--refuse\)/)
   })
-  it("keeps small state text in high-contrast ink while semantic borders carry status colour", () => {
+  it("keeps small state text in high-contrast ink while semantic borders carry status color", () => {
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8")
     expect(css).toMatch(/\.tree \.node-state\s*\{[^}]*fill:\s*var\(--ink\)/)
     expect(css).not.toMatch(/\.tree \.node\.is-(?:settled|refused) \.node-state\s*\{/)

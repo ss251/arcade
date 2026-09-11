@@ -21,10 +21,10 @@ import { nameOk } from "./hub-decode.ts"
  * uses Effect Schema and never zod, and `FlexibleSchema` accepts a `StandardSchema`, so no
  * second validator has to exist for the sake of a tool call.
  *
- * ## The catalogue is untrusted too
+ * ## The catalog is untrusted too
  *
  * `docs/threat-model.md` T-EXEC-003 covers a seller's RESULT reaching a model's context.
- * The catalogue is the same vector one surface earlier and strictly cheaper to attack: a
+ * The catalog is the same vector one surface earlier and strictly cheaper to attack: a
  * listing's `description`, `serviceName`, `tags` and `replaces` are free-text authored by
  * a stranger, they reach the model during DISCOVERY rather than after a purchase, and
  * publishing a listing costs nothing while getting a result requires someone to pay first.
@@ -88,7 +88,7 @@ export const arcade_list_skills = tool({
         count: 0,
         text:
           "No skills are listed right now. A listing is only valid while its seller's " +
-          "runner is connected, so an empty catalogue means nobody is currently serving — " +
+          "runner is connected, so an empty catalog means nobody is currently serving — " +
           "not that the marketplace is broken."
       }
     }
@@ -129,7 +129,7 @@ export const arcade_describe_skill = tool({
 export const arcade_quote = tool({
   description:
     "What one call would cost, taken from the endpoint's own payment challenge rather than " +
-    "the catalogue. Free, signs nothing, charges nothing. Use this before proposing a " +
+    "the catalog. Free, signs nothing, charges nothing. Use this before proposing a " +
     "purchase, because it is the price the buyer would actually be asked to sign.",
   inputSchema: std(SkillIdArgs),
   execute: async ({ skillId }) => {
@@ -265,7 +265,7 @@ export const READ_ONLY_TOOLS = {
  * This exists so the approval-secret guard can key off the FACT that a spending tool is
  * registered rather than off a flag someone has to remember to set. AI SDK 7 is explicit
  * that with no `experimental_toolApprovalSecret` configured, "approvals work as before
- * (backward compatible)" — issued and honoured UNSIGNED. So an unset secret would leave the
+ * (backward compatible)" — issued and honored UNSIGNED. So an unset secret would leave the
  * binding silently absent while every visible thing stayed identical: the card renders, the
  * visitor holds the button, the purchase proceeds. A working system with a quietly
  * different guarantee, at the one edge that moves money.

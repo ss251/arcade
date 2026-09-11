@@ -99,14 +99,14 @@ export const preflightWeb = (
     // a hub that does not exist.
     problems.push(
       `__warn__${choice.keyVar} is not set, so the chat (${spec}) will answer every message ` +
-        "with a 503. The catalogue and receipts still work."
+        "with a 503. The catalog and receipts still work."
     )
   }
 
   // The approval secret, required only once a spending tool is actually mounted.
   //
   // AI SDK 7: with no `experimental_toolApprovalSecret`, "approvals work as before
-  // (backward compatible)" — issued and honoured UNSIGNED. With one, "approval requests
+  // (backward compatible)" — issued and honored UNSIGNED. With one, "approval requests
   // without a valid signature are rejected (fail-closed)". So the unconfigured case is not
   // a missing feature, it is the same feature with the binding removed and no visible
   // difference: the card renders, the visitor approves, the purchase proceeds, and nothing

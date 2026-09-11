@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process"
 import { expect, it } from "vitest"
 
-it("renders actual H4-decoded catalogue data and independent failure states through the production Start route", async () => {
+it("renders actual H4-decoded catalog data and independent failure states through the production Start route", async () => {
   const child = spawn("bun", ["--no-env-file", "apps/web/test/fixtures/market-server.ts"], {
     cwd: new URL("../../..", import.meta.url).pathname,
     env: { PATH: process.env["PATH"] ?? "", ARCADE_NETWORK: "arc-testnet" }, stdio: ["ignore", "pipe", "pipe"]
@@ -23,22 +23,23 @@ it("renders actual H4-decoded catalogue data and independent failure states thro
       const html = await response.text()
       expect(html).not.toContain("PRIVATE_")
       const control = await (await get(origins!.hub + "/__fixture")).json()
-      expect(control.reads).toEqual({ listings: 1, stats: 1, other: 0 })
+      expect(control.reads).toEqual({ listings: 1, stats: 1, receipts: 1, other: 0 })
       return html
     }
     const ok = await read("ok")
     expect(ok).toContain("Diff Triage"); expect(ok).toContain("$1.24"); expect(ok).toContain("hub receipts")
     expect(ok).toContain("pay-tested"); expect(ok).toContain("recorded settled volume")
-    // A catalogue with no declarations says nothing about rails and shows no rail filter,
+    // A catalog with no declarations says nothing about rails and shows no rail filter,
     // rather than repeating an "unavailable" line and a control that empties the grid.
     expect(ok).not.toContain("Accepts (declared)")
     expect(ok).not.toContain("Declared payment rail")
     const rails = await read("rails")
-    expect(rails).toContain("Accepts (declared): gateway · exact · escrow")
-    expect(rails).toContain("Accepts (declared): exact")
+    // Protocol selection is available on demand; card prose leads with the skill.
+    expect(rails).toContain("payment options")
+    expect(rails).not.toContain("Accepts (declared):")
     // The third listing declares nothing: it is still listed, just silent about rails.
     expect(rails).toContain("Declared payment rail")
-    expect(rails.replaceAll("<!-- -->", "")).toContain("3 of 3 catalogue listings shown")
+    expect(rails.replaceAll("<!-- -->", "")).toContain("3 of 3 skills")
     expect(rails).toContain("not current payment availability")
     for (const mode of ["stats-down", "malformed-stats"]) {
       const html = await read(mode); expect(html).toContain("Diff Triage"); expect(html).toContain("Totals are unavailable")
@@ -49,6 +50,7 @@ it("renders actual H4-decoded catalogue data and independent failure states thro
       expect(html).not.toContain("No eligible listings")
     }
     const both = await read("both-down"); expect(both).toContain("Listings are unavailable"); expect(both).toContain("Totals are unavailable")
+    const activityDown = await read("activity-down"); expect(activityDown).toContain("Activity has not loaded"); expect(activityDown).toContain("Diff Triage"); expect(activityDown).toContain("$1.24")
     const empty = await read("empty"); expect(empty).toContain("No eligible listings"); expect(empty).toContain("$0.00")
     expect(empty).not.toContain("nobody is currently serving")
   } finally {

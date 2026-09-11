@@ -1,4 +1,5 @@
 import { createRouter } from "@tanstack/react-router"
+import { RouteState } from "./components/route-state.tsx"
 import { routeTree } from "./routeTree.gen"
 
 /**
@@ -10,14 +11,10 @@ export const getRouter = () =>
     routeTree,
     scrollRestoration: true,
     defaultPreload: "intent",
-    defaultNotFoundComponent: () => (
-      <main className="wrap">
-        <header className="top">
-          <span className="mark">ARCADE</span>
-        </header>
-        <p className="law">No such page.</p>
-      </main>
-    )
+    defaultPendingMs: 250,
+    defaultPendingComponent: () => <RouteState kind="loading" />,
+    defaultErrorComponent: () => <RouteState kind="error" />,
+    defaultNotFoundComponent: () => <RouteState kind="missing" />
   })
 
 declare module "@tanstack/react-router" {

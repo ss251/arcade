@@ -12,7 +12,7 @@ import arcadeMonogramSvg from "../marks/arcade-monogram.svg?raw"
  * parameters", which is exactly what a hotlink looks like in a judge's browser three days
  * after we tested it. These are files in the repo.
  *
- * Neither is a semantic colour. Blue means USDC, green settled, red not-settled — a
+ * Neither is a semantic color. Blue means USDC, green settled, red not-settled — a
  * self-contained brand object is a different category, and carrying one does not license a
  * third hue anywhere else on the card.
  */

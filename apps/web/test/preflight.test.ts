@@ -70,7 +70,7 @@ describe("apps/web preflight", () => {
   it("warns about a missing ANTHROPIC_API_KEY without refusing", () => {
     // Degradation, not misconfiguration: /api/chat already returns a 503 naming the
     // variable and saying discovery still works. Refusing here would take down a
-    // deployment whose catalogue and receipts are fine.
+    // deployment whose catalog and receipts are fine.
     const { fatal, warnings } = partition(
       preflightWeb({ ...PLATFORM, ARCADE_HUB: "https://hub.example" }).problems
     )

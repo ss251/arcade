@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest"
  * A single missing `}` does not fail the build, the typechecker, or any of the other 477
  * tests — CSS has no compiler here. What it does is make one rule swallow everything that
  * follows it, so the page renders with most of its design silently absent: max-width gone,
- * the composer unstyled, buttons reduced to full-width grey bars. It looks like a broken
+ * the composer unstyled, buttons reduced to full-width gray bars. It looks like a broken
  * app and reads like a broken app, and nothing in the repo says a word about it.
  *
  * That happened while DELETING a block: the edit removed the rules and took the closing
@@ -67,6 +67,28 @@ describe("styles.css is structurally sound", () => {
       expect(withoutComments, `${sel} must set scrollbar-width: none`).toMatch(rule)
       const webkit = new RegExp(`\\${sel}::-webkit-scrollbar\\s*\\{[^}]*width:\\s*0`, "s")
       expect(withoutComments, `${sel} must zero ::-webkit-scrollbar`).toMatch(webkit)
+    }
+  })
+})
+
+// Both semantic amounts and the demoted middle of a payment address must remain
+// readable on every solid surface. This guards a functional decision, not a snapshot.
+describe("adaptive text contrast", () => {
+  const pair = (token: string): string[] => {
+    const match = new RegExp(`--${token}: light-dark\\((#[a-f0-9]{6}), (#[a-f0-9]{6})\\)`).exec(CSS)
+    if (!match) throw Error(`Missing adaptive color pair: ${token}`)
+    return [match[1]!, match[2]!]
+  }
+  const luminance = (hex: string) => {
+    const values = [1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16) / 255)
+      .map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
+    return values[0]! * .2126 + values[1]! * .7152 + values[2]! * .0722
+  }
+  it.each(["ink", "slate", "usdc", "stamp", "refuse"])("keeps %s at AA for normal-size text in both schemes", token => {
+    for (const scheme of [0, 1]) for (const surface of ["paper", "card", "subtle"]) {
+      const foreground = luminance(pair(token)[scheme]!), background = luminance(pair(surface)[scheme]!)
+      const contrast = (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05)
+      expect(contrast, `${token} on ${surface}, scheme ${scheme}`).toBeGreaterThanOrEqual(4.5)
     }
   })
 })

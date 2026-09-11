@@ -29,7 +29,7 @@ export interface SigningRequest {
   readonly name?: string
   readonly ensName?: string
   readonly skillId: string
-  /** The resource the payment authorises. Derived, never supplied by the client. */
+  /** The resource the payment authorizes. Derived, never supplied by the client. */
   readonly resource: string
   readonly payTo: string
   readonly asset: string
@@ -48,7 +48,7 @@ export interface SigningRequest {
  * Derive what the visitor will be asked to sign, from what they approved.
  *
  * `approvedMaxUsd` is the argument the approval HMAC covers. The quote comes from the
- * endpoint's own 402 challenge rather than the catalogue, so a listing whose advertised
+ * endpoint's own 402 challenge rather than the catalog, so a listing whose advertised
  * price has drifted is caught here — and if the endpoint now asks for more than was
  * approved, this REFUSES rather than re-asking, because the visitor approved a number and
  * the number changed. Re-asking would be defensible; silently proceeding would not.

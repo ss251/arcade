@@ -67,7 +67,7 @@ export const onArc = async (p: Eip1193Provider): Promise<boolean> =>
 /**
  * Put the wallet on Arc, adding the network if it does not have it.
  *
- * 4902 is "unrecognised chain" — the expected answer for a first-time visitor, not an
+ * 4902 is "unrecognized chain" — the expected answer for a first-time visitor, not an
  * error. Some wallets return it from `wallet_switchEthereumChain`, others throw it, and at
  * least one reports it nested; all three are treated the same because the remedy is
  * identical and guessing wrong would strand someone at the network prompt.
@@ -82,9 +82,9 @@ export const ensureArc = async (p: Eip1193Provider): Promise<void> => {
     })
   } catch (e) {
     const code = (e as { code?: number; data?: { originalError?: { code?: number } } })
-    const unrecognised =
+    const unrecognized =
       code?.code === 4902 || code?.data?.originalError?.code === 4902
-    if (!unrecognised) throw e
+    if (!unrecognized) throw e
     // Adds AND switches in one prompt, which is why the guard can be an action.
     await p.request({ method: "wallet_addEthereumChain", params: [ARC_ADD_CHAIN_PARAMS] })
   }
@@ -95,7 +95,7 @@ export const connect = async (
 ): Promise<{ readonly address: string }> => {
   const accounts = (await p.request({ method: "eth_requestAccounts" })) as ReadonlyArray<string>
   const address = accounts[0]
-  if (address === undefined) throw new Error("no account was authorised")
+  if (address === undefined) throw new Error("no account was authorized")
   // Chain BEFORE the card, never after. See the module note.
   await ensureArc(p)
   return { address }

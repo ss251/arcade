@@ -74,7 +74,7 @@ describe("thread rendering — scripted conversations", () => {
     expect(html).toContain("list_skills")
     expect(html).not.toContain(">arcade_list_skills<")
     // The gloss is what makes the row legible to someone who has not read the source.
-    expect(html).toContain("reading the catalogue")
+    expect(html).toContain("reading the catalog")
   })
 
   it("tells a failed tool call apart from a running one", () => {
@@ -102,7 +102,7 @@ describe("thread rendering — scripted conversations", () => {
   })
 
   /**
-   * The one that matters. A fenced catalogue reaching the UI must render as a QUOTATION
+   * The one that matters. A fenced catalog reaching the UI must render as a QUOTATION
    * with the fence scaffolding stripped — the markers are addressed to the model and are
    * noise to a reader, but who wrote the text is exactly what the block has to convey.
    */
@@ -155,7 +155,7 @@ describe("thread rendering — scripted conversations", () => {
  *
  * Without `ANTHROPIC_API_KEY`, `/api/chat` returns 503. A page that still says "Ask for
  * what you need" and prints two suggested prompts is promising something that fails on
- * every attempt — and unlike an empty catalogue, which is the discovery guarantee working
+ * every attempt — and unlike an empty catalog, which is the discovery guarantee working
  * and visibly so, that just reads as broken. So the invitation is DERIVED from what the
  * deployment can do rather than asserted.
  *
@@ -166,6 +166,18 @@ describe("thread rendering — scripted conversations", () => {
  */
 describe("empty state — the invitation matches what the deployment can do", () => {
   const HUB = "https://arcade-hub-production.up.railway.app"
+
+  it("offers editable task suggestions without sending during render", () => {
+    let suggested = 0
+    const html = renderToStaticMarkup(<Empty chatLive hubUrl={HUB} selectedSkill="diff-triage" onSuggest={() => { suggested++ }} />)
+    expect(html).not.toContain("Find a skill for my task")
+    expect(html).not.toContain("Compare skills and prices")
+    expect(html).not.toContain("Shortcuts")
+    expect(html).toContain("Use Diff triage")
+    expect(html).toContain("Diff triage")
+    expect(html).toContain("Add your input below")
+    expect(suggested).toBe(0)
+  })
 
   it("invites and suggests when the chat is live", () => {
     const html = renderToStaticMarkup(<Empty chatLive hubUrl={HUB} />)
@@ -183,6 +195,9 @@ describe("empty state — the invitation matches what the deployment can do", ()
   it("says so plainly and points at the hub when it is not live", () => {
     const html = renderToStaticMarkup(<Empty chatLive={false} hubUrl={HUB} />)
     expect(html).toContain("not live")
+    expect(html).toContain('href="/"')
+    expect(html).toContain("Explore skills")
+    expect(html).toContain("Availability details")
     expect(html).toContain(HUB)
     // The invitation and the suggestions must both be gone — a disabled box under a
     // "try: …" line is the same broken promise in smaller type.
@@ -212,7 +227,7 @@ describe("empty state — the invitation matches what the deployment can do", ()
  * This is the boundary version of the figure problem rather than the detection version: the
  * failure is removed instead of caught, which is what made it worth more than another test.
  * These pin that the structured half is actually rendered, and that it is rendered in the
- * MEASURED voice — mono and the USDC colour — so the two surfaces speak one language.
+ * MEASURED voice — mono and the USDC color — so the two surfaces speak one language.
  */
 describe("tool output is rendered, not just narrated", () => {
   const listingsMsg = (skills: ReadonlyArray<{ id: string; price: string }>) => [
@@ -282,7 +297,7 @@ describe("tool output is rendered, not just narrated", () => {
     expect(html).not.toContain("$0.0005")
   })
 
-  it("renders nothing for a shape it does not recognise, rather than throwing", () => {
+  it("renders nothing for a shape it does not recognize, rather than throwing", () => {
     // Tool output crosses a version boundary — an older or newer shape must degrade to the
     // marker alone, never to a blank page.
     for (const output of [null, "a string", { skills: "not-an-array" }, { skills: [{}] }]) {

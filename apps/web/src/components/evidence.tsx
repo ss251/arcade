@@ -72,8 +72,8 @@ export function Evidence({ listing }: { readonly listing: ListingDetail }) {
     BigInt(listing.agentId) < 1n << 256n && listing.agentVerified === true && listing.evidenceStale === false &&
     count(listing.validationPasses, 20) && count(listing.validationsRead, 20) &&
     listing.validationPasses <= listing.validationsRead && count(listing.settlementFeedback, 4096)
-  return <section className="skill-evidence" aria-label="Settlement evidence">
-    <h2>settlement evidence</h2>
+  return <section className="skill-evidence content-panel" aria-label="Settlement evidence">
+    <h2>Settlement evidence</h2>
     <p className="skill-note">Hub-reported observations. These do not establish purchase availability.</p>
     <dl className="skill-facts">
       <div><dt>ERC-8004 identity</dt><dd>{listing.agentId === undefined ? "Identity evidence unavailable"

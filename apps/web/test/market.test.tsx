@@ -7,15 +7,16 @@ import { marketListing, marketStats, OBSERVED } from "./fixtures/market-data.ts"
 const card = (over: Parameters<typeof marketListing>[0] = {}, observedAtMs: number | undefined = OBSERVED) =>
   renderToStaticMarkup(<ListingCard listing={marketListing(over)} observedAtMs={observedAtMs} />)
 describe("H6 marketplace evidence and presentation", () => {
-  it("caps the price track so a long valid price cannot consume the name column", () => {
-    // Actual390px browser Red measured title width0 with minmax(0,auto).
+  it("gives name and price intrinsic tracks that stack with enlarged text", () => {
+    // Re-pinned 2026-09-10 for compact cards that still reflow at 200%: a fixed price percentage crushed
+    // both values. Minimum rem tracks wrap; neither can consume the other's track.
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8")
-    expect(/\.market \.listing-card\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) fit-content\(40%\)/.test(css)).toBe(true)
+    expect(css).toContain("grid-template-columns: repeat(auto-fit, minmax(min(100%, 6rem), 1fr))")
   })
-  it("ranks an annotated ENS name without asserting independent verification", () => {
+  it("leads with a human service name and leaves ENS detail to the listing", () => {
     const html = card({ ensName: "diff-triage.seller.arcade.eth" })
-    expect(html).toContain("diff-triage.seller.arcade.eth")
-    expect(html.indexOf("diff-triage.seller.arcade.eth")).toBeLessThan(html.indexOf("card-id"))
+    expect(html).toContain(">Diff Triage</a>")
+    expect(html).not.toContain("diff-triage.seller.arcade.eth")
     expect(html).toContain('href="/skill/diff-triage"')
     expect(html).not.toContain("verified"); expect(html).not.toContain("name is live")
   })
@@ -23,7 +24,7 @@ describe("H6 marketplace evidence and presentation", () => {
     // Both absences used to print a sentence about the absence, on every card. The rule
     // that matters is unchanged and asserted below: an unknown pay-test must never be
     // rendered as a passing or failing one. Silence satisfies it; a sentence only added
-    // noise to a nine-card catalogue.
+    // noise to a nine-card catalog.
     const explicit = card()
     expect(explicit).not.toContain("pay-test")
     expect(explicit).not.toContain("is-settled"); expect(explicit).not.toContain("is-refused")
@@ -60,7 +61,8 @@ describe("H6 marketplace evidence and presentation", () => {
     const html = card({ stats: { calls: 0, settled: 0, successRate: 0, p50LatencyMs: 0, p95LatencyMs: 0 } })
     expect(html).not.toContain("p50"); expect(html).not.toContain("0s")
     const real = card({ stats: { calls: 17, settled: 15, successRate: 15 / 17, p50LatencyMs: 2471, p95LatencyMs: 3113 } })
-    expect(real).toContain("15/17 settled"); expect(real).toContain("2.5s p50")
+    // Discovery shows one qualified proof line; technical latency belongs in receipt detail.
+    expect(real).toContain("15/17 settled"); expect(real).toContain("hub records"); expect(real).not.toContain("p50")
   })
   it("escapes hostile seller prose and retains the exact price string", () => {
     const html = card({ description: "<img src=x onerror=alert(1)>", price: "$0.000001" })

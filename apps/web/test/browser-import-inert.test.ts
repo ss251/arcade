@@ -27,10 +27,10 @@ describe("passive browser modules do not select a server environment on fresh im
   })
   it("imports and filters declared rails with no environment, wallet or storage reads", async () => {
     try {
-      const { declaredRailsOf, filterCatalogue } = await import("../src/lib/listing-rails.ts")
+      const { declaredRailsOf, filterCatalog } = await import("../src/lib/listing-rails.ts")
       const listing = { rails: ["erc8183", "gateway"] }
       expect(declaredRailsOf(listing)).toEqual(["gateway", "erc8183"])
-      expect(filterCatalogue([listing], "eip3009")).toEqual([])
+      expect(filterCatalog([listing], "eip3009")).toEqual([])
     } finally { noIO() }
   })
   it("imports and captures public context despite an invalid ambient selector", async () => {

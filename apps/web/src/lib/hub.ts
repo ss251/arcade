@@ -127,7 +127,7 @@ export interface Quote {
 /**
  * Ask the endpoint itself what a call costs, by reading its 402 challenge.
  *
- * This is a quote from the till rather than the catalogue: the challenge is what the buyer
+ * This is a quote from the till rather than the catalog: the challenge is what the buyer
  * would actually have to sign, so a listing whose advertised price has drifted from its
  * endpoint is caught here rather than after a signature.
  */
@@ -189,7 +189,7 @@ export const quote = async (targetInput: string | PurchaseTarget, input: unknown
      * the USDC contract's. The live hub offers two accepts for every listing — Gateway
      * (domain "GatewayWalletBatched", verifying the Gateway wallet) and the exact EIP-3009
      * rail — and the old `accepts.length !== 1` refused all of them, while taking accepts[0]
-     * would have signed a Gateway domain this path cannot honour and then tripped
+     * would have signed a Gateway domain this path cannot honor and then tripped
      * EnsPayToMismatch below on any ENS-locked name. Selecting on the splitter instead would
      * refuse every honest seller who does not use one.
      *

@@ -21,7 +21,7 @@ describe("private live purchase presentation", () => {
     const html = renderToStaticMarkup(<LivePurchaseView view={view()} />)
     expect(html).toContain("has not independently verified")
     expect(html).toContain("returned by the seller")
-    expect(html).toContain("complete JSON"); expect(html).toContain("&lt;script&gt;")
+    expect(html).toContain("Complete result JSON"); expect(html).toContain("&lt;script&gt;")
     expect(html).not.toContain("<script>")
     expect(html).toContain(`href="${outcome.explorer}"`)
     expect(html).toContain("inspect the reported transaction")
@@ -30,7 +30,7 @@ describe("private live purchase presentation", () => {
   it("discloses a long output without truncating its JSON", () => {
     const resultJson = JSON.stringify({ lines: Array.from({ length: 150 }, (_, i) => `line ${i}`) })
     const html = renderToStaticMarkup(<LivePurchaseView view={view({ outcome: { ...outcome, resultJson } })} />)
-    expect(html).toContain("show the full result"); expect(html).toContain("line 0"); expect(html).toContain("line 99")
+    expect(html).toContain("Complete result JSON"); expect(html).toContain("line 0"); expect(html).toContain("line 99")
   })
   it("never labels a Gateway transfer UUID as a mined transaction or explorer link", () => {
     const reference = "12345678-1234-4234-8234-123456789abc"

@@ -7,7 +7,7 @@ import { loadSkillPage } from "../src/lib/skill-page-data.ts"
 import { ListingCard } from "../src/components/listing-card.tsx"
 import { SkillPage } from "../src/components/skill-page.tsx"
 import { MarketListings } from "../src/components/market-listings.tsx"
-import { decodeDeclaredRails, declaredRailsOf, filterCatalogue, readRailFilter } from "../src/lib/listing-rails.ts"
+import { decodeDeclaredRails, declaredRailsOf, filterCatalog, readRailFilter } from "../src/lib/listing-rails.ts"
 import { marketListing } from "./fixtures/market-data.ts"
 
 const raw = (rails?: unknown) => ({ ...marketListing(), rails, inputSchema: {}, outputSchema: {} })
@@ -17,37 +17,36 @@ const view = async (value: unknown) => loadSkillPage({ name: "diff-triage" }, {
 }, () => 1000)
 
 describe("J11C public listing rail declarations", () => {
-  it("preserves every pre-J11 CSS byte and scopes the additive controls", () => {
+  it("pins the reviewed shared system and scopes the rail controls", () => {
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8")
     const marker = "\n/* J11 declared rail data"
     expect(css).toContain(marker)
-    // Re-locked 2026-09-08: the marketplace design pass deliberately rewrote the token
-    // block (two semantic stops that failed AA, plus the verdict tints and card shadows)
-    // and the .market rules above this marker. The lock's job is to catch an ACCIDENTAL
-    // rewrite of earlier CSS, so an intentional one re-pins rather than deletes it.
+    // Re-pinned 2026-09-10: the owner requested a complete UI system rebuild.
+    // This pin now protects the reviewed adaptive tokens and marketplace layout.
+    // Rail behavior stays unchanged; its rules end at the next named section.
     expect(createHash("sha256").update(css.slice(0, css.indexOf(marker))).digest("hex"))
-      .toBe("56a7f4953b32bfc84086c3414f9e203e36a863126cde490e450c23abd63dacf6")
-    const suffix = css.slice(css.indexOf(marker))
+      .toBe("8920508eaf61687c5c92f087f3e9eec3a58cefd64214f7cd18b751863dedd2c0")
+    const suffix = css.slice(css.indexOf(marker), css.indexOf("/* H8 skill-page:"))
     expect(suffix).toContain("min-height: 44px"); expect(suffix).toContain(":focus-visible")
     expect(suffix).not.toMatch(/(?:^|\n)(?:body|:root|\.buyer|\.publish|\.tree)[\s.{]/)
   })
   it("filters only explicit declarations and keeps unavailable metadata separate", () => {
     const all = decodeListings([raw(["erc8183", "gateway"]), { ...raw(["eip3009"]), id: "exact-skill" },
       { ...raw(), id: "legacy-skill" }, { ...raw(["PRIVATE"]), id: "unknown-skill" }])
-    expect(filterCatalogue(all, "all")).toBe(all)
-    expect(filterCatalogue(all, "gateway").map(x => x.id)).toEqual(["diff-triage"])
-    expect(filterCatalogue(all, "erc8183").map(x => x.id)).toEqual(["diff-triage"])
-    expect(filterCatalogue(all, "eip3009").map(x => x.id)).toEqual(["exact-skill"])
-    expect(filterCatalogue(all, "unavailable").map(x => x.id)).toEqual(["legacy-skill", "unknown-skill"])
-    expect(filterCatalogue(all.slice(1), "gateway")).toEqual([])
+    expect(filterCatalog(all, "all")).toBe(all)
+    expect(filterCatalog(all, "gateway").map(x => x.id)).toEqual(["diff-triage"])
+    expect(filterCatalog(all, "erc8183").map(x => x.id)).toEqual(["diff-triage"])
+    expect(filterCatalog(all, "eip3009").map(x => x.id)).toEqual(["exact-skill"])
+    expect(filterCatalog(all, "unavailable").map(x => x.id)).toEqual(["legacy-skill", "unknown-skill"])
+    expect(filterCatalog(all.slice(1), "gateway")).toEqual([])
     for (const value of ["PRIVATE", "exact", "escrow", "", null, {}, 0]) expect(readRailFilter(value)).toBeUndefined()
     expect(all).toHaveLength(4)
   })
-  it("renders labelled native controls and distinguishes an empty catalogue", () => {
+  it("renders labeled native controls and distinguishes an empty catalog", () => {
     const out = renderToStaticMarkup(<MarketListings listings={decodeListings([raw(["gateway"])])} observedAtMs={1000} />)
     expect(out).toContain("Declared payment rail"); expect(out).toContain("<select")
     expect(out).toContain('aria-describedby='); expect(out).toContain('role="status"')
-    expect(out).toContain("1 of 1 catalogue listings shown")
+    expect(out).toContain("1 of 1 skills")
     expect(out).toContain("not current payment availability")
     expect(out).toContain("does not change the recorded totals")
     const empty = renderToStaticMarkup(<MarketListings listings={[]} observedAtMs={1000} />)
@@ -77,11 +76,12 @@ describe("J11C public listing rail declarations", () => {
     const data = await view(raw(["erc8183", "gateway"]))
     expect(data.listing).toHaveProperty("rails", ["gateway", "erc8183"])
   })
-  it("renders declared acceptance on the actual card and detail without availability or signer claims", async () => {
+  it("keeps declared acceptance in detail while the discovery card leads with the skill", async () => {
     const value = raw(["erc8183", "eip3009", "gateway"])
     const listing = decodeListings([value])[0]!
     const card = renderToStaticMarkup(<ListingCard listing={listing} />)
-    expect(card).toContain("Accepts (declared): gateway · exact · escrow")
+    expect(card).not.toContain("Accepts (declared):")
+    expect(card).toContain('href="/skill/diff-triage"')
     const detail = renderToStaticMarkup(<SkillPage data={await view(value)} />)
     expect(detail).toContain("Accepts (declared): gateway · exact · escrow")
     expect(detail).toContain("not current payment availability")

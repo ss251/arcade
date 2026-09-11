@@ -2,8 +2,8 @@ import { createServer as httpServer } from "node:http"
 import { createServer } from "vite"
 import { marketListing, marketStats } from "./market-data.ts"
 
-let mode = "ok", reads = { listings: 0, stats: 0, other: 0 }
-const modes = new Set(["ok", "empty", "stats-down", "listings-down", "both-down", "malformed-stats", "malformed-listings", "long", "rails"])
+let mode = "ok", reads = { listings: 0, stats: 0, receipts: 0, other: 0 }
+const modes = new Set(["ok", "empty", "stats-down", "listings-down", "both-down", "malformed-stats", "malformed-listings", "long", "rails", "activity-down"])
 const json = (res: import("node:http").ServerResponse, body: unknown, status = 200) => {
   res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(body))
 }
@@ -11,10 +11,11 @@ const hub = httpServer((req, res) => {
   const url = new URL(req.url!, "http://127.0.0.1")
   if (url.pathname === "/__fixture") {
     const next = url.searchParams.get("mode")
-    if (next && modes.has(next)) { mode = next; reads = { listings: 0, stats: 0, other: 0 } }
+    if (next && modes.has(next)) { mode = next; reads = { listings: 0, stats: 0, receipts: 0, other: 0 } }
     json(res, { mode, reads }); return
   }
   if (req.method !== "GET") { reads.other++; json(res, {}, 405); return }
+  if (url.pathname === "/receipts") { reads.receipts++; json(res, mode === "activity-down" ? { error: "PRIVATE_HUB_DIAGNOSTIC" } : [], mode === "activity-down" ? 503 : 200); return }
   if (url.pathname === "/listings") {
     reads.listings++
     if (mode === "listings-down" || mode === "both-down") { json(res, { error: "PRIVATE_HUB_DIAGNOSTIC" }, 503); return }

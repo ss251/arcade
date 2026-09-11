@@ -17,9 +17,9 @@ const page = async (value: unknown) => loadSkillPage({ name: "diff-triage" }, {
 describe("G8 optional web index evidence", () => {
   it("retains only the shared four-field projection through both decoders", () => {
     const input = raw({ ...graph, indexedBlock: 99, privateUrl: "PRIVATE_GRAPH", nested: { key: "PRIVATE_GRAPH" } })
-    const detail = decodeListing(input, "diff-triage"), catalogue = decodeListings([input])
-    expect(detail).toHaveProperty("graph", graph); expect(catalogue[0]).toHaveProperty("graph", graph)
-    expect(JSON.stringify({ detail, catalogue })).not.toMatch(/PRIVATE_GRAPH|indexedBlock/)
+    const detail = decodeListing(input, "diff-triage"), catalog = decodeListings([input])
+    expect(detail).toHaveProperty("graph", graph); expect(catalog[0]).toHaveProperty("graph", graph)
+    expect(JSON.stringify({ detail, catalog })).not.toMatch(/PRIVATE_GRAPH|indexedBlock/)
   })
   it("preserves that exact evidence through the actual page serialization and render", async () => {
     const data = await page(raw()), html = renderToStaticMarkup(<SkillPage data={data} />)

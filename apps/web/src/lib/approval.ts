@@ -11,7 +11,7 @@ import { parsePrice } from "@arcade/core"
  *
  * ## The default is to ask
  *
- * `decide` returns `"user-approval"` for anything it does not positively recognise as
+ * `decide` returns `"user-approval"` for anything it does not positively recognize as
  * costless. A policy that fell through to `"approved"` on a shape it failed to parse would
  * be a gate that opens when confused, which is the failure mode this whole edge exists to
  * prevent — and the confusing input is exactly what an injected seller description would

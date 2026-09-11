@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { Chat } from "~/components/chat.tsx"
@@ -19,7 +19,7 @@ import { DEFAULT_MODEL, parseModel } from "~/lib/model.ts"
  * The page derives its invitation from this instead of asserting one. Without a key,
  * `/api/chat` returns a 503, and a page that still says "Ask for what you need" and prints
  * two suggested prompts is promising something the server has already declined to do. An
- * empty catalogue is the discovery guarantee working and reads as such; a chat that answers
+ * empty catalog is the discovery guarantee working and reads as such; a chat that answers
  * every message with an error just reads as broken.
  */
 const siteFacts = createServerFn({ method: "GET" }).handler(() => ({
@@ -31,6 +31,9 @@ const siteFacts = createServerFn({ method: "GET" }).handler(() => ({
 }))
 
 export const Route = createFileRoute("/chat")({
+  validateSearch: (search: Record<string, unknown>): { skill?: string } =>
+    typeof search["skill"] === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(search["skill"])
+      ? { skill: search["skill"] } : {},
   head: () => ({ meta: [
     { title: "Buy a skill — ARCADE" },
     { name: "description", content: "Ask an agent to find and buy a skill for you. Every purchase is confirmed before a cent moves, and settles on Arc only on success." },
@@ -48,7 +51,7 @@ export const Route = createFileRoute("/chat")({
  *
  * `localStorage` does not exist during SSR, and this page is server-rendered. Reading it in
  * an effect means the first paint is the empty-history one on both sides, so hydration
- * matches; the list arrives a frame later. Reading it in a `useState` initialiser would
+ * matches; the list arrives a frame later. Reading it in a `useState` initializer would
  * throw on the server, and guarding that with `typeof window` would produce markup the
  * client then contradicts — a hydration mismatch, which React resolves by silently
  * re-rendering and which shows up as a flicker nobody can reproduce on demand.
@@ -64,8 +67,10 @@ const newId = (): string => `c_${Math.random().toString(36).slice(2, 10)}`
 
 function Home() {
   const { chatLive, hubUrl } = Route.useLoaderData()
+  const { skill } = Route.useSearch()
   const [conversations, setConversations] = useState<ReadonlyArray<history.Conversation>>([])
   const [currentId, setCurrentId] = useState(newId)
+  const firstConversationId = useRef(currentId)
   const [initial, setInitial] = useState<ReadonlyArray<history.StoredMessage> | undefined>(undefined)
   const [sideOpen, setSideOpen] = useState(false)
 
@@ -99,26 +104,27 @@ function Home() {
 
   return (
     <div className={`shell${sideOpen ? " side-open" : ""}`}>
-      <Sidebar
-        conversations={conversations}
-        currentId={currentId}
-        onOpen={openConversation}
-        onNew={startNew}
-        onDelete={deleteConversation}
-        open={sideOpen}
-        onToggle={() => setSideOpen((v) => !v)}
-      />
-      <main className="wrap">
+      <main className="wrap chat-wrap">
         <Nav here="chat" />
-        <p className="top-meta">
-          <a href={hubUrl} target="_blank" rel="noreferrer">
-            settlement receipts ↗
-          </a>{" "}
-          · your wallet, your signature
-        </p>
+        <div className="chat-toolbar">
+          <div className="sidebar-anchor">
+            <Sidebar
+              conversations={conversations}
+              currentId={currentId}
+              onOpen={openConversation}
+              onNew={startNew}
+              onDelete={deleteConversation}
+              open={sideOpen}
+              onToggle={() => setSideOpen((v) => !v)}
+            />
+          </div>
+          <span>Your buying agent</span><a href="/buyer">My jobs</a>
+        </div>
         <Chat
           key={currentId}
           id={currentId}
+          selectedSkill={initial === undefined ? skill : undefined}
+          consumeListingDraft={currentId === firstConversationId.current && initial === undefined}
           initial={initial}
           onChanged={persist}
           chatLive={chatLive}

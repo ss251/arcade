@@ -21,7 +21,7 @@ it("serves chat at /chat while / is only the H6 shell, with keyless facts and or
     const chat = await get("/chat"), chatHtml = await chat.text()
     expect(chat.status).toBe(200)
     expect(chatHtml).toContain('aria-current="page"')
-    expect(chatHtml).toContain("settlement receipts")
+    expect(chatHtml).toContain("Your buying agent")
     expect(chatHtml).toContain("not live")
     expect(chatHtml).toContain('aria-label="Show conversations"')
     const market = await get("/"), marketHtml = await market.text()

@@ -101,7 +101,7 @@ describe("figures handed to a model are exact strings", () => {
     }
   })
 
-  it("keeps the catalogue price outside the fence and exact", async () => {
+  it("keeps the catalog price outside the fence and exact", async () => {
     // A price the seller cannot write is the hub's own voice, so it stays quotable. If it
     // were inside the fence the model would be told to treat it as an untrusted claim.
     stub([{ id: "diff-triage", version: "0.1.0", serviceName: "D", description: "x", price: "$0.12", seller: `0x${"1".repeat(40)}` }])

@@ -2,40 +2,10 @@ import { useEffect, useRef, useState } from "react"
 import { ArcMark, UsdcMark } from "./marks.tsx"
 
 /**
- * The purchase confirmation. The one thing in this product a judge will photograph.
- *
- * ## Hold, don't click
- *
- * design-sauce Law 5 is asymmetric timing: slow where the user deliberates, snappy where
- * the system responds. A hold-to-approve on a card that spends real USDC is the correct
- * physical expression of that, not decoration — a button that spends on a single click is
- * indistinguishable from one that dismisses a tooltip. 900ms linear while held; release and
- * dismissal are ~200ms ease-out.
- *
- * ## The price is the subject
- *
- * It used to be 17px in a 13px header row — a table cell. It is now its own block at 32px
- * against 11px labels, which is the ratio every wallet confirmation uses, because the amount
- * is the thing being decided about and everything else is context for it.
- *
- * ## The address is weighted, not truncated
- *
- * MEASURED, because demoting 32 of 42 characters to `--slate` was the one change here that
- * could have hurt a security-critical element. On the card surface the ends read 16.44:1
- * light / 13.63:1 dark and the demoted middle 5.39:1 / 5.77:1 — both middles clear AA text
- * at 4.5:1. **This row now depends on `--slate` staying above that**, which was not true of
- * anything else using it, so changing that token means re-measuring here.
- *
- * This card's job is letting someone verify who gets their money, so showing more of the
- * string beats showing less. The full 42 characters render, with the first six and last four
- * bold and the middle demoted — the eye checks the ends against another source, and hiding
- * the middle removes the option of checking anything else.
- *
- * ## It takes no new colour
- *
- * Blue is USDC, green is settled, red is not-settled. The card earns attention through
- * surface, scale and the hold. The two brand marks are self-contained objects, which is a
- * different category from a semantic hue.
+ * A deliberate payment decision: amount first, exact recipient next, approval last.
+ * The 900ms hold is a safety boundary, including for keyboard and reduced-motion users.
+ * Addresses stay complete; quote identity changes cancel an in-progress hold.
+ * Blue denotes USDC only. A quote or approval never earns a settlement color.
  */
 
 export interface ConfirmProps {
@@ -189,73 +159,58 @@ export const Confirm = ({
     onDeny()
   }
 
-  const label = decided ? "decision recorded" : blocked === undefined ? `hold to pay ${price}` : "unavailable"
+  const label = decided ? "Decision recorded" : blocked === undefined ? `Hold to pay ${price}` : "Unavailable"
 
   return (
     <div className="confirm" role="group" aria-label={`Confirm purchase of ${skillId}`}>
-      {/*
-        The purchase is already a four-node graph — discover → quote → approve → settle — and
-        every other surface renders it as prose. This card IS node three, so saying so costs a
-        constant and no new state, and it is the one element that says the product is a graph
-        rather than a form.
-      */}
-      <div className="steps" aria-label="Step 3 of 4: approve">
-        <span className="step-ticks" aria-hidden="true">
-          <i className="done" />
-          <i className="done" />
-          <i className="now" />
-          <i />
-        </span>
-        <span className="step-said">step 3 of 4 · approve</span>
-      </div>
+      <div className="confirm-eyebrow">Your approval is required</div>
+      <h2 className="confirm-title">Review payment</h2>
 
-      <div className="confirm-head">
-        <span className="confirm-what">buy</span>
-        <span className="tool-id">{skillId}</span>
-      </div>
-
-      {ensName === undefined ? null : <div className="ens-name" title={ensName}>{ensName}</div>}
-
-      {/* The subject of the card. Mark at cap height beside it, not decorating it. */}
       <div className="price-block">
         <UsdcMark />
         <span className="price-big">{price}</span>
+        <span className="confirm-currency">USDC</span>
+      </div>
+
+      <div className="confirm-head">
+        <span className="confirm-what">For one call to</span>
+        <strong className="confirm-service">{skillId.replace(/[-_]+/g, " ").replace(/^./, letter => letter.toUpperCase())}</strong>
       </div>
 
       <dl className="confirm-facts">
         <div className="fact">
           <dt>
-            pays{ensName === undefined ? "" : " · from ENS"}
+            Recipient{ensName === undefined ? "" : " · from ENS"}
             <CopyButton value={payTo} label="the payout address" />
           </dt>
           <dd>
+            {ensName === undefined ? null : <div className="ens-name" title={ensName}>{ensName}</div>}
             <Address value={payTo} />
           </dd>
         </div>
-        <div className="fact">
-          <dt>network</dt>
+        <div className="fact fact-network">
+          <dt>Network</dt>
           <dd className="net">
             <ArcMark />
-            <span className="measured">{network}</span>
+            <span>{network === "eip155:5042002" ? "Arc Testnet" : network}</span>
           </dd>
         </div>
       </dl>
 
-      {blocked === undefined ? (
-        <p className="confirm-law">
-          Your wallet signs in your browser. ARCADE hubs settle only after the result validates.
-          If the outcome is unconfirmed, a signed authorization may remain valid — check the
-          settlement record before retrying.
-        </p>
-      ) : (
-        <p className="confirm-blocked">{blocked}</p>
-      )}
+      <p className="confirm-law">Only charged if the job succeeds.</p>
+      <details className="disclose confirm-terms">
+        <summary>How payment works</summary>
+        <p className="confirm-caution">Skill <code>{skillId}</code> · Network <code>{network}</code></p>
+        <p className="confirm-caution">ARCADE hubs settle only after the result validates. Your wallet signs in your browser.</p>
+        <p className="confirm-caution">If the outcome is unconfirmed, a signed authorization may remain valid — check the
+          settlement record before retrying.</p>
+      </details>
+      {blocked === undefined ? null : <p className="confirm-blocked" role="status">{blocked}</p>}
 
-      <p className="tool-note">Hold with a pointer, Space or Enter for 0.9 seconds. Releasing or leaving the card cancels.</p>
 
       <div className="confirm-actions">
         <button type="button" className="deny" onClick={deny} disabled={decided}>
-          no
+          Decline
         </button>
         {blocked !== undefined && onConnect !== undefined ? (
           // Replaces the approve button rather than sitting beside it. There is exactly one
@@ -268,7 +223,7 @@ export const Confirm = ({
             disabled={connecting === true}
           >
             <span className="approve-label">
-              {connecting === true ? "check your wallet…" : "connect wallet"}
+              {connecting === true ? "Check your wallet…" : "Connect wallet"}
             </span>
           </button>
         ) : (
@@ -306,6 +261,7 @@ export const Confirm = ({
         </button>
         )}
       </div>
+      <p className="tool-note confirm-hint">Hold with a pointer, Space or Enter for 0.9 seconds. Releasing or leaving the card cancels.</p>
     </div>
   )
 }

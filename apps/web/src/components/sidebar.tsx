@@ -63,7 +63,7 @@ export const Sidebar = ({
       </button>
       {open ? (
         <button type="button" className="side-new" onClick={onNew}>
-          new chat
+          New chat
         </button>
       ) : null}
     </div>
@@ -78,7 +78,7 @@ export const Sidebar = ({
           <ul className="side-list">
             {conversations.map((c) => (
               <li key={c.id} className={c.id === currentId ? "is-current" : undefined}>
-                <button type="button" className="side-row" onClick={() => onOpen(c.id)}>
+                <button type="button" className="side-row" onClick={() => onOpen(c.id)} aria-current={c.id === currentId ? "page" : undefined}>
                   <span className="side-title">{c.title}</span>
                   <span className="side-when">{ago(c.updatedAtMs)}</span>
                 </button>
@@ -94,7 +94,7 @@ export const Sidebar = ({
               </li>
             ))}
           </ul>
-          <p className="side-foot">stored in this browser</p>
+          <p className="side-foot">Stored in this browser</p>
         </>
       )
     ) : null}

@@ -1,0 +1,9 @@
+# Final visual review
+
+The final 156-frame route/state matrix and four-frame 200% type/reduced-motion pass share the same stable web-source fingerprint. All six primary contact sheets were opened after the final capture; journey, features, wallet/recovery states, and individual payment images were inspected across the iteration process. No runtime exceptions, console errors, document-level horizontal overflow, or unexpected fixture network requests remained.
+
+The rendered checks found and drove fixes for the activity timestamp hydration mismatch, narrow-screen discovery density, enlarged-type search/price reflow, approval button wrapping, and a real approval first-show scroll defect. Final approval images are captured spontaneously after the stream settles, before any harness scroll: the header and amount are visible in every normal viewport/scheme. Pointer-down produces measured progress, releasing early remains unsigned, and each complete hold drives exactly one synthetic signature, accepted call, and recovered result.
+
+Fixtures are explicitly synthetic. They verify UI and client callback behavior, not real wallet balances, payments, chain settlement, or provider behavior. The default route-not-found screen, failed catalog/result reads, pending result, disconnected/ready/unavailable wallet, one-shot listing input, discovery controls, and both receipt-tree presentations are included. The generic router loading/error components were not artificially injected; the waiting and failure evidence uses the application's real purchase and read paths.
+
+Start with [the review gallery](index.html), [all individual PNGs](README.md), and [200% type evidence](README-accessibility.md). Retained `approval-review/` files document the earlier scroll defect; they are not the final approval proof.

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { readFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { Evidence, SchemaBlock } from "../src/components/evidence.tsx"
-import { SkillPage } from "../src/components/skill-page.tsx"
+import { InputGuide, SkillPage } from "../src/components/skill-page.tsx"
 import { decodeListing, decodeReceipts } from "../src/lib/hub-decode.ts"
 import type { SkillPageData, SkillPageListing } from "../src/lib/skill-page-data.ts"
 import { loadChainConfig } from "../../../packages/core/src/chain-config.ts"
@@ -56,7 +56,7 @@ describe("H8 qualified listing evidence", () => {
   })
   it("shows only real H4 fresh verified counts with their bounded D provenance", () => {
     const out = renderToStaticMarkup(<Evidence listing={evidenceListing()} />)
-    expect(out).toContain("settlement evidence")
+    expect(out).toContain("Settlement evidence")
     expect(out).toContain("Hub-verified seller ownership")
     expect(out).toContain("7 of 9")
     expect(out).toContain("latest 20 unique validation requests")
@@ -150,17 +150,40 @@ describe("H8 bounded schema inspection", () => {
 })
 
 describe("H8 listing page and public receipt records", () => {
-  it("uses the existing navigation and an ordinary qualified chat link, never a payment form", () => {
+  it("explains actual required input fields without inventing example values", () => {
+    const out = renderToStaticMarkup(<InputGuide schema={{ type: "object", required: ["diff"], properties: {
+      diff: { type: "string", description: "Unified diff to review" }, context: { type: "string" }
+    } }} />)
+    expect(out).toContain("What to send"); expect(out).toContain("Required · Text")
+    expect(out).toContain("Optional · Text"); expect(out).toContain("Unified diff to review")
+    expect(out).not.toContain("example"); expect(out).not.toContain("<input")
+  })
+  it("falls back to full schema guidance without executing seller getters", () => {
+    let calls = 0
+    const schema = { type: "object", properties: Object.defineProperty({}, "diff", {
+      enumerable: true, get() { calls++; return { type: "string", description: "PRIVATE" } }
+    }) }
+    for (const value of [schema, true, { type: "array" },
+      { type: "object", properties: { diff: { type: "string" } }, allOf: [{ required: ["diff"] }] }]) {
+      const out = renderToStaticMarkup(<InputGuide schema={value} />)
+      expect(out).toContain("custom input format"); expect(out).not.toContain("PRIVATE")
+    }
+    expect(calls).toBe(0)
+  })
+  it("offers local input preparation and a qualified assistant handoff, never a payment form", () => {
     const out = html()
     expect(out).toContain('class="wrap skill-page"')
     expect(out).toContain('aria-label="Sections"')
     expect(out).toContain('href="/chat"')
-    expect(out).toContain("Open chat")
+    expect(out).toContain("Try in assistant")
+    expect(out).toContain('href="/chat?skill=diff-triage"')
     expect(out).toContain("Availability and payment are checked separately")
     expect(out).toContain("$0.12")
     expect(out).toContain("per call")
     expect(out).toContain("Declared bounds")
-    expect(out).not.toMatch(/<form|<input|<button|wallet key|payment-signature|x-job-token|\/market/)
+    expect(out).toContain('class="skill-try-input"')
+    expect(out).toContain("No call or payment starts on this page")
+    expect(out).not.toMatch(/wallet key|payment-signature|x-job-token|\/market/)
   })
   it("does not render private/unknown listing fields, pay-test IDs or invented seller/pay-test links", () => {
     const l = { ...listing({ payTested: { jobId: "job_PRIVATE_SENTINEL0000", atMs: 0, ok: true, settleTx: TX },
@@ -189,18 +212,18 @@ describe("H8 listing page and public receipt records", () => {
     expect(out).toContain("Recent public records")
     expect(out).toContain("diff-triage")
     expect(out).not.toContain("No such listing")
-    expect(out).not.toContain("Open chat")
+    expect(out).not.toContain("Try in assistant")
   })
   it.each(["invalid_name", "name_expired", "name_unavailable", "name_mismatch"] as const)("does not offer a detail purchase shortcut after %s", nameError => {
     const out = html({ nameError, resolvedName: null })
-    expect(out).not.toContain("Open chat")
+    expect(out).not.toContain("Try in assistant")
     expect(out).not.toContain("undefined")
     expect(out).toContain('role="status"')
   })
   it.each([{ delisted: true }, { ensExpired: true }])("labels unavailable detail and suppresses its chat CTA", over => {
     const out = html({ listing: listing({ ensName: "diff-triage.ss251.arcade.eth", ...over }) })
     expect(out).toContain("<h1>Diff Triage</h1>")
-    expect(out).not.toContain("Open chat")
+    expect(out).not.toContain("Try in assistant")
     expect(out).toContain("informational")
   })
   it("uses only correlated resolved name as an additional observation, not an unverified title", () => {
@@ -248,14 +271,14 @@ describe("H8 listing page and public receipt records", () => {
     expect(out).toContain("canary")
     expect(out).not.toMatch(/\$0 charged|balance untouched|refunded/)
   })
-  it("appends only scoped content-flow, wrapping, local scrolling and keyboard CSS", () => {
+  it("pins the reviewed system and retains scoped wrapping, scrolling and keyboard CSS", () => {
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8")
     const marker = "/* H8 skill-page:"
     expect(css).toContain(marker)
     const prefix = css.slice(0, css.indexOf(marker))
-    // Re-locked 2026-09-08 for the same deliberate marketplace/token rewrite; see the
-    // note in listing-rails.test.tsx. An intentional edit re-pins this hash.
-    expect(createHash("sha256").update(prefix).digest("hex")).toBe("a0a964938c2fcbc5f9cf4158710b85a0cf9218061cc970bf4dc9d4df0469c365")
+    // Re-pinned 2026-09-10 for the owner-requested complete design system rebuild.
+    // Keep the scope and accessibility assertions, not the obsolete presentation.
+    expect(createHash("sha256").update(prefix).digest("hex")).toBe("2ca2234a1667cf95a5b1500371210e80278b5d78584be59355c72bb5a37d4e5e")
     const end = css.indexOf("/* Ordinary buyer recovery")
     expect(end).toBeGreaterThan(css.indexOf(marker))
     const scoped = css.slice(css.indexOf(marker), end)

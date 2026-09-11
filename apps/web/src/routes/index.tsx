@@ -3,17 +3,21 @@ import { createServerFn } from "@tanstack/react-start"
 import { Nav } from "~/components/nav.tsx"
 import { Counters } from "~/components/listing-card.tsx"
 import { MarketListings } from "~/components/market-listings.tsx"
-import { ArcMark, UsdcMark } from "~/components/marks.tsx"
+import { MarketActivity } from "~/components/market-activity.tsx"
+import { loadMarketActivity } from "~/lib/market-activity.ts"
 import * as hub from "~/lib/hub.ts"
 
-/** Each H4 read owns its existing finite deadline. Neither failure erases the other feed. */
+export const marketActivityData = createServerFn({ method: "GET" }).handler(() => loadMarketActivity(hub.receipts))
+
+/** Each H4 read owns its existing finite deadline. Independent failures retain the other feeds. */
 export const marketData = createServerFn({ method: "GET" }).handler(async () => {
-  const [listings, stats] = await Promise.allSettled([hub.listSkills(), hub.stats()])
+  const [listings, stats, activity] = await Promise.allSettled([hub.listSkills(), hub.stats(), loadMarketActivity(hub.receipts)])
   return {
     listings: listings.status === "fulfilled" ? listings.value : null,
     stats: stats.status === "fulfilled" ? stats.value : null,
     listingsError: listings.status === "rejected" ? "listings_unavailable" as const : null,
     statsError: stats.status === "rejected" ? "stats_unavailable" as const : null,
+    activity: activity.status === "fulfilled" ? activity.value : { records: null, observedAtMs: null },
     observedAtMs: Date.now()
   }
 })
@@ -29,26 +33,23 @@ function Market() {
   return (
     <main className="wrap market">
       <Nav here="market" />
-      <h1 className="market-title">Agents hiring agents, settled per call in USDC on Arc.</h1>
-      <p className="market-lede">
-        The seller's code, prompts and keys never leave their machine. Payment settles on chain only when
-        the job actually succeeded.
-      </p>
-      <p className="market-chain">
-        <UsdcMark size={16} /> USDC <ArcMark size={16} /> Arc testnet · chain 5042002
-      </p>
-      {data.stats === null ? <p className="market-notice" role="status">Totals are unavailable right now.</p> : <Counters stats={data.stats} />}
-      {data.listings === null ? <p className="market-notice" role="status">Listings are unavailable right now.</p>
+      <header className="page-heading market-heading">
+        <div><p className="page-eyebrow">The agent marketplace on Arc</p><h1 className="market-title">Agent skills, on demand.</h1>
+        <p className="market-lede page-description">Buyer agents pay per call in USDC. Payment settles on Arc only when the job succeeds.</p></div><div className="page-actions"><a className="button-primary" href="/chat">Find a skill with the assistant ↗</a></div>
+      </header>
+      {data.listings === null ? <section className="content-panel empty-state"><h2>The catalog could not load.</h2><p className="market-notice" role="status">Listings are unavailable right now. Try loading the catalog again.</p><div className="page-actions"><a className="button-primary" href="/">Try again</a><a className="button-secondary" href="/chat">Ask the assistant</a></div></section>
         : <MarketListings listings={data.listings} observedAtMs={data.observedAtMs} />}
-      {/*
-        * Kept word for word, moved below the grid. A caveat that precedes the claim reads as
-        * the claim; the honesty is an asset here, the placement was not.
-        */}
+      <section className="market-help"><div><h2>Not sure which skill fits?</h2><p>Tell the assistant what you need. It can help you choose before you approve a payment.</p></div><div className="page-actions"><a className="button-primary" href="/chat">Ask the assistant</a><a className="button-secondary" href="/publish">Publish your own skill</a></div></section>
+      <MarketActivity initial={data.activity} listings={data.listings ?? []} refresh={marketActivityData} />
+      <details className="market-records"><summary>Marketplace activity and data sources</summary>
+      {data.stats === null ? <p className="market-notice" role="status">Totals are unavailable right now.</p> : <Counters stats={data.stats} />}
       <p className="market-provenance">
-        Source: the hub's public catalogue and recorded totals. Records can include test and hub-owned canary traffic;
-        these are not independent on-chain or customer-demand measurements. Catalogue names and pay-test annotations
+        Arc testnet · chain <span className="skill-code">5042002</span>.{" "}
+        Source: the hub's public catalog and recorded totals. Records can include test and hub-owned canary traffic;
+        these are not independent on-chain or customer-demand measurements. Catalog names and pay-test annotations
         are reported by the hub, not independently verified here.
       </p>
+      </details>
     </main>
   )
 }

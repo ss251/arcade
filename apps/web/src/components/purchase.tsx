@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { formatPrice, parsePrice } from "../../../../packages/core/src/money.ts"
 import { Confirm } from "./confirm.tsx"
+import { ResultContent } from "./result-content.tsx"
 import { capturePurchasePart } from "../lib/purchase-conversation.ts"
 import { capturePurchaseContext, type BrowserPurchaseContext } from "../lib/purchase-context.ts"
 import { PurchaseQuoteFailure, quotePurchaseContext } from "../lib/purchase-quote.ts"
@@ -16,28 +17,40 @@ export const ArchivedPurchase = () => <div className="tool-out">
 
 /** Receives only the private runner's closed projection, never SDK tool output. */
 export const LivePurchaseView = ({ view }: { view: Readonly<PurchaseView> }) => {
-  const result = view.outcome?.resultJson, long = result !== null && result !== undefined && result.length > 1200
-  const body = result === null || result === undefined ? null : <blockquote className="quoted">
-    <span className="quoted-label">returned by the seller · complete JSON</span>
-    <pre className="result">{result}</pre>
-  </blockquote>
-  return <div className="tool-out">
-    <p className="tool-note" role="status">{view.message}</p>
-    {view.jobId ? <p className="tool-note">job <span className="measured">{view.jobId}</span></p> : null}
-    {view.outcome ? <div className="tool-row"><span className="tool-id">{view.outcome.skillId}</span>
-      <span className={view.outcome.settled ? "usdc" : "unsettled"}>
-        {view.outcome.settled ? formatPrice(BigInt(view.outcome.priceAtomic)) : "hub reports not settled"}
-      </span></div> : null}
-    {view.outcome?.explorer ? <p className="tool-note"><a href={view.outcome.explorer} target="_blank" rel="noreferrer">
-      inspect the reported transaction ↗</a></p> : null}
-    {view.outcome?.referenceKind === "gateway-transfer" ? <p className="tool-note">Gateway transfer
-      <span className="measured"> {view.outcome.reference}</span> · not a mined transaction</p> : null}
-    {view.recovery === "stored" || view.recovery === "already_stored" ? <p className="tool-note">Recovery saved in this browser.</p>
-      : view.recovery === "recovered" ? <p className="tool-note">Recovery saved. Earlier malformed recovery data was replaced.</p>
-      : view.recovery ? <p className="tool-note" role="alert">Recovery was not saved. Keep this tab open; closing it may lose access to this job.
-        Do not repeat the payment.</p> : null}
-    {long ? <details className="disclose"><summary>show the full result</summary>{body}</details> : body}
-  </div>
+  const result = view.outcome?.resultJson
+  const titles: Record<PurchaseView["phase"], string> = {
+    refused: "Purchase not started", declined: "Purchase declined", unconfirmed: "Payment needs a check",
+    checking: "Checking your purchase", signing: "Check your wallet", submitting: "Submitting your purchase",
+    pending: "Waiting for the result", settled: "Your result is ready", not_settled: "The job did not settle"
+  }
+  const needsCheck = view.phase === "unconfirmed" || view.phase === "not_settled"
+  const saved = view.recovery === "stored" || view.recovery === "already_stored" || view.recovery === "recovered"
+  return <section className="tool-out purchase-outcome" aria-label="Purchase outcome">
+    <div className="purchase-outcome-heading"><h2 role="status">{titles[view.phase]}</h2>
+      {view.outcome?.settled ? <span className="usdc">{formatPrice(BigInt(view.outcome.priceAtomic))}</span> : null}</div>
+    {!view.outcome || needsCheck ? <p className="tool-note">{view.message}</p> : null}
+    {result !== null && result !== undefined ? <div className="purchase-result"><h3>Your result</h3>
+      <p className="quoted-label">returned by the seller</p><ResultContent json={result} /></div> : null}
+    <div className="purchase-next">
+      {view.outcome?.explorer ? <a className="button-secondary" href={view.outcome.explorer} target="_blank" rel="noreferrer">
+        View settlement ↗</a> : null}
+      {saved ? <a className="button-secondary" href="/buyer">View job and receipt tree</a>
+        : needsCheck ? <a className="button-secondary" href="/buyer">Check your saved jobs</a> : null}
+    </div>
+    {view.recovery && !saved ? <p className="tool-note" role="alert">Recovery was not saved. Keep this tab open; closing it may lose access to this job.
+      Do not repeat the payment.</p> : null}
+    <details className="disclose purchase-record"><summary>Payment and receipt details</summary>
+      {view.outcome && !needsCheck ? <p className="tool-note">{view.message}</p> : null}
+      {view.jobId ? <p className="tool-note">Job <span className="measured">{view.jobId}</span></p> : null}
+      {view.outcome ? <p className="tool-note">Skill <span className="tool-id">{view.outcome.skillId}</span>
+        {view.outcome.settled ? null : <span className="unsettled"> · hub reports not settled</span>}</p> : null}
+      {view.outcome?.explorer ? <p className="tool-note">Use the settlement link to inspect the reported transaction.</p> : null}
+      {view.outcome?.referenceKind === "gateway-transfer" ? <p className="tool-note">Gateway transfer
+        <span className="measured"> {view.outcome.reference}</span> · not a mined transaction</p> : null}
+      {view.recovery === "stored" || view.recovery === "already_stored" ? <p className="tool-note">Recovery saved in this browser.</p>
+        : view.recovery === "recovered" ? <p className="tool-note">Recovery saved. Earlier malformed recovery data was replaced.</p> : null}
+    </details>
+  </section>
 }
 
 export type PurchaseDecision = (part: unknown, approved: boolean, context?: BrowserPurchaseContext,
@@ -49,8 +62,8 @@ const TERMS_BLOCK = "Complete payment terms or verified ENS records are unavaila
 /** Mounted only by a live conversation owner, never a generic transcript renderer.
  * The caller keys this component by the complete original decision binding.
  */
-export const PendingPurchase = ({ part, onDecision, quote = quotePurchaseContext }: {
-  part: unknown; onDecision: PurchaseDecision; quote?: typeof quotePurchaseContext
+export const PendingPurchase = ({ part, onDecision, onReady, quote = quotePurchaseContext }: {
+  part: unknown; onDecision: PurchaseDecision; onReady?: (element: HTMLDivElement) => void; quote?: typeof quotePurchaseContext
 }) => {
   const captured = capturePurchasePart(part), binding = captured?.binding, bindingKey = JSON.stringify(binding)
   const [terms, setTerms] = useState<BrowserPurchaseContext>()
@@ -61,7 +74,11 @@ export const PendingPurchase = ({ part, onDecision, quote = quotePurchaseContext
   const [decisionFailed, setDecisionFailed] = useState(false)
   const selected = useRef<{ controller: AbortController; provider: Eip1193Provider } | undefined>(undefined)
   const current = useRef({ part, onDecision, terms, wallet })
+  const approvalRef = useRef<HTMLDivElement>(null)
   current.current = { part, onDecision, terms, wallet }
+  useLayoutEffect(() => {
+    if (terms && approvalRef.current) onReady?.(approvalRef.current)
+  }, [terms, onReady])
 
   useEffect(() => {
     const c = new AbortController()
@@ -122,21 +139,25 @@ export const PendingPurchase = ({ part, onDecision, quote = quotePurchaseContext
 
   if (!binding || captured?.state !== "approval-requested") return <ArchivedPurchase />
   if (decisionFailed) return <p className="tool-note" role="alert">This decision could not be applied. Request a fresh purchase; do not repeat an existing payment.</p>
-  if (!terms && !failed) return <div className="tool-out"><p className="tool-note">asking the endpoint what this costs…</p></div>
+  if (!terms && !failed) return <div className="tool-out purchase-loading" role="status"><h3>Getting your price</h3>
+    <p className="tool-note">We’re asking the endpoint what this costs. Nothing has been signed.</p>
+    <button type="button" className="deny" onClick={deny}>Cancel request</button></div>
   if (!terms) return <div className="tool-out">
-    <p className="tool-note">requested {binding.name ? "ENS name" : "skill"} <span className="measured">{binding.name ?? binding.skillId}</span></p>
+    <h3>This purchase needs a fresh quote</h3>
+    <p className="tool-note">Requested {binding.name ? "ENS name" : "skill"} <span className="measured">{binding.name ?? binding.skillId}</span></p>
     <p className="tool-note">Proposed ceiling {binding.maxAmountUsd}. No verified quote.</p>
     <p className="confirm-blocked purchase-refusal" role="alert">{failed}</p>
-    <button type="button" className="deny" onClick={deny}>no</button>
+    <button type="button" className="deny" onClick={deny}>Dismiss request</button>
     <details className="disclose"><summary>review exact purchase input</summary><pre className="result">{binding.input}</pre></details>
   </div>
-  return <div>
+  return <div ref={approvalRef}>
     <Confirm decisionKey={decisionKey} skillId={terms.skillId} price={formatPrice(BigInt(terms.amountAtomic))}
       payTo={terms.payTo} network={terms.network} ensName={terms.ensName}
       blocked={failed ?? (wallet ? undefined : walletBlock)} connecting={connecting}
       {...(!failed && terms && !wallet && provider() ? { onConnect: () => select(true) } : {})}
       onApprove={approve} onDeny={deny} />
-    {wallet ? <p className="tool-note">selected buyer <span className="measured">{wallet.buyer}</span></p> : null}
-    <details className="disclose"><summary>review exact purchase input</summary><pre className="result">{binding.input}</pre></details>
+    <details className="disclose purchase-input"><summary>Purchase input and wallet</summary>
+      {wallet ? <p className="tool-note">Selected buyer <span className="measured">{wallet.buyer}</span></p> : null}
+      <pre className="result">{binding.input}</pre></details>
   </div>
 }

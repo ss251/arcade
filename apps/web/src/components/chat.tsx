@@ -1,32 +1,20 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react"
 import { useChat } from "@ai-sdk/react"
 import { lastAssistantMessageIsCompleteWithApprovalResponses } from "ai"
-import { MessageScroller } from "@shadcn/react/message-scroller"
+import { MessageScroller, useMessageScroller } from "@shadcn/react/message-scroller"
 import { Streamdown } from "streamdown"
 import { COMMANDS, matchCommands, parseCommand, type Command } from "../lib/commands.ts"
 import type { StoredMessage } from "../lib/history.ts"
 import { ArchivedPurchase, LivePurchaseView, PendingPurchase, type PurchaseDecision } from "./purchase.tsx"
 import { capturePurchasePart, createPurchaseConversation } from "../lib/purchase-conversation.ts"
 import type { PurchaseView } from "../lib/purchase-run.ts"
+import { consumeSkillDraft } from "../lib/skill-input-draft.ts"
+import { createApprovalRevealPolicy } from "../lib/approval-reveal.ts"
 
 /**
- * The buying agent's chat surface.
- *
- * Motion is decided by design-sauce Law 4's frequency test, whose dominant branch here is
- * "don't". Streaming text chunks arrive many times per second, so they get NO animation —
- * not a subtle one. Message arrival happens tens of times a day, so it gets opacity only,
- * 200ms, strong ease-out, reusing the `arrive` keyframe already defined in
- * `apps/hub/src/ui.ts:233` rather than inventing a second one. Nothing animates layout, and
- * no motion is stacked on `MessageScroller`, which already owns scroll anchoring and
- * auto-follow — animating a component that owns the behaviour is how you get fighting
- * scroll positions.
- *
- * Provenance (Law 3) is the layout's organising idea, same as the settlement page. The
- * model's prose is sans because it is a claim. Prices, hashes, addresses and latencies are
- * mono because they were measured. Seller-written copy arrives fenced from the tool layer
- * and is rendered as a QUOTED block — the fence scaffolding itself is stripped, because it
- * is addressed to the model and would be noise to a reader, but the fact that a stranger
- * wrote it is exactly what the block communicates.
+ * Human conversation uses platform sans; exact identifiers use monospace.
+ * Streaming and tool status updates appear immediately, without decorative motion.
+ * Seller-authored content remains a literal quotation, never trusted page markup.
  */
 
 // ── message parts ───────────────────────────────────────────────────────────
@@ -45,7 +33,7 @@ const unfence = (text: string): { body: string; quoted: boolean } => {
  * to someone who has never read this codebase — which is every judge and every visitor.
  */
 const DOING: Record<string, string> = {
-  list_skills: "reading the catalogue",
+  list_skills: "reading the catalog",
   describe_skill: "reading the listing",
   quote: "asking the endpoint its price",
   receipts: "reading the settlement feed",
@@ -61,10 +49,8 @@ const DOING: Record<string, string> = {
  * signal that cannot be told apart from a different outcome. The three states are now
  * distinct, and the failed one says so.
  *
- * Motion follows Law 4's frequency test. Tool calls happen several times per message, so the
- * running state gets one low-amplitude opacity pulse on a 2px dot and nothing else — no
- * spinner, no layout movement, and it stops the moment the state resolves. `prefers-reduced-
- * motion` drops the pulse and keeps the dot, which is the state, not the decoration.
+ * Tool calls happen several times per message. The status changes immediately without
+ * a looping pulse or layout motion; its label remains the source of the state.
  */
 const ToolMarker = ({ name, state }: { name: string; state: string }) => {
   const short = name.replace(/^arcade_/, "")
@@ -73,7 +59,7 @@ const ToolMarker = ({ name, state }: { name: string; state: string }) => {
   return (
     <div className={`marker${done ? " is-done" : failed ? " is-failed" : " is-running"}`} role="status">
       <span className="marker-dot" aria-hidden="true" />
-      <span className="marker-name">{short}</span>
+      <details className="marker-detail"><summary>Technical activity</summary><span className="marker-name">{short}</span></details>
       <span className="marker-doing">{DOING[short] ?? ""}</span>
       <span className="marker-state">{failed ? "failed" : done ? "done" : "running"}</span>
     </div>
@@ -83,7 +69,7 @@ const ToolMarker = ({ name, state }: { name: string; state: string }) => {
 /**
  * Seller-written text, shown as a quotation rather than as the page's own voice.
  *
- * This does NOT take a semantic colour. Blue means USDC, green means settled, red means
+ * This does NOT take a semantic color. Blue means USDC, green means settled, red means
  * not settled (Law 2); spending a fourth on "untrusted" would erode the three that carry
  * money meaning. It earns its separation from a rule and a label instead.
  */
@@ -103,21 +89,22 @@ const Quoted = ({ children }: { children: string }) => (
  * half a cent" for $0.0005 would be uncatchable, because the trustworthy copy was thrown
  * away one layer earlier. Rendering the first makes the model's rounding cosmetic.
  *
- * It also restores `ui.ts`'s law on this surface. Mono is what was MEASURED, sans is what
- * was CLAIMED — the settlement page has kept that distinction in every row it has rendered,
- * and a chat that prints every figure inside a sentence collapses it, putting hub-computed
- * numbers in the claimed voice. Here the typography does the arguing: the price is mono and
- * carries the USDC colour because the hub computed it; the prose around it stays sans.
+ * Identifiers use monospace for character verification. Prices use platform sans with
+ * tabular figures because they are quantities. The USDC color separates exact amounts
+ * from the surrounding human prose, regardless of what the model says about them.
  *
  * Scoped to listings and quotes, where a price is the whole point. Receipts are deliberately
  * NOT mirrored here — they already live on the hub page, and a second home for them would be
  * the second copy this codebase keeps deleting.
  */
+const skillLabel = (id: string) => id.replace(/[-_]+/g, " ").replace(/^./, letter => letter.toUpperCase())
+
 const Listings = ({ skills }: { skills: ReadonlyArray<{ id: string; price: string }> }) => (
   <div className="tool-out">
     {skills.map((s) => (
       <div className="tool-row" key={s.id}>
-        <span className="tool-id">{s.id}</span>
+        <div className="tool-service"><a href={`/skill/${encodeURIComponent(s.id)}`}>{skillLabel(s.id)}</a>
+          <details className="disclose"><summary>Skill details</summary><span className="tool-id">{s.id}</span></details></div>
         <span className="usdc">{s.price}</span>
       </div>
     ))}
@@ -127,14 +114,16 @@ const Listings = ({ skills }: { skills: ReadonlyArray<{ id: string; price: strin
 const Quote = ({ skillId, price }: { skillId: string; price: string }) => (
   <div className="tool-out">
     <div className="tool-row">
-      <span className="tool-id">{skillId}</span>
+      <div className="tool-service"><strong>{skillLabel(skillId)}</strong>
+        <details className="disclose"><summary>Quote details</summary><span className="tool-id">{skillId}</span>
+          <p className="tool-note">Quoted from the endpoint’s own payment challenge · signs nothing</p></details></div>
       <span className="usdc">{price}</span>
     </div>
-    <p className="tool-note">quoted from the endpoint’s own payment challenge · signs nothing</p>
+    <p className="tool-note">For one call. Review and approve before paying.</p>
   </div>
 )
 
-/** Read the structured half, defensively — a shape we do not recognise renders nothing. */
+/** Read the structured half, defensively — a shape we do not recognize renders nothing. */
 const ToolOutput = ({ name, output }: { name: string; output: unknown }) => {
   if (output === null || typeof output !== "object") return null
   const o = output as Record<string, unknown>
@@ -205,7 +194,7 @@ export const Thread = ({
 }: {
   messages: ReadonlyArray<UIMessageLike>
   /** Only the live Chat supplies an owner-backed renderer. Default is wholly passive. */
-  renderPurchase?: (part: UIMessageLike["parts"][number]) => ReactNode
+  renderPurchase?: (part: UIMessageLike["parts"][number], messageId: string) => ReactNode
 }) => {
   /*
    * The newest USER turn is the scroll anchor.
@@ -227,7 +216,7 @@ export const Thread = ({
     {messages.map((m) => (
       <MessageScroller.Item key={m.id} messageId={m.id} scrollAnchor={m.id === anchorId}>
         <article className={`msg msg-${m.role}`}>
-          <span className="who">{m.role === "user" ? "you" : "arcade"}</span>
+          <span className="who">{m.role === "user" ? "You" : "ARCADE"}</span>
           <div className="body">
             {m.parts.map((part, i) => {
               if (part.type === "text") {
@@ -238,7 +227,7 @@ export const Thread = ({
 
                 if (name === "arcade_call_skill") {
                   return <div key={i}>{m.role === "assistant" && renderPurchase
-                    ? renderPurchase(part) : <ArchivedPurchase />}</div>
+                    ? renderPurchase(part, m.id) : <ArchivedPurchase />}</div>
                 }
                 return (
                   <div key={i}>
@@ -283,12 +272,55 @@ export interface ChatProps {
   readonly hubUrl: string
   /** Identity of this conversation. Switching it REMOUNTS the chat — see `index.tsx`. */
   readonly id?: string | undefined
+  /** Listing context fills the composer only; it never sends or authorizes. */
+  readonly selectedSkill?: string | undefined
+  /** True only for the initial fresh route conversation, never a restored or new-history chat. */
+  readonly consumeListingDraft?: boolean | undefined
   readonly initial?: ReadonlyArray<StoredMessage> | undefined
   /** Called with the settled transcript, for the caller to persist. */
   readonly onChanged?: ((messages: ReadonlyArray<StoredMessage>) => void) | undefined
 }
 
-export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) => {
+/** A composition commit or Shift+Enter always belongs to the textarea, never send. */
+export const composerKeyAction = (input: string, key: string, modifiers: {
+  shift?: boolean; alt?: boolean; ctrl?: boolean; meta?: boolean; composing?: boolean; keyCode?: number
+} = {}, cursor = 0): "native" | "send" | "next" | "previous" | "clear" | Command => {
+  if (modifiers.composing || modifiers.keyCode === 229 || modifiers.shift || modifiers.alt || modifiers.ctrl || modifiers.meta) return "native"
+  const choices = matchCommands(input)
+  if (choices.length) {
+    if (key === "ArrowDown") return "next"
+    if (key === "ArrowUp") return "previous"
+    if (key === "Escape") return "clear"
+    if (key === "Tab" || key === "Enter") {
+      const picked = choices[cursor]
+      if (!picked) return "native"
+      return key === "Enter" && picked.arg === undefined && input === `/${picked.name}` ? "send" : picked
+    }
+  }
+  return key === "Enter" ? "send" : "native"
+}
+
+/** Quote loading changes the card's height. Reveal its start only after the terms
+ * mount; scroll this viewport alone, never the page or its sticky navigation. */
+const RevealedPurchase = ({ part, messageId, decisionKey, onDecision, policy, viewport }: {
+  part: unknown; messageId: string; decisionKey: string; onDecision: PurchaseDecision
+  policy: ReturnType<typeof createApprovalRevealPolicy>; viewport: RefObject<HTMLDivElement | null>
+}) => {
+  const { scrollToMessage } = useMessageScroller()
+  useLayoutEffect(() => { policy.register(decisionKey, true) }, [policy, decisionKey])
+  const ready = useCallback((element: HTMLDivElement) => {
+    const container = viewport.current
+    if (!container || !policy.reveal(decisionKey)) return
+    // Exit the library's streaming user-message anchor before revealing the card.
+    // Otherwise its next resize restores that prompt, especially at large text sizes.
+    scrollToMessage(messageId, { align: "start", behavior: "instant" })
+    container.scrollTo({ top: container.scrollTop + element.getBoundingClientRect().top - container.getBoundingClientRect().top - 16,
+      behavior: "instant" })
+  }, [decisionKey, messageId, policy, scrollToMessage, viewport])
+  return <PendingPurchase part={part} onDecision={onDecision} onReady={ready} />
+}
+
+export const Chat = ({ chatLive, hubUrl, id, initial, onChanged, selectedSkill, consumeListingDraft = false }: ChatProps) => {
   // Spread rather than assigned: `exactOptionalPropertyTypes` distinguishes an absent
   // property from one explicitly set to undefined, and `ChatInit` accepts only the former.
   const { messages, sendMessage, status, error, addToolApprovalResponse } = useChat({
@@ -310,6 +342,14 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
   const ownerRef = useRef<{ id: string | undefined; owner: Owner } | undefined>(undefined)
   const [owner, setOwner] = useState<Owner>()
   const [purchaseViews, setPurchaseViews] = useState<Record<string, Readonly<PurchaseView>>>({})
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const approvalReveal = useMemo(createApprovalRevealPolicy, [id])
+  const manualScrolling = useRef(false)
+  const readingEarlier = () => { manualScrolling.current = true; approvalReveal.setFollowing(false) }
+  const followLatest = () => { manualScrolling.current = false; approvalReveal.setFollowing(true) }
+  const livePendingApproval = owner && ownerRef.current?.owner === owner && ownerRef.current.id === id &&
+    messages.some(message => message.role === "assistant" && message.parts.some(part =>
+      !(part.type.startsWith("tool-") && "toolCallId" in part && Object.hasOwn(purchaseViews, part.toolCallId as string)) && owner.canConfirm(part)))
   const latest = useRef({ messages, addToolApprovalResponse })
   latest.current = { messages, addToolApprovalResponse }
   // Setup/cleanup/setup under StrictMode leaves one live owner, never a restored permit.
@@ -346,7 +386,36 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
     } catch { active.owner.discard(key); return false }
     return true
   }, [id])
-  const [input, setInput] = useState("")
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const draftChecked = useRef(false), inputEdited = useRef(false)
+  const [input, setInput] = useState(() => !initial?.length && selectedSkill ? `Help me use ${selectedSkill}. Explain what input it needs and quote the price before I decide.` : "")
+  useEffect(() => {
+    if (draftChecked.current) return
+    draftChecked.current = true
+    if (!consumeListingDraft || initial !== undefined || !selectedSkill || messages.length || inputEdited.current) return
+    try {
+      const draft = consumeSkillDraft(window.sessionStorage, selectedSkill)
+      if (draft !== undefined && !inputEdited.current) {
+        setInput(`Help me use ${selectedSkill} with this input. Check the input and quote the price before I decide.\n\n${draft}`)
+      }
+    } catch { /* Storage may be unavailable. The ordinary editable skill request remains. */ }
+  }, [consumeListingDraft, initial, selectedSkill])
+  useEffect(() => {
+    const field = inputRef.current
+    if (!field) return
+    const resize = () => {
+      const style = getComputedStyle(field)
+      const line = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.5
+      const padding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom)
+      const border = Number.parseFloat(style.borderTopWidth) + Number.parseFloat(style.borderBottomWidth)
+      field.style.height = "auto"
+      field.style.height = `${Math.min(field.scrollHeight + border, line * 8 + padding + border)}px`
+    }
+    resize()
+    window.addEventListener("resize", resize)
+    return () => window.removeEventListener("resize", resize)
+  }, [input])
+  const suggest = (value: string) => { inputEdited.current = true; setInput(value); inputRef.current?.focus() }
   // Which row the arrow keys are on. Reset whenever the candidate list changes.
   const [cursor, setCursor] = useState(0)
 
@@ -366,6 +435,7 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
   const send = (text: string) => {
     const trimmed = text.trim()
     if (trimmed === "" || busy || !chatLive) return
+    followLatest()
     setInput("")
     // A command becomes the English it stands for, then travels the ordinary path. See
     // `lib/commands.ts` for why there is no second route to the tools.
@@ -378,26 +448,16 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
     setInput(c.arg === undefined ? `/${c.name}` : `/${c.name} `)
   }
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!open) return
-    if (e.key === "ArrowDown") {
-      e.preventDefault()
-      setCursor((i) => (i + 1) % candidates.length)
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault()
-      setCursor((i) => (i - 1 + candidates.length) % candidates.length)
-    } else if (e.key === "Tab" || (e.key === "Enter" && candidates.length > 0)) {
-      const picked = candidates[cursor]
-      if (picked === undefined) return
-      // Enter on a complete, argument-less command sends it. Otherwise completing is the
-      // more useful default — Enter should never fire `/buy` with no skill named.
-      if (e.key === "Enter" && picked.arg === undefined && input === `/${picked.name}`) return
-      e.preventDefault()
-      complete(picked)
-    } else if (e.key === "Escape") {
-      e.preventDefault()
-      setInput("")
-    }
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const action = composerKeyAction(input, e.key, { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey,
+      meta: e.metaKey, composing: e.nativeEvent.isComposing, keyCode: e.keyCode }, cursor)
+    if (action === "native") return
+    e.preventDefault()
+    if (action === "send") send(input)
+    else if (action === "next") setCursor((i) => (i + 1) % candidates.length)
+    else if (action === "previous") setCursor((i) => (i - 1 + candidates.length) % candidates.length)
+    else if (action === "clear") setInput("")
+    else complete(action)
   }
 
   const submit = (e: React.FormEvent) => {
@@ -412,39 +472,51 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
         its start, rather than at the very bottom of a long reply with no idea what was
         asked. Same reasoning as the anchor choice itself.
       */}
-      <MessageScroller.Provider autoScroll defaultScrollPosition="last-anchor">
+      <MessageScroller.Provider autoScroll={messages.length > 0 && !livePendingApproval} defaultScrollPosition={messages.length > 0 ? "last-anchor" : "start"}>
         <MessageScroller.Root className="scroller">
-          <MessageScroller.Viewport className="viewport" aria-label="Conversation">
+          <MessageScroller.Viewport className="viewport" aria-label="Conversation" ref={viewportRef}
+            onWheel={readingEarlier} onTouchMove={readingEarlier}
+            onPointerDown={event => { if (event.target === event.currentTarget) readingEarlier() }}
+            onKeyDown={event => { if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) readingEarlier() }}
+            onScroll={event => {
+              if (!manualScrolling.current) return
+              const element = event.currentTarget
+              approvalReveal.setFollowing(element.scrollHeight - element.scrollTop - element.clientHeight < 32)
+            }}>
             <MessageScroller.Content className="thread">
-              {messages.length === 0 ? <Empty chatLive={chatLive} hubUrl={hubUrl} /> : null}
+              {messages.length === 0 ? <Empty chatLive={chatLive} hubUrl={hubUrl} selectedSkill={selectedSkill} onSuggest={suggest} /> : null}
               <Thread
                 messages={messages as ReadonlyArray<UIMessageLike>}
-                renderPurchase={part => {
+                renderPurchase={(part, messageId) => {
                   const captured = capturePurchasePart(part), key = part.toolCallId
                   // A malformed/replaced SDK part still gets its private progress,
                   // but prototype names can never be mistaken for stored views.
                   const view = key === undefined || !Object.hasOwn(purchaseViews, key) ? undefined : purchaseViews[key]
                   if (view) return <LivePurchaseView view={view} />
                   if (owner && ownerRef.current?.owner === owner && ownerRef.current.id === id && owner.canConfirm(part)) {
-                    return <PendingPurchase key={JSON.stringify(captured?.binding)} part={part} onDecision={decide} />
+                    const decisionKey = JSON.stringify(captured?.binding)
+                    return <RevealedPurchase key={decisionKey} decisionKey={decisionKey} messageId={messageId} part={part} onDecision={decide}
+                      policy={approvalReveal} viewport={viewportRef} />
                   }
                   return <ArchivedPurchase />
                 }}
               />
             </MessageScroller.Content>
           </MessageScroller.Viewport>
-          <MessageScroller.Button className="to-latest" direction="end">
-            latest
-          </MessageScroller.Button>
+          {messages.length > 0 ? <MessageScroller.Button className="to-latest" direction="end" onClick={followLatest}>
+            Jump to latest
+          </MessageScroller.Button> : null}
         </MessageScroller.Root>
       </MessageScroller.Provider>
 
       {error !== undefined ? (
         <p className="chat-error" role="alert">
-          The chat request did not complete. Check any pending purchase before retrying.
+          This request did not finish. <a href="/buyer">Check your jobs</a> before asking again,
+          or <a href="/">explore skills</a>. Pending payments are never retried automatically.
         </p>
       ) : null}
 
+      {busy ? <p className="chat-working" role="status">Your agent is working on your request…</p> : null}
       <form className="composer" onSubmit={submit}>
         {/*
           The command menu. Present only while a leading slash is being typed, which is the
@@ -478,20 +550,26 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
             ))}
           </ul>
         ) : null}
-        <input
+        <textarea
           className="prompt"
+          rows={1}
+          ref={inputRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => { inputEdited.current = true; setInput(e.target.value) }}
           onKeyDown={onKeyDown}
           placeholder={
-            chatLive ? "What do you need bought?  ( / for commands )" : "The chat is not live on this deployment"
+            chatLive ? "Message…" : "Chat unavailable"
           }
           aria-label="Message"
           autoComplete="off"
           disabled={!chatLive}
         />
-        <button className="send" type="submit" disabled={!chatLive || busy || input.trim() === ""}>
-          {busy ? "…" : "send"}
+        <button className="send" type="submit" disabled={!chatLive || busy || input.trim() === ""}
+          aria-label={busy ? "Working" : "Send message"}>
+          <span className="send-label">{busy ? "Working…" : "Send"}</span>
+          <svg className="send-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M10 16V4m-5 5 5-5 5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </form>
     </div>
@@ -503,46 +581,47 @@ export const Chat = ({ chatLive, hubUrl, id, initial, onChanged }: ChatProps) =>
  * suggestions are real prompts, and the sentence states what is free, because "does this
  * cost me anything to look" is the first question a visitor actually has.
  */
-export const Empty = ({ chatLive, hubUrl }: ChatProps) =>
+export const Empty = ({ chatLive, hubUrl, selectedSkill, onSuggest }: ChatProps & { onSuggest?: (value: string) => void }) =>
   chatLive ? (
-    <div className="empty-state">
-      <p className="law">
-        Ask for what you need. Listing, describing and quoting are <b>free</b> and sign
-        nothing. A purchase is signed by your own wallet, in your browser.
+    <div className="empty-state chat-intro">
+      <p className="chat-kicker">Your buying agent</p>
+      <h1 className="chat-title">{selectedSkill ? `Use ${skillLabel(selectedSkill)}` : "Ask for what you need."}</h1>
+      <p className="law chat-description">
+        {selectedSkill ? "Add your input below. Your agent checks the skill and price before you approve."
+          : "Find the right agent skill, review the price, and approve the call. Payment settles on Arc only when the job succeeds."}
       </p>
-      {/*
-        The empty state teaches the one mechanic worth knowing, with the real commands
-        rather than a description of them — Law 9's "empty state plus one real action".
-      */}
-      <ul className="empty-cmds">
-        {COMMANDS.map((c) => (
-          <li key={c.name}>
-            <span className="slash-name">
-              /{c.name}
-              {c.arg === undefined ? "" : ` ${c.arg}`}
-            </span>
-            <span className="slash-hint">{c.hint}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="note">or just ask — type / for commands</p>
+      {selectedSkill ? null : <div className="chat-suggestions" aria-label="Suggested requests">
+        {["Find a skill for my task", "Compare skills and prices", "Help me check a result"].map((label, index) =>
+          <button type="button" key={label} disabled={onSuggest === undefined} onClick={() => onSuggest?.([
+            "Help me find the right skill. Here is the task I need done: ",
+            "Show me the available skills and compare what they do and the price per call.",
+            "Help me check the result and settlement of a previous job."
+          ][index]!)}>{label}<span aria-hidden="true">↗</span></button>)}
+      </div>}
+      <p className="note">Explore and compare for free. You approve every purchase.</p>
+      {selectedSkill ? null : <details className="disclose chat-commands">
+        <summary>Shortcuts — type / for commands</summary>
+        <ul className="empty-cmds">
+          {COMMANDS.map((c) => (
+            <li key={c.name}>
+              <span className="slash-name">/{c.name}{c.arg === undefined ? "" : ` ${c.arg}`}</span>
+              <span className="slash-hint">{c.hint}</span>
+            </li>
+          ))}
+        </ul>
+      </details>}
     </div>
   ) : (
-    // No key on this deployment, so do not invite what the server has already declined to
-    // do. Say what is true and send the visitor somewhere that works — the settlement page
-    // is the artifact worth reaching, and it is live.
-    <div className="empty-state">
-      <p className="law">
-        The chat is <b>not live</b> on this deployment. The marketplace it reads from is:
-        every listing, price and settled receipt is on the{" "}
-        <a href={hubUrl} target="_blank" rel="noreferrer">
-          hub
-        </a>
-        , and each receipt links to its transaction on Arc.
-      </p>
-      <p className="note">
-        Listing, describing and quoting are free and sign nothing. A purchase is signed by
-        your own wallet, in your browser — ARCADE never holds funds.
-      </p>
+    <div className="empty-state chat-intro">
+      <p className="chat-kicker">Your buying agent</p>
+      <h1 className="chat-title">Explore skills while chat is away.</h1>
+      <p className="law chat-description">Chat is unavailable right now. You can still find skills,
+        compare prices, and review your existing jobs.</p>
+      <div className="chat-fallback-actions"><a className="button-primary" href="/">Explore skills</a>
+        <a className="button-secondary" href="/buyer">View your jobs</a></div>
+      <details className="disclose"><summary>Availability details</summary>
+        <p className="note">The chat is not live on this deployment.
+          <a href={hubUrl} target="_blank" rel="noreferrer"> Inspect hub receipts ↗</a></p>
+      </details>
     </div>
   )

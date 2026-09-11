@@ -27,6 +27,8 @@ describe("confirm card — verified ENS quote", () => {
   })
   it("states the hub settlement policy without promising that a remote refusal revokes a signature", () => {
     const html = renderToStaticMarkup(<Confirm {...base} ensName={name} />)
+    expect(html).toContain("Only charged if the job succeeds")
+    expect(html).toContain("How payment works")
     expect(html).toContain("ARCADE hubs settle only after the result validates")
     expect(html).toContain("signed authorization may remain valid")
     expect(html).toContain("check the settlement record before retrying")
