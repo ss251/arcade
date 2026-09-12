@@ -32,7 +32,18 @@ const discard = (req: Request) => { if (req.body !== null && !req.body.locked) v
 /** Capture configuration once, before any application layers, signer or listener. */
 export const makeBrowserCors = (webValue: unknown, publicValue: unknown) => {
   const webOrigin = webValue === undefined ? null : origin(webValue)
-  const publicOrigin = webOrigin === null ? null : origin(publicValue)
+  /*
+   * The public origin stands on its own. It used to be derived only when a web origin was
+   * also configured, so a hub with ARCADE_PUBLIC_URL set but ARCADE_WEB_ORIGIN unset fell
+   * back to the raw request origin for the poll link it hands a paying buyer. Behind a
+   * TLS-terminating proxy that origin is not the https host the buyer called, the buyer
+   * SDK rightly refused the link as foreign, and a settled one-cent job on production was
+   * paid for and never collected. Browser CORS still needs the web origin; the poll link
+   * never did.
+   */
+  // A web origin without a public URL is still a configuration error: browser CORS cannot
+  // hand out links it cannot name. A public URL alone is simply honored.
+  const publicOrigin = publicValue !== undefined || webOrigin !== null ? origin(publicValue) : null
   return Object.freeze({ publicOrigin,
     async handle(req: Request, next: () => Promise<Response>): Promise<Response> {
       // Existing native CLI/runner/F protocols have no Origin and retain their own guards.
