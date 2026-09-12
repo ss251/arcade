@@ -718,7 +718,14 @@ code { font-family: var(--mono); overflow-wrap: anywhere; }
 .nav-item > svg { flex: none; width: 18px; height: 18px; }
 .nav-context { display: none; }
 @media (min-width: 64rem) {
-  .wrap { max-width: 88rem; margin-left: 13.5rem; margin-right: auto; padding: 2.5rem clamp(2rem, 4vw, 4rem) 4rem; }
+  /*
+   * The rail is fixed and 13.5rem wide, so the BODY carries that offset and the content
+   * column centers in what remains. Putting the offset on .wrap as a left margin with
+   * margin-right: auto pinned the column to the rail and left the right third of a wide
+   * window empty.
+   */
+  body { padding-left: 13.5rem; }
+  .wrap { max-width: 88rem; margin: 0 auto; padding: 2.5rem clamp(2rem, 4vw, 4rem) 4rem; }
   .nav { position: fixed; inset: 0 auto 0 0; width: 13.5rem; min-height: 100dvh; align-items: stretch; justify-content: flex-start; flex-direction: column; gap: 2.5rem; padding: 2rem 1rem; background: var(--subtle); backdrop-filter: none; box-shadow: none; }
   .nav .mark { align-self: flex-start; padding: 0 .75rem; }
   .nav nav { flex-direction: column; align-items: stretch; gap: .375rem; }
