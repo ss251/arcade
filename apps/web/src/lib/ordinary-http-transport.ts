@@ -99,9 +99,14 @@ export async function ordinaryHttp<A>(prepare: () => PreparedOrdinaryRequest<A>,
       if (headerBytes > 16_384) { cancelBody(response); return unavailable() }
     }
     const type = response.headers.get("content-type"), encoding = response.headers.get("content-encoding"), length = response.headers.get("content-length")
+    // Fetch exposes decoded body bytes but can retain the wire encoding/length headers
+    // (for example Railway's gzip responses). Bound the bytes we actually consume;
+    // a compressed wire length cannot establish the decoded size or its completeness.
+    const compressed = encoding !== null && /^(gzip|deflate|br)$/i.test(encoding)
     if (!type || !/^application\/json(?:\s*;\s*charset=(?:utf-8|"utf-8"))?$/i.test(type) ||
-      encoding !== null && encoding.toLowerCase() !== "identity" ||
-      length !== null && (length.length > 7 || !/^(0|[1-9][0-9]*)$/.test(length) || Number(length) > ORDINARY_BODY_LIMIT || response.headers.has("transfer-encoding"))) {
+      encoding !== null && encoding.toLowerCase() !== "identity" && !compressed ||
+      length !== null && (length.length > 16 || !/^(0|[1-9][0-9]*)$/.test(length) || !Number.isSafeInteger(Number(length)) ||
+        !compressed && Number(length) > ORDINARY_BODY_LIMIT || response.headers.has("transfer-encoding"))) {
       cancelBody(response); return unavailable()
     }
     reader = response.body.getReader()
@@ -118,7 +123,7 @@ export async function ordinaryHttp<A>(prepare: () => PreparedOrdinaryRequest<A>,
       if (size > ORDINARY_BODY_LIMIT) return unavailable()
       text += decoder.decode(chunk.value, { stream: true })
     }
-    if (length !== null && Number(length) !== size) return unavailable()
+    if (!compressed && length !== null && Number(length) !== size) return unavailable()
     text += decoder.decode()
     const body: unknown = JSON.parse(text)
     check()

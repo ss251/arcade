@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { looksLikeFenceEscape } from "@arcade/core"
-import { arcade_describe_skill, arcade_list_skills, arcade_receipts } from "../src/lib/tools.ts"
+import { arcade_describe_skill, arcade_list_skills, arcade_quote, arcade_receipts } from "../src/lib/tools.ts"
 
 /**
  * The catalog is untrusted input, and this is the surface where that starts to matter.
@@ -42,6 +42,61 @@ const stubFetch = (body: unknown, status = 200) => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
+
+describe("quotes carry the skill's actual input", () => {
+  const HUB = "https://hub.example"
+  const ADDRESS = "0x14490658fc8C7e3f5cDc68f01317Bdf684715182"
+  const stubQuote = (requiresAddress: boolean) => {
+    vi.stubEnv("ARCADE_HUB", HUB)
+    const request = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes("/listings/")) return Response.json(listing({
+        inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] },
+        outputSchema: { type: "object" }, bounds: { timeoutSec: 30 }
+      }))
+      // The live hub validates skill input before returning the payment challenge.
+      const input = JSON.parse(String(init?.body))
+      if (requiresAddress && input.address !== ADDRESS) return Response.json({ error: "invalid_input" }, { status: 400 })
+      return Response.json({ x402Version: 2, accepts: [{
+        scheme: "exact", amount: "10000", payTo: `0x${"2".repeat(40)}`,
+        asset: "0x3600000000000000000000000000000000000000", network: "eip155:5042002",
+        resource: `${HUB}/x/${listing().seller}/usdc-flow-check`, maxTimeoutSeconds: 604900
+      }] }, { status: 402 })
+    })
+    vi.stubGlobal("fetch", request)
+    return request
+  }
+
+  it("quotes an input-required skill and forwards its supplied address without payment", async () => {
+    const request = stubQuote(true)
+    const out = await arcade_quote.execute!({ skillId: "usdc-flow-check", input: JSON.stringify({ address: ADDRESS }) }, opts)
+    expect(out).toMatchObject({ price: "$0.01", amountAtomic: "10000" })
+    expect(request).toHaveBeenCalledTimes(2)
+    const [url, init] = request.mock.calls[1]!
+    expect(url).toBe(`${HUB}/x/${listing().seller}/usdc-flow-check`)
+    expect(init?.method).toBe("POST")
+    expect(JSON.parse(String(init?.body))).toEqual({ address: ADDRESS })
+    const headers = new Headers(init?.headers)
+    expect(headers.has("payment-signature")).toBe(false)
+    expect(headers.has("x-payment")).toBe(false)
+  })
+
+  it("preserves empty-object quoting when input is omitted", async () => {
+    const request = stubQuote(false)
+    expect(await arcade_quote.execute!({ skillId: "usdc-flow-check" }, opts)).toMatchObject({ price: "$0.01" })
+    expect(JSON.parse(String(request.mock.calls[1]![1]?.body))).toEqual({})
+  })
+
+  it.each([
+    ["malformed JSON", "{"], ["array", "[]"], ["null", "null"], ["scalar", "1"],
+    ["oversized UTF-8 object", JSON.stringify({ value: "é".repeat(65_536) })]
+  ])("refuses %s before any hub IO", async (_label, input) => {
+    const request = vi.fn()
+    vi.stubGlobal("fetch", request)
+    await expect(arcade_quote.execute!({ skillId: "usdc-flow-check", input }, opts)).rejects.toThrow("bounded JSON object")
+    expect(request).not.toHaveBeenCalled()
+  })
 })
 
 describe("catalog tools — seller prose is untrusted", () => {

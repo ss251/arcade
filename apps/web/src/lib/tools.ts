@@ -130,10 +130,20 @@ export const arcade_quote = tool({
   description:
     "What one call would cost, taken from the endpoint's own payment challenge rather than " +
     "the catalog. Free, signs nothing, charges nothing. Use this before proposing a " +
-    "purchase, because it is the price the buyer would actually be asked to sign.",
-  inputSchema: std(SkillIdArgs),
-  execute: async ({ skillId }) => {
-    const q = await hub.quote(skillId)
+    "purchase, because it is the price the buyer would actually be asked to sign. Describe " +
+    "the skill first and supply its actual input: the endpoint validates input before " +
+    "returning a price. Ask the visitor for missing required fields before quoting.",
+  inputSchema: std(Schema.Struct({
+    ...SkillIdArgs.fields,
+    input: Schema.optional(Schema.String.annotations({
+      description: "The skill's actual input as a JSON object string, matching inputSchema " +
+        "from arcade_describe_skill. The parsed object must fit within 131072 UTF-8 bytes. " +
+        "Omit only when the skill accepts an empty object."
+    }))
+  })),
+  execute: async ({ skillId, input }) => {
+    const parsedInput = purchaseInput(input)
+    const q = await hub.quote(skillId, parsedInput)
     return {
       skillId: q.skillId,
       amountAtomic: q.amountAtomic,

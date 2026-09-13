@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { createServer } from "node:http"
+import { gzipSync } from "node:zlib"
 import { readOrdinaryResult, readOrdinaryTree, OrdinaryJobHttpFailure, ORDINARY_BODY_LIMIT } from "../src/lib/ordinary-job-http.ts"
 
 const ORIGIN = "https://hub.example", ID = `job_${"a".repeat(32)}`, TOKEN = "b".repeat(32)
@@ -102,9 +104,61 @@ describe("ordinary browser capability reads", () => {
     expect(await finish(readOrdinaryResult(row(), {}, async () => json(`${body} `)))).toBe("refused")
     expect(await finish(readOrdinaryResult(row(), {}, async () => json("{}", { "content-length": "3" })))).toBe("refused")
   })
+  it.each(["gzip", "deflate", "br", "GZip"])("accepts Fetch-decoded %s with a different wire length", async encoding => {
+    // Native Fetch has already decompressed this body, while retaining response headers.
+    const body = { result: "x".repeat(300) }
+    expect(await readOrdinaryResult(row(), {}, async () => json(JSON.stringify(body), {
+      "content-encoding": encoding, "content-length": "40"
+    }))).toEqual({ status: 200, body })
+    expect(await readOrdinaryResult(row(), {}, async () => json("{}", { "content-encoding": encoding })))
+      .toEqual({ status: 200, body: {} })
+  })
+  it("reads a real gzip HTTP response through native Fetch", async () => {
+    const body = { result: "x".repeat(300) }, compressed = gzipSync(JSON.stringify(body))
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json", "content-encoding": "gzip",
+        "content-length": compressed.byteLength })
+      response.end(compressed)
+    })
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve))
+    try {
+      const address = server.address()
+      if (!address || typeof address === "string") throw new Error("Fixture did not bind")
+      expect(await readOrdinaryResult({ ...row(), hubOrigin: `http://127.0.0.1:${address.port}` }, {}))
+        .toEqual({ status: 200, body })
+    } finally {
+      server.closeAllConnections()
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    }
+  })
+  it("bounds decoded compressed bytes even when the advertised wire length is tiny", async () => {
+    const body = `"${"x".repeat(ORDINARY_BODY_LIMIT - 2)}"`
+    const headers = { "content-encoding": "gzip", "content-length": "10" }
+    expect((await readOrdinaryResult(row(), {}, async () => json(body, headers))).body).toHaveLength(ORDINARY_BODY_LIMIT - 2)
+    const cancel = vi.fn()
+    const response = new Response(new ReadableStream({ start(c) {
+      c.enqueue(new TextEncoder().encode(body)); c.enqueue(new Uint8Array([0x20]))
+    }, cancel }), { headers: { "content-type": "application/json", ...headers } })
+    expect(await finish(readOrdinaryResult(row(), {}, async () => response))).toBe("refused")
+    expect(cancel).toHaveBeenCalled()
+    expect(response.body?.locked).toBe(false)
+  })
+  it("treats compressed length as wire metadata while retaining identity length checks", async () => {
+    expect((await readOrdinaryResult(row(), {}, async () => json("{}", {
+      "content-encoding": "br", "content-length": String(ORDINARY_BODY_LIMIT + 1)
+    }))).body).toEqual({})
+    expect(await finish(readOrdinaryResult(row(), {}, async () => json("{}", {
+      "content-encoding": "identity", "content-length": "3"
+    })))).toBe("refused")
+  })
   it.each([
     { "content-type": "text/plain" }, { "content-type": "application/json; charset=latin1" },
-    { "content-encoding": "gzip" }, { "content-length": "01" }, { "content-length": "-1" },
+    { "content-encoding": "zstd" }, { "content-encoding": "gzip, br" }, { "content-encoding": "gzip;level=1" },
+    { "content-encoding": "gzip," }, { "content-encoding": "" },
+    { "content-length": "01" }, { "content-length": "-1" },
+    { "content-encoding": "gzip", "content-length": "01" },
+    { "content-encoding": "br", "content-length": "9007199254740992" },
+    { "content-encoding": "gzip", "content-length": "40", "transfer-encoding": "chunked" },
     { "content-length": "999999999999999999999999" }, { "content-length": "2", "transfer-encoding": "chunked" }
   ])("refuses unsupported response framing %j", async headers => {
     const cancel = vi.fn()

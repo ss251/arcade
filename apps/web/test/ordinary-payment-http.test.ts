@@ -127,7 +127,7 @@ describe("one-shot direct ordinary browser submission", () => {
     expect(f).toHaveBeenCalledTimes(1)
   })
   it.each([
-    { "content-type": "text/plain" }, { "content-encoding": "gzip" }, { "content-length": "1" },
+    { "content-type": "text/plain" }, { "content-encoding": "zstd" }, { "content-length": "1" },
     { "content-length": "01" }, { "content-length": "999999" }
   ])("retains bounded response framing for POST %j", async headers => {
     const f = vi.fn(async () => new Response(JSON.stringify(accepted()), { status: 202, headers: { "content-type": "application/json", ...headers } }))
