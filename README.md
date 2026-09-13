@@ -186,8 +186,9 @@ up to three partners and require transparent reuse/AI attribution and a
 Arc evidence is recorded testnet settlement plus configuration/runtime work.
 The Graph has a [recorded selected indexed match](docs/superpowers/sdd/2026-09-04-G-graph/task-6-indexed-match-review.md),
 not current global marketplace completeness or a paid Base query.
-ENS has a [stopped isolated demonstration](docs/runbook.md#ens-namespaces-sepolia),
-not a production name deployment. The owner must reconcile partner eligibility
+ENS has the [September 5 isolated demonstration](docs/runbook.md#ens-namespaces-sepolia)
+plus one production name re-pointed and renewed to the live hub; the rest of the
+namespace is not deployed. The owner must reconcile partner eligibility
 and live form fields before submitting.
 
 ### Guarantees, and what is not guaranteed
@@ -395,7 +396,7 @@ Three more things:
 
 ## Discovery
 
-**Optional ENSv2 names (Sepolia beta):** configured namespaces publish a skill's endpoint, payment address and chain; by-name buyers refuse a conflicting challenge before signing. September 5 live evidence proves registration, an Arc settlement, scoped price revocation and expiry-driven discovery removal. The demo URLs were temporary and are now stopped; production re-pointing remains pending. See [ENS namespaces](docs/runbook.md#ens-namespaces-sepolia).
+**Optional ENSv2 names (Sepolia beta):** configured namespaces publish a skill's endpoint, payment address and chain; by-name buyers refuse a conflicting challenge before signing. September 5 live evidence proves registration, an Arc settlement, scoped price revocation and expiry-driven discovery removal. The September 5 demo URLs were temporary; on September 8 the production hub was re-pointed under the same name and on September 13 the expired leaf was renewed, so `usdc-flow-check.scf821769ed.arcade.eth` resolves to the live hub until October 13. See [ENS namespaces](docs/runbook.md#ens-namespaces-sepolia).
 
 `GET /openapi.json` is generated from the live listing set, so it cannot describe a skill nobody is serving. Each listing gets its own concrete operation — not a `/x/{seller}/{skill}` template, which would require the client to already know which sellers exist:
 

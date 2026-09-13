@@ -1357,6 +1357,32 @@ now point at production. Text re-pointing never revives a name. Making
 owner/root RENEW described below, which is a different transaction under different
 authority and is **not** authorized by this re-point.
 
+### Owner renewal — executed September 13, 2026
+
+The separate owner/root RENEW described below ran for the same retained registration,
+after the owner's explicit request on submission day. Nothing was registered, transferred
+or re-pointed; only the leaf's expiry changed.
+
+| | |
+|---|---|
+| name | `usdc-flow-check.scf821769ed.arcade.eth` |
+| transaction | [`0xe4b39435…`](https://sepolia.etherscan.io/tx/0xe4b39435178cb981822eb601874b7dee661f58a46cc60e1582bc2a1608709b4e) · Sepolia block 11695958 · 41,786 gas |
+| call | `skillRegistry.renew(labelId("usdc-flow-check"), 1791895260)` on `0xdafbdd2d…bdc6` from the owner `0x8260C32f…9469` |
+| expiry | 1788590760 (expired 8.2 days) → **1791895260**, 2026-10-13T12:41:00Z, chain time + 30 days |
+| readback | `getExpiry` equals the new expiry; `getOwner` returns the seller `0xcf821769…A78a` again; `tokenId` unchanged from the demo proof |
+| guarded resolution | now **present**: endpoint `https://arcade-hub-production.up.railway.app/x/0xcf821769ed3c0e55e152745377bb833d7155a78a/usdc-flow-check`, payTo `0x9e304ec1…` (FeeSplitterV2), chain `eip155:5042002`, price 11000 atomic |
+
+Command: `bun --no-env-file run scripts/ens-renew-leaf.ts --send` (the same script without
+`--send` is the keyless preflight: parent seller name live until 1796362884, owner root roles
+present, exact-call simulation). The owner key was read in-process from Keychain and never
+printed. Intent, send, receipt and readback lines are journalled under the gitignored
+`handoff/ens-renew-2026-09-13/`. `bun --no-env-file run scripts/ens-resolve-check.ts` reproduces
+the guarded resolution keylessly through the buyer's own policy reader.
+
+Not done here: no daemon renewal grant was changed and the production runner still does not
+renew this name, so it expires again on October 13 unless renewed; the demo price bump (11000
+atomic) was preserved, not restored; no MCP record was added.
+
 ### Expiry and recovery are separate operations
 
 Re-pointing text is not renewal. An expired leaf's resolver records remain owner-editable via root SET_TEXT, but guarded ENS resolution remains absent. The runnable command verifies the changed raw records and owner/root authority, checks the unchanged token/latestOwner and returns `resolutionExpectedAbsent:true` only when chain state and typed guarded-name absence both agree. It does not call that a live endpoint. For the same retained registration, an explicitly approved owner/root-RENEW call would be `skillRegistry.renew(labelId(skill.label), <fixed-approved-future-expiry>)`, using the existing driver with a **different recovery journal and binding** and the intent→send→confirmed→readback discipline above. This is a separate future operation, not part of the executable re-point command. Verify owner root RENEW, retained token/latestOwner against the demo proof, live parents, and a fixed future expiry on actual Sepolia time. Do not unregister/register/transfer or grant daemon root RENEW. Recheck per-name daemon roles after revival; restore only the exact scoped grant if absent and separately approved.
